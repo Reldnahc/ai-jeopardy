@@ -4,6 +4,7 @@ import { createHashRouter, RouterProvider} from 'react-router-dom';
 import MainPage from './pages/MainPage.tsx';
 import Game from './pages/Game';
 import Lobby from './pages/Lobby';
+import UserHistory from "./pages/UserHistory.tsx";
 import './index.css'; // Include this in the main entry point
 import {WebSocketProvider} from "./contexts/WebSocketContext.tsx";
 import { AuthProvider } from './contexts/AuthContext.tsx';
@@ -33,6 +34,10 @@ const router = createHashRouter([
     {
         path: "/profile/:username",
         element: <Layout><Profile /></Layout>
+    },
+    {
+        path: "/profile/:username/history",
+        element: <Layout><UserHistory /></Layout>
     },
     {
         path: "/recent-boards",

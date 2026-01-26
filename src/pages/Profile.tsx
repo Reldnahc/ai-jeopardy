@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
-import { supabase } from '../supabaseClient'; // Supabase client
+import { Link, useParams } from 'react-router-dom';
+import { supabase } from '../supabaseClient'
 import { Board } from '../types/Board';
 import ProfileGameCard from "../components/profile/ProfileGameCard.tsx";
 import Avatar from "../components/common/Avatar.tsx";
 import {useAuth} from "../contexts/AuthContext.tsx";
-import {useUserProfile} from "../contexts/UserProfileContext.tsx"; // Import the `Board` type
+import {useUserProfile} from "../contexts/UserProfileContext.tsx";
 import { motion } from 'framer-motion';
 import LoadingScreen from "../components/common/LoadingScreen.tsx";
 
@@ -27,7 +27,7 @@ interface RouteParams extends Record<string, string | undefined> {
 }
 
 const Profile: React.FC = () => {
-    const { username } = useParams<RouteParams>(); // Current username from the route
+    const { username } = useParams<RouteParams>();
     const [profile, setProfile] = useState<ProfileData | null>(null);
     const [boards, setBoards] = useState<Board[]>([]); // State for the user's boards
     const [loading, setLoading] = useState<boolean>(true);
@@ -263,9 +263,19 @@ const Profile: React.FC = () => {
 
                     {/* Recently Generated Boards */}
                     <div>
-                        <h2 className="text-2xl font-semibold mb-4 text-gray-800">
-                            Recently Generated Boards
-                        </h2>
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-2xl font-semibold text-gray-800">
+                                Recently Generated Boards
+                            </h2>
+
+                            <Link
+                                to={`/profile/${profile.username}/history`}
+                                className="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors"
+                            >
+                                View full history
+                            </Link>
+                        </div>
+
                         <div className="space-y-4">
                             {boards.length > 0 ? (
                                 boards.map((board, idx) => (
@@ -276,6 +286,7 @@ const Profile: React.FC = () => {
                             )}
                         </div>
                     </div>
+
                 </div>
             </motion.div>
         </div>
