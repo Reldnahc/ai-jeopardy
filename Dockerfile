@@ -18,6 +18,7 @@ COPY --from=build /app/package*.json ./
 
 # copy backend + built frontend
 COPY --from=build /app/backend ./backend
+COPY --from=build /app/shared ./shared
 COPY --from=build /app/dist ./dist
 
 ENV NODE_ENV=production
