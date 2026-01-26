@@ -10,6 +10,7 @@ import PlayerSearch from "../components/main/PlayerSearch.tsx";
 
 export default function MainPage() {
     const [gameId, setGameId] = useState('');
+    const [isCreatingLobby, setIsCreatingLobby] = useState(false);
     const [cotd, setCotd] = useState({
         category: "Connecting to server...",
         description: ""
@@ -20,6 +21,7 @@ export default function MainPage() {
     const { profile, loading: profileLoading, refetchProfile } = useProfile();
     const { socket, isSocketReady } = useWebSocket();
     const navigate = useNavigate();
+
 
     const adjectives = [
         "Hallucinated",
@@ -45,6 +47,7 @@ export default function MainPage() {
                 }
                 if (message.type === 'lobby-created') {
                     console.log( "received 'lobby-created' message");
+                    setIsCreatingLobby(false);
                     navigate(`/lobby/${message.gameId}`, {
                         state: {
                             playerName: profile.displayname,
@@ -128,6 +131,7 @@ export default function MainPage() {
     }
 
     const handleCreateGame = async () => {
+        if (isCreatingLobby) return;
         if (!user) {
             showAlert(
                 <span>
@@ -144,7 +148,7 @@ export default function MainPage() {
             return;
         }
         if (socket && isSocketReady && profile) {
-
+            setIsCreatingLobby(true);
             socket.send(
                 JSON.stringify({
                     type: 'create-lobby',
@@ -160,7 +164,7 @@ export default function MainPage() {
 
     const handleJoinGame = async () => {
         if (!gameId.trim()) {
-            showAlert(
+            await showAlert(
                 <span>
                     <span className="text-red-500 font-bold text-xl">Please enter a valid Game ID.</span><br/>
                 </span>,
@@ -262,10 +266,40 @@ export default function MainPage() {
                                 </h3>
                                 <button
                                     onClick={handleCreateGame}
-                                    className="w-full h-full py-3 px-6 text-white bg-green-500 hover:bg-green-600 text-xl rounded-lg font-semibold focus:outline-none transition-colors duration-200"
+                                    disabled={isCreatingLobby}
+                                    aria-busy={isCreatingLobby}
+                                    className="w-full h-full py-3 px-6 text-white bg-green-500 hover:bg-green-600 disabled:opacity-60 disabled:cursor-not-allowed text-xl rounded-lg font-semibold transition-colors duration-200"
                                 >
-                                    Create Game
+                                    {isCreatingLobby ? (
+                                        <span className="flex items-center justify-center gap-2">
+                                            <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">
+                                                <circle
+                                                    className="opacity-25"
+                                                    cx="12"
+                                                    cy="12"
+                                                    r="10"
+                                                    stroke="currentColor"
+                                                    strokeWidth="4"
+                                                />
+                                                <path
+                                                    className="opacity-75"
+                                                    fill="currentColor"
+                                                    d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                                                />
+                                            </svg>
+                                            <span>Creating…</span>
+                                        </span>
+                                    ) : (
+                                        "Create Game"
+                                    )}
                                 </button>
+
+                                {isCreatingLobby && (
+                                    <p className="mt-3 text-sm text-gray-600 text-center">
+                                        Creating lobby… this can take a few seconds.
+                                    </p>
+                                )}
+
                             </div>
 
                             {/* Join Game Box */}
