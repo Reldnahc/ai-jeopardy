@@ -96,6 +96,10 @@ const Lobby: React.FC = () => {
 
     useEffect(() => {
         if (socket && isSocketReady) {
+            setIsLoading(true);
+            setLoadingMessage("Joining lobby...");
+
+
             socket.onmessage = (event) => {
                 const message = JSON.parse(event.data);
                 console.log(message);
@@ -127,6 +131,9 @@ const Lobby: React.FC = () => {
                             finalJeopardy: message.lockedCategories.finalJeopardy,
                         });
                     }
+
+                    setIsLoading(false);
+                    setLoadingMessage("");
                 }
 
                 if (message.type === 'category-lock-updated') {
@@ -182,13 +189,18 @@ const Lobby: React.FC = () => {
                 }
 
                 if (message.type === 'check-lobby-response') {
-                    console.log(message.isValid);
                     if (!message.isValid) {
                         navigate("/");
-                    } else {
-                        setIsLoading(false);
+                        return;
                     }
+
+                    setLoadingMessage("Syncing lobby state...");
+                    socket.send(JSON.stringify({
+                        type: 'request-lobby-state',
+                        gameId,
+                    }));
                 }
+                
             };
             socket.send(
                 JSON.stringify({
@@ -199,7 +211,7 @@ const Lobby: React.FC = () => {
 
             setIsLoading(true);
         }
-    }, [isSocketReady, gameId]);
+    }, [isSocketReady, gameId, socket, profile, lockedCategories, showAlert, setIsLeavingPage, navigate]);
 
     const onToggleLock = (
         boardType: 'firstBoard' | 'secondBoard' | 'finalJeopardy',
