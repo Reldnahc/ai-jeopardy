@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "Bundler",
+    "outDir": "shared-dist",
+    "rootDir": "shared",
+    "declaration": false,
+    "sourceMap": false,
+    "strict": true,
+    "skipLibCheck": true
+  },
+  "include": ["shared/**/*.ts"],
+  "exclude": ["node_modules", "dist", "backend", "shared-dist"]
+}
