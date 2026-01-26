@@ -3,7 +3,7 @@ import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
 import 'dotenv/config';
 import {supabase} from "../config/database.js";
-import { modelsByValue } from "../../shared/models.ts";
+import { modelsByValue } from "../../shared/models.js";
 
 // Initialize AI clients
 const openai = new OpenAI();

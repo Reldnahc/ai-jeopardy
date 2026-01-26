@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import GameCard from "../components/recentboards/GameCard";
 import { Board } from "../types/Board.ts";
 import { supabase } from "../supabaseClient.ts";
-import {models} from "../../shared/models.ts";
+import {models} from "../../shared/models.js";
 
 const RecentBoards = () => {
     const [boards, setBoards] = useState<Board[]>([]); // Holds the list of fetched boards

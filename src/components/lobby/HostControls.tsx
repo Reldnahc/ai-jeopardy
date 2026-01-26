@@ -1,4 +1,4 @@
-import { models } from '../../../shared/models.ts';
+import { models } from '../../../shared/models.js';
 import { useProfile } from "../../contexts/ProfileContext.tsx";
 
 interface Model {
