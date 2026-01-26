@@ -146,11 +146,11 @@ const Header: React.FC = () => {
                                             }}
                                             className="block px-4 py-2 text-blue-600 hover:bg-gray-200 text-left w-full"
                                         >
-                                            Your Profile
+                                            Profile
                                         </button>
                                         <button
                                             onClick={() => {
-                                                handleNavigate('/history');
+                                                handleNavigate('/profile/' + profile.username + '/history');
                                                 setDropdownOpen(false);
                                             }}
                                             className="block px-4 py-2 text-blue-600 hover:bg-gray-200 text-left w-full"
@@ -259,7 +259,7 @@ const Header: React.FC = () => {
                                             setDropdownOpen(false);
                                         }}
                                     >
-                                        Your Profile
+                                        Profile
                                     </motion.button>
                                     <motion.button
                                         className="block px-4 py-2 hover:bg-blue-500 cursor-pointer"
@@ -269,11 +269,11 @@ const Header: React.FC = () => {
                                             exit: { opacity: 0, y: -10 } // Matches exit animation
                                         }}
                                         onClick={() => {
-                                            handleNavigate('/history');
+                                            handleNavigate('/profile/' + profile.username + '/history');
                                             setDropdownOpen(false);
                                         }}
                                     >
-                                        Your History
+                                        History
                                     </motion.button>
 
                                     <motion.button

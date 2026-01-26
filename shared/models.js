@@ -26,7 +26,7 @@ export const models = [
         value: "gpt-5.2",
         label: "GPT-5.2",
         provider: "openai",
-        price: 200,
+        price: 100,
         hideTemp: true,
         presetTemp: 1,
         disabled: true,
@@ -44,7 +44,7 @@ export const models = [
         value: "claude-3-5-sonnet-latest",
         label: "Claude 3.5 Sonnet",
         provider: "anthropic",
-        price: 200,
+        price: 100,
         disabled: true,
     },
     {

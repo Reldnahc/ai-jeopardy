@@ -48,17 +48,15 @@ const HostControls: React.FC<HostControlsProps> = ({
         return groups;
     }, {} as Record<number, Model[]>);
 
-    function checkCantAfford(model: Model) {
-        if (model.price === 0) {
-            return false;
-        }
-        if (profile) {
-            if (profile.role === 'admin' || profile.role === 'privileged' || profile.tokens >= model.price) {
-                return false;
-            }
-        }
-        return true;
+    function checkCantUseModel(model: Model) {
+        // Free models are always available
+        if (model.price === 0) return false;
+
+        // Paid models: only admin/privileged
+        const role = profile?.role;
+        return !(role === "admin" || role === "privileged");
     }
+
 
     const handleTimeChange = (
         e: React.ChangeEvent<HTMLInputElement>,
@@ -90,22 +88,27 @@ const HostControls: React.FC<HostControlsProps> = ({
                         >
                             {Object.entries(groupedModels).map(([price, models]) => (
                                 <optgroup
-                                    label={`Cost: ${price === "0" ? "Free" : `${price} tokens`}`}
                                     key={price}
+                                    label={price === "0" ? "Free Models" : "Premium Models"}
                                 >
                                     {models.map((model) => (
                                         <option
                                             key={model.value}
                                             value={model.value}
-                                            disabled={checkCantAfford(model)} // Disable dynamically
+                                            disabled={checkCantUseModel(model)}
                                         >
                                             {model.label}
+                                            {model.price > 0 && !(profile?.role === "admin" || profile?.role === "privileged")
+                                                ? " (Locked)"
+                                                : ""}
                                         </option>
+
                                     ))}
                                 </optgroup>
                             ))}
                         </select>
                     </div>
+
                     {/* Temperature Slider */}
                     {!hideTemp && (
                         <div className="flex flex-col gap-2 w-full mb-3">

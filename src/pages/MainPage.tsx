@@ -106,31 +106,17 @@ export default function MainPage() {
             );
         }
     }, [socket, isSocketReady, profile, navigate, showAlert]);
-
-    useEffect(() => {
-        const onBeforeUnload = (e: BeforeUnloadEvent) => {
-            if (!isCreatingLobby) return;
-            e.preventDefault();
-            // Chrome requires returnValue to be set.
-            e.returnValue = "";
-        };
-
-        window.addEventListener("beforeunload", onBeforeUnload);
-        return () => window.removeEventListener("beforeunload", onBeforeUnload);
-    }, [isCreatingLobby]);
     
     const handleGenerateRandomCategories = () => {
         const shuffledCategories = randomCategoryList.sort(() => 0.5 - Math.random());
         return shuffledCategories.slice(0, 11);
     };
 
-
-
     function sendErrorAlert() {
         showAlert(
             <span>
                 <span className="text-red-500 font-bold text-xl">Connection to Websockets failed.</span><br/>
-                <span className="text-gray-900 font-semibold"> If you are using an adblocker please disable it and refresh the page. Otherwise try again.</span>
+                <span className="text-gray-900 font-semibold">Please refresh the page and try again.</span>
             </span>,
             [
                 {
@@ -243,9 +229,9 @@ export default function MainPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6 }}
-                className="bg-white rounded-xl shadow-2xl overflow-hidden w-full max-w-6xl"
+                className="bg-white rounded-xl shadow-2xl overflow-hidden w-full max-w-6xl p-20 pt-4"
             >
-                <div className="grid grid-cols-1 md:grid-cols-3">
+
                     {/* Main Content (spans two columns on medium+ screens) */}
                     <div className="col-span-2 p-10">
                         <h1 className="text-5xl font-extrabold text-gray-900 text-center">
@@ -256,27 +242,29 @@ export default function MainPage() {
                         </p>
 
                         {/* Featured Category Card */}
-                        <div className="mt-8">
-                            <div className="p-6 bg-gray-50 rounded-lg border border-gray-200 shadow-sm">
-                                <h3 className="text-2xl font-semibold text-gray-800 text-center mb-2">
+                        <div className="mt-10">
+                            <div className="p-8 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border border-gray-200 shadow-sm">
+                                <div className="text-center mb-6">
+                                  <span className="inline-block text-xl uppercase tracking-wider text-gray-500 font-semibold">
                                     Featured Category
-                                </h3>
-                                <p className="text-xl font-bold text-gray-900 text-center">
+                                  </span>
+                                </div>
+
+                                <h3 className="text-4xl font-bold text-gray-900 text-center mb-3">
                                     {cotd.category}
-                                </p>
-                                <p className="text-lg text-gray-600 text-center">
+                                </h3>
+
+                                <p className="text-lg text-gray-700 text-center max-w-2xl mx-auto leading-relaxed">
                                     {cotd.description}
                                 </p>
                             </div>
                         </div>
 
+
                         {/* Create & Join Game Section */}
                         <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
                             {/* Create Game Box */}
                             <div className="flex flex-col justify-center items-center bg-gray-50 p-6 rounded-lg border-gray-200 shadow">
-                                <h3 className="text-2xl font-semibold text-gray-800 text-center mb-4">
-                                    Create a Game
-                                </h3>
                                 <button
                                     onClick={handleCreateGame}
                                     disabled={isCreatingLobby}
@@ -317,9 +305,6 @@ export default function MainPage() {
 
                             {/* Join Game Box */}
                             <div className="bg-gray-50 p-6 rounded-lg border border-gray-200 shadow">
-                                <h3 className="text-2xl font-semibold text-gray-800 text-center mb-4">
-                                    Join a Game
-                                </h3>
                                 <div className="flex flex-col gap-4">
                                     <div className="flex flex-col">
                                         <label htmlFor="gameId" className="text-lg font-medium text-gray-800">
@@ -356,49 +341,60 @@ export default function MainPage() {
                                 <summary className="text-2xl font-semibold text-gray-800 cursor-pointer">
                                     How to Play
                                 </summary>
+
                                 <p className="mt-4 text-lg text-gray-700">
-                                    Welcome to AI Jeopardy! This is a new project so please be patient.
+                                    Welcome to <strong>AI Jeopardy!</strong> This project is still evolving, so thank you for your patience as new features and improvements are rolled out.
                                 </p>
-                                <ul className="list-disc ml-6 mt-4 text-lg text-gray-700">
-                                    <li> To create a game you will first need to make an account in the top right.</li>
-                                    <li> You don't need an account to join a game as a guest. Just insert the code your friend gave you above.</li>
-                                    <li> Consider creating an account to customize your profile, create games, and more!</li>
-                                    <li> Once you're in a lobby, select categories that you want to have questions generated for.</li>
-                                    <li> If you're the host, press the "Start Game" button to begin! Otherwise wait for the host to begin.</li>
-                                    <li> The host controls the game, once they are done reading the prompt they unlock the buzzer and the players race to buzz in if they know the answer.</li>
-                                    <li> Have fun and enjoy the game!</li>
+
+                                <ul className="list-disc ml-6 mt-4 text-lg text-gray-700 space-y-2">
+                                    <li>
+                                        To create a game, you’ll first need to create an account using the menu in the top-right corner.
+                                    </li>
+                                    <li>
+                                        You do <strong>not</strong> need an account to join a game. Simply enter the game code provided by your host to join as a guest.
+                                    </li>
+                                    <li>
+                                        Creating an account allows you to customize your profile, host games, and access additional features.
+                                    </li>
+                                    <li>
+                                        Once you’re in a lobby, players select the categories they want questions to be generated from.
+                                    </li>
+                                    <li>
+                                        When everyone is ready, the host starts the game by pressing the <strong>“Start Game”</strong> button.
+                                    </li>
+                                    <li>
+                                        During gameplay, the host reads the question and then unlocks the buzzer. Players race to buzz in if they know the answer.
+                                    </li>
+                                    <li>
+                                        Most importantly—have fun, compete, and enjoy the experience!
+                                    </li>
                                 </ul>
                             </details>
                         </div>
-                        {/* How to Play Section */}
+
                         <div className="mt-8">
                             <details className="bg-gray-50 p-6 rounded-lg border border-gray-200 shadow" open>
                                 <summary className="text-2xl font-semibold text-gray-800 cursor-pointer">
                                     About Models
                                 </summary>
-                                <p className="mt-4 text-lg text-gray-700">
 
-                                    <span className="text-xl text-bold text-red-500">
-                                        The model options are currently locked as tokens are not yet implemented.
-                                        Please choose from the available free models.
-                                    </span><br/>
-                                    <span className="mb-t text-lg text-bold text-gray-700">
-                                        The host is shown a model section field, for the most part you can leave this as is.
-                                        However, if you want to change the model you can do so by clicking the dropdown and selecting a model from the list.
-                                        The use of some of these models is quite expensive, some of them cost tokens.
+                                <p className="mt-4 text-lg text-gray-700">
+                                    <span className="block text-xl font-semibold text-red-500 mb-2">
+                                        Model selection is currently limited.
                                     </span>
+                                    <span className="block">
+                                        At this time, only the available free models can be selected. Additional model options are visible but locked while the project is in its early stages.
+                                    </span>
+                                </p>
+
+                                <p className="mt-4 text-lg text-gray-700">
+                                    The host will see a model selection field in the lobby settings. In most cases, you can safely leave this set to the default option.
+                                    If you’d like to experiment, you can open the dropdown and choose from the available models listed.
                                 </p>
                             </details>
                         </div>
-                    </div>
 
-                    {/* Sponsored/Banner Ad Column */}
-                    <div className="p-10 bg-gray-100 border-l border-gray-200 flex">
-                        <div className="w-full text-center">
-                            <h2 className="text-2xl font-bold text-gray-800 mb-4">Sponsored</h2>
-                        </div>
                     </div>
-                </div>
             </motion.div>
         </div>
     );
