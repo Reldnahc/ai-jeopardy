@@ -105,8 +105,20 @@ export default function MainPage() {
                 })
             );
         }
-    }, [socket, isSocketReady, profile]);
+    }, [socket, isSocketReady, profile, navigate, showAlert]);
 
+    useEffect(() => {
+        const onBeforeUnload = (e: BeforeUnloadEvent) => {
+            if (!isCreatingLobby) return;
+            e.preventDefault();
+            // Chrome requires returnValue to be set.
+            e.returnValue = "";
+        };
+
+        window.addEventListener("beforeunload", onBeforeUnload);
+        return () => window.removeEventListener("beforeunload", onBeforeUnload);
+    }, [isCreatingLobby]);
+    
     const handleGenerateRandomCategories = () => {
         const shuffledCategories = randomCategoryList.sort(() => 0.5 - Math.random());
         return shuffledCategories.slice(0, 11);
@@ -163,6 +175,7 @@ export default function MainPage() {
     };
 
     const handleJoinGame = async () => {
+        if (isCreatingLobby) return;
         if (!gameId.trim()) {
             await showAlert(
                 <span>
@@ -323,6 +336,8 @@ export default function MainPage() {
                                     </div>
                                     <button
                                         onClick={handleJoinGame}
+                                        disabled={isCreatingLobby}
+                                        aria-busy={isCreatingLobby}
                                         className="py-3 px-6 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded transition-colors duration-200"
                                     >
                                         Join Game
