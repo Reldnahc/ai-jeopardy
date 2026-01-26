@@ -11,6 +11,7 @@ node_modules
 dist
 dist-ssr
 *.local
+repomix-output.xml
 
 # Editor directories and files
 .vscode/*
@@ -23,8 +24,7 @@ dist-ssr
 *.sln
 *.sw?
 
+.env.backend
 .env
-.env.local
-.env.development
-.env.production
+
 

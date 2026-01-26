@@ -473,6 +473,7 @@ const Lobby: React.FC = () => {
                                     setTimeToBuzz={setTimeToBuzz}
                                     timeToAnswer={timeToAnswer}
                                     setTimeToAnswer={setTimeToAnswer}
+                                    isSoloLobby={players.length <= 1}
                                 />
                             </motion.div>
                         )}

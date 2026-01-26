@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useState} from 'react';
+import {useCallback, useEffect, useRef, useState} from 'react';
 import {useLocation, useParams} from 'react-router-dom';
 import JeopardyBoard from '../components/game/JeopardyBoard.tsx';
 import {Category, Clue} from "../types.ts";
@@ -37,28 +37,28 @@ export default function Game() {
     const [isGameOver, setIsGameOver] = useState(false); // New state to track if Final Jeopardy is finished
     const [boardData, setBoardData] = useState<{
         firstBoard: {
-            categories: Category[]; // An array of Category
+            categories: Category[];
         };
         secondBoard: {
-            categories: Category[]; // Also an array of Category
+            categories: Category[];
         };
         finalJeopardy: {
-            categories: Category[]; // Matches the types
+            categories: Category[];
         };
     }>({
         firstBoard: {
             categories: [
-                { category: '', values: [] }, // Example category structure
+                { category: '', values: [] },
             ],
         },
         secondBoard: {
             categories: [
-                { category: '', values: [] }, // Same consistent structure
+                { category: '', values: [] },
             ],
         },
         finalJeopardy: {
             categories: [
-                { category: '', values: [] }, // Same consistent structure
+                { category: '', values: [] },
             ],
         },
     });
@@ -83,6 +83,12 @@ export default function Game() {
         onLeave: handleLeaveGame,
         confirmMessage: 'Are you sure you want to leave? This will remove you from the current game.'
     });
+
+    const boardDataRef = useRef(boardData);
+
+    useEffect(() => {
+        boardDataRef.current = boardData;
+    }, [boardData]);
 
     useEffect(() => {
         if (socket && isSocketReady) {
@@ -126,7 +132,14 @@ export default function Game() {
                     console.log("All wagers have been submitted! Final Jeopardy can begin.");
                     setAllWagersSubmitted(true);
                     setWagers(wagers);
-                    onClueSelected(boardData.finalJeopardy.categories[0].values[0]);
+                    const finalClue = boardDataRef.current.finalJeopardy?.categories?.[0]?.values?.[0];
+
+                    if (!finalClue) {
+                        console.error("Final Jeopardy clue missing when wagers submitted.", boardDataRef.current.finalJeopardy);
+                    } else {
+                        onClueSelected(finalClue);
+                    }
+
                 }
 
                 if (message.type === 'player-list-update') {
@@ -360,7 +373,7 @@ export default function Game() {
         }
     };
 
-    const onClueSelected = (clue: Clue) => {
+    const onClueSelected = useCallback((clue: Clue) => {
         if (isHost && clue) {
             if (socket && isSocketReady) {
                 socket.send(
@@ -376,7 +389,7 @@ export default function Game() {
                 setLastQuestionValue(clue.value); // Set last question value based on clue's value
             }
         }
-    };
+    },[isHost, socket, isSocketReady, gameId]);
 
     if (!boardData) {
         return <p>Loading board... Please wait!</p>; // Display a loading message

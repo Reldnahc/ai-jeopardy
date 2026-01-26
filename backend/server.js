@@ -1,18 +1,19 @@
 import { WebSocketServer } from 'ws';
 import 'dotenv/config';
 import { createBoardData, createCategoryOfTheDay } from './services/aiService.js';
-import express from "express"; // Import express
-import cors from "cors"; // Import cors
-import bodyParser from "body-parser"; // Import body-parser
+import http from "http";
+import express from "express";
+import cors from "cors";
+import bodyParser from "body-parser";
 import {PING_INTERVAL, WS_PORT} from "./config/websocket.js";
 import {supabase} from "./config/database.js";
 import {getColorFromPlayerName} from "./services/userService.js";
+import path from "path";
+import { fileURLToPath } from "url";
 
 const app = express(); // Initialize Express app
 app.use(cors());
 app.use(bodyParser.json());
-const wss = new WebSocketServer({ port: WS_PORT, });
-console.log(`WebSocket server running on ws://localhost:${WS_PORT}`);
 
 const authenticateRequest = async (req, res, next) => {
     const authHeader = req.headers.authorization;
@@ -36,7 +37,23 @@ app.get("/protected", authenticateRequest, (req, res) => {
     res.send(`Hello, ${req.user.email}. This is a protected API!`);
 });
 
-app.listen(3002, () => console.log("Server running on http://localhost:3002"));
+const server = http.createServer(app);
+const wss = new WebSocketServer({ server });
+
+server.listen(3002, () => {
+    console.log("HTTP + WS listening on :3002");
+});
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const distPath = path.join(__dirname, "..", "dist");
+app.use(express.static(distPath));
+
+// SPA fallback
+app.get("*", (req, res) => {
+    res.sendFile(path.join(distPath, "index.html"));
+});
 
 // Store game state
 const games = {};

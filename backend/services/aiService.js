@@ -3,6 +3,7 @@ import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
 import 'dotenv/config';
 import {supabase} from "../config/database.js";
+import { modelsByValue } from "../../shared/models.ts";
 
 // Initialize AI clients
 const openai = new OpenAI();
@@ -11,6 +12,12 @@ const deepseek = new OpenAI({
     baseURL: 'https://api.deepseek.com',
     apiKey: process.env.DEEPSEEK_API_KEY
 });
+
+const providerApiMap = {
+    openai: callOpenAi,
+    deepseek: callDeepseek,
+    anthropic: callAnthropic,
+};
 
 function callOpenAi(model, prompt, temp) {
     return openai.chat.completions.create({
@@ -123,27 +130,24 @@ async function createBoardData(categories, model, host, temperature) {
 
 
     try {
-        let apiCall;
 
-        switch (model) {
-            case "gpt-4o-mini":
-            case "gpt-4o":
-            case "o1-mini":
-                apiCall = callOpenAi;
-                break;
-            case "deepseek-reasoner":
-            case "deepseek-chat":
-                apiCall = callDeepseek;
-                break;
-            case "claude-3-5-sonnet-latest":
-            case "claude-3-5-haiku-latest":
-                apiCall = callAnthropic;
-                break;
+        const modelDef = modelsByValue[model];
+
+        if (!modelDef) {
+            throw new Error(`Unknown model: ${model}`);
         }
 
-        const firstBoardPromise = apiCall(model, prompt(firstCategories), temperature);
-        const secondBoardPromise = apiCall(model, prompt(secondCategories, true), temperature);
-        const finalBoardPromise = apiCall(model, finalPrompt(finalCategory), temperature);
+        const apiCall = providerApiMap[modelDef.provider];
+
+        if (!apiCall) {
+            throw new Error(`No API handler for provider: ${modelDef.provider}`);
+        }
+
+        const effectiveTemp = modelDef.hideTemp ? (modelDef.presetTemp ?? 0) : temperature;
+
+        const firstBoardPromise = apiCall(model, prompt(firstCategories), effectiveTemp);
+        const secondBoardPromise = apiCall(model, prompt(secondCategories, true), effectiveTemp);
+        const finalBoardPromise = apiCall(model, finalPrompt(finalCategory), effectiveTemp);
 
         const [firstResponse, secondResponse, finalResponse] = await Promise.all([firstBoardPromise, secondBoardPromise, finalBoardPromise]);
 
