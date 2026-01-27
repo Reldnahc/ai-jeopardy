@@ -46,13 +46,12 @@ const WagerInput: React.FC<WagerInputProps> = ({
                                             type="number"
                                             min={0}
                                             max={scores[player.name] || 0}
-                                            value={wagers[player.name] || ""}
-                                            onChange={(e) =>
-                                                handleWagerChange(
-                                                    player.name,
-                                                    parseInt(e.target.value, 10)
-                                                )
-                                            }
+                                            value={wagers[player.name] ?? ""}
+                                            onChange={(e) => {
+                                                const v = e.target.value;
+                                                const n = v === "" ? 0 : Number(v);
+                                                handleWagerChange(player.name, Number.isNaN(n) ? 0 : n);
+                                            }}
                                             disabled={wagerSubmitted.includes(player.name)}
                                             className="w-[100px] p-1 mr-2 border text-black border-gray-300 rounded"
                                         />

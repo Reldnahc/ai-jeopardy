@@ -96,44 +96,60 @@ const JeopardyBoard: React.FC<JeopardyBoardProps> =
         setWagers((prev) => ({ ...prev, [player]: wager }));
     };
 
-    const submitWager = (player: string) => {
-        if (wagers[player] === undefined) {
-            wagers[player] = 0;
-        }
-        console.log(scores);
-        console.log(player);
-        console.log(scores[player]);
-        if (wagers[player] !== undefined && wagers[player] <= (scores[player] || 0)) {
-            setWagerSubmitted((prev) => [...prev, player]);
+        const submitWager = (player: string) => {
+            const score = scores[player] ?? 0;
 
-            // Notify the server that the wager is submitted
+            // If score is <= 0 in Final Jeopardy, wager MUST be 0.
+            const rawWager = wagers[player];
+            const normalizedWager =
+                score <= 0
+                    ? 0
+                    : Math.max(0, Number.isFinite(rawWager) ? rawWager : 0);
+
+            // Only enforce max-wager rule when score > 0
+            if (score > 0 && normalizedWager > score) {
+                showAlert(
+                    <span>
+                        <span className="text-red-500 font-bold text-xl">
+                            Wager cannot exceed current score!
+                        </span>
+                        <br />
+                    </span>,
+                    [
+                        {
+                            label: "Okay",
+                            actionValue: "okay",
+                            styleClass: "bg-green-500 text-white hover:bg-green-600",
+                        },
+                    ]
+                );
+                return;
+            }
+
+            // Persist the wager locally (so UI shows 0 too)
+            setWagers((prev) => ({ ...prev, [player]: normalizedWager }));
+
+            // Prevent duplicate submits
+            setWagerSubmitted((prev) => (prev.includes(player) ? prev : [...prev, player]));
+
+            // Send to server
             if (socket && isSocketReady) {
                 socket.send(
                     JSON.stringify({
                         type: "submit-wager",
                         gameId,
                         player,
-                        wager: wagers[player],
+                        wager: normalizedWager,
                     })
                 );
+            } else {
+                console.warn("[Wager] socket not ready; wager submit not sent");
             }
-        } else {
-            showAlert(
-                <span>
-                    <span className="text-red-500 font-bold text-xl">Wager cannot exceed current score!</span><br/>
-                </span>,
-                [
-                    {
-                        label: "Okay",
-                        actionValue: "okay",
-                        styleClass: "bg-green-500 text-white hover:bg-green-600",
-                    }]
-            );
-        }
-    };
+        };
 
 
-    if (!boardData || boardData.length === 0) {
+
+        if (!boardData || boardData.length === 0) {
         return <p>No board data available.</p>; // Handle invalid board data
     }
 
