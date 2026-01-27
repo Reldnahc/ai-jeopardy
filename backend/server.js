@@ -282,16 +282,24 @@ wss.on('connection', (ws) => {
                 const { gameId, categories } = data;
 
                 if (games[gameId]) {
-                    // Broadcast the updated categories to all players in the lobby
+                    const next = Array.isArray(categories) ? categories : [];
+
+                    games[gameId].categories = next;
+
                     broadcast(gameId, {
                         type: 'categories-updated',
-                        categories,
+                        categories: next,
                     });
-                    console.log(`[Server] Categories updated for game ${gameId}:`, categories);
+
+                    console.log(`[Server] Categories updated for game ${gameId}:`, next);
                 } else {
-                    ws.send(JSON.stringify({ type: 'error', message: 'Only the host can update categories.' }));
+                    ws.send(JSON.stringify({
+                        type: 'error',
+                        message: `Game ${gameId} not found while updating categories.`,
+                    }));
                 }
             }
+
 
             if (data.type === 'buzz') {
                 const { gameId } = data;

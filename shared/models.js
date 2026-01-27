@@ -1,5 +1,14 @@
 export const models = [
     {
+        value: "gpt-5-mini",
+        label: "GPT-5 Mini",
+        provider: "openai",
+        price: 0,
+        hideTemp: true,
+        presetTemp: 1,
+        disabled: false,
+    },
+    {
         value: "gpt-4o-mini",
         label: "GPT-4o Mini",
         provider: "openai",
@@ -12,15 +21,6 @@ export const models = [
         provider: "openai",
         price: 100,
         disabled: true,
-    },
-    {
-        value: "gpt-5-mini",
-        label: "GPT-5 Mini",
-        provider: "openai",
-        price: 0,
-        hideTemp: true,
-        presetTemp: 1,
-        disabled: false,
     },
     {
         value: "gpt-5.2",

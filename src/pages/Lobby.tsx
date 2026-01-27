@@ -44,7 +44,7 @@ const Lobby: React.FC = () => {
     const [copySuccess, setCopySuccess] = useState(false);
     const [players, setPlayers] = useState<Player[]>(location.state?.players || []);
     const [host, setHost] = useState<string | null>(null);
-    const [selectedModel, setSelectedModel] = useState('gpt-4o-mini'); // Default value for dropdown
+    const [selectedModel, setSelectedModel] = useState('gpt-5-mini'); // Default value for dropdown
     const [lockedCategories, setLockedCategories] = useState<LockedCategories>({
         firstBoard: Array(5).fill(false), // Default unlocked
         secondBoard: Array(5).fill(false), // Default unlocked
@@ -301,7 +301,7 @@ const Lobby: React.FC = () => {
             if (boardType === "finalJeopardy") {
                 const updated = { ...prev, finalJeopardy: value };
 
-                if (isHost && isSocketReady && gameId) {
+                if (isSocketReady && gameId) {
                     sendJson({
                         type: "update-categories",
                         gameId,
@@ -317,7 +317,7 @@ const Lobby: React.FC = () => {
 
             const updated = { ...prev, [boardType]: updatedBoard };
 
-            if (isHost && isSocketReady && gameId) {
+            if (isSocketReady && gameId) {
                 sendJson({
                     type: "update-categories",
                     gameId,
@@ -363,7 +363,7 @@ const Lobby: React.FC = () => {
                 updatedCategories[boardType] = board;
             }
 
-            if (isHost && isSocketReady && gameId) {
+            if (isSocketReady && gameId) {
                 sendJson({
                     type: "update-categories",
                     gameId,
