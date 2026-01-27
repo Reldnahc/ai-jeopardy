@@ -91,6 +91,9 @@ wss.on('connection', (ws) => {
                     })),
                     host: games[data.gameId].host,
                     categories: games[data.gameId].categories || [],
+                    lockedCategories: games[data.gameId].lockedCategories,
+                    inLobby: games[data.gameId].inLobby,
+                    isGenerating: Boolean(games[data.gameId].isGenerating),
                 }));
             }
             if (data.type === 'create-lobby') {
@@ -187,7 +190,9 @@ wss.on('connection', (ws) => {
                     })),
                     host: games[gameId].host,
                     categories: games[gameId].categories || [],
-                    lockedCategories: games[gameId].lockedCategories
+                    lockedCategories: games[data.gameId].lockedCategories,
+                    inLobby: games[data.gameId].inLobby,
+                    isGenerating: Boolean(games[data.gameId].isGenerating),
                 }));
                 broadcast(gameId, {
                     type: 'player-list-update',
@@ -203,9 +208,9 @@ wss.on('connection', (ws) => {
             if (data.type === 'create-game') {
                 const {gameId, categories, selectedModel, host, temperature, timeToBuzz, timeToAnswer} = data;
 
-                broadcast(gameId, {
-                    type: 'trigger-loading',
-                });
+                if (games[gameId]) games[gameId].isGenerating = true;
+
+                broadcast(gameId, { type: 'trigger-loading' });
 
                 const boardData = await createBoardData(categories, selectedModel, host, temperature);
 

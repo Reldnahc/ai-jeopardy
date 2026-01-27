@@ -141,6 +141,8 @@ const Lobby: React.FC = () => {
                         players: Player[];
                         host: string;
                         categories?: string[];
+                        inLobby?: boolean;
+                        isGenerating?: boolean;
                         lockedCategories?: {
                             firstBoard: boolean[];
                             secondBoard: boolean[];
@@ -165,6 +167,18 @@ const Lobby: React.FC = () => {
                             secondBoard: m.lockedCategories.secondBoard,
                             finalJeopardy: m.lockedCategories.finalJeopardy,
                         });
+                    }
+
+                    if (m.isGenerating) {
+                        setIsLoading(true);
+                        setLoadingMessage("Generating your questions...");
+                        return;
+                    }
+
+                    if (m.inLobby === false && profile?.displayname) {
+                        setIsLeavingPage(true);
+                        setAllowLeave(true);
+                        return;
                     }
 
                     setIsLoading(false);
@@ -229,6 +243,14 @@ const Lobby: React.FC = () => {
                     const m = message as unknown as { isValid: boolean };
 
                     if (!m.isValid) {
+                        if (profile?.displayname) {
+                            setIsLoading(true);
+                            setLoadingMessage("Game already started. Joining game...");
+                            setIsLeavingPage(true);
+                            setAllowLeave(true);
+                            return;
+                        }
+
                         navigate("/");
                         return;
                     }
