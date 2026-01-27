@@ -7,6 +7,7 @@ import {useProfile} from "../contexts/ProfileContext.tsx";
 import {useAlert} from "../contexts/AlertContext.tsx";
 import { motion } from 'framer-motion';
 import PlayerSearch from "../components/main/PlayerSearch.tsx";
+import {Player} from "../types/Lobby.ts";
 
 export default function MainPage() {
     const [gameId, setGameId] = useState('');
@@ -19,7 +20,7 @@ export default function MainPage() {
     const { showAlert } = useAlert();
     const { user } = useAuth();
     const { profile, loading: profileLoading, refetchProfile } = useProfile();
-    const { socket, isSocketReady } = useWebSocket();
+    const { isSocketReady, sendJson, subscribe } = useWebSocket();
     const navigate = useNavigate();
 
 
@@ -38,43 +39,55 @@ export default function MainPage() {
     );
 
     useEffect(() => {
-        if (socket && isSocketReady && profile) {
-            socket.onmessage = (event) => {
-                const message = JSON.parse(event.data);
-                console.log(message);
-                if (message.type === 'category-of-the-day') {
-                    setCotd(message.cotd);
+        if (!isSocketReady) return;
+
+        const unsubscribe = subscribe((message) => {
+            console.log(message);
+
+            switch (message.type) {
+                case "category-of-the-day": {
+                    const m = message as unknown as { cotd: { category: string; description: string } };
+                    setCotd(m.cotd);
+                    return;
                 }
-                if (message.type === 'lobby-created') {
-                    console.log( "received 'lobby-created' message");
+
+                case "lobby-created": {
+                    const m = message as unknown as {
+                        gameId: string;
+                        players: Player[];
+                        categories: string[];
+                    };
+
                     setIsCreatingLobby(false);
-                    navigate(`/lobby/${message.gameId}`, {
+
+                    // profile is required to host
+                    if (!profile) return;
+
+                    navigate(`/lobby/${m.gameId}`, {
                         state: {
                             playerName: profile.displayname,
                             isHost: true,
-                            players: message.players,
-                            categories: message.categories,
+                            players: m.players,
+                            categories: m.categories,
                         },
                     });
-                    console.log(message.gameId);
-                    socket.send(
-                        JSON.stringify({
-                            type: 'request-lobby-state',
-                            gameId: message.gameId,
-                        })
-                    );
+
+                    sendJson({ type: "request-lobby-state", gameId: m.gameId });
+                    return;
                 }
-                if (message.type === 'check-lobby-response') {
-                    if (message.isValid){
-                        const name = profile ? profile.displayname : '';
-                        socket.send(
-                            JSON.stringify({
-                                type: 'join-lobby',
-                                gameId: message.gameId,
-                                playerName: name.trim(),
-                            })
-                        );
-                        navigate(`/lobby/${message.gameId}`, {
+
+                case "check-lobby-response": {
+                    const m = message as unknown as { isValid: boolean; gameId: string };
+
+                    if (m.isValid) {
+                        const name = profile ? profile.displayname : "";
+                        sendJson({
+                            type: "join-lobby",
+                            gameId: m.gameId,
+                            playerName: name.trim(),
+                        });
+
+                        navigate(`/lobby/${m.gameId}`, {
                             state: {
                                 playerName: name.trim(),
                                 isHost: false,
@@ -83,30 +96,35 @@ export default function MainPage() {
                     } else {
                         showAlert(
                             <span>
-                            <span className="text-red-500 font-bold text-xl">Invalid lobby or game already in progress.</span><br/>
-                        </span>,
+                              <span className="text-red-500 font-bold text-xl">Invalid lobby or game already in progress.</span>
+                              <br />
+                            </span>,
                             [
                                 {
                                     label: "Okay",
                                     actionValue: "okay",
                                     styleClass: "bg-green-500 text-white hover:bg-green-600",
-                                }
+                                },
                             ]
                         );
-
                     }
-
+                    return;
                 }
-            };
 
-            socket.send(
-                JSON.stringify({
-                    type: 'check-cotd',
-                })
-            );
-        }
-    }, [socket, isSocketReady, profile, navigate, showAlert]);
-    
+                default:
+                    return;
+            }
+        });
+
+        return unsubscribe;
+    }, [isSocketReady, subscribe, navigate, showAlert, profile, sendJson]);
+
+    useEffect(() => {
+        if (!isSocketReady) return;
+
+        sendJson({ type: "check-cotd" });
+    }, [isSocketReady, sendJson]);
+
     const handleGenerateRandomCategories = () => {
         const shuffledCategories = randomCategoryList.sort(() => 0.5 - Math.random());
         return shuffledCategories.slice(0, 11);
@@ -145,15 +163,13 @@ export default function MainPage() {
             );
             return;
         }
-        if (socket && isSocketReady && profile) {
+        if (isSocketReady && profile) {
             setIsCreatingLobby(true);
-            socket.send(
-                JSON.stringify({
-                    type: 'create-lobby',
-                    host: profile.displayname,
-                    categories: handleGenerateRandomCategories(),
-                })
-            );
+            sendJson({
+                type: "create-lobby",
+                host: profile.username,
+                categories: handleGenerateRandomCategories(),
+            });
             console.log('sent create-lobby message');
         } else {
             sendErrorAlert();
@@ -210,13 +226,8 @@ export default function MainPage() {
             await refetchProfile(); // Optional - ensures profile is up-to-date
         }
 
-        if (socket && isSocketReady) {
-            socket.send(
-                JSON.stringify({
-                    type: 'check-lobby',
-                    gameId,
-                })
-            );
+        if (isSocketReady) {
+            sendJson({ type: "check-lobby", gameId });
         } else {
             sendErrorAlert();
         }

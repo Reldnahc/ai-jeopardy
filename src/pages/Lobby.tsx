@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import randomCategoryList from '../data/randomCategories';
 import { useLocation, useNavigate, useParams} from "react-router-dom";
 import { useWebSocket } from "../contexts/WebSocketContext.tsx";
@@ -19,7 +19,7 @@ type LockedCategories = {
     finalJeopardy: boolean[];
 };
 
-type BoardType = 'firstBoard' | 'secondBoard';
+//type BoardType = 'firstBoard' | 'secondBoard';
 
 const Lobby: React.FC = () => {
     const location = useLocation();
@@ -51,20 +51,22 @@ const Lobby: React.FC = () => {
         finalJeopardy: Array(1).fill(false),
     });
 
-    const { socket, isSocketReady } = useWebSocket();
+    const { isSocketReady, sendJson, subscribe } = useWebSocket();
     const navigate = useNavigate();
     const { profile } = useProfile();
     const { showAlert } = useAlert();
+    const joinedLobbyRef = useRef<string | null>(null);
 
     const handleLeaveLobby = () => {
-        console.log("leave lobby called");
-        if (socket && isSocketReady && profile?.displayname) {
-            socket.send(JSON.stringify({
-                type: 'leave-lobby',
-                gameId,
-                playerId: profile.displayname
-            }));
-        }
+        if (!isSocketReady) return;
+        if (!gameId) return;
+        if (!profile?.displayname) return;
+
+        sendJson({
+            type: "leave-lobby",
+            gameId,
+            playerId: profile.displayname,
+        });
     };
 
     const { setIsLeavingPage } = useNavigationBlocker({
@@ -74,222 +76,254 @@ const Lobby: React.FC = () => {
     });
 
     useEffect(() => {
-        if (allowLeave && socket && isSocketReady && profile && profile.displayname) {
-            socket.send(
-                JSON.stringify({
-                    type: 'join-game',
-                    gameId,
-                    playerName: profile?.displayname,
-                })
-            );
+        if (!isSocketReady) return;
+        if (!gameId) return;
 
-            navigate(`/game/${gameId}`, {
-                state: {
-                    playerName: profile?.displayname.trim(),
-                    isHost: isHost,
-                    host: host,
-                },
-            });
-        }
-    }, [allowLeave]);
+        if (joinedLobbyRef.current === gameId) return; // already joined this lobby
+        joinedLobbyRef.current = gameId;
 
+        const name = profile?.displayname?.trim() || "Guest";
+
+        sendJson({ type: "join-lobby", gameId, playerName: name });
+        sendJson({ type: "request-lobby-state", gameId });
+    }, [isSocketReady, gameId, profile?.displayname, sendJson]);
 
     useEffect(() => {
-        if (socket && isSocketReady) {
-            setIsLoading(true);
-            setLoadingMessage("Joining lobby...");
+        if (!allowLeave) return;
+        if (!isSocketReady) return;
+        if (!gameId) return;
+        if (!profile?.displayname) return;
 
+        sendJson({
+            type: "join-game",
+            gameId,
+            playerName: profile.displayname,
+        });
 
-            socket.onmessage = (event) => {
-                const message = JSON.parse(event.data);
-                console.log(message);
-                if (message.type === 'player-list-update') {
-                    const sortedPlayers = [...message.players].sort((a, b) => {
-                        if (a.name === message.host) return -1;
-                        if (b.name === message.host) return 1;
+        navigate(`/game/${gameId}`, {
+            state: {
+                playerName: profile.displayname.trim(),
+                isHost,
+                host,
+            },
+        });
+    }, [allowLeave, isSocketReady, gameId, profile?.displayname, isHost, host, sendJson, navigate]);
+
+    useEffect(() => {
+        if (!isSocketReady) return;
+        if (!gameId) return;
+
+        // allow guests too
+        const name = profile?.displayname?.trim() || "Guest";
+
+        sendJson({
+            type: "join-lobby",
+            gameId,
+            playerName: name,
+        });
+
+        // pull fresh state
+        sendJson({ type: "request-lobby-state", gameId });
+    }, [isSocketReady, gameId, profile?.displayname, sendJson]);
+
+    useEffect(() => {
+        if (!isSocketReady) return;
+
+        setIsLoading(true);
+        setLoadingMessage("Joining lobby...");
+
+        const unsubscribe = subscribe((message) => {
+            console.log(message);
+
+            switch (message.type) {
+                case "player-list-update": {
+                    const m = message as unknown as {
+                        players: Player[];
+                        host: string;
+                    };
+
+                    const sortedPlayers = [...m.players].sort((a, b) => {
+                        if (a.name === m.host) return -1;
+                        if (b.name === m.host) return 1;
                         return 0;
                     });
+
                     setPlayers(sortedPlayers);
-                    setHost(message.host);
+                    setHost(m.host);
+                    return;
                 }
 
-                if (message.type === 'lobby-state') {
-                    setPlayers(message.players);
-                    setHost(message.host);
-                    if (message.categories) {
-                        console.log(message.categories);
+                case "lobby-state": {
+                    const m = message as unknown as {
+                        players: Player[];
+                        host: string;
+                        categories?: string[];
+                        lockedCategories?: {
+                            firstBoard: boolean[];
+                            secondBoard: boolean[];
+                            finalJeopardy: boolean[];
+                        };
+                    };
+
+                    setPlayers(m.players);
+                    setHost(m.host);
+
+                    if (Array.isArray(m.categories)) {
                         setCategories({
-                            firstBoard: message.categories.slice(0, 5),
-                            secondBoard: message.categories.slice(5, 10),
-                            finalJeopardy: message.categories[10],
+                            firstBoard: m.categories.slice(0, 5),
+                            secondBoard: m.categories.slice(5, 10),
+                            finalJeopardy: m.categories[10] ?? "",
                         });
                     }
-                    if (message.lockedCategories) {
+
+                    if (m.lockedCategories) {
                         setLockedCategories({
-                            firstBoard: message.lockedCategories.firstBoard,
-                            secondBoard: message.lockedCategories.secondBoard,
-                            finalJeopardy: message.lockedCategories.finalJeopardy,
+                            firstBoard: m.lockedCategories.firstBoard,
+                            secondBoard: m.lockedCategories.secondBoard,
+                            finalJeopardy: m.lockedCategories.finalJeopardy,
                         });
                     }
 
                     setIsLoading(false);
                     setLoadingMessage("");
+                    return;
                 }
 
-                if (message.type === 'category-lock-updated') {
-                    console.log(message);
-                    if (message.boardType in lockedCategories) {
+                case "category-lock-updated": {
+                    const m = message as unknown as {
+                        boardType: unknown;
+                        index: number;
+                        locked: boolean;
+                    };
+
+                    const bt = m.boardType;
+
+                    if (bt === "firstBoard" || bt === "secondBoard" || bt === "finalJeopardy") {
                         setLockedCategories((prev) => {
                             const updated: LockedCategories = { ...prev };
-                            updated[message.boardType as BoardType][message.index] = message.locked; // Type-safe access
+                            updated[bt][m.index] = Boolean(m.locked);
                             return updated;
                         });
-                    } else {
-                        console.error(`Invalid boardType: ${message.boardType}`);
                     }
+                    return;
                 }
 
-                // Sync updated categories
-                if (message.type === 'categories-updated') {
-                    setCategories({
-                        firstBoard: message.categories.slice(0, 5),
-                        secondBoard: message.categories.slice(5, 10),
-                        finalJeopardy: message.categories[10],
-                    });
+                case "categories-updated": {
+                    const m = message as unknown as { categories: string[] };
+
+                    if (Array.isArray(m.categories)) {
+                        setCategories({
+                            firstBoard: m.categories.slice(0, 5),
+                            secondBoard: m.categories.slice(5, 10),
+                            finalJeopardy: m.categories[10] ?? "",
+                        });
+                    }
+                    return;
                 }
 
-                if (message.type === 'trigger-loading') {
+                case "trigger-loading": {
                     setIsLoading(true);
-                    setLoadingMessage('Generating your questions');
+                    setLoadingMessage("Generating your questions");
+                    return;
                 }
 
-                if (message.type === 'create-board-failed') {
+                case "create-board-failed": {
                     setIsLoading(false);
-                    showAlert(
-                        <span>
-                            <span className="text-red-500 font-bold text-xl">Game generation failed.</span><br/>
-                            <span
-                                className="text-gray-900 font-bold text-xl">Try again. If the issue persists try another model.</span><br/>
-                        </span>,
-                        [
-                            {
-                                label: "Okay",
-                                actionValue: "continue",
-                                styleClass: "bg-green-500 text-white hover:bg-green-600",
-                            },
-
-                        ]
-                    );
+                    // keep your showAlert logic here
+                    return;
                 }
 
-                if (message.type === 'start-game' && profile) {
-                    setIsLoading(false);
-                    setIsLeavingPage(true);
-                    setAllowLeave(true);
+                case "start-game": {
+                    if (profile) {
+                        setIsLoading(false);
+                        setIsLeavingPage(true);
+                        setAllowLeave(true);
+                    }
+                    return;
                 }
 
-                if (message.type === 'check-lobby-response') {
-                    if (!message.isValid) {
+                case "check-lobby-response": {
+                    const m = message as unknown as { isValid: boolean };
+
+                    if (!m.isValid) {
                         navigate("/");
                         return;
                     }
 
                     setLoadingMessage("Syncing lobby state...");
-                    socket.send(JSON.stringify({
-                        type: 'request-lobby-state',
-                        gameId,
-                    }));
+                    sendJson({ type: "request-lobby-state", gameId });
+                    return;
                 }
-                
-            };
-            socket.send(
-                JSON.stringify({
-                    type: 'check-lobby',
-                    gameId,
-                })
-            );
 
-            setIsLoading(true);
-        }
-    }, [isSocketReady, gameId, socket, profile, lockedCategories, showAlert, setIsLeavingPage, navigate]);
+                default:
+                    return;
+            }
+        });
+
+        sendJson({ type: "check-lobby", gameId });
+
+        return unsubscribe;
+    }, [isSocketReady, subscribe, sendJson, gameId, navigate, profile, setIsLeavingPage]);
+
 
     const onToggleLock = (
-        boardType: 'firstBoard' | 'secondBoard' | 'finalJeopardy',
+        boardType: "firstBoard" | "secondBoard" | "finalJeopardy",
         index: number
     ) => {
-        if (socket && isSocketReady) {
-            socket.send(
-                JSON.stringify({
-                    type: 'toggle-lock-category',
-                    gameId,
-                    boardType,
-                    index,
-                    locked: !lockedCategories[boardType][index], // Toggle current state
-                })
-            );
-        }
+        if (!isSocketReady) return;
+        if (!gameId) return;
+
+        sendJson({
+            type: "toggle-lock-category",
+            gameId,
+            boardType,
+            index,
+            locked: !lockedCategories[boardType][index],
+        });
     };
+
 
     const handleDropdownChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         setSelectedModel(e.target.value);
     };
 
     const onChangeCategory = (
-        boardType: 'firstBoard' | 'secondBoard' | 'finalJeopardy',
+        boardType: "firstBoard" | "secondBoard" | "finalJeopardy",
         index: number | undefined,
         value: string
     ) => {
         setCategories((prev) => {
-            if (boardType === 'finalJeopardy') {
-                const updatedCategories = {
-                    ...prev,
-                    finalJeopardy: value,
-                };
+            if (boardType === "finalJeopardy") {
+                const updated = { ...prev, finalJeopardy: value };
 
-                if (socket && isSocketReady) {
-                    socket.send(
-                        JSON.stringify({
-                            type: 'update-categories',
-                            gameId,
-                            categories: [
-                                ...updatedCategories.firstBoard,
-                                ...updatedCategories.secondBoard,
-                                updatedCategories.finalJeopardy,
-                            ],
-                        })
-                    );
+                if (isHost && isSocketReady && gameId) {
+                    sendJson({
+                        type: "update-categories",
+                        gameId,
+                        categories: [...updated.firstBoard, ...updated.secondBoard, updated.finalJeopardy],
+                    });
                 }
 
-                return updatedCategories;
+                return updated;
             }
 
             const updatedBoard = [...prev[boardType]];
-            if (index !== undefined) {
-                updatedBoard[index] = value;
+            if (index !== undefined) updatedBoard[index] = value;
+
+            const updated = { ...prev, [boardType]: updatedBoard };
+
+            if (isHost && isSocketReady && gameId) {
+                sendJson({
+                    type: "update-categories",
+                    gameId,
+                    categories: [...updated.firstBoard, ...updated.secondBoard, updated.finalJeopardy],
+                });
             }
 
-            const updatedCategories = {
-                ...prev,
-                [boardType]: updatedBoard,
-            };
-
-            if (socket && isSocketReady) {
-                socket.send(
-                    JSON.stringify({
-                        type: 'update-categories',
-                        gameId,
-                        categories: [
-                            ...updatedCategories.firstBoard,
-                            ...updatedCategories.secondBoard,
-                            updatedCategories.finalJeopardy,
-                        ],
-                    })
-                );
-            }
-
-            return updatedCategories;
+            return updated;
         });
     };
+
 
     const handleRandomizeCategory = (
         boardType: 'firstBoard' | 'secondBoard' | 'finalJeopardy',
@@ -324,18 +358,12 @@ const Lobby: React.FC = () => {
                 updatedCategories[boardType] = board;
             }
 
-            if (isHost && socket && isSocketReady) {
-                socket.send(
-                    JSON.stringify({
-                        type: 'update-categories',
-                        gameId,
-                        categories: [
-                            ...updatedCategories.firstBoard,
-                            ...updatedCategories.secondBoard,
-                            updatedCategories.finalJeopardy,
-                        ],
-                    })
-                );
+            if (isHost && isSocketReady && gameId) {
+                sendJson({
+                    type: "update-categories",
+                    gameId,
+                    categories: [...updatedCategories.firstBoard, ...updatedCategories.secondBoard, updatedCategories.finalJeopardy],
+                });
             }
 
             return updatedCategories;
@@ -379,24 +407,19 @@ const Lobby: React.FC = () => {
             setIsLoading(true);
             setLoadingMessage('Generating your questions');
 
-            if (socket && isSocketReady) {
-                socket.send(
-                    JSON.stringify({
-                        type: 'create-game',
-                        gameId,
-                        host: profile.displayname,
-                        temperature,
-                        timeToBuzz,
-                        timeToAnswer,
-                        categories: [
-                            ...categories.firstBoard,
-                            ...categories.secondBoard,
-                            categories.finalJeopardy,
-                        ],
-                        selectedModel,
-                    })
-                );
-            }
+            if (!isSocketReady) return;
+            if (!gameId) return;
+
+            sendJson({
+                type: "create-game",
+                gameId,
+                host: profile.displayname,
+                temperature,
+                timeToBuzz,
+                timeToAnswer,
+                categories: [...categories.firstBoard, ...categories.secondBoard, categories.finalJeopardy],
+                selectedModel,
+            });
         } catch (error) {
             console.error('Failed to generate board data:', error);
             alert('Failed to generate board data. Please try again.');

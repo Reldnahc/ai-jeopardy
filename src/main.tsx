@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { createHashRouter, RouterProvider} from 'react-router-dom';
+import { createBrowserRouter, RouterProvider} from 'react-router-dom';
 import MainPage from './pages/MainPage.tsx';
 import Game from './pages/Game';
 import Lobby from './pages/Lobby';
@@ -18,7 +18,7 @@ import NotFoundPage from "./pages/NotFoundPage.tsx";
 import Layout from "./components/common/Layout.tsx";
 
 // Define the router configuration
-const router = createHashRouter([
+const router = createBrowserRouter([
     {
         path: "/",
         element: <Layout><MainPage /></Layout>

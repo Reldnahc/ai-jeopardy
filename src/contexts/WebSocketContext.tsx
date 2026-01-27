@@ -1,104 +1,169 @@
-import React, { createContext, useContext, useRef, useEffect, useState } from "react";
-import {useProfile} from "./ProfileContext.tsx";
-import {useAuth} from "./AuthContext.tsx";
+import React, {
+    createContext, useContext, useRef, useEffect, useState,
+    useCallback, useMemo
+} from "react";
+// import { useProfile } from "./ProfileContext.tsx";
+// import { useAuth } from "./AuthContext.tsx";
+
+type WSMessage = { type: string; [key: string]: unknown };
+type Listener = (msg: WSMessage) => void;
 
 interface WebSocketContextType {
     socket: WebSocket | null;
     isSocketReady: boolean;
+    sendJson: (payload: object) => void;
+    subscribe: (listener: Listener) => () => void;
 }
 
-// Create a context for the WebSocket
 const WebSocketContext = createContext<WebSocketContextType | null>(null);
 
-// WebSocketProvider Component
 export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const socketRef = useRef<WebSocket | null>(null);
+    const listenersRef = useRef(new Set<Listener>());
+
+    // queued JSON strings waiting for OPEN
+    const queueRef = useRef<string[]>([]);
+    const connectingRef = useRef(false);
+
     const [isSocketReady, setIsSocketReady] = useState(false);
-    const [hasSentJoinMessage, setHasSentJoinMessage] = useState(false);
-    const { profile, error} = useProfile();
-    const { loading } = useAuth();
 
-    useEffect(() => {
-        if (!socketRef.current ) {
-            // Initialize WebSocket connection
-            const wsUrl = import.meta.env.VITE_WS_URL;
-            socketRef.current = new WebSocket(wsUrl);
+    // const { profile, error } = useProfile();
+    // const { loading } = useAuth();
 
-            // Handle successful connection
-
-            socketRef.current.onopen = () => {
-                console.log("WebSocket connected");
-                setIsSocketReady(true); // Mark socket as ready
-
-            };
-
-
-            // Handle socket errors
-            socketRef.current.onerror = (error) => {
-                console.error("WebSocket error:", error);
-                setIsSocketReady(false); // Ensure it's marked as not ready
-            };
-
-            // Handle socket closure
-            socketRef.current.onclose = () => {
-                console.log("WebSocket closed, cleaning up...");
-                socketRef.current = null; // Reset reference
-                setIsSocketReady(false); // Set ready state to false
-            };
-
-            console.log("WebSocket initialized:", socketRef.current);
-        }
-
+    const subscribe = useCallback((listener: Listener) => {
+        listenersRef.current.add(listener);
+        return () => listenersRef.current.delete(listener);
     }, []);
 
-    const sendJoinMessage = () => {
+    const flushQueue = useCallback(() => {
+        const s = socketRef.current;
+        if (!s || s.readyState !== WebSocket.OPEN) return;
 
-        if (socketRef.current && isSocketReady) {
+        if (queueRef.current.length > 0) {
+            console.log(`[WS] flushing ${queueRef.current.length} queued messages`);
+        }
 
-            const currentPage = location.hash;
-            const playerName = profile?.displayname; // Use profile when available
-            const gameId = currentPage.split('/')[2];
-            const action = currentPage.includes('/lobby')
-                ? 'join-lobby'
-                : currentPage.includes('/game')
-                    ? 'join-game'
-                    : null;
+        for (const msg of queueRef.current) s.send(msg);
+        queueRef.current = [];
+    }, []);
 
-            if (action) {
-                socketRef.current?.send(
-                    JSON.stringify({
-                        type: action,
-                        gameId,
-                        playerName,
-                    })
-                );
-                console.log(`Sent ${action} message with playerName: ${playerName}`);
+    const attachSocketHandlers = useCallback((ws: WebSocket) => {
+        ws.onopen = () => {
+            console.log("[WS] connected");
+            connectingRef.current = false;
+            setIsSocketReady(true);
+            flushQueue();
+        };
+
+        ws.onerror = (err) => {
+            console.error("[WS] error:", err);
+            // do not null socket here; onclose will handle lifecycle
+            setIsSocketReady(false);
+        };
+
+        ws.onclose = (e) => {
+            console.warn("[WS] closed", { code: e.code, reason: e.reason, wasClean: e.wasClean });
+
+            // Only clear if THIS ws is still the active one
+            if (socketRef.current === ws) {
+                socketRef.current = null;
+                setIsSocketReady(false);
+                listenersRef.current.clear();
             }
-        }
-    };
+            connectingRef.current = false;
+        };
 
-    // Retry sending the join message when profile or loading state changes
+        ws.onmessage = (event) => {
+            let parsed: unknown;
+            try {
+                parsed = JSON.parse(event.data);
+            } catch {
+                console.warn("[WS] non-JSON message:", event.data);
+                return;
+            }
+
+            if (
+                typeof parsed !== "object" ||
+                parsed === null ||
+                !("type" in parsed) ||
+                typeof (parsed as { type?: unknown }).type !== "string"
+            ) return;
+
+            const msg = parsed as WSMessage;
+            for (const listener of listenersRef.current) listener(msg);
+        };
+    }, [flushQueue]);
+
+    const ensureSocket = useCallback(() => {
+        const existing = socketRef.current;
+
+        // If we have a live socket (OPEN or CONNECTING), keep it.
+        if (existing && (existing.readyState === WebSocket.OPEN || existing.readyState === WebSocket.CONNECTING)) {
+            return existing;
+        }
+
+        // Avoid spamming reconnections if multiple sends happen in the same tick
+        if (connectingRef.current) return existing;
+
+        connectingRef.current = true;
+
+        const wsUrl = import.meta.env.VITE_WS_URL;
+        const ws = new WebSocket(wsUrl);
+        socketRef.current = ws;
+
+        console.log("[WS] initializing:", wsUrl);
+        attachSocketHandlers(ws);
+
+        return ws;
+    }, [attachSocketHandlers]);
+
+    const sendJson = useCallback((payload: object) => {
+        const msg = JSON.stringify(payload);
+
+        const ws = ensureSocket();
+
+        if (!ws) {
+            console.warn("[WS] sendJson queued but no socket instance:", payload);
+            queueRef.current.push(msg);
+            return;
+        }
+
+        if (ws.readyState !== WebSocket.OPEN) {
+            console.log("[WS] sendJson queued (not OPEN):", ws.readyState, payload);
+            queueRef.current.push(msg);
+            return;
+        }
+
+        ws.send(msg);
+    }, [ensureSocket]);
+
+    // Create socket on mount (optional, but good UX)
     useEffect(() => {
-        if (profile && isSocketReady && !hasSentJoinMessage) {
-            sendJoinMessage(); // Trigger join message when profile becomes available
-            setHasSentJoinMessage(true);
-        }
-    }, [profile, error, isSocketReady, hasSentJoinMessage, loading]);
+        ensureSocket();
+        return () => {
+            const ws = socketRef.current;
+            if (ws) ws.close();
+            socketRef.current = null;
+            setIsSocketReady(false);
+            listenersRef.current.clear();
+            queueRef.current = [];
+            connectingRef.current = false;
+        };
+    }, [ensureSocket]);
 
-    return (
-        <WebSocketContext.Provider value={{ socket: socketRef.current, isSocketReady }}>
-            {children}
-        </WebSocketContext.Provider>
-    );
+
+    const value = useMemo<WebSocketContextType>(() => ({
+        socket: socketRef.current,
+        isSocketReady,
+        sendJson,
+        subscribe,
+    }), [isSocketReady, sendJson, subscribe]);
+
+    return <WebSocketContext.Provider value={value}>{children}</WebSocketContext.Provider>;
 };
 
-// Custom Hook to use the WebSocket context
 export const useWebSocket = () => {
     const context = useContext(WebSocketContext);
-
-    if (!context) {
-        throw new Error("useWebSocket must be used within a WebSocketProvider");
-    }
-
+    if (!context) throw new Error("useWebSocket must be used within a WebSocketProvider");
     return context;
 };
