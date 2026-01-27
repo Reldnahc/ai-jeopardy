@@ -59,6 +59,14 @@ let cotd =
     description: ""
     };
 
+
+// Ensure array exists and is 11 long
+const normalizeCategories11 = (arr) => {
+    const next = Array.isArray(arr) ? arr.slice(0, 11) : [];
+    while (next.length < 11) next.push("");
+    return next;
+};
+
 wss.on('connection', (ws) => {
     ws.id = Math.random().toString(36).substr(2, 9); // Assign a unique ID to each socket
     console.log('New client connected');
@@ -90,7 +98,7 @@ wss.on('connection', (ws) => {
                         text_color: p.text_color,
                     })),
                     host: games[data.gameId].host,
-                    categories: games[data.gameId].categories || [],
+                    categories: normalizeCategories11(games[data.gameId].categories),
                     lockedCategories: games[data.gameId].lockedCategories,
                     inLobby: games[data.gameId].inLobby,
                     isGenerating: Boolean(games[data.gameId].isGenerating),
@@ -121,7 +129,7 @@ wss.on('connection', (ws) => {
                     host,
                     players: [{ id: ws.id, name: host, color, text_color }],
                     inLobby: true,
-                    categories: categories || [],
+                    categories: normalizeCategories11(categories),
                     lockedCategories: {
                         firstBoard: Array(5).fill(false),
                         secondBoard: Array(5).fill(false),
@@ -132,7 +140,7 @@ wss.on('connection', (ws) => {
                 ws.send(JSON.stringify({
                     type: 'lobby-created',
                     gameId: newGameId,
-                    categories: categories || [],
+                    categories: normalizeCategories11(categories),
                     players: [{ id: ws.id, name: host, color, text_color }],
                 }));
             }
@@ -189,10 +197,10 @@ wss.on('connection', (ws) => {
                         text_color: p.text_color,
                     })),
                     host: games[gameId].host,
-                    categories: games[gameId].categories || [],
-                    lockedCategories: games[data.gameId].lockedCategories,
-                    inLobby: games[data.gameId].inLobby,
-                    isGenerating: Boolean(games[data.gameId].isGenerating),
+                    categories: normalizeCategories11(games[gameId].categories),
+                    lockedCategories: games[gameId].lockedCategories,
+                    inLobby: games[gameId].inLobby,
+                    isGenerating: Boolean(games[gameId].isGenerating),
                 }));
                 broadcast(gameId, {
                     type: 'player-list-update',
@@ -278,13 +286,57 @@ wss.on('connection', (ws) => {
                 }
             }
 
+            if (data.type === "update-category") {
+                const { gameId, boardType, index, value } = data;
+
+                if (!games[gameId]) {
+                    ws.send(JSON.stringify({
+                        type: "error",
+                        message: `Game ${gameId} not found while updating category.`,
+                    }));
+                    return;
+                }
+
+                const game = games[gameId];
+
+                // Enforce lock server-side (prevents bypass / stale UI)
+                if (
+                    (boardType === "firstBoard" || boardType === "secondBoard") &&
+                    game.lockedCategories?.[boardType]?.[index]
+                ) return;
+
+                if (boardType === "finalJeopardy" && game.lockedCategories?.finalJeopardy?.[0]) return;
+
+                game.categories = normalizeCategories11(game.categories);
+
+                // Map boardType/index -> global index in the flat 11 array
+                let globalIndex = -1;
+                if (boardType === "firstBoard") globalIndex = index;          // 0-4
+                else if (boardType === "secondBoard") globalIndex = 5 + index; // 5-9
+                else if (boardType === "finalJeopardy") globalIndex = 10;      // 10
+
+                if (globalIndex < 0 || globalIndex > 10) return;
+
+                game.categories[globalIndex] = String(value ?? "");
+
+                // Broadcast only the patch (no full array overwrite race)
+                broadcast(gameId, {
+                    type: "category-updated",
+                    boardType,
+                    index: boardType === "finalJeopardy" ? 0 : index,
+                    value: game.categories[globalIndex],
+                });
+
+                console.log(`[Server] Category updated for game ${gameId}: ${boardType}[${index}] -> ${value}`);
+            }
+
             if (data.type === 'update-categories') {
                 const { gameId, categories } = data;
 
                 if (games[gameId]) {
-                    const next = Array.isArray(categories) ? categories : [];
-
+                    const next = normalizeCategories11(categories);
                     games[gameId].categories = next;
+
 
                     broadcast(gameId, {
                         type: 'categories-updated',

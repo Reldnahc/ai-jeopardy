@@ -204,7 +204,27 @@ const Lobby: React.FC = () => {
                     }
                     return;
                 }
+                case "category-updated": {
+                    const m = message as unknown as {
+                        boardType: "firstBoard" | "secondBoard" | "finalJeopardy";
+                        index: number;
+                        value: string;
+                    };
 
+                    setCategories((prev) => {
+                        if (m.boardType === "finalJeopardy") {
+                            return { ...prev, finalJeopardy: m.value ?? "" };
+                        }
+
+                        const nextBoard = [...prev[m.boardType]];
+                        if (m.index >= 0 && m.index < nextBoard.length) {
+                            nextBoard[m.index] = m.value ?? "";
+                        }
+                        return { ...prev, [m.boardType]: nextBoard };
+                    });
+
+                    return;
+                }
                 case "categories-updated": {
                     const m = message as unknown as { categories: string[] };
 
@@ -303,9 +323,11 @@ const Lobby: React.FC = () => {
 
                 if (isSocketReady && gameId) {
                     sendJson({
-                        type: "update-categories",
+                        type: "update-category",
                         gameId,
-                        categories: [...updated.firstBoard, ...updated.secondBoard, updated.finalJeopardy],
+                        boardType: "finalJeopardy",
+                        index: 0,
+                        value,
                     });
                 }
 
@@ -317,18 +339,19 @@ const Lobby: React.FC = () => {
 
             const updated = { ...prev, [boardType]: updatedBoard };
 
-            if (isSocketReady && gameId) {
+            if (isSocketReady && gameId && index !== undefined) {
                 sendJson({
-                    type: "update-categories",
+                    type: "update-category",
                     gameId,
-                    categories: [...updated.firstBoard, ...updated.secondBoard, updated.finalJeopardy],
+                    boardType,
+                    index,
+                    value,
                 });
             }
 
             return updated;
         });
     };
-
 
     const handleRandomizeCategory = (
         boardType: 'firstBoard' | 'secondBoard' | 'finalJeopardy',
@@ -362,13 +385,24 @@ const Lobby: React.FC = () => {
             }
 
             if (isSocketReady && gameId) {
-                sendJson({
-                    type: "update-categories",
-                    gameId,
-                    categories: [...updatedCategories.firstBoard, ...updatedCategories.secondBoard, updatedCategories.finalJeopardy],
-                });
+                if (boardType === "finalJeopardy") {
+                    sendJson({
+                        type: "update-category",
+                        gameId,
+                        boardType: "finalJeopardy",
+                        index: 0,
+                        value: updatedCategories.finalJeopardy,
+                    });
+                } else if (index !== undefined) {
+                    sendJson({
+                        type: "update-category",
+                        gameId,
+                        boardType,
+                        index,
+                        value: updatedCategories[boardType][index],
+                    });
+                }
             }
-
             return updatedCategories;
         });
     };

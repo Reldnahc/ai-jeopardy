@@ -227,8 +227,20 @@ export default function Game() {
 
             if (message.type === "final-jeopardy") {
                 setActiveBoard("finalJeopardy");
+
+                setIsFinalJeopardy(true);
+
+                setAllWagersSubmitted(false);
+                setWagers({});
+
+                setSelectedClue(null);
+                setShowAnswer(false);
+                setBuzzResult(null);
+                setTimerEndTime(null);
+                setTimerDuration(0);
                 return;
             }
+
 
             if (message.type === "all-wagers-submitted") {
                 const m = message as unknown as { wagers: Record<string, number> };
@@ -331,6 +343,11 @@ export default function Game() {
             if (message.type === "transition-to-second-board") {
                 setActiveBoard("secondBoard");
                 setClearedClues(new Set());
+
+                setIsFinalJeopardy(false);
+                setAllWagersSubmitted(false);
+                setWagers({});
+
                 return;
             }
 
