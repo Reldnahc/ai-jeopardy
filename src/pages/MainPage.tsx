@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWebSocket } from "../contexts/WebSocketContext.tsx";
-import randomCategoryList from "../data/randomCategories.ts";
 import {useAuth} from "../contexts/AuthContext.tsx";
 import {useProfile} from "../contexts/ProfileContext.tsx";
 import {useAlert} from "../contexts/AlertContext.tsx";
 import { motion } from 'framer-motion';
 import PlayerSearch from "../components/main/PlayerSearch.tsx";
 import {Player} from "../types/Lobby.ts";
+import {getUniqueCategories} from "../categories/getUniqueCategories.ts";
 
 export default function MainPage() {
     const [gameId, setGameId] = useState('');
@@ -126,8 +126,8 @@ export default function MainPage() {
     }, [isSocketReady, sendJson]);
 
     const handleGenerateRandomCategories = () => {
-        const shuffledCategories = randomCategoryList.sort(() => 0.5 - Math.random());
-        return shuffledCategories.slice(0, 11);
+
+        return getUniqueCategories(11);
     };
 
     function sendErrorAlert() {

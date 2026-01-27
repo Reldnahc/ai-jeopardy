@@ -1,5 +1,4 @@
 import React, {useEffect, useRef, useState} from 'react';
-import randomCategoryList from '../data/randomCategories';
 import { useLocation, useNavigate, useParams} from "react-router-dom";
 import { useWebSocket } from "../contexts/WebSocketContext.tsx";
 import LobbySidebar from "../components/lobby/LobbySidebar.tsx";
@@ -12,6 +11,7 @@ import {useProfile} from "../contexts/ProfileContext.tsx";
 import {useAlert} from "../contexts/AlertContext.tsx";
 import { motion } from 'framer-motion';
 import {useNavigationBlocker} from "../hooks/useNavigationBlocker.ts";
+import {getUniqueCategories} from "../categories/getUniqueCategories.ts";
 
 type LockedCategories = {
     firstBoard: boolean[]; // Jeopardy lock states
@@ -340,8 +340,7 @@ const Lobby: React.FC = () => {
             if (boardType === 'finalJeopardy') {
                 let newCategory;
                 do {
-                    newCategory =
-                        randomCategoryList[Math.floor(Math.random() * randomCategoryList.length)];
+                    newCategory = getUniqueCategories(1)[0];
                 } while (
                     prev.firstBoard.includes(newCategory) ||
                     prev.secondBoard.includes(newCategory) ||
@@ -352,8 +351,7 @@ const Lobby: React.FC = () => {
                 const board = [...updatedCategories[boardType]];
                 let newCategory;
                 do {
-                    newCategory =
-                        randomCategoryList[Math.floor(Math.random() * randomCategoryList.length)];
+                    newCategory = getUniqueCategories(1)[0];
                 } while (
                     board.includes(newCategory) ||
                     prev.firstBoard.includes(newCategory) ||
