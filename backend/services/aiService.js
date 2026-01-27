@@ -90,44 +90,116 @@ async function createBoardData(categories, model, host, temperature) {
     const [firstCategories, secondCategories, finalCategory] = [categories.slice(0, 5), categories.slice(5, 10), categories[10]];
 
     const prompt = (categories, double = false) => `
-        Create a Jeopardy board with the following 5 categories: ${categories.join(', ')}.
-        Each category should contain 5 questions, each with a value and an answer. Make sure they follow the jeopardy format.
-        Each answer should be formated in question like jeopardy. The questions should be more difficult according to their value. 
-        The Questions should avoid having the answer in the clue or category title. 
-        ${double ? 'Make this a Double Jeopardy board, ensuring values are doubled, ranging from 400 to 2000 instead of 200 to 1000. ' +
-        'they should be more difficult according to their value. questions over 500 points should be hard.' : ''}
-        Format the response in JSON as:
+        You are a professional Jeopardy clue writer.
+        
+        Create a complete Jeopardy board using the following EXACTLY 5 categories:
+        ${categories.map((c, i) => `${i + 1}. ${c}`).join('\n')}
+        
+        GENERAL RULES:
+        - Each category MUST contain exactly 5 clues.
+        - Clue values must be ${double ? '400, 800, 1200, 1600, 2000' : '200, 400, 600, 800, 1000'}.
+        - Difficulty MUST scale strictly with value.
+        - Clues MUST be factual, unambiguous, and verifiable.
+        - Do NOT reuse facts, answers, or phrasing across clues or categories.
+        - Avoid obvious giveaways (dates, names, or key phrases directly matching the answer).
+        - The category title must NOT appear in the clue or answer.
+        - Clues must be written in Jeopardy answer format (statements, not questions).
+        - Player responses MUST be phrased as a question (e.g., "What is…", "Who is…").
+        
+        DIFFICULTY GUIDELINES:
+        - Lowest value: common knowledge, accessible to casual players.
+        - Middle values: require reasoning, inference, or deeper familiarity.
+        - Highest values: challenging even for enthusiasts; obscure facts, multi-step reasoning, or indirect references.
+        ${double ? '- All clues should be noticeably harder than standard Jeopardy.\n- 1200+ value clues should be genuinely difficult.' : ''}
+        
+        CONTENT QUALITY RULES:
+        - Do NOT include trick questions, wordplay-only clues, or riddles.
+        - Avoid “this X that Y” phrasing when possible.
+        - No pop culture unless the category clearly implies it.
+        - Avoid subjective or opinion-based answers.
+        - Do NOT include meta commentary, explanations, or apologies.
+        
+        OUTPUT FORMAT:
+        Return ONLY valid JSON in the following structure:
+        
         {
-           "categories": [
-                {
-                    "category": "Category Name",
-                    "values": [
-                        { "value": 200, "question": "Question", "answer": "Answer?" },
-                        // More values...
-                    ]
-                },
-                // More categories...
-            ]
+          "categories": [
+            {
+              "category": "Category Name",
+              "values": [
+                { "value": 200, "question": "Clue text", "answer": "Correct response phrased as a question" }
+              ]
+            }
+          ]
         }
+        
+        Do NOT wrap the JSON in markdown.
+        Do NOT include any text outside the JSON.
+        SELF-CHECK (DO NOT OUTPUT THIS SECTION):
+        Before producing the final JSON, silently validate and repair until ALL checks pass:
+        
+        STRUCTURE CHECKS
+        - Output is valid JSON (no trailing commas, no markdown, no extra text).
+        - Exactly 5 categories.
+        - Each category has exactly 5 values.
+        - Values are exactly ${double ? '[400,800,1200,1600,2000]' : '[200,400,600,800,1000]'} in ascending order.
+        
+        CONTENT CHECKS
+        - Every "answer" is phrased as a question (starts with "Who is", "What is", "Where is", etc.).
+        - Clue text ("question") is a statement, not a question (no question marks).
+        - Category title does not appear verbatim in the clue or answer.
+        - No clue contains the full answer text (or a near-exact paraphrase) as a giveaway.
+        - No duplicate answers across the entire board.
+        - No repeated distinctive phrasing across clues.
+        
+        DIFFICULTY CHECKS
+        - 200/400 are broadly accessible.
+        - Higher values become progressively harder; top value in each category is the hardest.
+        
+        If any check fails, rewrite ONLY the failing clues/categories and re-check.
+        When all checks pass, output ONLY the final JSON.
     `;
+
     const finalPrompt = (category) => `
-         Generate me Json for a very difficult question in this category ${category}.
-         It should be a very difficult question. Make sure it follows the jeopardy format.
-         The answer should be formated in question like jeopardy.
-         Format the response in JSON as:
-          {
-            "categories": [
-               {
-                   "category": "Category Name",
-                   "values": [
-                       { "question": "Question", "answer": "Answer?" },
-                   ]
-               },
-            ]
+        You are a professional Jeopardy clue writer.
+        
+        Create a SINGLE Final Jeopardy clue for this category:
+        "${category}"
+        
+        RULES:
+        - Exactly ONE clue and ONE correct response.
+        - Very difficult (Final Jeopardy level).
+        - Factual, unambiguous, verifiable.
+        - Do NOT include the category title verbatim in the clue or answer.
+        - Do NOT include the answer text (or near-paraphrase) in the clue.
+        - Clue is a statement (no question mark).
+        - Response is phrased as a question ("What is…", "Who is…", etc.).
+        
+        OUTPUT FORMAT:
+        Return ONLY valid JSON in this structure:
+        
+        {
+          "categories": [
+            {
+              "category": "Category Name",
+              "values": [
+                { "question": "Clue text", "answer": "Correct response phrased as a question" }
+              ]
+            }
+          ]
         }
-   `;
-
-
+        
+        Do NOT wrap the JSON in markdown.
+        Do NOT include any text outside the JSON.
+        
+        SELF-CHECK (DO NOT OUTPUT THIS SECTION):
+        - Valid JSON only.
+        - Exactly one category, exactly one value.
+        - "question" has no question mark.
+        - "answer" is a question starting with Who/What/Where/When/Which.
+        - No category-title leakage; no answer giveaway.
+        If any check fails, rewrite and re-check. Output ONLY the final JSON when valid.
+    `;
 
     try {
 
