@@ -197,20 +197,13 @@ export default function MainPage() {
             const action = await showAlert(
                 <span>
                     <span className="text-red-500 font-bold text-xl">You are not logged in.</span><br/>
-                    <span
-                        className="text-gray-900 font-bold text-xl">Are you sure you want to play as a guest?</span><br/>
                 </span>,
                 [
                     {
                         label: "Go Back",
                         actionValue: "return",
                         styleClass: "bg-red-500 text-white hover:bg-red-600",
-                    },
-                    {
-                        label: "Continue",
-                        actionValue: "continue",
-                        styleClass: "bg-green-500 text-white hover:bg-green-600",
-                    },
+                    }
 
                 ]
             );
@@ -362,7 +355,7 @@ export default function MainPage() {
                                         To create a game, you’ll first need to create an account using the menu in the top-right corner.
                                     </li>
                                     <li>
-                                        You do <strong>not</strong> need an account to join a game. Simply enter the game code provided by your host to join as a guest.
+                                        You <strong>do</strong> need an account to join a game. Create one using the menu in the top-right corner.
                                     </li>
                                     <li>
                                         Creating an account allows you to customize your profile, host games, and access additional features.

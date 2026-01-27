@@ -111,23 +111,6 @@ const Lobby: React.FC = () => {
 
     useEffect(() => {
         if (!isSocketReady) return;
-        if (!gameId) return;
-
-        // allow guests too
-        const name = profile?.displayname?.trim() || "Guest";
-
-        sendJson({
-            type: "join-lobby",
-            gameId,
-            playerName: name,
-        });
-
-        // pull fresh state
-        sendJson({ type: "request-lobby-state", gameId });
-    }, [isSocketReady, gameId, profile?.displayname, sendJson]);
-
-    useEffect(() => {
-        if (!isSocketReady) return;
 
         setIsLoading(true);
         setLoadingMessage("Joining lobby...");

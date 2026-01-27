@@ -150,18 +150,15 @@ wss.on('connection', (ws) => {
                     return;
                 }
 
-                let actualName = playerName;
-
-                // Assign "Guest" if name is blank or whitespace
-                if (!playerName || !playerName.trim()) {
-                    let guestIndex = 1;
-                    const usedNames = games[gameId].players.map((player) => player.name);
-
-                    // Increment guest index until an unused guest name is found
-                    while (usedNames.includes(`Guest ${guestIndex}`)) {
-                        guestIndex++;
-                    }
-                    actualName = `Guest ${guestIndex}`;
+                const actualName = (playerName ?? "").trim();
+                if (!actualName) {
+                    ws.send(JSON.stringify({ type: "error", message: "Guest players are disabled. Please log in." }));
+                    return;
+                }
+                // Block reserved guest-style names (prevents UI bypass)
+                if (/^guest(\s+\d+)?$/i.test(actualName)) {
+                    ws.send(JSON.stringify({ type: "error", message: "Guest players are disabled. Please choose another name (or log in)." }));
+                    return;
                 }
 
                 // Add the player to the game
