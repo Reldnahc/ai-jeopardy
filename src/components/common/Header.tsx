@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useLocation, useNavigate} from "react-router-dom";
+import {Link, useLocation, useNavigate} from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext.tsx";
 import { useProfile } from "../../contexts/ProfileContext.tsx";
 import LoginForm from "./LoginForm.tsx";
@@ -81,21 +81,21 @@ const Header: React.FC = () => {
             <div className="container mx-auto flex items-center py-4 px-6 justify-between h-full">
                 {/* Left Section: Logo (and optional left-side nav links) */}
                 <div className="flex items-center space-x-6">
-                    <button
-                        onClick={() => handleNavigate('/')}
+                    <Link
+                        to="/"
                         className="text-2xl md:text-3xl font-bold hover:underline text-blue-700 hover:text-blue-500"
                     >
                         AI-Jeopardy.com
-                    </button>
+                    </Link>
 
                     {/* Optional navigation links */}
                     <nav className="hidden md:flex items-center space-x-3">
-                        <button
-                            onClick={() => handleNavigate('/recent-boards')}
-                            className="px-4 text-xl py-2 hover:underline hover:bg-blue-500 rounded text-white hover:text-white"
+                        <Link
+                            to="/recent-boards"
+                            className="px-4 text-xl py-2 hover:underline rounded"
                         >
                             Recent Boards
-                        </button>
+                        </Link>
                     </nav>
                 </div>
 
@@ -139,24 +139,20 @@ const Header: React.FC = () => {
                                         exit={{ opacity: 0, scale: 0.9 }}
                                         transition={{ duration: 0.3 }}
                                     >
-                                        <button
-                                            onClick={() => {
-                                                handleNavigate('/profile/' + profile.username);
-                                                setDropdownOpen(false);
-                                            }}
-                                            className="block px-4 py-2 text-blue-600 hover:bg-gray-200 text-left w-full"
+                                        <Link
+                                            to={`/profile/${profile.username}`}
+                                            onClick={() => setDropdownOpen(false)}
+                                            className="block px-4 py-2 text-blue-600 hover:bg-gray-200"
                                         >
                                             Profile
-                                        </button>
-                                        <button
-                                            onClick={() => {
-                                                handleNavigate('/profile/' + profile.username + '/history');
-                                                setDropdownOpen(false);
-                                            }}
+                                        </Link>
+
+                                        <Link
+                                            to={`/profile/${profile.username}/history`}
                                             className="block px-4 py-2 text-blue-600 hover:bg-gray-200 text-left w-full"
                                         >
                                             History
-                                        </button>
+                                        </Link>
                                         <span
                                             onClick={handleLogout}
                                             className="block px-4 py-2 text-red-600 hover:bg-gray-200 cursor-pointer"
