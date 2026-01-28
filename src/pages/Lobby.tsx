@@ -1,4 +1,4 @@
-import React, {useEffect, useRef, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 import { useLocation, useNavigate, useParams} from "react-router-dom";
 import { useWebSocket } from "../contexts/WebSocketContext.tsx";
 import LobbySidebar from "../components/lobby/LobbySidebar.tsx";
@@ -10,8 +10,8 @@ import {Player} from "../types/Lobby.ts";
 import {useProfile} from "../contexts/ProfileContext.tsx";
 import {useAlert} from "../contexts/AlertContext.tsx";
 import { motion } from 'framer-motion';
-import {useNavigationBlocker} from "../hooks/useNavigationBlocker.ts";
 import {getUniqueCategories} from "../categories/getUniqueCategories.ts";
+import {useGameSession} from "../hooks/useGameSession.ts";
 
 type LockedCategories = {
     firstBoard: boolean[]; // Jeopardy lock states
@@ -23,7 +23,6 @@ type LockedCategories = {
 
 const Lobby: React.FC = () => {
     const location = useLocation();
-
     const [categories, setCategories] = useState<{
         firstBoard: string[];
         secondBoard: string[];
@@ -33,7 +32,6 @@ const Lobby: React.FC = () => {
         secondBoard: ['', '', '', '', ''],
         finalJeopardy: '',
     });
-    const isHost = location.state?.isHost || false;
     const { gameId } = useParams<{ gameId: string }>();
     const [isLoading, setIsLoading] = useState(false);
     const [allowLeave, setAllowLeave] = useState(false);
@@ -55,59 +53,63 @@ const Lobby: React.FC = () => {
     const navigate = useNavigate();
     const { profile } = useProfile();
     const { showAlert } = useAlert();
+    const { session, saveSession } = useGameSession();
+
     const joinedLobbyRef = useRef<string | null>(null);
 
-    const handleLeaveLobby = () => {
-        if (!isSocketReady) return;
-        if (!gameId) return;
-        if (!profile?.displayname) return;
+    const effectivePlayerName = useMemo(() => {
+        if (location.state?.playerName) return location.state.playerName;
+        if (session?.gameId === gameId && session?.playerName) return session.playerName;
+        if (profile?.displayname) return profile.displayname;
+        return null;
+    }, [location.state, session, gameId, profile]);
+    const isHost = location.state?.isHost || (session?.gameId === gameId && session?.isHost) || false;
 
-        sendJson({
-            type: "leave-lobby",
-            gameId,
-            playerId: profile.displayname,
-        });
-    };
+    useEffect(() => {
+        if (!gameId || !effectivePlayerName) return;
 
-    const { setIsLeavingPage } = useNavigationBlocker({
-        shouldBlock: !allowLeave,
-        onLeave: handleLeaveLobby,
-        confirmMessage: 'Are you sure you want to leave? This will remove you from the current lobby.'
-    });
+        const shouldUpdate =
+            session?.gameId !== gameId ||
+            session?.playerName !== effectivePlayerName ||
+            session?.isHost !== Boolean(isHost);
+
+        if (!shouldUpdate) return;
+
+        saveSession(gameId, effectivePlayerName, Boolean(isHost));
+    }, [gameId, effectivePlayerName, isHost, session?.gameId, session?.playerName, session?.isHost, saveSession]);
 
     useEffect(() => {
         if (!isSocketReady) return;
         if (!gameId) return;
+        if (!effectivePlayerName) return;
 
-        if (joinedLobbyRef.current === gameId) return; // already joined this lobby
+        if (joinedLobbyRef.current === gameId) return;
         joinedLobbyRef.current = gameId;
 
-        const name = profile?.displayname?.trim() || "Guest";
-
-        sendJson({ type: "join-lobby", gameId, playerName: name });
+        sendJson({ type: "join-lobby", gameId, playerName: effectivePlayerName });
         sendJson({ type: "request-lobby-state", gameId });
-    }, [isSocketReady, gameId, profile?.displayname, sendJson]);
+    }, [isSocketReady, gameId, effectivePlayerName, sendJson]);
+
 
     useEffect(() => {
         if (!allowLeave) return;
         if (!isSocketReady) return;
         if (!gameId) return;
-        if (!profile?.displayname) return;
 
         sendJson({
             type: "join-game",
             gameId,
-            playerName: profile.displayname,
+            playerName: effectivePlayerName,
         });
 
         navigate(`/game/${gameId}`, {
             state: {
-                playerName: profile.displayname.trim(),
+                playerName: effectivePlayerName,
                 isHost,
                 host,
             },
         });
-    }, [allowLeave, isSocketReady, gameId, profile?.displayname, isHost, host, sendJson, navigate]);
+    }, [allowLeave, isSocketReady, gameId, isHost, host, sendJson, navigate, effectivePlayerName]);
 
     useEffect(() => {
         if (!isSocketReady) return;
@@ -176,7 +178,6 @@ const Lobby: React.FC = () => {
                     }
 
                     if (m.inLobby === false && profile?.displayname) {
-                        setIsLeavingPage(true);
                         setAllowLeave(true);
                         return;
                     }
@@ -246,16 +247,14 @@ const Lobby: React.FC = () => {
 
                 case "create-board-failed": {
                     setIsLoading(false);
-                    // keep your showAlert logic here
+
                     return;
                 }
 
                 case "start-game": {
-                    if (profile) {
-                        setIsLoading(false);
-                        setIsLeavingPage(true);
-                        setAllowLeave(true);
-                    }
+                    setIsLoading(false);
+                    setAllowLeave(true);
+
                     return;
                 }
 
@@ -266,7 +265,6 @@ const Lobby: React.FC = () => {
                         if (profile?.displayname) {
                             setIsLoading(true);
                             setLoadingMessage("Game already started. Joining game...");
-                            setIsLeavingPage(true);
                             setAllowLeave(true);
                             return;
                         }
@@ -288,7 +286,7 @@ const Lobby: React.FC = () => {
         sendJson({ type: "check-lobby", gameId });
 
         return unsubscribe;
-    }, [isSocketReady, subscribe, sendJson, gameId, navigate, profile, setIsLeavingPage]);
+    }, [isSocketReady, subscribe, sendJson, gameId, navigate, profile]);
 
 
     const onToggleLock = (

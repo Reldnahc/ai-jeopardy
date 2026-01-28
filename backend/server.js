@@ -88,6 +88,25 @@ wss.on('connection', (ws) => {
                 // Assign the game ID to the WebSocket instance
                 ws.gameId = data.gameId;
             }
+            if (data.type === 'kick-player') {
+                const { gameId, targetPlayerName } = data;
+
+                const requester = games[gameId].players.find(p => p.id === ws.id);
+                if (requester && requester.name === games[gameId].host) {
+
+                    // Filter out the target player
+                    games[gameId].players = games[gameId].players.filter(p => p.name !== targetPlayerName);
+
+                    broadcast(gameId, {
+                        type: 'player-list-update',
+                        players: games[gameId].players,
+                        host: games[gameId].host,
+                    });
+
+                    // Explicitly tell the kicked player to leave (if they are still connected)
+                    //TODO You might want to send a specific "kicked" message type
+                }
+            }
             if (data.type === 'request-lobby-state'){
                 ws.send(JSON.stringify({
                     type: 'lobby-state',
@@ -145,49 +164,98 @@ wss.on('connection', (ws) => {
                 }));
             }
 
-            if (data.type === 'join-lobby') {
-                const {gameId, playerName} = data;
+            if (data.type === "leave-lobby") {
+                const { gameId, playerId, playerName } = data;
+                const name = String(playerId ?? playerName ?? "").trim();
 
-                // Reject blank player names
-                if (!games[gameId]) {
-                    ws.send(JSON.stringify({type: 'error', message: 'Lobby does not exist!'}));
-                    return;
+                const effectiveGameId =
+                    (gameId && games[gameId] ? gameId : null) ??
+                    (ws.gameId && games[ws.gameId] ? ws.gameId : null);
+
+                if (!effectiveGameId || !games[gameId] || !name) return;
+
+                const game = games[effectiveGameId];
+
+                // Only do hard-removal in the lobby
+                if (!game.inLobby) return;
+
+                const before = game.players.length;
+                game.players = game.players.filter((p) => p.name !== name);
+
+                if (game.players.length === before) return; // nothing to do
+
+                // If host left, reassign host (or delete lobby if empty)
+                if (game.host === name) {
+                    if (game.players.length === 0) {
+                        delete games[effectiveGameId];
+                        return;
+                    }
+                    game.host = game.players[0].name;
                 }
 
-                const existingPlayer = games[gameId].players.find((p) => p.id === ws.id || p.name === playerName);
-                // Reject if the player already exists
-                if (existingPlayer) {
-                    ws.send(JSON.stringify({type: 'info', message: 'You are already in the lobby.'}));
+                broadcast(gameId, {
+                    type: "player-list-update",
+                    players: game.players.map((p) => ({
+                        name: p.name,
+                        color: p.color,
+                        text_color: p.text_color,
+                    })),
+                    host: game.host,
+                });
+
+                return;
+            }
+
+            if (data.type === 'join-lobby') {
+                const { gameId, playerName } = data;
+
+                if (!games[gameId]) {
+                    ws.send(JSON.stringify({ type: 'error', message: 'Lobby does not exist!' }));
                     return;
                 }
 
                 const actualName = (playerName ?? "").trim();
                 if (!actualName) {
-                    ws.send(JSON.stringify({ type: "error", message: "Guest players are disabled. Please log in." }));
-                    return;
-                }
-                // Block reserved guest-style names (prevents UI bypass)
-                if (/^guest(\s+\d+)?$/i.test(actualName)) {
-                    ws.send(JSON.stringify({ type: "error", message: "Guest players are disabled. Please choose another name (or log in)." }));
+                    ws.send(JSON.stringify({ type: "error", message: "Invalid name." }));
                     return;
                 }
 
-                // Add the player to the game
-                const msg = await getColorFromPlayerName(actualName);
-                let color;
-                let text_color;
+                // 1. Try to find existing player by NAME
+                const existingPlayer = games[gameId].players.find(p => p.name === actualName);
 
-                if (msg && msg.color) color = msg.color;
-                else color = "bg-blue-500";
-                if (msg && msg.text_color) text_color = msg.text_color;
-                else text_color = "text-white";
+                if (existingPlayer) {
+                    // RECONNECT: Update the socket ID to the new connection
+                    console.log(`[Server] Player ${actualName} reconnected to Lobby ${gameId}`);
+                    existingPlayer.id = ws.id; // <--- CRITICAL FIX
+                    existingPlayer.online = true;
+                    ws.gameId = gameId;
+                } else {
+                    // NEW PLAYER: Add them to the list
+                    const msg = await getColorFromPlayerName(actualName);
+                    const raceConditionCheck = games[gameId].players.find(p => p.name === actualName);
 
-                // Add the player
-                const existing = games[gameId].players.find(p => p.id === ws.id);
-                if (!existing) {
-                    games[gameId].players.push({id: ws.id, name: actualName, color: color, text_color: text_color});
-                    console.log(`Player ${actualName} joined game ${gameId}`);
+
+                    if (raceConditionCheck) {
+                        // Treat it as a reconnect/update instead of a new push
+                        raceConditionCheck.id = ws.id;
+                        raceConditionCheck.online = true;
+                        ws.gameId = gameId;
+                    } else {
+                        // Safe to push new player
+                        const color = msg?.color || "bg-blue-500";
+                        const text_color = msg?.text_color || "text-white";
+
+                        games[gameId].players.push({
+                            id: ws.id,
+                            name: actualName,
+                            color,
+                            text_color
+                        });
+                        ws.gameId = gameId;
+                    }
                 }
+
+                // Always send state
                 ws.send(JSON.stringify({
                     type: 'lobby-state',
                     gameId,
@@ -202,6 +270,7 @@ wss.on('connection', (ws) => {
                     inLobby: games[gameId].inLobby,
                     isGenerating: Boolean(games[gameId].isGenerating),
                 }));
+
                 broadcast(gameId, {
                     type: 'player-list-update',
                     players: games[gameId].players.map((p) => ({
@@ -486,6 +555,7 @@ wss.on('connection', (ws) => {
 
             if (data.type === 'join-game') {
                 const { gameId, playerName } = data;
+
                 if (!playerName || !playerName.trim()) {
                     ws.send(JSON.stringify({ type: 'error', message: 'Player name cannot be blank.' }));
                     return;
@@ -496,42 +566,73 @@ wss.on('connection', (ws) => {
                     return;
                 }
 
-                // Check if the player is already in the game based on socket ID
-                const existingPlayer = games[gameId].players.find((p) => p.id === ws.id);
+                // 1. Find player by NAME (The Source of Truth)
+                const existingPlayer = games[gameId].players.find((p) => p.name === playerName);
+
                 if (existingPlayer) {
-                    ws.send(JSON.stringify({ type: 'info', message: 'You are already in the game.' }));
+                    // RECONNECT LOGIC
+                    console.log(`[Server] Player ${playerName} reconnected to Game ${gameId}`);
+
+                    // Update their socket ID so server sends messages to the right place
+                    existingPlayer.id = ws.id;
+                    existingPlayer.online = true;
+                    ws.gameId = gameId;
+
+                    // Force this socket to know it belongs to this game
+                    // (This prevents the 'kick-player' host check from failing later)
+
                 } else {
-                    if (!games[gameId].players.includes(playerName)) {
-                        const color = await getColorFromPlayerName(playerName);
-                        games[gameId].players.push({id: ws.id, name: playerName, color: color.color, text_color: color.text_color});
+                    // NEW PLAYER LOGIC
+                    // Only add if they truly aren't in the list
+                    const colorData = await getColorFromPlayerName(playerName);
+                    const raceConditionCheck = games[gameId].players.find((p) => p.name === playerName);
+
+                    if (raceConditionCheck) {
+                        raceConditionCheck.id = ws.id;
+                        raceConditionCheck.online = true;
+                        ws.gameId = gameId;
+                    } else {
+                        const newPlayer = {
+                            id: ws.id,
+                            name: playerName,
+                            color: colorData?.color || "bg-blue-500",
+                            text_color: colorData?.text_color || "text-white",
+                            online: true
+                        };
+                        games[gameId].players.push(newPlayer);
+                        ws.gameId = gameId;
                     }
                 }
 
-                // Notify the new player of the current game state (buzz result, buzzer status, board, and selected clue if any)
+                // 2. Hydrate Client State
+                // Send EVERYTHING needed to sync the client to right now
                 ws.send(JSON.stringify({
                     type: 'game-state',
                     gameId,
-                    players: games[gameId].players.map((p) => ({
+                    players: games[gameId].players.map(p => ({
                         name: p.name,
                         color: p.color,
-                        text_color: p.text_color,
+                        text_color: p.text_color
                     })),
                     host: games[gameId].host,
                     buzzResult: games[gameId].buzzed,
                     clearedClues: Array.from(games[gameId].clearedClues || new Set()),
                     boardData: games[gameId].boardData,
-                    selectedClue: games[gameId].selectedClue || null, // Add currently selected clue if any
-                    buzzerLocked: games[gameId].buzzerLocked,         // Send buzzer state
+                    selectedClue: games[gameId].selectedClue || null,
+                    buzzerLocked: games[gameId].buzzerLocked,
                     scores: games[gameId].scores,
+                    // Sync timers
+                    timerEndTime: games[gameId].timerEndTime,
+                    timerDuration: games[gameId].timeToAnswer
                 }));
 
-                // Notify all players
+                // Notify others
                 broadcast(gameId, {
                     type: 'player-list-update',
-                    players: games[gameId].players.map((p) => ({
+                    players: games[gameId].players.map(p => ({
                         name: p.name,
                         color: p.color,
-                        text_color: p.text_color,
+                        text_color: p.text_color
                     })),
                     host: games[gameId].host,
                 });
@@ -794,20 +895,26 @@ wss.on('connection', (ws) => {
     });
 
     ws.on('close', () => {
-        console.log(`WebSocket closed for game ${ws.gameId}`);
-        // Remove the player when they disconnect
-        Object.keys(games).forEach((gameId) => {
-            games[gameId].players = games[gameId].players.filter((p) => p.id !== ws.id);
-            broadcast(gameId, {
-                type: 'player-list-update',
-                players: games[gameId].players.map((p) => ({
-                    name: p.name,
-                    color: p.color,
-                    text_color: p.text_color,
-                })),
-                host: games[gameId].host,
-            });
-        });
+        console.log(`WebSocket closed for socket ${ws.id}`);
+
+        // Find the game this socket belonged to
+        const gameId = ws.gameId;
+
+        if (gameId && games[gameId]) {
+            const player = games[gameId].players.find((p) => p.id === ws.id);
+
+            if (player) {
+                console.log(`[Server] Player ${player.name} disconnected (soft).`);
+                player.online = false; // Mark offline but KEEP in array
+
+                // Broadcast update so frontend can gray them out
+                broadcast(gameId, {
+                    type: 'player-list-update',
+                    players: games[gameId].players,
+                    host: games[gameId].host,
+                });
+            }
+        }
     });
 });
 

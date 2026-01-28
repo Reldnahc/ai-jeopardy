@@ -16,37 +16,59 @@ import {AlertProvider} from "./contexts/AlertContext.tsx";
 import {DeviceProvider} from "./contexts/DeviceContext.tsx";
 import NotFoundPage from "./pages/NotFoundPage.tsx";
 import Layout from "./components/common/Layout.tsx";
+import RouteWatchRoot from "./components/common/RouteWatchRoot.tsx";
 
 // Define the router configuration
 const router = createBrowserRouter([
     {
-        path: "/",
-        element: <Layout><MainPage /></Layout>
+        element: (
+                <RouteWatchRoot/>
+        ),
+        children: [
+            {
+                path: "/",
+                element: (
+                        <Layout><MainPage/></Layout>
+                )
+            },
+            {
+                path: "/lobby/:gameId",
+                element: (
+                        <Layout><Lobby/></Layout>
+                )
+            },
+            {
+                path: "/game/:gameId",
+                element: (
+                        <Game/>
+                )
+            },
+            {
+                path: "/profile/:username",
+                element: (
+                        <Layout><Profile/></Layout>
+                )
+            },
+            {
+                path: "/profile/:username/history",
+                element: (
+                        <Layout><UserHistory/></Layout>
+                )
+            },
+            {
+                path: "/recent-boards",
+                element: (
+                        <Layout><RecentBoards/></Layout>
+                )
+            },
+            {
+                path: "*",
+                element: (
+                        <Layout><NotFoundPage/></Layout>
+                )
+            }
+        ],
     },
-    {
-        path: "/lobby/:gameId",
-        element: <Layout><Lobby /></Layout>
-    },
-    {
-        path: "/game/:gameId",
-        element: <Game/>
-    },
-    {
-        path: "/profile/:username",
-        element: <Layout><Profile /></Layout>
-    },
-    {
-        path: "/profile/:username/history",
-        element: <Layout><UserHistory /></Layout>
-    },
-    {
-        path: "/recent-boards",
-        element: <Layout><RecentBoards /></Layout>
-    },
-    {
-        path: "*",
-        element: <Layout><NotFoundPage /></Layout>
-    }
 ]);
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

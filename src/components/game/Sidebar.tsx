@@ -68,11 +68,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                                             }`}
                                         >
                                          ${scores[player.name] || 0}
-                                            { player.name === buzzResult && (
-                                                <span className="ml-1 text-red-500">
-                                                    - Buzzed
-                                                </span>
-                                            )}
                                         </span>
                                     )}
                                 </div>

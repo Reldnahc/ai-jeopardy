@@ -45,7 +45,7 @@ const JeopardyBoard: React.FC<JeopardyBoardProps> =
     const [wagers, setWagers] = useState<Record<string, number>>({});
     const [wagerSubmitted, setWagerSubmitted] = useState<string[]>([]);
     const [drawingSubmitted, setDrawingSubmitted] = useState<Record<string, boolean>>({});
-    const { socket, isSocketReady } = useWebSocket();
+    const { sendJson } = useWebSocket();
     const { showAlert } = useAlert();
 
         // @ts-expect-error works better this way
@@ -133,18 +133,13 @@ const JeopardyBoard: React.FC<JeopardyBoardProps> =
             setWagerSubmitted((prev) => (prev.includes(player) ? prev : [...prev, player]));
 
             // Send to server
-            if (socket && isSocketReady) {
-                socket.send(
-                    JSON.stringify({
-                        type: "submit-wager",
-                        gameId,
-                        player,
-                        wager: normalizedWager,
-                    })
-                );
-            } else {
-                console.warn("[Wager] socket not ready; wager submit not sent");
-            }
+            sendJson({
+                type: "submit-wager",
+                gameId,
+                player,
+                wager: normalizedWager,
+            });
+
         };
 
 

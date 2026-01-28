@@ -8,8 +8,8 @@ import FinalScoreScreen from "../components/game/FinalScoreScreen.tsx";
 import {useWebSocket} from "../contexts/WebSocketContext.tsx";
 import {Player} from "../types/Lobby.ts";
 import {useDeviceContext} from "../contexts/DeviceContext.tsx";
-import {useNavigationBlocker} from "../hooks/useNavigationBlocker.ts";
 import MobileSidebar from "../components/game/MobileSidebar.tsx";
+import {useGameSession} from "../hooks/useGameSession.ts";
 
 type BoardData = {
     firstBoard: { categories: Category[] };
@@ -23,9 +23,9 @@ type SelectedClueFromServer = Clue & { isAnswerRevealed?: boolean };
 export default function Game() {
     const {gameId} = useParams<{ gameId: string }>();
     const location = useLocation();
+    const { session, saveSession } = useGameSession();
     const playerName = location.state?.playerName || '';
     const [host, setHost] = useState<string | null>(null);
-    const isHost = location.state?.isHost || false;
     const [players, setPlayers] = useState<Player[]>(location.state?.players || []);
     const [buzzResult, setBuzzResult] = useState<string | null>(null);
     const [selectedClue, setSelectedClue] = useState<Clue | null>(null);
@@ -50,32 +50,39 @@ export default function Game() {
         finalJeopardy: { categories: [{ category: '', values: [] }] },
     });
 
-
     // Persistent WebSocket connection
     const { isSocketReady, sendJson, subscribe } = useWebSocket();
     const { deviceType } = useDeviceContext();
 
-    const handleLeaveGame = useCallback(() => {
-        console.log("leave game called");
-        if (!gameId) return;
-        sendJson({ type: "leave-game", gameId });
-    }, [gameId, sendJson]); // Add dependencies
-
-
-    const { setIsLeavingPage } = useNavigationBlocker({
-        shouldBlock: !isGameOver,
-        onLeave: handleLeaveGame,
-        confirmMessage: 'Are you sure you want to leave? This will remove you from the current game.'
-    });
-
     const boardDataRef = useRef(boardData);
+
+    const effectivePlayerName = location.state?.playerName ||
+        (session?.gameId === gameId ? session?.playerName : '') ||
+        '';
+    const isHost = Boolean(host && effectivePlayerName && host.trim() === effectivePlayerName.trim());
+
+    useEffect(() => {
+        if (gameId && effectivePlayerName) {
+            saveSession(gameId, effectivePlayerName, isHost);
+        }
+    }, [gameId, effectivePlayerName, saveSession, isHost]);
+
+    useEffect(() => {
+        if (!isSocketReady || !gameId || !effectivePlayerName) return;
+
+        // Whether it's a fresh join or a reconnect, we send "join-game".
+        // The server now handles the difference.
+        sendJson({
+            type: "join-game",
+            gameId,
+            playerName: effectivePlayerName,
+        });
+
+    }, [isSocketReady, gameId, effectivePlayerName, sendJson]);
 
     useEffect(() => {
         boardDataRef.current = boardData;
     }, [boardData]);
-
-
-
 
     useEffect(() => {
         if (isSocketReady) {
@@ -128,16 +135,19 @@ export default function Game() {
     };
 
     const handleScoreUpdate = (player: string, delta: number) => {
-        if (isFinalJeopardy && allWagersSubmitted){
-            delta = wagers[player];//TODO fix negative final jeopardy wagers
+        if (isFinalJeopardy && allWagersSubmitted) {
+            const w = Math.abs(wagers[player] ?? 0);
+            delta = (delta < 0 ? -w : w);
         }
+
         const newScores = {...scores, [player]: (scores[player] || 0) + delta};
         setScores(newScores);
+
         if (isSocketReady) {
-            // Emit score update to server
             sendJson({ type: "update-score", gameId, player, delta });
         }
     };
+
 
     const markAllCluesComplete = () => {
         if (isSocketReady) {
@@ -364,16 +374,13 @@ export default function Game() {
             }
 
             if (message.type === "game-over") {
-                setIsLeavingPage(true);
                 setIsGameOver(true);
                 return;
             }
         });
 
         return unsubscribe;
-    }, [isSocketReady, subscribe, timerVersion, onClueSelected, setIsLeavingPage]);
-
-
+    }, [isSocketReady, subscribe, timerVersion, onClueSelected]);
 
     if (!boardData) {
         return <p>Loading board... Please wait!</p>; // Display a loading message

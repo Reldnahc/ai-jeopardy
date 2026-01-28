@@ -58,7 +58,7 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                                                                      timerEndTime,
                                                                      timerDuration
                                                                  }) => {
-    const { socket, isSocketReady } = useWebSocket();
+    const { sendJson } = useWebSocket();
     const {deviceType} = useDeviceContext()
     return (
         <div className="absolute inset-0 h-[calc(100vh-5.5rem)] text-white flex flex-col justify-center items-center z-10 p-5">
@@ -145,16 +145,13 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                                         canvasRef.current?.exportPaths().then((paths: string) => {
                                             const drawingData = JSON.stringify(paths);
 
-                                            if (socket && isSocketReady) {
-                                                socket.send(
-                                                    JSON.stringify({
-                                                        type: "final-jeopardy-drawing",
-                                                        gameId,
-                                                        player: currentPlayer,
-                                                        drawing: drawingData,
-                                                    })
-                                                );
-                                            }
+                                            sendJson({
+                                                type: "final-jeopardy-drawing",
+                                                gameId,
+                                                player: currentPlayer,
+                                                drawing: drawingData,
+                                            });
+
 
                                             if (!drawingSubmitted[currentPlayer]) {
                                                 setDrawingSubmitted((prev) => ({
@@ -195,17 +192,14 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                     <button
                         onClick={() => {
                             if (buzzerLocked) {
-                                if (socket && isSocketReady) {
-                                    socket.send(JSON.stringify({ type: 'unlock-buzzer', gameId }));
-                                }
+                                sendJson({ type: "unlock-buzzer", gameId });
                                 setBuzzerLocked(false);
                             } else {
-                                if (socket && isSocketReady) {
-                                    socket.send(JSON.stringify({ type: 'reset-buzzer', gameId }));
-                                }
+                                sendJson({ type: "reset-buzzer", gameId });
                                 setBuzzResult(null);
                                 setBuzzerLocked(true);
                             }
+
                         }}
                         style={{ fontSize: "clamp(1rem, 2.5vw, 2rem)" }}
                         className={`mt-4 mr-3 px-12 min-w-[22rem] py-5 rounded-xl font-bold shadow-2xl text-white transition duration-300 ease-in-out ${
@@ -223,42 +217,18 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                         onClick={() => {
                             if (!showAnswer) {
                                 setShowAnswer(true);
-                                if (socket && isSocketReady) {
-                                    socket.send(
-                                        JSON.stringify({
-                                            type: 'reveal-answer',
-                                            gameId,
-                                        })
-                                    );
-                                }
+                                sendJson({ type: "reveal-answer", gameId });
                             } else {
                                 setShowClue(false);
 
-                                if (localSelectedClue && socket && isSocketReady) {
+                                if (localSelectedClue) {
                                     const clueId = `${localSelectedClue.value}-${localSelectedClue.question}`;
 
-                                    socket.send(
-                                        JSON.stringify({
-                                            type: "clue-cleared",
-                                            gameId,
-                                            clueId,
-                                        })
-                                    );
-
-                                    socket.send(
-                                        JSON.stringify({
-                                            type: "return-to-board",
-                                            gameId,
-                                        })
-                                    );
+                                    sendJson({ type: "clue-cleared", gameId, clueId });
+                                    sendJson({ type: "return-to-board", gameId });
 
                                     if (isFinalJeopardy) {
-                                        socket.send(
-                                            JSON.stringify({
-                                                type: "trigger-game-over",
-                                                gameId,
-                                            })
-                                        );
+                                        sendJson({ type: "trigger-game-over", gameId });
                                     }
                                 }
                             }

@@ -2,17 +2,14 @@ import React, {
     createContext, useContext, useRef, useEffect, useState,
     useCallback, useMemo
 } from "react";
-// import { useProfile } from "./ProfileContext.tsx";
-// import { useAuth } from "./AuthContext.tsx";
-
 type WSMessage = { type: string; [key: string]: unknown };
 type Listener = (msg: WSMessage) => void;
 
 interface WebSocketContextType {
-    socket: WebSocket | null;
     isSocketReady: boolean;
     sendJson: (payload: object) => void;
     subscribe: (listener: Listener) => () => void;
+    setLobbyPresence: (presence: { gameId: string; playerId: string } | null) => void;
 }
 
 const WebSocketContext = createContext<WebSocketContextType | null>(null);
@@ -26,6 +23,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const connectingRef = useRef(false);
 
     const [isSocketReady, setIsSocketReady] = useState(false);
+    const lastLobbyRef = useRef<{ gameId: string; playerId: string } | null>(null);
 
     // const { profile, error } = useProfile();
     // const { loading } = useAuth();
@@ -33,6 +31,11 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const subscribe = useCallback((listener: Listener) => {
         listenersRef.current.add(listener);
         return () => listenersRef.current.delete(listener);
+    }, []);
+
+
+    const setLobbyPresence = useCallback((presence: { gameId: string; playerId: string } | null) => {
+        lastLobbyRef.current = presence;
     }, []);
 
     const flushQueue = useCallback(() => {
@@ -68,7 +71,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             if (socketRef.current === ws) {
                 socketRef.current = null;
                 setIsSocketReady(false);
-                listenersRef.current.clear();
+                //listenersRef.current.clear();
             }
             connectingRef.current = false;
         };
@@ -145,7 +148,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             if (ws) ws.close();
             socketRef.current = null;
             setIsSocketReady(false);
-            listenersRef.current.clear();
+            //listenersRef.current.clear();
             queueRef.current = [];
             connectingRef.current = false;
         };
@@ -153,11 +156,11 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
 
     const value = useMemo<WebSocketContextType>(() => ({
-        socket: socketRef.current,
         isSocketReady,
         sendJson,
         subscribe,
-    }), [isSocketReady, sendJson, subscribe]);
+        setLobbyPresence
+    }), [isSocketReady, sendJson, setLobbyPresence, subscribe]);
 
     return <WebSocketContext.Provider value={value}>{children}</WebSocketContext.Provider>;
 };

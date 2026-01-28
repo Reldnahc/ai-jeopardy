@@ -8,6 +8,7 @@ import { motion } from 'framer-motion';
 import PlayerSearch from "../components/main/PlayerSearch.tsx";
 import {Player} from "../types/Lobby.ts";
 import {getUniqueCategories} from "../categories/getUniqueCategories.ts";
+import {useGameSession} from "../hooks/useGameSession.ts";
 
 export default function MainPage() {
     const [gameId, setGameId] = useState('');
@@ -16,7 +17,7 @@ export default function MainPage() {
         category: "Connecting to server...",
         description: ""
     });
-
+    const { saveSession } = useGameSession();
     const { showAlert } = useAlert();
     const { user } = useAuth();
     const { profile, loading: profileLoading, refetchProfile } = useProfile();
@@ -60,8 +61,8 @@ export default function MainPage() {
 
                     setIsCreatingLobby(false);
 
-                    // profile is required to host
                     if (!profile) return;
+                    saveSession(m.gameId, profile.displayname, true);
 
                     navigate(`/lobby/${m.gameId}`, {
                         state: {
@@ -81,11 +82,14 @@ export default function MainPage() {
 
                     if (m.isValid) {
                         const name = profile ? profile.displayname : "";
-                        sendJson({
-                            type: "join-lobby",
-                            gameId: m.gameId,
-                            playerName: name.trim(),
-                        });
+
+                        saveSession(m.gameId, name.trim(), false);
+                        //TODO Remove
+                        // sendJson({
+                        //     type: "join-lobby",
+                        //     gameId: m.gameId,
+                        //     playerName: name.trim(),
+                        // });
 
                         navigate(`/lobby/${m.gameId}`, {
                             state: {
@@ -167,7 +171,7 @@ export default function MainPage() {
             setIsCreatingLobby(true);
             sendJson({
                 type: "create-lobby",
-                host: profile.username,
+                host: profile.displayname,
                 categories: handleGenerateRandomCategories(),
             });
             console.log('sent create-lobby message');
