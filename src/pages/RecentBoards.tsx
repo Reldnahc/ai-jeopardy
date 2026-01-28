@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import GameCard from "../components/recentboards/GameCard";
 import { Board } from "../types/Board.ts";
-import { supabase } from "../supabaseClient.ts";
+import { supabase } from "../supabaseClient";
 import {models} from "../../shared/models.js";
 
 const RecentBoards = () => {

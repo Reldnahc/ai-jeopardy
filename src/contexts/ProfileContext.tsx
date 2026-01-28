@@ -1,5 +1,5 @@
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
-import {supabase} from "../supabaseClient.ts";
+import {supabase} from "../supabaseClient";
 import {useAuth} from "./AuthContext.tsx";
 
 // Define the shape of the data you expect from the "profiles" table

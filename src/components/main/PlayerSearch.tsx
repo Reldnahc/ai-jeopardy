@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import {supabase} from "../../supabaseClient.ts";
+import {supabase} from "../../supabaseClient";
 import {useNavigate} from "react-router-dom";
 import Avatar from "../common/Avatar.tsx";
 

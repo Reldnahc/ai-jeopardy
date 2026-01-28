@@ -3,7 +3,7 @@ import {Link, useLocation, useNavigate} from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext.tsx";
 import { useProfile } from "../../contexts/ProfileContext.tsx";
 import LoginForm from "./LoginForm.tsx";
-import { supabase } from "../../supabaseClient.ts";
+import { supabase } from "../../supabaseClient";
 import Avatar from "./Avatar.tsx";
 import { useUserProfile } from "../../contexts/UserProfileContext.tsx";
 import { motion, AnimatePresence } from "framer-motion";
@@ -12,7 +12,7 @@ import {useAlert} from "../../contexts/AlertContext.tsx";
 const Header: React.FC = () => {
     const [dropdownOpen, setDropdownOpen] = useState(false); // Profile dropdown state
     const [menuOpen, setMenuOpen] = useState(false); // Hamburger menu state
-    const { user } = useAuth();
+    const { user, setUser } = useAuth();
     const { profile } = useProfile();
     const { userProfile } = useUserProfile();
     const dropdownRef = useRef<HTMLDivElement>(null); // Reference to the dropdown menu
@@ -69,6 +69,7 @@ const Header: React.FC = () => {
             console.log("No auth session (already logged out).");
         } finally {
             // Always close menus so UI doesn't feel stuck
+            setUser(null);
             setDropdownOpen(false);
             setMenuOpen(false);
 
