@@ -30,11 +30,11 @@ const LoginForm = () => {
         setOpen(!open);
     };
 
-    // Animation Variants
-    const formVariants = {
-        hidden: { height: 0, opacity: 0 }, // Collapse with no height
-        visible: { height: "auto", opacity: 1 }, // Expand to full height
-        exit: { height: 0, opacity: 0 }, // Collapse with transition
+    // Switch animation (no sliding). Size changes are handled by layout.
+    const switchVariants = {
+        initial: { opacity: 0, scale: 0.98 },
+        animate: { opacity: 1, scale: 1 },
+        exit: { opacity: 0, scale: 0.98 },
     };
 
     return (
@@ -52,20 +52,28 @@ const LoginForm = () => {
                 {open && (
                     <motion.div
                         className="absolute right-0 mt-2 w-80 bg-white p-6 rounded-lg shadow-xl z-10 overflow-hidden"
+                        layout="size"
                         initial={{ opacity: 0, scale: 0.95, y: -10 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                        transition={{ duration: 0.2 }}
+                        transition={{
+                            duration: 0.2,
+                            ease: "easeOut",
+                            layout: { duration: 0.25, ease: "easeInOut" }
+                        }}
+
                     >
-                        <AnimatePresence mode="wait"> {/* Switch between login and signup */}
+                        {/* Switch between login and signup (grow/shrink only) */}
+                        <AnimatePresence mode="wait" initial={false}>
                             {showSignup ? (
                                 <motion.div
                                     key="signup"
-                                    variants={formVariants}
-                                    initial="hidden"
-                                    animate="visible"
+                                    variants={switchVariants}
+                                    initial="initial"
+                                    animate="animate"
                                     exit="exit"
-                                    transition={{ duration: 0.2 }} // Adjust duration for smoothness
+                                    transition={{ duration: 0.15 }}
+                                    layout
                                 >
                                     <Signup />
                                     <p className="mt-4 text-center text-gray-700 text-sm">
@@ -86,11 +94,12 @@ const LoginForm = () => {
                             ) : (
                                 <motion.div
                                     key="login"
-                                    variants={formVariants}
-                                    initial="hidden"
-                                    animate="visible"
+                                    variants={switchVariants}
+                                    initial="initial"
+                                    animate="animate"
                                     exit="exit"
-                                    transition={{ duration: 0.2 }} // Adjust duration for smoothness
+                                    transition={{ duration: 0.15 }}
+                                    layout
                                 >
                                     <Login />
                                     <p className="mt-4 text-center text-gray-700 text-sm">

@@ -6,7 +6,6 @@ import ProfileGameCard from "../components/profile/ProfileGameCard.tsx";
 import Avatar from "../components/common/Avatar.tsx";
 import {useAuth} from "../contexts/AuthContext.tsx";
 import {useUserProfile} from "../contexts/UserProfileContext.tsx";
-import { motion } from 'framer-motion';
 import LoadingScreen from "../components/common/LoadingScreen.tsx";
 
 // Define the expected shape of the profile data from Supabase
@@ -156,12 +155,7 @@ const Profile: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-gradient-to-r from-indigo-400 to-blue-700 flex items-center justify-center p-6">
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6 }}
-                className="max-w-3xl w-full bg-white rounded-xl shadow-2xl overflow-hidden p-6"
-            >
+            <div className="max-w-3xl w-full bg-white rounded-xl shadow-2xl overflow-hidden p-6">
                 <div className="space-y-8">
                     {/* Profile Header */}
                     <div className="flex items-center space-x-4">
@@ -288,7 +282,7 @@ const Profile: React.FC = () => {
                     </div>
 
                 </div>
-            </motion.div>
+            </div>
         </div>
     );
 

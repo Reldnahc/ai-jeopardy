@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { motion } from "framer-motion";
 import { supabase } from "../supabaseClient";
 import { Board } from "../types/Board";
 import Avatar from "../components/common/Avatar";
@@ -154,12 +153,7 @@ export default function UserHistory() {
 
     return (
         <div className="min-h-screen bg-gradient-to-r from-indigo-400 to-blue-700 flex flex-col items-center p-6">
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6 }}
-                className="bg-white rounded-xl shadow-2xl overflow-hidden w-full max-w-6xl"
-            >
+            <div className="bg-white rounded-xl shadow-2xl overflow-hidden w-full max-w-6xl">
                 <div className="p-10">
                     {/* Header */}
                     <div className="flex items-center justify-between gap-4 flex-wrap mb-8">
@@ -215,7 +209,7 @@ export default function UserHistory() {
                         )}
                     </div>
                 </div>
-            </motion.div>
+            </div>
         </div>
     );
 }

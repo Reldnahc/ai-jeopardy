@@ -40,6 +40,8 @@ const Lobby: React.FC = () => {
     const [timeToBuzz, setTimeToBuzz] = useState(10);
     const [timeToAnswer, setTimeToAnswer] = useState(10);
     const [copySuccess, setCopySuccess] = useState(false);
+    const [boardJson, setBoardJson] = useState<string>("");
+    const [boardJsonError, setBoardJsonError] = useState<string | null>(null);
     const [players, setPlayers] = useState<Player[]>(location.state?.players || []);
     const [host, setHost] = useState<string | null>(null);
     const [selectedModel, setSelectedModel] = useState('gpt-5-mini'); // Default value for dropdown
@@ -247,7 +249,20 @@ const Lobby: React.FC = () => {
 
                 case "create-board-failed": {
                     setIsLoading(false);
-
+                    const m = message as unknown as { message?: string };
+                    showAlert(
+                        <span>
+                            <span className="text-red-500 font-bold text-xl">Failed to start game</span><br/>
+                            <span>{m.message ?? "Unknown error."}</span>
+                        </span>,
+                        [
+                            {
+                                label: "Okay",
+                                actionValue: "okay",
+                                styleClass: "bg-green-500 text-white hover:bg-green-600",
+                            }
+                        ]
+                    );
                     return;
                 }
 
@@ -405,6 +420,28 @@ const Lobby: React.FC = () => {
         });
     };
 
+    const tryValidateBoardJson = (raw: string): string | null => {
+        if (!raw.trim()) return null; // empty means "use AI"
+
+        try {
+            const parsed = JSON.parse(raw) as unknown;
+
+            // We only do minimal checks here because server is authoritative.
+            if (typeof parsed !== "object" || parsed === null) return "Board JSON must be an object.";
+
+            const p = parsed as any;
+            const bd = p.boardData && typeof p.boardData === "object" ? p.boardData : p;
+
+            if (!bd.firstBoard || !bd.secondBoard || !bd.finalJeopardy) {
+                return "Missing firstBoard / secondBoard / finalJeopardy.";
+            }
+
+            return null;
+        } catch {
+            return "Invalid JSON (can’t parse).";
+        }
+    };
+
     const handleCreateGame = async () => {
         if (!profile) {
             showAlert(
@@ -420,23 +457,50 @@ const Lobby: React.FC = () => {
             );
             return;
         }
-        if (
-            categories.firstBoard.some((c) => !c.trim()) ||
-            categories.secondBoard.some((c) => !c.trim())
-        ) {
+
+        const localJsonError = tryValidateBoardJson(boardJson);
+        setBoardJsonError(localJsonError);
+
+        const usingImportedBoard = boardJson.trim().length > 0;
+
+        if (usingImportedBoard && localJsonError) {
             showAlert(
                 <span>
-                    <span className="text-red-500 font-bold text-xl">Please fill in all the categories</span><br/>
+                    <span className="text-red-500 font-bold text-xl">Invalid board JSON</span><br/>
+                    <span>{localJsonError}</span>
                 </span>,
                 [
                     {
                         label: "Okay",
                         actionValue: "okay",
                         styleClass: "bg-green-500 text-white hover:bg-green-600",
-                    }]
+                    }
+                ]
             );
             return;
         }
+
+        // Only require categories when NOT importing
+        if (!usingImportedBoard) {
+            if (
+                categories.firstBoard.some((c) => !c.trim()) ||
+                categories.secondBoard.some((c) => !c.trim())
+            ) {
+                showAlert(
+                    <span>
+                        <span className="text-red-500 font-bold text-xl">Please fill in all the categories</span><br/>
+                    </span>,
+                    [
+                        {
+                            label: "Okay",
+                            actionValue: "okay",
+                            styleClass: "bg-green-500 text-white hover:bg-green-600",
+                        }]
+                );
+                return;
+            }
+        }
+
 
         try {
             setIsLoading(true);
@@ -454,6 +518,7 @@ const Lobby: React.FC = () => {
                 timeToAnswer,
                 categories: [...categories.firstBoard, ...categories.secondBoard, categories.finalJeopardy],
                 selectedModel,
+                boardJson: boardJson.trim() ? boardJson : undefined,
             });
         } catch (error) {
             console.error('Failed to generate board data:', error);
@@ -465,12 +530,7 @@ const Lobby: React.FC = () => {
         <LoadingScreen message={loadingMessage}/>
     ) : (
         <div className="min-h-[calc(100vh-5.5rem)] bg-gradient-to-r from-indigo-400 to-blue-700 p-6">
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6 }}
-                className="bg-white rounded-xl shadow-2xl overflow-hidden w-full max-w-6xl mx-auto"
-            >
+            <div className="bg-white rounded-xl shadow-2xl overflow-hidden w-full max-w-6xl mx-auto">
                 <div className="grid grid-cols-1 lg:grid-cols-4">
                     {/* Sidebar Column */}
                     <div className="lg:col-span-1 border-r border-gray-200 bg-gray-50 p-6">
@@ -533,6 +593,41 @@ const Lobby: React.FC = () => {
                                 animate={{ opacity: 1 }}
                                 className="mt-8 border-t border-gray-200 pt-6"
                             >
+                                <div className="mb-6 p-4 rounded-lg border border-gray-200 bg-gray-50">
+                                    <div className="flex items-center justify-between gap-3 mb-2">
+                                        <h3 className="text-lg font-semibold text-gray-800">Custom Board (Copy/Paste JSON)</h3>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setBoardJson(""); setBoardJsonError(null); }}
+                                            className="px-3 py-1 rounded bg-gray-200 text-gray-800 hover:bg-gray-300"
+                                        >
+                                            Clear
+                                        </button>
+                                    </div>
+
+                                    <p className="text-sm text-gray-600 mb-2">
+                                        If you paste JSON here, the game will start using this board (no AI generation).
+                                        Leave empty to use categories + AI.
+                                    </p>
+
+                                    <textarea
+                                        value={boardJson}
+                                        onChange={(e) => {
+                                            const next = e.target.value;
+                                            setBoardJson(next);
+                                            setBoardJsonError(tryValidateBoardJson(next));
+                                        }}
+                                        className="w-full h-40 p-3 rounded border border-gray-300 font-mono text-sm text-black bg-white"
+                                        placeholder='Paste board JSON here... (must include firstBoard, secondBoard, finalJeopardy)'
+                                    />
+
+                                    {boardJsonError && boardJson.trim().length > 0 && (
+                                        <div className="mt-2 text-sm text-red-600">
+                                            {boardJsonError}
+                                        </div>
+                                    )}
+                                </div>
+
                                 <HostControls
                                     selectedModel={selectedModel}
                                     onModelChange={handleDropdownChange}
@@ -549,7 +644,7 @@ const Lobby: React.FC = () => {
                         )}
                     </div>
                 </div>
-            </motion.div>
+            </div>
         </div>
     );
 };

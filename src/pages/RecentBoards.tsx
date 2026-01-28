@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from "react";
-import { motion } from "framer-motion";
 import GameCard from "../components/recentboards/GameCard";
 import { Board } from "../types/Board.ts";
 import { supabase } from "../supabaseClient.ts";
@@ -80,12 +79,7 @@ const RecentBoards = () => {
 
 
             {/* Boards Display */}
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6 }}
-                className="bg-white rounded-xl shadow-2xl overflow-hidden w-full max-w-6xl"
-            >
+            <div className="bg-white rounded-xl shadow-2xl overflow-hidden w-full max-w-6xl">
                 <div className="p-10">
                     <h1 className="text-4xl font-bold text-gray-900 mb-8 text-center">
                         Recent Boards
@@ -133,7 +127,7 @@ const RecentBoards = () => {
                     {/* Dummy div to trigger infinite scroll */}
                     <div ref={loadMoreRef} className="h-12"></div>
                 </div>
-            </motion.div>
+            </div>
         </div>
     );
 };

@@ -4,7 +4,6 @@ import { useWebSocket } from "../contexts/WebSocketContext.tsx";
 import {useAuth} from "../contexts/AuthContext.tsx";
 import {useProfile} from "../contexts/ProfileContext.tsx";
 import {useAlert} from "../contexts/AlertContext.tsx";
-import { motion } from 'framer-motion';
 import PlayerSearch from "../components/main/PlayerSearch.tsx";
 import {Player} from "../types/Lobby.ts";
 import {getUniqueCategories} from "../categories/getUniqueCategories.ts";
@@ -233,12 +232,7 @@ export default function MainPage() {
     return (
         <div className="min-h-screen bg-gradient-to-r from-indigo-400 to-blue-700 flex items-center justify-center p-6 ">
             {/* Animated container for the main card */}
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6 }}
-                className="bg-white rounded-xl shadow-2xl overflow-hidden w-full max-w-6xl p-20 pt-4"
-            >
+            <div className="bg-white rounded-xl shadow-2xl overflow-hidden w-full max-w-6xl p-20 pt-4">
 
                     {/* Main Content (spans two columns on medium+ screens) */}
                     <div className="col-span-2 p-10">
@@ -403,7 +397,7 @@ export default function MainPage() {
                         </div>
 
                     </div>
-            </motion.div>
+            </div>
         </div>
     );
 }
