@@ -23,7 +23,7 @@ function callOpenAi(model, prompt, temp) {
     return openai.chat.completions.create({
         model: model,
         messages: [{role: "user", content: prompt}],
-        store: true,
+        response_format: { type: "json_object" },
         temperature: temp,
     });
 }
@@ -32,7 +32,6 @@ function callDeepseek(model, prompt, temp) {
     return deepseek.chat.completions.create({
         model: model,
         messages: [{role: "user", content: prompt}],
-        store: true,
         temperature: temp,
     });
 }
@@ -92,73 +91,52 @@ async function createBoardData(categories, model, host, temperature) {
     const prompt = (categories, double = false) => `
         You are a professional Jeopardy clue writer.
         
-        Create a complete Jeopardy board using the following EXACTLY 5 categories:
-        ${categories.map((c, i) => `${i + 1}. ${c}`).join('\n')}
+        Create a complete Jeopardy board using EXACTLY these 5 categories:
+        ${categories.map((c, i) => `${i + 1}. ${c}`).join("\n")}
         
-        GENERAL RULES:
-        - Each category MUST contain exactly 5 clues.
-        - Clue values must be ${double ? '400, 800, 1200, 1600, 2000' : '200, 400, 600, 800, 1000'}.
-        - Difficulty MUST scale strictly with value.
-        - Clues MUST be factual, unambiguous, and verifiable.
-        - Do NOT reuse facts, answers, or phrasing across clues or categories.
-        - Avoid obvious giveaways (dates, names, or key phrases directly matching the answer).
-        - The category title must NOT appear in the clue or answer.
-        - Clues must be written in Jeopardy answer format (statements, not questions).
-        - Player responses MUST be phrased as a question (e.g., "What is…", "Who is…").
+        RULES:
+        - Exactly 5 clues per category.
+        - Values must be ${double ? "400, 800, 1200, 1600, 2000" : "200, 400, 600, 800, 1000"}.
+        - Difficulty must strictly increase with value.
+        - Clues must be factual, unambiguous, and verifiable.
+        - No repeated facts, answers, or distinctive phrasing anywhere.
+        - Do NOT include the category title in any clue or answer.
+        - Clues are statements (no question marks).
+        - Answers must be phrased as questions and end with a ?.
         
-        DIFFICULTY GUIDELINES:
-        - Lowest value: common knowledge, accessible to casual players.
-        - Middle values: require reasoning, inference, or deeper familiarity.
-        - Highest values: challenging even for enthusiasts; obscure facts, multi-step reasoning, or indirect references.
-        ${double ? '- All clues should be noticeably harder than standard Jeopardy.\n- 1200+ value clues should be genuinely difficult.' : ''}
+        DIFFICULTY:
+        - Lowest values: common knowledge.
+        - Middle values: reasoning or deeper familiarity.
+        - Highest values: challenging even for enthusiasts.
+        ${double ? "- Double Jeopardy clues should be noticeably harder overall." : ""}
         
-        CONTENT QUALITY RULES:
-        - Do NOT include trick questions, wordplay-only clues, or riddles.
-        - Avoid “this X that Y” phrasing when possible.
-        - No pop culture unless the category clearly implies it.
-        - Avoid subjective or opinion-based answers.
-        - Do NOT include meta commentary, explanations, or apologies.
+        AVOID:
+        - Trick questions, riddles, or wordplay-only clues.
+        - Obvious giveaways (dates, names, or direct matches).
+        - Subjective or opinion-based answers.
+        - Meta commentary or explanations.
         
-        OUTPUT FORMAT:
-        Return ONLY valid JSON in the following structure:
+        OUTPUT:
+        Return ONLY valid JSON in this exact structure:
         
         {
           "categories": [
             {
               "category": "Category Name",
               "values": [
-                { "value": 200, "question": "Clue text", "answer": "Correct response phrased as a question" }
+                { "value": 200, "question": "Clue text", "answer": "Correct response phrased as a question?" }
               ]
             }
           ]
         }
         
-        Do NOT wrap the JSON in markdown.
-        Do NOT include any text outside the JSON.
-        SELF-CHECK (DO NOT OUTPUT THIS SECTION):
-        Before producing the final JSON, silently validate and repair until ALL checks pass:
-        
-        STRUCTURE CHECKS
-        - Output is valid JSON (no trailing commas, no markdown, no extra text).
+        STRICT REQUIREMENTS:
         - Exactly 5 categories.
-        - Each category has exactly 5 values.
-        - Values are exactly ${double ? '[400,800,1200,1600,2000]' : '[200,400,600,800,1000]'} in ascending order.
-        
-        CONTENT CHECKS
-        - Every "answer" is phrased as a question (starts with "Who is", "What is", "Where is", etc.).
-        - Clue text ("question") is a statement, not a question (no question marks).
-        - Category title does not appear verbatim in the clue or answer.
-        - No clue contains the full answer text (or a near-exact paraphrase) as a giveaway.
-        - No duplicate answers across the entire board.
-        - No repeated distinctive phrasing across clues.
-        
-        DIFFICULTY CHECKS
-        - 200/400 are broadly accessible.
-        - Higher values become progressively harder; top value in each category is the hardest.
-        
-        If any check fails, rewrite ONLY the failing clues/categories and re-check.
-        When all checks pass, output ONLY the final JSON.
-    `;
+        - Exactly 5 values per category.
+        - Values must be exactly ${double ? "[400,800,1200,1600,2000]" : "[200,400,600,800,1000]"} in ascending order.
+        - No markdown. No extra text. Valid JSON only.
+        `;
+
 
     const finalPrompt = (category) => `
         You are a professional Jeopardy clue writer.
@@ -217,11 +195,24 @@ async function createBoardData(categories, model, host, temperature) {
 
         const effectiveTemp = modelDef.hideTemp ? (modelDef.presetTemp ?? 0) : temperature;
 
-        const firstBoardPromise = apiCall(model, prompt(firstCategories), effectiveTemp);
-        const secondBoardPromise = apiCall(model, prompt(secondCategories, true), effectiveTemp);
-        const finalBoardPromise = apiCall(model, finalPrompt(finalCategory), effectiveTemp);
+        const t0 = Date.now();
+        const mark = (label) => console.log(`[timing] ${label}: ${Date.now() - t0}ms`);
 
-        const [firstResponse, secondResponse, finalResponse] = await Promise.all([firstBoardPromise, secondBoardPromise, finalBoardPromise]);
+        mark("before starting requests");
+
+        const firstBoardPromise = apiCall(model, prompt(firstCategories), effectiveTemp)
+            .then(r => { mark("first board done"); return r; });
+
+        const secondBoardPromise = apiCall(model, prompt(secondCategories, true), effectiveTemp)
+            .then(r => { mark("second board done"); return r; });
+
+        const finalBoardPromise = apiCall(model, finalPrompt(finalCategory), effectiveTemp)
+            .then(r => { mark("final done"); return r; });
+
+        const [firstResponse, secondResponse, finalResponse] =
+            await Promise.all([firstBoardPromise, secondBoardPromise, finalBoardPromise]);
+
+        mark("all done");
 
         let firstBoard;
         let secondBoard;
