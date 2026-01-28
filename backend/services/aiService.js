@@ -79,61 +79,113 @@ async function createCategoryOfTheDay() {
     return data;
 }
 
+function cleanJsonText(s) {
+    return String(s ?? "").replace(/```(?:json)?/g, "").trim();
+}
+
+function parseProviderJson(response) {
+    // Anthropic shape: { content: [{ text: "..." }] }
+    if (response?.content?.[0]?.text) {
+        return JSON.parse(cleanJsonText(response.content[0].text));
+    }
+    // OpenAI/DeepSeek chat.completions shape: { choices: [{ message: { content: "..." } }] }
+    if (response?.choices?.[0]?.message?.content) {
+        return JSON.parse(cleanJsonText(response.choices[0].message.content));
+    }
+    throw new Error("Unknown AI response shape (cannot parse JSON).");
+}
+
+async function mapWithConcurrency(items, limit, mapper) {
+    const results = new Array(items.length);
+    let idx = 0;
+
+    const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+        while (true) {
+            const i = idx++;
+            if (i >= items.length) return;
+            results[i] = await mapper(items[i], i);
+        }
+    });
+
+    await Promise.all(workers);
+    return results;
+}
+
+const saveBoardAsync = async ({ supabase, host, board }) => {
+    try {
+        const profileRes = await supabase
+            .from("profiles")
+            .select("id")
+            .eq("username", host.toLowerCase())
+            .single();
+
+        const ownerId = profileRes.data?.id;
+        if (!ownerId) {
+            console.log("[Server] Board not saved: profile missing id");
+            return;
+        }
+
+        const { error } = await supabase
+            .from("jeopardy_boards")
+            .insert([{ board, owner: ownerId }]);
+
+        if (error) console.log("[Server] Error saving board:", error);
+        else console.log("[Server] Board saved successfully");
+    } catch (e) {
+        console.log("[Server] Error saving board (async):", e?.message ?? e);
+    }
+};
+
 async function createBoardData(categories, model, host, temperature) {
     console.log("Beginning to create board data with categories: " + categories);
 
     if (!categories || categories.length !== 11) {
-        return res.status(400).json({error: 'You must provide exactly 11 categories.'});
+        // note: your original code referenced `res` here, but this is a service fn
+        throw new Error("You must provide exactly 11 categories.");
     }
 
-    const [firstCategories, secondCategories, finalCategory] = [categories.slice(0, 5), categories.slice(5, 10), categories[10]];
+    const [firstCategories, secondCategories, finalCategory] = [
+        categories.slice(0, 5),
+        categories.slice(5, 10),
+        categories[10],
+    ];
 
-    const prompt = (categories, double = false) => `
+    const modelDef = modelsByValue[model];
+    if (!modelDef) throw new Error(`Unknown model: ${model}`);
+
+    const apiCall = providerApiMap[modelDef.provider];
+    if (!apiCall) throw new Error(`No API handler for provider: ${modelDef.provider}`);
+
+    const effectiveTemp = modelDef.hideTemp ? (modelDef.presetTemp ?? 0) : temperature;
+
+    const valuesFor = (double) => (double ? [400, 800, 1200, 1600, 2000] : [200, 400, 600, 800, 1000]);
+
+    const categoryPrompt = (category, double = false) => `
         You are a professional Jeopardy clue writer.
         
-        Create a complete Jeopardy board using EXACTLY these 5 categories:
-        ${categories.map((c, i) => `${i + 1}. ${c}`).join("\n")}
+        Write ONE complete Jeopardy category: "${category}"
         
         RULES:
-        - Exactly 5 clues per category.
-        - Values must be ${double ? "400, 800, 1200, 1600, 2000" : "200, 400, 600, 800, 1000"}.
+        - Exactly 5 clues with values ${double ? "400, 800, 1200, 1600, 2000" : "200, 400, 600, 800, 1000"}.
         - Difficulty must strictly increase with value.
-        - Clues must be factual, unambiguous, and verifiable.
-        - No repeated facts, answers, or distinctive phrasing anywhere.
-        - Do NOT include the category title in any clue or answer.
+        - Clues must be factual, unambiguous, verifiable.
+        - Do NOT include the category title verbatim in any clue or answer.
         - Clues are statements (no question marks).
         - Answers must be phrased as questions and end with a ?.
+        - No repeated facts/answers/phrasing within this category.
         
-        DIFFICULTY:
-        - Lowest values: common knowledge.
-        - Middle values: reasoning or deeper familiarity.
-        - Highest values: challenging even for enthusiasts.
-        ${double ? "- Double Jeopardy clues should be noticeably harder overall." : ""}
-        
-        AVOID:
-        - Trick questions, riddles, or wordplay-only clues.
-        - Obvious giveaways (dates, names, or direct matches).
-        - Subjective or opinion-based answers.
-        - Meta commentary or explanations.
-        
-        OUTPUT:
-        Return ONLY valid JSON in this exact structure:
+        OUTPUT: Return ONLY valid JSON in this exact shape:
         
         {
-          "categories": [
-            {
-              "category": "Category Name",
-              "values": [
-                { "value": 200, "question": "Clue text", "answer": "Correct response phrased as a question?" }
-              ]
-            }
+          "category": "Category Name",
+          "values": [
+            { "value": ${double ? 400 : 200}, "question": "Clue text", "answer": "Correct response phrased as a question?" }
           ]
         }
         
-        STRICT REQUIREMENTS:
-        - Exactly 5 categories.
-        - Exactly 5 values per category.
-        - Values must be exactly ${double ? "[400,800,1200,1600,2000]" : "[200,400,600,800,1000]"} in ascending order.
+        STRICT:
+        - Exactly 5 values.
+        - Values must be exactly ${JSON.stringify(valuesFor(double))} in ascending order.
         - No markdown. No extra text. Valid JSON only.
         `;
 
@@ -141,125 +193,122 @@ async function createBoardData(categories, model, host, temperature) {
     const finalPrompt = (category) => `
         You are a professional Jeopardy clue writer.
         
-        Create a SINGLE Final Jeopardy clue for this category:
-        "${category}"
+        Create a SINGLE Final Jeopardy clue for category: "${category}"
         
         RULES:
-        - Exactly ONE clue and ONE correct response.
-        - Very difficult (Final Jeopardy level).
+        - Exactly ONE clue and ONE response.
+        - Very difficult.
         - Factual, unambiguous, verifiable.
-        - Do NOT include the category title verbatim in the clue or answer.
-        - Do NOT include the answer text (or near-paraphrase) in the clue.
+        - Do NOT include the category title verbatim in clue/answer.
         - Clue is a statement (no question mark).
-        - Response is phrased as a question ("What is…", "Who is…", etc.).
+        - Answer is a question and ends with a ?.
         
-        OUTPUT FORMAT:
-        Return ONLY valid JSON in this structure:
+        OUTPUT ONLY valid JSON in this exact shape:
         
         {
-          "categories": [
-            {
-              "category": "Category Name",
-              "values": [
-                { "question": "Clue text", "answer": "Correct response phrased as a question" }
-              ]
-            }
+          "category": "Category Name",
+          "values": [
+            { "question": "Clue text", "answer": "Correct response phrased as a question?" }
           ]
         }
         
-        Do NOT wrap the JSON in markdown.
-        Do NOT include any text outside the JSON.
-        
-        SELF-CHECK (DO NOT OUTPUT THIS SECTION):
-        - Valid JSON only.
-        - Exactly one category, exactly one value.
-        - "question" has no question mark.
-        - "answer" is a question starting with Who/What/Where/When/Which.
-        - No category-title leakage; no answer giveaway.
-        If any check fails, rewrite and re-check. Output ONLY the final JSON when valid.
-    `;
+        STRICT:
+        - Exactly 1 value.
+        - No markdown. No extra text.
+        `;
+
+
+    const t0 = Date.now();
+    const mark = (label) => console.log(`[timing] ${label}: ${Date.now() - t0}ms`);
+
+    const timed = async (label, fn) => {
+        const start = Date.now();
+        mark(`${label} START`);
+        try {
+            const out = await fn();
+            const dur = Date.now() - start;
+            mark(`${label} END (+${dur}ms)`);
+            return out;
+        } catch (e) {
+            const dur = Date.now() - start;
+            mark(`${label} FAIL (+${dur}ms)`);
+            throw e;
+        }
+    };
+
+    mark("createBoardData BEGIN");
 
     try {
+        // Fire ALL Single categories immediately
+        const firstCategoryPromises = firstCategories.map((cat, i) =>
+            timed(`SINGLE C${i + 1} (${cat})`, async () => {
+                const r = await apiCall(model, categoryPrompt(cat, false), effectiveTemp);
+                const json = parseProviderJson(r);
 
-        const modelDef = modelsByValue[model];
+                if (!json || typeof json.category !== "string" || !Array.isArray(json.values)) {
+                    throw new Error(`Single category ${i} missing {category, values}`);
+                }
 
-        if (!modelDef) {
-            throw new Error(`Unknown model: ${model}`);
-        }
+                return json;
+            })
+        );
 
-        const apiCall = providerApiMap[modelDef.provider];
+        // Fire ALL Double categories immediately
+        const secondCategoryPromises = secondCategories.map((cat, i) =>
+            timed(`DOUBLE C${i + 1} (${cat})`, async () => {
+                const r = await apiCall(model, categoryPrompt(cat, true), effectiveTemp);
+                const json = parseProviderJson(r);
 
-        if (!apiCall) {
-            throw new Error(`No API handler for provider: ${modelDef.provider}`);
-        }
+                if (!json || typeof json.category !== "string" || !Array.isArray(json.values)) {
+                    throw new Error(`Double category ${i} missing {category, values}`);
+                }
 
-        const effectiveTemp = modelDef.hideTemp ? (modelDef.presetTemp ?? 0) : temperature;
+                return json;
+            })
+        );
 
-        const t0 = Date.now();
-        const mark = (label) => console.log(`[timing] ${label}: ${Date.now() - t0}ms`);
+        // Fire Final immediately too
+        const finalPromise = timed(`FINAL (${finalCategory})`, async () => {
+            const r = await apiCall(model, finalPrompt(finalCategory), effectiveTemp);
+            const json = parseProviderJson(r);
 
-        mark("before starting requests");
-
-        const firstBoardPromise = apiCall(model, prompt(firstCategories), effectiveTemp)
-            .then(r => { mark("first board done"); return r; });
-
-        const secondBoardPromise = apiCall(model, prompt(secondCategories, true), effectiveTemp)
-            .then(r => { mark("second board done"); return r; });
-
-        const finalBoardPromise = apiCall(model, finalPrompt(finalCategory), effectiveTemp)
-            .then(r => { mark("final done"); return r; });
-
-        const [firstResponse, secondResponse, finalResponse] =
-            await Promise.all([firstBoardPromise, secondBoardPromise, finalBoardPromise]);
-
-        mark("all done");
-
-        let firstBoard;
-        let secondBoard;
-        let finalJeopardy;
-
-        if (firstResponse.content && firstResponse.content[0]) {
-            firstBoard = JSON.parse(firstResponse.content[0].text.replace(/```(?:json)?/g, "").trim());
-            secondBoard = JSON.parse(secondResponse.content[0].text.replace(/```(?:json)?/g, "").trim());
-            finalJeopardy = JSON.parse(finalResponse.content[0].text.replace(/```(?:json)?/g, "").trim());
-        } else {
-            firstBoard = JSON.parse(firstResponse.choices[0].message.content.replace(/```(?:json)?/g, "").trim());
-            secondBoard = JSON.parse(secondResponse.choices[0].message.content.replace(/```(?:json)?/g, "").trim());
-            finalJeopardy = JSON.parse(finalResponse.choices[0].message.content.replace(/```(?:json)?/g, "").trim());
-        }
-
-        const board = {
-            host,
-            model,
-            firstBoard,
-            secondBoard,
-            finalJeopardy,
-        }
-
-        const response = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('username', host.toLowerCase())
-            .single();
-
-        console.log(response);
-
-        if (response.data && response.data.id){
-            const { data, error } = await supabase
-                .from('jeopardy_boards')
-                .insert([{ board, owner: response.data.id }]);
-            if (data) {
-                console.log('Board saved successfully:', data);
+            if (!json || typeof json.category !== "string" || !Array.isArray(json.values)) {
+                throw new Error("Final jeopardy missing {category, values}");
             }
-            if (error) {
-                console.log('Error:', error);
-            }
-        }
 
-        return {firstBoard, secondBoard, finalJeopardy};
+            return json;
+        });
+
+        mark("ALL REQUESTS FIRED");
+
+        // Await them all together (also timed)
+        const [firstCategoryResults, secondCategoryResults, finalBuilt] = await timed(
+            "AWAIT ALL RESULTS",
+            async () =>
+                Promise.all([
+                    Promise.all(firstCategoryPromises),
+                    Promise.all(secondCategoryPromises),
+                    finalPromise,
+                ])
+        );
+
+        mark("ALL RESULTS RECEIVED");
+
+        const firstBoard = { categories: firstCategoryResults };
+        const secondBoard = { categories: secondCategoryResults };
+        const finalJeopardy = { categories: [finalBuilt] };
+
+        const board = { host, model, firstBoard, secondBoard, finalJeopardy };
+
+        void saveBoardAsync({ supabase, host, board });
+
+        mark("createBoardData DONE");
+        return { firstBoard, secondBoard, finalJeopardy };
     } catch (error) {
-        console.error('[Server] Error generating board data:', error.message);
+        mark("createBoardData ERROR");
+        console.error("[Server] Error generating board data:", error?.message ?? error);
         console.error(error);
+        throw error;
     }
 }
 
