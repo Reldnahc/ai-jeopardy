@@ -4,8 +4,6 @@ export const models = [
         label: "GPT-5 Mini",
         provider: "openai",
         price: 0,
-        hideTemp: true,
-        presetTemp: 1,
         disabled: false,
     },
     {
@@ -13,8 +11,6 @@ export const models = [
         label: "GPT-5 Nano",
         provider: "openai",
         price: 0,
-        hideTemp: true,
-        presetTemp: 1,
         disabled: false,
     },
     {
@@ -43,8 +39,6 @@ export const models = [
         label: "GPT-5.2",
         provider: "openai",
         price: 100,
-        hideTemp: true,
-        presetTemp: 1,
         disabled: true,
     },
     {
@@ -53,8 +47,6 @@ export const models = [
         provider: "openai",
         price: 100,
         disabled: true,
-        hideTemp: true,
-        presetTemp: 1,
     },
     {
         value: "claude-3-5-sonnet-latest",

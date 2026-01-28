@@ -401,7 +401,6 @@ wss.on('connection', (ws) => {
                     categories,
                     selectedModel,
                     host,
-                    temperature,
                     timeToBuzz,
                     timeToAnswer,
                     boardJson, // <-- NEW
@@ -431,7 +430,7 @@ wss.on('connection', (ws) => {
                     } else {
                         // AI FLOW (existing)
                         games[gameId].isGenerating = true;
-                        boardData = await createBoardData(categories, selectedModel, host, temperature);
+                        boardData = await createBoardData(categories, selectedModel, host);
                     }
                 } catch (e) {
                     console.error("[Server] create-game failed:", e);

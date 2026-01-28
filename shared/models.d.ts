@@ -6,8 +6,6 @@ export type Model = {
     provider: Provider;
     price: number;
     disabled: boolean;
-    hideTemp?: boolean;
-    presetTemp?: number;
 };
 
 export const models: Model[];

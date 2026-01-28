@@ -19,26 +19,23 @@ const providerApiMap = {
     anthropic: callAnthropic,
 };
 
-function callOpenAi(model, prompt, temp) {
+function callOpenAi(model, prompt) {
     return openai.chat.completions.create({
         model: model,
         messages: [{role: "user", content: prompt}],
         response_format: { type: "json_object" },
-        temperature: temp,
     });
 }
 
-function callDeepseek(model, prompt, temp) {
+function callDeepseek(model, prompt) {
     return deepseek.chat.completions.create({
         model: model,
         messages: [{role: "user", content: prompt}],
-        temperature: temp,
     });
 }
-function callAnthropic(model, prompt, temp) {
+function callAnthropic(model, prompt) {
     return anthropic.messages.create({
         model: model,
-        temperature: temp,
         system: "Respond only with valid JSON as described. Do not include any other text.",
         max_tokens: 2000,
         messages: [
@@ -136,7 +133,7 @@ const saveBoardAsync = async ({ supabase, host, board }) => {
     }
 };
 
-async function createBoardData(categories, model, host, temperature) {
+async function createBoardData(categories, model, host) {
     console.log("Beginning to create board data with categories: " + categories);
 
     if (!categories || categories.length !== 11) {
@@ -155,8 +152,6 @@ async function createBoardData(categories, model, host, temperature) {
 
     const apiCall = providerApiMap[modelDef.provider];
     if (!apiCall) throw new Error(`No API handler for provider: ${modelDef.provider}`);
-
-    const effectiveTemp = modelDef.hideTemp ? (modelDef.presetTemp ?? 0) : temperature;
 
     const valuesFor = (double) => (double ? [400, 800, 1200, 1600, 2000] : [200, 400, 600, 800, 1000]);
 
@@ -242,7 +237,7 @@ async function createBoardData(categories, model, host, temperature) {
         // Fire ALL Single categories immediately
         const firstCategoryPromises = firstCategories.map((cat, i) =>
             timed(`SINGLE C${i + 1} (${cat})`, async () => {
-                const r = await apiCall(model, categoryPrompt(cat, false), effectiveTemp);
+                const r = await apiCall(model, categoryPrompt(cat, false));
                 const json = parseProviderJson(r);
 
                 if (!json || typeof json.category !== "string" || !Array.isArray(json.values)) {
@@ -256,7 +251,7 @@ async function createBoardData(categories, model, host, temperature) {
         // Fire ALL Double categories immediately
         const secondCategoryPromises = secondCategories.map((cat, i) =>
             timed(`DOUBLE C${i + 1} (${cat})`, async () => {
-                const r = await apiCall(model, categoryPrompt(cat, true), effectiveTemp);
+                const r = await apiCall(model, categoryPrompt(cat, true));
                 const json = parseProviderJson(r);
 
                 if (!json || typeof json.category !== "string" || !Array.isArray(json.values)) {
@@ -269,7 +264,7 @@ async function createBoardData(categories, model, host, temperature) {
 
         // Fire Final immediately too
         const finalPromise = timed(`FINAL (${finalCategory})`, async () => {
-            const r = await apiCall(model, finalPrompt(finalCategory), effectiveTemp);
+            const r = await apiCall(model, finalPrompt(finalCategory));
             const json = parseProviderJson(r);
 
             if (!json || typeof json.category !== "string" || !Array.isArray(json.values)) {

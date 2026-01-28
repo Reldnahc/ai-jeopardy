@@ -36,7 +36,6 @@ const Lobby: React.FC = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [allowLeave, setAllowLeave] = useState(false);
     const [loadingMessage, setLoadingMessage] = useState('');
-    const [temperature, setTemperature] = useState(0.1);
     const [timeToBuzz, setTimeToBuzz] = useState(10);
     const [timeToAnswer, setTimeToAnswer] = useState(10);
     const [copySuccess, setCopySuccess] = useState(false);
@@ -512,9 +511,7 @@ const Lobby: React.FC = () => {
             sendJson({
                 type: "create-game",
                 gameId,
-                host: profile.displayname,
-                temperature,
-                timeToBuzz,
+                host: profile.displayname,                timeToBuzz,
                 timeToAnswer,
                 categories: [...categories.firstBoard, ...categories.secondBoard, categories.finalJeopardy],
                 selectedModel,
@@ -550,30 +547,30 @@ const Lobby: React.FC = () => {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 ">
                                 <div className="min-w-0">
 
-                                <CategoryBoard
-                                    title="Jeopardy!"
-                                    categories={categories.firstBoard}
-                                    isHost={isHost}
-                                    lockedCategories={lockedCategories.firstBoard}
-                                    boardType="firstBoard"
-                                    onChangeCategory={onChangeCategory}
-                                    onRandomizeCategory={handleRandomizeCategory}
-                                    onToggleLock={onToggleLock}
-                                />
+                                    <CategoryBoard
+                                        title="Jeopardy!"
+                                        categories={categories.firstBoard}
+                                        isHost={isHost}
+                                        lockedCategories={lockedCategories.firstBoard}
+                                        boardType="firstBoard"
+                                        onChangeCategory={onChangeCategory}
+                                        onRandomizeCategory={handleRandomizeCategory}
+                                        onToggleLock={onToggleLock}
+                                    />
                                 </div>
-                                    <div className="min-w-0">
+                                <div className="min-w-0">
 
                                     <CategoryBoard
-                                    title="Double Jeopardy!"
-                                    categories={categories.secondBoard}
-                                    isHost={isHost}
-                                    lockedCategories={lockedCategories.secondBoard}
-                                    boardType="secondBoard"
-                                    onChangeCategory={onChangeCategory}
-                                    onRandomizeCategory={handleRandomizeCategory}
-                                    onToggleLock={onToggleLock}
-                                />
-                                    </div>
+                                        title="Double Jeopardy!"
+                                        categories={categories.secondBoard}
+                                        isHost={isHost}
+                                        lockedCategories={lockedCategories.secondBoard}
+                                        boardType="secondBoard"
+                                        onChangeCategory={onChangeCategory}
+                                        onRandomizeCategory={handleRandomizeCategory}
+                                        onToggleLock={onToggleLock}
+                                    />
+                                </div>
                             </div>
 
                             <FinalJeopardyCategory
@@ -591,54 +588,23 @@ const Lobby: React.FC = () => {
                             <motion.div
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
-                                className="mt-8 border-t border-gray-200 pt-6"
+                                className="mt-8"
                             >
-                                <div className="mb-6 p-4 rounded-lg border border-gray-200 bg-gray-50">
-                                    <div className="flex items-center justify-between gap-3 mb-2">
-                                        <h3 className="text-lg font-semibold text-gray-800">Custom Board (Copy/Paste JSON)</h3>
-                                        <button
-                                            type="button"
-                                            onClick={() => { setBoardJson(""); setBoardJsonError(null); }}
-                                            className="px-3 py-1 rounded bg-gray-200 text-gray-800 hover:bg-gray-300"
-                                        >
-                                            Clear
-                                        </button>
-                                    </div>
-
-                                    <p className="text-sm text-gray-600 mb-2">
-                                        If you paste JSON here, the game will start using this board (no AI generation).
-                                        Leave empty to use categories + AI.
-                                    </p>
-
-                                    <textarea
-                                        value={boardJson}
-                                        onChange={(e) => {
-                                            const next = e.target.value;
-                                            setBoardJson(next);
-                                            setBoardJsonError(tryValidateBoardJson(next));
-                                        }}
-                                        className="w-full h-40 p-3 rounded border border-gray-300 font-mono text-sm text-black bg-white"
-                                        placeholder='Paste board JSON here... (must include firstBoard, secondBoard, finalJeopardy)'
-                                    />
-
-                                    {boardJsonError && boardJson.trim().length > 0 && (
-                                        <div className="mt-2 text-sm text-red-600">
-                                            {boardJsonError}
-                                        </div>
-                                    )}
-                                </div>
 
                                 <HostControls
                                     selectedModel={selectedModel}
                                     onModelChange={handleDropdownChange}
                                     onCreateGame={handleCreateGame}
-                                    temperature={temperature}
                                     timeToBuzz={timeToBuzz}
-                                    setTemperature={setTemperature}
                                     setTimeToBuzz={setTimeToBuzz}
                                     timeToAnswer={timeToAnswer}
                                     setTimeToAnswer={setTimeToAnswer}
                                     isSoloLobby={players.length <= 1}
+                                    boardJson={boardJson}
+                                    setBoardJson={setBoardJson}
+                                    boardJsonError={boardJsonError}
+                                    setBoardJsonError={setBoardJsonError}
+                                    tryValidateBoardJson={tryValidateBoardJson}
                                 />
                             </motion.div>
                         )}
