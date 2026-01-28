@@ -78,7 +78,7 @@ export default function Game() {
 
 
     useEffect(() => {
-        if (!isSocketReady || !gameId || !effectivePlayerName) return;
+        if (!gameId || !effectivePlayerName) return;
 
         // Whether it's a fresh join or a reconnect, we send "join-game".
         // The server now handles the difference.
@@ -88,20 +88,20 @@ export default function Game() {
             playerName: effectivePlayerName,
         });
 
-    }, [isSocketReady, gameId, effectivePlayerName, sendJson]);
+    }, [ gameId, effectivePlayerName, sendJson]);
 
     useEffect(() => {
         boardDataRef.current = boardData;
     }, [boardData]);
 
     useEffect(() => {
-        if (isSocketReady) {
-            sendJson({
-                type: "update-cleared-clues",
-                gameId,
-                clearedClues: Array.from(clearedClues),
-            });
-        }
+
+        sendJson({
+            type: "update-cleared-clues",
+            gameId,
+            clearedClues: Array.from(clearedClues),
+        });
+
 
         if (
             activeBoard === 'firstBoard' && boardData.firstBoard.categories[0].category !== '' &&
@@ -109,32 +109,29 @@ export default function Game() {
                 category.values.every((clue) => clearedClues.has(`${clue.value}-${clue.question}`))
             )
         ) {
-            if (isSocketReady) {
-                sendJson({
-                    type: "transition-to-second-board",
-                    gameId
-                });
-                setActiveBoard('secondBoard');
-                setIsFinalJeopardy(false);
 
-            }
+            sendJson({
+                type: "transition-to-second-board",
+                gameId
+            });
+            setActiveBoard('secondBoard');
+            setIsFinalJeopardy(false);
+
+
         } else if (
             activeBoard === 'secondBoard' && boardData.firstBoard.categories[0].category !== '' &&
             boardData.secondBoard.categories.every((category: Category) =>
                 category.values.every((clue) => clearedClues.has(`${clue.value}-${clue.question}`))
             )
         ) {
-            if (isSocketReady) {
-                sendJson({
-                    type: "transition-to-final-jeopardy",
-                    gameId
-                });
-                setActiveBoard('finalJeopardy');
-                setIsFinalJeopardy(true);
-            }
-
+            sendJson({
+                type: "transition-to-final-jeopardy",
+                gameId
+            });
+            setActiveBoard('finalJeopardy');
+            setIsFinalJeopardy(true);
         }
-    }, [clearedClues, gameId, activeBoard, isSocketReady, boardData.firstBoard.categories, boardData.secondBoard.categories, sendJson]);
+    }, [clearedClues, gameId, activeBoard, boardData.firstBoard.categories, boardData.secondBoard.categories, sendJson]);
 
     const updateClearedClues = (newClearedClues: string[]) => {
         setClearedClues((prev) => {
@@ -153,30 +150,25 @@ export default function Game() {
         const newScores = {...scores, [player]: (scores[player] || 0) + delta};
         setScores(newScores);
 
-        if (isSocketReady) {
-            sendJson({ type: "update-score", gameId, player, delta });
-        }
+        sendJson({ type: "update-score", gameId, player, delta });
+
     };
 
 
     const markAllCluesComplete = () => {
-        if (isSocketReady) {
-            if (!gameId) return;
-            sendJson({ type: "mark-all-complete", gameId });
-
-            // Update local state for cleared clues
-            if (activeBoard === 'firstBoard') {
-                const allClues = boardData.firstBoard.categories.flatMap((category: Category) =>
-                    category.values.map((clue) => `${clue.value}-${clue.question}`)
-                );
-                setClearedClues(new Set(allClues));
-            } else if (activeBoard === 'secondBoard') {
-                const allClues = boardData.secondBoard.categories.flatMap((category: Category) =>
-                    category.values.map((clue) => `${clue.value}-${clue.question}`)
-                );
-                setClearedClues(new Set(allClues.splice(0, 25)));
-            }
+        if (!gameId) return;
+        sendJson({ type: "mark-all-complete", gameId });
+        // Update local state for cleared clues
+        if (activeBoard === 'firstBoard') {
+            const allClues = boardData.firstBoard.categories.flatMap((category: Category) => category.values.map((clue) => `${clue.value}-${clue.question}`)
+            );
+            setClearedClues(new Set(allClues));
+        } else if (activeBoard === 'secondBoard') {
+            const allClues = boardData.secondBoard.categories.flatMap((category: Category) => category.values.map((clue) => `${clue.value}-${clue.question}`)
+            );
+            setClearedClues(new Set(allClues.splice(0, 25)));
         }
+
     };
 
     const handleBuzz = () => {
@@ -192,22 +184,20 @@ export default function Game() {
             return;
         }
         if (!gameId) return;
-        if (isSocketReady) {
-            sendJson({ type: "buzz", gameId, playerName });        }
+        sendJson({ type: "buzz", gameId, playerName });
     };
 
     const onClueSelected = useCallback((clue: Clue) => {
         if (isHost && clue) {
-            if (isSocketReady) {
-                if (!gameId) return;
-                sendJson({ type: "clue-selected", gameId, clue });
-            }
+            if (!gameId) return;
+            sendJson({ type: "clue-selected", gameId, clue });
+
             setSelectedClue(clue); // Update the host's UI
             if (clue.value !== undefined) {
                 setLastQuestionValue(clue.value); // Set last question value based on clue's value
             }
         }
-    },[isHost, isSocketReady, gameId, sendJson]);
+    },[isHost, gameId, sendJson]);
 
     useEffect(() => {
         if (!isSocketReady) return;
