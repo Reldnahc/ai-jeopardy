@@ -652,34 +652,60 @@ wss.on('connection', (ws) => {
                 }));
             }
 
-            if (data.type === 'leave-game') {
-                const { gameId } = data;
+            if (data.type === "leave-game") {
+                const { gameId, playerName } = data;
+                if (!gameId || !games[gameId]) return;
 
-                console.log("game", games[gameId]);
+                const game = games[gameId];
 
-                if (games[gameId]) {
+                // Prefer explicit name (intentional leave), fallback to socket id
+                const name = String(playerName || "").trim();
 
-                    // Remove the player from the list of players in the game
-                    games[gameId].players = games[gameId].players.filter((player) => {
-                        if (player.id === ws.id) {
-                            console.log(`Player ${player.name} is being removed from game ${gameId}`);
-                            return false; // Exclude this player from the filtered list
-                        }
-                        return true; // Include all other players
-                    });
+                const leavingPlayer =
+                    (name && game.players.find(p => p.name === name)) ||
+                    game.players.find(p => p.id === ws.id);
 
-                    // Optional: Notify other players in the game that this player has left
-                    broadcast(gameId, {
-                        type: 'player-list-update',
-                        players: games[gameId].players.map((p) => ({
-                            name: p.name,
-                            color: p.color,
-                            text_color: p.text_color,
-                        })),
-                        host: games[gameId].host,
-                    });
+                if (!leavingPlayer) return;
+
+                const leavingName = leavingPlayer.name;
+
+                // HARD REMOVE from players
+                game.players = game.players.filter(p => p.name !== leavingName);
+
+                // PURGE any state that can block FJ
+                if (game.wagers) delete game.wagers[leavingName];
+                if (game.drawings) delete game.drawings[leavingName];
+                if (game.scores) delete game.scores[leavingName];
+
+                // If host left, reassign (or delete if empty)
+                if (game.host === leavingName) {
+                    if (game.players.length === 0) {
+                        delete games[gameId];
+                        return;
+                    }
+                    game.host = game.players[0].name;
                 }
+
+                // Stop this socket from continuing to receive broadcasts for this game
+                ws.gameId = null;
+
+                broadcast(gameId, {
+                    type: "player-list-update",
+                    players: game.players.map(p => ({
+                        name: p.name,
+                        color: p.color,
+                        text_color: p.text_color,
+                        online: p.online !== false,
+                    })),
+                    host: game.host,
+                });
+                // After removal, re-check whether we can unblock Final Jeopardy
+               maybeBroadcastAllWagersSubmitted(gameId);
+               maybeBroadcastAllFinalDrawingsSubmitted(gameId);
+
+                return;
             }
+
 
 
             if (data.type === 'reveal-answer') {
@@ -822,32 +848,28 @@ wss.on('connection', (ws) => {
                         player,
                         wager,
                     });
-
-                    // Check if all wagers are submitted
-                    let expectedWagers;
-                    if (games[gameId].players.length === 1){
-                        expectedWagers = games[gameId].players.length;
-                    } else {
-                        expectedWagers = games[gameId].players.length - 1;
-                    }
-
-                    const allSubmitted = Object.keys(games[gameId].wagers).length === expectedWagers;
-
-                    if (allSubmitted) {
-                        broadcast(gameId, {type: "all-wagers-submitted", wagers: games[gameId].wagers});
-                    }
+                    maybeBroadcastAllWagersSubmitted(gameId);
                 }
             }
 
             if (data.type === 'transition-to-final-jeopardy') {
-                const {gameId} = data;
+                const { gameId } = data;
 
                 if (games[gameId]) {
-                    broadcast(gameId, {type: 'final-jeopardy'});
+                    const game = games[gameId];
+
+                    game.isFinalJeopardy = true;
+                    game.finalJeopardyStage = "wager"; // "wager" -> "drawing" -> "done"
+
+                    game.wagers = {};
+                    game.drawings = {};
+
+                    broadcast(gameId, { type: 'final-jeopardy' });
                 } else {
                     console.error(`[Server] Game ID ${gameId} not found for board transition.`);
                 }
             }
+
 
             if (data.type === 'final-jeopardy-drawing') {
                 const {gameId, player, drawing} = data;
@@ -876,15 +898,7 @@ wss.on('connection', (ws) => {
                         player,
                     });
 
-                    const expectedSubmissions = games[gameId].players.length === 1 ? games[gameId].players.length : games[gameId].players.length - 1;
-                    const allPlayersSubmitted = Object.keys(games[gameId].drawings).length === expectedSubmissions;
-
-                    if (allPlayersSubmitted) {
-                        broadcast(gameId, {
-                            type: 'all-final-jeopardy-drawings-submitted',
-                            drawings: games[gameId].drawings,
-                        });
-                    }
+                    maybeBroadcastAllFinalDrawingsSubmitted(gameId);
                 } else {
                     console.error(`[Server] Game ID ${gameId} not found when submitting final jeopardy drawing.`);
                 }
@@ -897,25 +911,61 @@ wss.on('connection', (ws) => {
     ws.on('close', () => {
         console.log(`WebSocket closed for socket ${ws.id}`);
 
-        // Find the game this socket belonged to
         const gameId = ws.gameId;
+        if (!gameId || !games[gameId]) return;
 
-        if (gameId && games[gameId]) {
-            const player = games[gameId].players.find((p) => p.id === ws.id);
+        const game = games[gameId];
+        const player = game.players.find((p) => p.id === ws.id);
+        if (!player) return;
 
-            if (player) {
-                console.log(`[Server] Player ${player.name} disconnected (soft).`);
-                player.online = false; // Mark offline but KEEP in array
+        if (game.inLobby) {
+            const leavingName = player.name;
+            console.log(`[Server] Player ${leavingName} disconnected in lobby (hard remove).`);
 
-                // Broadcast update so frontend can gray them out
-                broadcast(gameId, {
-                    type: 'player-list-update',
-                    players: games[gameId].players,
-                    host: games[gameId].host,
-                });
+            game.players = game.players.filter((p) => p.id !== ws.id);
+
+            // If host left, reassign host (or delete lobby if empty)
+            if (game.host === leavingName) {
+                if (game.players.length === 0) {
+                    delete games[gameId];
+                    return;
+                }
+                game.host = game.players[0].name;
             }
+
+            broadcast(gameId, {
+                type: "player-list-update",
+                players: game.players.map((p) => ({
+                    name: p.name,
+                    color: p.color,
+                    text_color: p.text_color,
+                    online: true, // lobby should never have "offline" players
+                })),
+                host: game.host,
+            });
+
+            return;
         }
+
+        console.log(`[Server] Player ${player.name} disconnected (soft).`);
+        player.online = false;
+
+        broadcast(gameId, {
+            type: "player-list-update",
+            players: game.players.map((p) => ({
+                name: p.name,
+                color: p.color,
+                text_color: p.text_color,
+                online: p.online !== false,
+            })),
+            host: game.host,
+        });
+
+        // Unblock Final Jeopardy if they were required
+        maybeBroadcastAllWagersSubmitted(gameId);
+        maybeBroadcastAllFinalDrawingsSubmitted(gameId);
     });
+
 });
 
 // Broadcast a message to all clients in a specific game
@@ -926,6 +976,61 @@ function broadcast(gameId, message) {
         }
     });
 }
+
+function isOnline(p) {
+    return p?.online !== false; // undefined -> treated as online
+}
+
+function getExpectedFinalists(game) {
+    if (!game) return [];
+
+    // Solo game: only player is also the one who must submit
+    if (game.players.length === 1) return [game.players[0]];
+
+    // Normal: host does NOT submit; only online contestants count
+    return game.players.filter(p => p.name !== game.host && isOnline(p));
+}
+
+function maybeBroadcastAllWagersSubmitted(gameId) {
+    const game = games[gameId];
+    if (!game) return;
+
+    if (!game.isFinalJeopardy || game.finalJeopardyStage !== "wager") return;
+
+    const expected = getExpectedFinalists(game).map(p => p.name);
+
+    const wagers = game.wagers || {};
+    const allSubmitted = expected.every(name =>
+        Object.prototype.hasOwnProperty.call(wagers, name)
+    );
+
+    // If no expected finalists (everyone offline), that still means "done"
+    if (expected.length === 0 || allSubmitted) {
+        game.finalJeopardyStage = "drawing";
+        broadcast(gameId, { type: "all-wagers-submitted", wagers });
+    }
+}
+
+
+function maybeBroadcastAllFinalDrawingsSubmitted(gameId) {
+    const game = games[gameId];
+    if (!game) return;
+
+    if (!game.isFinalJeopardy || game.finalJeopardyStage !== "drawing") return;
+
+    const expected = getExpectedFinalists(game).map(p => p.name);
+
+    const drawings = game.drawings || {};
+    const allSubmitted = expected.every(name =>
+        Object.prototype.hasOwnProperty.call(drawings, name)
+    );
+
+    if (expected.length === 0 || allSubmitted) {
+        game.finalJeopardyStage = "done";
+        broadcast(gameId, { type: "all-final-jeopardy-drawings-submitted", drawings });
+    }
+}
+
 
 setInterval(() => {
     wss.clients.forEach((ws) => {

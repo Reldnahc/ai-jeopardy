@@ -1,5 +1,5 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
-import {useLocation, useParams} from 'react-router-dom';
+import {useLocation, useNavigate, useParams} from 'react-router-dom';
 import JeopardyBoard from '../components/game/JeopardyBoard.tsx';
 import {Category, Clue} from "../types.ts";
 import Sidebar from "../components/game/Sidebar.tsx";
@@ -23,7 +23,8 @@ type SelectedClueFromServer = Clue & { isAnswerRevealed?: boolean };
 export default function Game() {
     const {gameId} = useParams<{ gameId: string }>();
     const location = useLocation();
-    const { session, saveSession } = useGameSession();
+    const navigate = useNavigate();
+    const { session, saveSession, clearSession  } = useGameSession();
     const playerName = location.state?.playerName || '';
     const [host, setHost] = useState<string | null>(null);
     const [players, setPlayers] = useState<Player[]>(location.state?.players || []);
@@ -60,6 +61,26 @@ export default function Game() {
         (session?.gameId === gameId ? session?.playerName : '') ||
         '';
     const isHost = Boolean(host && effectivePlayerName && host.trim() === effectivePlayerName.trim());
+
+    const leaveGame = useCallback(() => {
+        if (!gameId || !effectivePlayerName) {
+            clearSession();
+            navigate("/");
+            return;
+        }
+
+        if (isSocketReady) {
+            sendJson({
+                type: "leave-game",
+                gameId,
+                playerName: effectivePlayerName,
+            });
+        }
+
+        clearSession();
+        navigate("/");
+    }, [gameId, effectivePlayerName, isSocketReady, sendJson, clearSession, navigate]);
+
 
     useEffect(() => {
         if (!gameId || !effectivePlayerName) return;
@@ -400,6 +421,7 @@ export default function Game() {
                     buzzResult={buzzResult}
                     lastQuestionValue={lastQuestionValue}
                     handleScoreUpdate={handleScoreUpdate}
+                    onLeaveGame={leaveGame}
                 />
             ) : (
                 <Sidebar
@@ -412,6 +434,7 @@ export default function Game() {
                     activeBoard={activeBoard}
                     handleScoreUpdate={handleScoreUpdate}
                     markAllCluesComplete={markAllCluesComplete}
+                    onLeaveGame={leaveGame}
                 />
                 )}
             {/* Jeopardy Board Section */}

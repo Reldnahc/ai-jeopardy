@@ -12,6 +12,7 @@ interface MobileSidebarProps {
     lastQuestionValue: number;
     handleScoreUpdate: (player: string, delta: number) => void;
     buzzResult: string | null;
+    onLeaveGame: () => void;
 }
 
 const MobileSidebar: React.FC<MobileSidebarProps> = ({
@@ -22,6 +23,7 @@ const MobileSidebar: React.FC<MobileSidebarProps> = ({
                                                          lastQuestionValue,
                                                          handleScoreUpdate,
                                                          buzzResult,
+                                                         onLeaveGame
                                                      }) => {
     const [isOpen, setIsOpen] = useState(false);
     const navigate = useNavigate();
@@ -106,6 +108,17 @@ const MobileSidebar: React.FC<MobileSidebarProps> = ({
                                     ))}
                                 </ul>
                             </div>
+                            <button
+                                className="w-full mb-3 px-4 py-2 rounded-lg bg-red-600 text-white font-bold hover:bg-red-700"
+                                onClick={() => {
+                                    const ok = window.confirm(
+                                        "Leave the game?\n\nLeaving means you will quit this game and may not be able to rejoin."
+                                    );
+                                    if (ok) onLeaveGame();
+                                }}
+                            >
+                                Leave Game
+                            </button>
                         </div>
                     </motion.div>
                 )}

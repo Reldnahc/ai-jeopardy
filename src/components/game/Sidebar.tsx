@@ -2,7 +2,6 @@ import React from "react";
 import {useProfile} from "../../contexts/ProfileContext.tsx";
 import Avatar from "../common/Avatar.tsx";
 import {Player} from "../../types/Lobby.ts";
-import {useNavigate} from "react-router-dom";
 
 interface SidebarProps {
     isHost: boolean;
@@ -14,6 +13,7 @@ interface SidebarProps {
     handleScoreUpdate: (player: string, delta: number) => void;
     markAllCluesComplete: () => void;
     buzzResult: string | null;
+    onLeaveGame: () => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -26,19 +26,26 @@ const Sidebar: React.FC<SidebarProps> = ({
                                              handleScoreUpdate,
                                              markAllCluesComplete,
                                              buzzResult,
+                                             onLeaveGame,
                                          }) => {
 
     const { profile } = useProfile();
-    const navigate = useNavigate();
 
     return (
         <div className="flex-none w-full md:w-72 flex flex-col items-start gap-5 p-5 overflow-hidden box-border relative">
             <div className="flex flex-col gap-0 p-1 w-full" style={{ fontFamily: "'Poppins', sans-serif" }}>
+                <button
+                    className="w-full mb-3 px-4 py-2 rounded-lg bg-red-700 text-white font-bold hover:bg-red-900"
+                    onClick={() => {
+                        const ok = window.confirm(
+                            "Leave the game?\n\nLeaving means you will quit this game and may not be able to rejoin."
+                        );
+                        if (ok) onLeaveGame();
+                    }}
+                >
+                    Leave Game
+                </button>
                 <div>
-                    <button className="mx-auto w-full text-center text-2xl font-bold text-blue-700 hover:text-blue-500"
-                            onClick={() => navigate('/')}>
-                        AI-Jeopardy.com
-                    </button>
                     <h2 className="text-2xl mt-3 font-extrabold bg-gradient-to-r from-[#1e88e5] via-[#3d5afe] to-[#5c6bc0] text-white px-5 py-5 rounded-lg text-center flex items-center gap-2.5 shadow-md mb-3">
                         Players
                     </h2>
@@ -46,8 +53,9 @@ const Sidebar: React.FC<SidebarProps> = ({
                         {players.map((player) => (
                                 <li
                                 key={player.name}
-                                className={`flex items-center p-2.5 rounded-lg mb-2 text-base shadow-sm text-blue-500 ${
-                                    host === player.name
+                                className={`flex items-center p-2.5 rounded-lg mb-2 text-base shadow-sm text-blue-500 
+                                ${player.online === false ? "opacity-50" : ""}
+                                ${host === player.name
                                         ? "bg-yellow-200 border-yellow-500 border-2"
                                         : buzzResult === player.name
                                             ? "bg-red-300 border-red-500 border-2"
@@ -92,6 +100,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                     </ul>
                 </div>
             </div>
+
 
             {/* Fixed Bottom Section */}
             <div className="fixed bottom-0 left-0 w-full md:w-72 flex flex-col items-center gap-5 z-[100]">
