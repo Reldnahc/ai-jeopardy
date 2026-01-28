@@ -1,36 +1,57 @@
 import { useState } from "react";
-import { supabase } from "../../supabaseClient"; // Import the supabase client you already configured
+import { supabase } from "../../supabaseClient";
 
 const Login = () => {
-    const [email, setEmail] = useState("");
+    const [identifier, setIdentifier] = useState(""); // email OR username
     const [password, setPassword] = useState("");
-    const [error, setError] = useState(""); // To display error messages
+    const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
 
-    const handleLogin = async (e: { preventDefault: () => void; }) => {
+    const handleLogin = async (e: { preventDefault: () => void }) => {
         e.preventDefault();
         setLoading(true);
-        setError(""); // Reset error state
+        setError("");
 
-        if (!email || !password) {
-            setError("Please enter both email and password."); // Validate input
+        const id = identifier.trim();
+        const pw = password.trim();
+
+        if (!id || !pw) {
+            setError("Please enter your email/username and password.");
             setLoading(false);
             return;
         }
 
         try {
-            const { data, error } = await supabase.auth.signInWithPassword({
-                email: email.trim(),
-                password: password.trim(),
+            // 1) Resolve email (if identifier is already email, function returns it)
+            const { data: email, error: rpcError } = await supabase.rpc(
+                "login_email_for",
+                { identifier: id }
+            );
+
+            if (rpcError) {
+                setError("Login lookup failed. Please try again.");
+                return;
+            }
+
+            if (!email) {
+                setError("No account found for that email/username.");
+                return;
+            }
+
+            // 2) Sign in with password using resolved email
+            const { data, error: signInError } = await supabase.auth.signInWithPassword({
+                email,
+                password: pw,
             });
 
-            if (error) {
-                setError(error.message); // Show errors from Supabase
-            } else {
-                console.log("User logged in:", data.user);
+            if (signInError) {
+                setError(signInError.message);
+                return;
             }
-        } catch (error) {
-            console.error("Unexpected error:", error);
+
+            console.log("User logged in:", data.user);
+        } catch (err) {
+            console.error("Unexpected error:", err);
             setError("An unexpected error occurred. Please try again.");
         } finally {
             setLoading(false);
@@ -40,21 +61,24 @@ const Login = () => {
     return (
         <div className="max-w-sm mx-auto rounded-lg p-6">
             <h2 className="text-2xl font-semibold mb-4 text-center text-blue-500">Login</h2>
+
             <form onSubmit={handleLogin} className="space-y-4">
                 <div>
-                    <label htmlFor="email" className="block text-blue-500 font-medium">
-                        Email
+                    <label htmlFor="identifier" className="block text-blue-500 font-medium">
+                        Email or Username
                     </label>
                     <input
-                        type="email"
-                        id="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="Enter your email"
+                        type="text"
+                        id="identifier"
+                        value={identifier}
+                        onChange={(e) => setIdentifier(e.target.value)}
+                        placeholder="Enter your email or username"
+                        autoComplete="username"
                         required
                         className="w-full p-3 border border-gray-300 rounded text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                 </div>
+
                 <div>
                     <label htmlFor="password" className="block text-blue-500 font-medium">
                         Password
@@ -65,6 +89,7 @@ const Login = () => {
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         placeholder="Enter your password"
+                        autoComplete="current-password"
                         required
                         className="w-full p-3 border border-gray-300 rounded text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
