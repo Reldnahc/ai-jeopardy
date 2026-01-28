@@ -154,6 +154,19 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         };
     }, [ensureSocket]);
 
+    useEffect(() => {
+        const interval = setInterval(() => {
+            const ws = socketRef.current;
+
+            // Reconnect if fully closed or missing
+            if (!ws || ws.readyState === WebSocket.CLOSED) {
+                console.log("[WS] attempting reconnect...");
+                ensureSocket();
+            }
+        }, 5000);
+
+        return () => clearInterval(interval);
+    }, [ensureSocket]);
 
     const value = useMemo<WebSocketContextType>(() => ({
         isSocketReady,
