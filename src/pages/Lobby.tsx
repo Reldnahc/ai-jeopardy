@@ -44,6 +44,7 @@ const Lobby: React.FC = () => {
     const [players, setPlayers] = useState<Player[]>(location.state?.players || []);
     const [host, setHost] = useState<string | null>(null);
     const [selectedModel, setSelectedModel] = useState('gpt-5-mini'); // Default value for dropdown
+    const [includeVisuals, setIncludeVisuals] = useState(false);
     const [lockedCategories, setLockedCategories] = useState<LockedCategories>({
         firstBoard: Array(5).fill(false), // Default unlocked
         secondBoard: Array(5).fill(false), // Default unlocked
@@ -511,11 +512,13 @@ const Lobby: React.FC = () => {
             sendJson({
                 type: "create-game",
                 gameId,
-                host: profile.displayname,                timeToBuzz,
+                host: profile.displayname,
+                timeToBuzz,
                 timeToAnswer,
                 categories: [...categories.firstBoard, ...categories.secondBoard, categories.finalJeopardy],
                 selectedModel,
                 boardJson: boardJson.trim() ? boardJson : undefined,
+                includeVisuals,
             });
         } catch (error) {
             console.error('Failed to generate board data:', error);
@@ -605,6 +608,8 @@ const Lobby: React.FC = () => {
                                     boardJsonError={boardJsonError}
                                     setBoardJsonError={setBoardJsonError}
                                     tryValidateBoardJson={tryValidateBoardJson}
+                                    includeVisuals={includeVisuals}
+                                    setIncludeVisuals={setIncludeVisuals}
                                 />
                             </motion.div>
                         )}

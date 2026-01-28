@@ -10,6 +10,8 @@ import {supabase} from "./config/database.js";
 import {getColorFromPlayerName} from "./services/userService.js";
 import path from "path";
 import { fileURLToPath } from "url";
+import { GetObjectCommand } from "@aws-sdk/client-s3";
+import { r2 } from "./services/r2Client.js";
 
 const app = express(); // Initialize Express app
 app.use(cors());
@@ -45,10 +47,7 @@ const __dirname = path.dirname(__filename);
 const distPath = path.join(__dirname, "..", "dist");
 app.use(express.static(distPath));
 
-// SPA fallback
-app.get("*", (req, res) => {
-    res.sendFile(path.join(distPath, "index.html"));
-});
+
 
 // Store game state
 const games = {};
@@ -403,8 +402,14 @@ wss.on('connection', (ws) => {
                     host,
                     timeToBuzz,
                     timeToAnswer,
-                    boardJson, // <-- NEW
+                    boardJson,
+                    includeVisuals,
                 } = data;
+
+                const usingImportedBoard = Boolean(boardJson && boardJson.trim());
+                const effectiveIncludeVisuals = usingImportedBoard
+                    ? true
+                    : Boolean(includeVisuals);
 
                 if (!games[gameId]) {
                     broadcast(gameId, { type: 'create-board-failed', message: 'Game not found.' });
@@ -428,9 +433,12 @@ wss.on('connection', (ws) => {
                         }
                         boardData = imported;
                     } else {
-                        // AI FLOW (existing)
+                        // AI FLOW
                         games[gameId].isGenerating = true;
-                        boardData = await createBoardData(categories, selectedModel, host);
+                        boardData = await createBoardData(categories, selectedModel, host, {
+                            includeVisuals: effectiveIncludeVisuals,
+                            maxVisualCluesPerCategory: 2,
+                        });
                     }
                 } catch (e) {
                     console.error("[Server] create-game failed:", e);
@@ -1204,5 +1212,80 @@ setInterval(async () => {
     cotd = await createCategoryOfTheDay();
 }, 60000 * 60);
 
+app.get("/api/images/:assetId", async (req, res) => {
+    try {
+        const { assetId } = req.params;
 
+        const { data, error } = await supabase
+            .from("image_assets")
+            .select("storage_key, content_type")
+            .eq("id", assetId)
+            .single();
 
+        if (error || !data) {
+            return res.status(404).json({ error: "Image asset not found" });
+        }
+
+        const storageKey = data.storage_key;
+        const contentType = data.content_type || "image/webp";
+
+        const cmd = new GetObjectCommand({
+            Bucket: process.env.R2_BUCKET,
+            Key: storageKey,
+        });
+
+        const obj = await r2.send(cmd);
+
+        res.setHeader("Content-Type", contentType);
+        // cache hard; if you ever change an image, it should get a new sha256/key anyway
+        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+
+        // obj.Body is a stream
+        obj.Body.pipe(res);
+    } catch (e) {
+        console.error("GET /api/images/:assetId failed:", e);
+        res.status(500).json({ error: "Failed to load image" });
+    }
+});
+app.get("/test/image/:assetId", async (req, res) => {
+    const { assetId } = req.params;
+
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.send(`
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>Image Test</title>
+        <style>
+          body { font-family: system-ui, sans-serif; padding: 24px; }
+          img { max-width: 100%; height: auto; border: 1px solid #ddd; border-radius: 8px; }
+          code { background: #f3f3f3; padding: 2px 6px; border-radius: 6px; }
+        </style>
+      </head>
+      <body>
+        <h2>R2 Image Serve Test</h2>
+        <p>assetId: <code>${assetId}</code></p>
+        <p>URL: <code>/api/images/${assetId}</code></p>
+        <img src="/api/images/${assetId}" alt="test image" />
+      </body>
+    </html>
+  `);
+});
+app.get("/api/image-assets/:assetId", async (req, res) => {
+    const { assetId } = req.params;
+
+    const { data, error } = await supabase
+        .from("image_assets")
+        .select("*")
+        .eq("id", assetId)
+        .single();
+
+    if (error || !data) return res.status(404).json({ error: "Not found" });
+    res.json(data);
+});
+
+// SPA fallback
+app.get("*", (req, res) => {
+    res.sendFile(path.join(distPath, "index.html"));
+});

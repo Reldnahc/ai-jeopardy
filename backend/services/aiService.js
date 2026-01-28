@@ -1,9 +1,10 @@
-// aiService.js
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
 import 'dotenv/config';
 import {supabase} from "../config/database.js";
 import { modelsByValue } from "../../shared/models.js";
+import { pickCommonsImageForQueries } from "./commonsService.js";
+import { ingestImageToR2FromUrl } from "./imageAssetService.js";
 
 // Initialize AI clients
 const openai = new OpenAI();
@@ -133,11 +134,89 @@ const saveBoardAsync = async ({ supabase, host, board }) => {
     }
 };
 
-async function createBoardData(categories, model, host) {
+function stripVisualWording(question) {
+    return String(question ?? "")
+        .replace(/\b(shown|pictured)\s+here\b/gi, "")
+        .replace(/\b(in\s+the\s+image|in\s+this\s+(photo|picture))\b/gi, "")
+        .replace(/\s{2,}/g, " ")
+        .trim();
+}
+
+async function populateBoardVisuals(board, settings) {
+    if (!settings.includeVisuals) return;
+
+    // Only first + second boards (NO final jeopardy visuals)
+    const rounds = [
+        board?.firstBoard?.categories,
+        board?.secondBoard?.categories,
+    ].filter(Array.isArray);
+
+    for (const categories of rounds) {
+        for (const cat of categories) {
+            const values = Array.isArray(cat?.values) ? cat.values : [];
+            const visualClues = values
+                .filter((c) => c?.visual?.commonsSearchQueries?.length)
+                .slice(0, settings.maxVisualCluesPerCategory);
+
+            for (const clue of visualClues) {
+                try {
+                    const found = await pickCommonsImageForQueries(
+                        clue.visual.commonsSearchQueries,
+                        {
+                            thumbWidth: settings.commonsThumbWidth,
+                            maxQueries: settings.maxImageSearchTries,
+                            searchLimit: 5,
+                        }
+                    );
+
+                    if (!found) {
+                        // Could not resolve; remove visual wording
+                        clue.question = stripVisualWording(clue.question);
+                        delete clue.visual;
+                        continue;
+                    }
+
+                    const assetId = await ingestImageToR2FromUrl(
+                        found.downloadUrl,
+                        {
+                            sourceUrl: found.sourceUrl,
+                            license: found.license,
+                            licenseUrl: found.licenseUrl,
+                            attribution: found.attribution,
+                        },
+                        supabase
+                    );
+
+                    clue.media = { type: "image", assetId };
+                    delete clue.visual;
+                } catch (e) {
+                    // Fail-soft: keep clue as text
+                    clue.question = stripVisualWording(clue.question);
+                    delete clue.visual;
+                }
+            }
+
+            // Cleanup any remaining visual specs if they exceed maxVisualCluesPerCategory
+            for (const clue of values) {
+                if (clue?.visual) delete clue.visual;
+            }
+        }
+    }
+}
+
+async function createBoardData(categories, model, host, options = {}) {
+    const settings = {
+        includeVisuals: false,
+        maxVisualCluesPerCategory: 2,
+        maxImageSearchTries: 6,
+        commonsThumbWidth: 1600,
+        ...options,
+    };
     console.log("Beginning to create board data with categories: " + categories);
 
+    //settings.includeVisuals = Boolean(options.includeVisuals);
+
     if (!categories || categories.length !== 11) {
-        // note: your original code referenced `res` here, but this is a service fn
         throw new Error("You must provide exactly 11 categories.");
     }
 
@@ -155,34 +234,63 @@ async function createBoardData(categories, model, host) {
 
     const valuesFor = (double) => (double ? [400, 800, 1200, 1600, 2000] : [200, 400, 600, 800, 1000]);
 
-    const categoryPrompt = (category, double = false) => `
+    const categoryPrompt = (category, double = false) => {
+        const values = valuesFor(double);
+
+        const visualRules = settings.includeVisuals
+            ? `
+        VISUAL CLUES (optional):
+        - Make up to ${settings.maxVisualCluesPerCategory} of the 5 clues visual.
+        - ONLY choose subjects very likely to have a clear file on Wikimedia Commons.
+        - If a clue is visual, add:
+          "visual": { "commonsSearchQueries": ["...", "..."] }
+        - No URLs.`
+                    : "";
+
+                const outputSchema = settings.includeVisuals
+                    ? `
+        OUTPUT: Return ONLY valid JSON in this exact shape:
+        {"category":"Category Name","values":[
+          {"value":${values[0]},"question":"Clue text","answer":"Correct response phrased as a question?","visual":{"commonsSearchQueries":["query 1","query 2"]}},
+          {"value":${values[1]},"question":"...","answer":"...?"},
+          {"value":${values[2]},"question":"...","answer":"...?"},
+          {"value":${values[3]},"question":"...","answer":"...?"},
+          {"value":${values[4]},"question":"...","answer":"...?"}
+        ]}`
+                    : `
+        OUTPUT: Return ONLY valid JSON in this exact shape:
+        {"category":"Category Name","values":[
+          {"value":${values[0]},"question":"Clue text","answer":"Correct response phrased as a question?"},
+          {"value":${values[1]},"question":"...","answer":"...?"},
+          {"value":${values[2]},"question":"...","answer":"...?"},
+          {"value":${values[3]},"question":"...","answer":"...?"},
+          {"value":${values[4]},"question":"...","answer":"...?"}
+        ]}`;
+
+                return`
         You are a professional Jeopardy clue writer.
-        
         Write ONE complete Jeopardy category: "${category}"
         
         RULES:
         - Exactly 5 clues with values ${double ? "400, 800, 1200, 1600, 2000" : "200, 400, 600, 800, 1000"}.
-        - Difficulty must strictly increase with value.
-        - Clues must be factual, unambiguous, verifiable.
+        - Difficulty strictly increases with value.
+        - Clues are factual and unambiguous.
         - Do NOT include the category title verbatim in any clue or answer.
         - Clues are statements (no question marks).
-        - Answers must be phrased as questions and end with a ?.
-        - No repeated facts/answers/phrasing within this category.
+        - Answers are phrased as questions and end with a ?.
+        - No repeated facts/answers/phrasing.
         
-        OUTPUT: Return ONLY valid JSON in this exact shape:
+        ${visualRules}
         
-        {
-          "category": "Category Name",
-          "values": [
-            { "value": ${double ? 400 : 200}, "question": "Clue text", "answer": "Correct response phrased as a question?" }
-          ]
-        }
+        ${outputSchema}
         
         STRICT:
         - Exactly 5 values.
-        - Values must be exactly ${JSON.stringify(valuesFor(double))} in ascending order.
+        - Values must be exactly ${JSON.stringify(values)} in ascending order.
         - No markdown. No extra text. Valid JSON only.
-        `;
+        `.trim();
+    };
+
 
 
     const finalPrompt = (category) => `
@@ -294,6 +402,8 @@ async function createBoardData(categories, model, host) {
         const finalJeopardy = { categories: [finalBuilt] };
 
         const board = { host, model, firstBoard, secondBoard, finalJeopardy };
+
+        await populateBoardVisuals(board, settings);
 
         void saveBoardAsync({ supabase, host, board });
 

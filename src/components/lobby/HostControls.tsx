@@ -24,6 +24,8 @@ interface HostControlsProps {
     setTimeToBuzz: (time: number) => void;
     setTimeToAnswer: (time: number) => void;
     onCreateGame: () => void;
+    includeVisuals: boolean;
+    setIncludeVisuals: (value: boolean) => void;
 }
 
 const HostControls: React.FC<HostControlsProps> = ({
@@ -40,6 +42,8 @@ const HostControls: React.FC<HostControlsProps> = ({
                                                        setTimeToBuzz,
                                                        setTimeToAnswer,
                                                        onCreateGame,
+                                                       includeVisuals,
+                                                       setIncludeVisuals,
                                                    }) => {
     const { profile } = useProfile();
     // Group the models by price
@@ -216,6 +220,18 @@ const HostControls: React.FC<HostControlsProps> = ({
                                         </div>
                                     </div>
                                 </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="checkbox"
+                                    id="includeVisuals"
+                                    checked={includeVisuals}
+                                    onChange={(e) => setIncludeVisuals(e.target.checked)}
+                                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                                />
+                                <label htmlFor="includeVisuals" className="text-gray-700">
+                                    Enable Visual Clues (Wikimedia Commons)
+                                </label>
                             </div>
 
                             <button
