@@ -62,10 +62,20 @@ export default function Game() {
     const isHost = Boolean(host && effectivePlayerName && host.trim() === effectivePlayerName.trim());
 
     useEffect(() => {
-        if (gameId && effectivePlayerName) {
-            saveSession(gameId, effectivePlayerName, isHost);
+        if (!gameId || !effectivePlayerName) return;
+
+        // Only write if different
+        if (
+            session?.gameId === gameId &&
+            session?.playerName === effectivePlayerName &&
+            session?.isHost === isHost
+        ) {
+            return;
         }
-    }, [gameId, effectivePlayerName, saveSession, isHost]);
+
+        saveSession(gameId, effectivePlayerName, isHost);
+    }, [gameId, effectivePlayerName, isHost, saveSession, session]);
+
 
     useEffect(() => {
         if (!isSocketReady || !gameId || !effectivePlayerName) return;

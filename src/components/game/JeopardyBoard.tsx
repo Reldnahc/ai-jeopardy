@@ -31,7 +31,6 @@ interface JeopardyBoardProps {
     timerDuration: number;
     showAnswer: boolean;
     setShowAnswer: React.Dispatch<React.SetStateAction<boolean>>;
-
 }
 
 const JeopardyBoard: React.FC<JeopardyBoardProps> =
