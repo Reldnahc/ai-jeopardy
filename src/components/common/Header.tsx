@@ -27,12 +27,15 @@ const Header: React.FC = () => {
 
     // Handle logout
     const handleLogout = async () => {
-        const prevent = location.pathname.includes('/game/') || location.pathname.includes('/lobby/');
+        const prevent = location.pathname.includes("/game/") || location.pathname.includes("/lobby/");
         if (prevent) {
             showAlert(
                 <span>
-                    <span className="text-red-500 font-bold text-xl">You cannot log out in a game or lobby.</span><br/>
-                </span>,
+                <span className="text-red-500 font-bold text-xl">
+                    You cannot log out in a game or lobby.
+                </span>
+                <br />
+            </span>,
                 [
                     {
                         label: "Okay",
@@ -43,13 +46,37 @@ const Header: React.FC = () => {
             );
             return;
         }
-        const { error } = await supabase.auth.signOut();
-        if (error) {
-            console.error("Error logging out:", error.message);
-        } else {
-            console.log("Logged out successfully!");
+
+        try {
+            const { error } = await supabase.auth.signOut();
+
+            // Supabase sometimes returns this when you're already logged out.
+            if (error && !error.message?.toLowerCase().includes("auth session missing")) {
+                console.error("Error logging out:", error.message);
+                return;
+            }
+
+            console.log("Logged out successfully (or already logged out).");
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : String(err);
+
+            if (!msg.toLowerCase().includes("auth session missing")) {
+                console.error("Error logging out:", err);
+                return;
+            }
+
+            // Treat as already logged out
+            console.log("No auth session (already logged out).");
+        } finally {
+            // Always close menus so UI doesn't feel stuck
+            setDropdownOpen(false);
+            setMenuOpen(false);
+
+            // Optional: send them home after logout
+            // navigate("/");
         }
     };
+
 
     const handleNavigate = async (to: string) => {
         navigate(to);
