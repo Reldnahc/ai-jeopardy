@@ -99,6 +99,7 @@ export default function Game() {
 
 
     useEffect(() => {
+        if (!isSocketReady) return;
         if (!gameId || !effectivePlayerName) return;
 
         // Whether it's a fresh join or a reconnect, we send "join-game".
@@ -109,7 +110,7 @@ export default function Game() {
             playerName: effectivePlayerName,
         });
 
-    }, [ gameId, effectivePlayerName, sendJson]);
+    }, [gameId, effectivePlayerName, sendJson, isSocketReady]);
 
     useEffect(() => {
         boardDataRef.current = boardData;
@@ -154,13 +155,13 @@ export default function Game() {
         }
     }, [clearedClues, gameId, activeBoard, boardData.firstBoard.categories, boardData.secondBoard.categories, sendJson]);
 
-    const updateClearedClues = (newClearedClues: string[]) => {
-        setClearedClues((prev) => {
-            const updatedClues = new Set(prev);
-            newClearedClues.forEach((clue: string) => updatedClues.add(clue));
-            return updatedClues;
-        });
-    };
+    // const updateClearedClues = (newClearedClues: string[]) => {
+    //     setClearedClues((prev) => {
+    //         const updatedClues = new Set(prev);
+    //         newClearedClues.forEach((clue: string) => updatedClues.add(clue));
+    //         return updatedClues;
+    //     });
+    // };
 
     const handleScoreUpdate = (player: string, delta: number) => {
         if (isFinalJeopardy && allWagersSubmitted) {
@@ -245,7 +246,9 @@ export default function Game() {
                 setBoardData(m.boardData);
                 setScores(m.scores || {});
 
-                if (m.clearedClues) updateClearedClues(m.clearedClues);
+                if (Array.isArray(m.clearedClues)) {
+                    setClearedClues(new Set(m.clearedClues));
+                }
 
                 if (m.selectedClue) {
                     setSelectedClue({
@@ -315,6 +318,10 @@ export default function Game() {
 
             if (message.type === "reset-buzzer") {
                 setBuzzResult(null);
+                setBuzzerLocked(true);
+
+                setTimerEndTime(null);
+                setTimerDuration(0);
                 return;
             }
 

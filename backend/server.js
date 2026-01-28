@@ -468,18 +468,22 @@ wss.on('connection', (ws) => {
             }
 
             if (data.type === 'reset-buzzer') {
-                const {gameId} = data;
+                const { gameId } = data;
+                const game = games[gameId];
+                if (!game) return;
 
-                if (games[gameId]) {
-                    games[gameId].buzzed = null;
-                    games[gameId].buzzerLocked = true;
+                game.buzzed = null;
+                game.buzzerLocked = true;
 
-                    games[gameId].timerVersion = (games[gameId].timerVersion || 0) + 1;
+                game.timerEndTime = null;
 
-                    // Notify all players to reset the buzzer
-                    broadcast(gameId, {type: 'reset-buzzer'});
-                }
+                game.timerVersion = (game.timerVersion || 0) + 1;
+
+                broadcast(gameId, { type: 'reset-buzzer' });
+                broadcast(gameId, { type: 'buzzer-locked' });
+                broadcast(gameId, { type: 'timer-end' }); // client now clears on reset-buzzer anyway
             }
+
 
             if (data.type === 'mark-all-complete') {
                 const {gameId} = data;
