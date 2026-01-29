@@ -1,4 +1,4 @@
-import React from "react";
+import React, {useEffect} from "react";
 import { ReactSketchCanvas } from "react-sketch-canvas";
 import { convertToSVG, DrawingPath } from "../../utils/drawingUtils.tsx";
 import { Clue } from "../../types.ts";
@@ -64,6 +64,13 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
         localSelectedClue?.media?.type === "image"
             ? localSelectedClue.media.assetId
             : null;
+
+    useEffect(() => {
+        if (localSelectedClue?.media?.type === "image") {
+            const img = new Image();
+            img.src = `/api/images/${localSelectedClue.media.assetId}`;
+        }
+    }, [localSelectedClue]);
 
     return (
         <div className="absolute inset-0 h-[calc(100vh-5.5rem)] text-white flex flex-col justify-center items-center z-10 p-5">

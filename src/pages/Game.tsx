@@ -221,6 +221,33 @@ export default function Game() {
         }
     },[isHost, gameId, sendJson]);
 
+    function preloadImages(urls: string[]) {
+        urls.forEach((url) => {
+            const img = new Image();
+            img.src = url;
+        });
+    }
+
+    useEffect(() => {
+        const urls: string[] = [];
+
+        const collect = (categories?: Category[]) => {
+            categories?.forEach((cat) =>
+                cat.values.forEach((clue) => {
+                    if (clue.media?.type === "image") {
+                        urls.push(`/api/images/${clue.media.assetId}`);
+                    }
+                })
+            );
+        };
+
+        collect(boardData.firstBoard.categories);
+        collect(boardData.secondBoard.categories);
+        collect(boardData.finalJeopardy.categories);
+
+        preloadImages(urls);
+    }, [boardData]);
+
     useEffect(() => {
         if (!isSocketReady) return;
 
