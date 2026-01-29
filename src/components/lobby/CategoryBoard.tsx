@@ -88,18 +88,21 @@ const CategoryBoard: React.FC<CategoryBoardProps> = ({
                 <div key={index} className="flex items-center mb-3 gap-2.5 flex-nowrap">
                     <input
                         ref={(el) => { inputRefs.current[index] = el; }}
-                        id={`${title}-${index}`}
                         type="text"
                         value={category || ''}
+                        disabled={lockedCategories[index]}
                         onChange={(e) => {
                             onChangeCategory(boardType, index, e.target.value);
                             if (inputRefs.current[index]) fitInputText(inputRefs.current[index]!);
                         }}
                         placeholder={`Category ${index + 1}`}
-                        className="h-[48px] leading-none p-[10px] rounded border text-black bg-gray-50 border-gray-300 flex-1 min-w-0"
-                        disabled={lockedCategories[index]}
+                        className={`
+                            h-[48px] leading-none p-[10px] rounded border flex-1 min-w-0
+                            ${lockedCategories[index]
+                            ? "bg-gray-200 text-gray-500 border-gray-400 border-dashed cursor-not-allowed opacity-80"
+                            : "bg-gray-50 text-black border-gray-300"}
+                        `}
                     />
-
 
                     {isHost && (
                         <div className="flex gap-2">

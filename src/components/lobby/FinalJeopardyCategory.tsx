@@ -34,13 +34,19 @@ const FinalJeopardyCategory: React.FC<FinalJeopardyCategoryProps> = ({
                 <input
                     type="text"
                     value={category}
-                    disabled={lockedCategories[0]} // Disable input if locked
+                    disabled={lockedCategories[0]}
                     onChange={(e) =>
                         onChangeCategory('finalJeopardy', undefined, e.target.value)
                     }
                     placeholder="Enter Final Jeopardy Category"
-                    className="text-[1.2rem] p-[10px] rounded border text-black bg-gray-50 border-gray-300 flex-1 min-w-0"
+                    className={`
+                        text-[1.2rem] p-[10px] rounded border flex-1 min-w-0
+                        ${lockedCategories[0]
+                        ? "bg-gray-200 text-gray-500 border-gray-400 border-dashed cursor-not-allowed opacity-80"
+                        : "bg-gray-50 text-black border-gray-300"}
+                    `}
                 />
+
                 {isHost && (
                     <div>
                         <button
