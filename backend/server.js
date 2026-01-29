@@ -1077,21 +1077,24 @@ wss.on('connection', (ws) => {
             }
 
 
-            if (data.type === 'update-score') {
-                const {gameId, player, delta} = data;
+            if (data.type === "update-score") {
+                const { gameId, player, delta } = data;
+                const game = games[gameId];
+                if (!game) return;
 
-                if (games[gameId]) {
-                    // Update score
-                    const game = games[gameId];
-                    game.scores[player] = (game.scores[player] || 0) + delta;
-                    console.log(game.scores);
-                    // Broadcast updated scores
-                    broadcast(gameId, {
-                        type: 'update-scores',
-                        scores: game.scores,
-                    });
-                }
+                const hostPlayer = game.players?.find(p => p.name === game.host);
+                if (hostPlayer && hostPlayer.id !== ws.id) return;
+
+                if (!game.scores) game.scores = {};
+                game.scores[player] = (game.scores[player] || 0) + Number(delta || 0);
+
+                broadcast(gameId, {
+                    type: "update-scores",
+                    scores: game.scores,
+                });
             }
+
+
 
             if (data.type === "submit-wager") {
                 const {gameId, player, wager} = data;

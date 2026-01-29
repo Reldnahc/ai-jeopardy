@@ -61,6 +61,19 @@ export default function Game() {
         '';
     const isHost = Boolean(host && effectivePlayerName && host.trim() === effectivePlayerName.trim());
 
+    const handleScoreUpdate = (player: string, delta: number) => {
+        if (!gameId) return;
+
+        // Final Jeopardy: host buttons mean +wager / -wager, not +/- lastQuestionValue.
+        if (isFinalJeopardy && allWagersSubmitted) {
+            const w = Math.abs(wagers[player] ?? 0);
+            delta = delta < 0 ? -w : w;
+        }
+
+        // Server-authoritative:
+        sendJson({ type: "update-score", gameId, player, delta });
+    };
+
     const leaveGame = useCallback(() => {
         if (!gameId || !effectivePlayerName) {
             clearSession();
@@ -115,19 +128,6 @@ export default function Game() {
         boardDataRef.current = boardData;
     }, [boardData]);
 
-    const handleScoreUpdate = (player: string, delta: number) => {
-        if (isFinalJeopardy && allWagersSubmitted) {
-            const w = Math.abs(wagers[player] ?? 0);
-            delta = (delta < 0 ? -w : w);
-        }
-
-        const newScores = {...scores, [player]: (scores[player] || 0) + delta};
-        setScores(newScores);
-
-        sendJson({ type: "update-score", gameId, player, delta });
-
-    };
-
     const markAllCluesComplete = () => {
         if (!gameId) return;
         sendJson({ type: "mark-all-complete", gameId });
@@ -146,7 +146,7 @@ export default function Game() {
             return;
         }
         if (!gameId) return;
-        sendJson({ type: "buzz", gameId, playerName });
+        sendJson({ type: "buzz", gameId, effectivePlayerName });
     };
 
     const onClueSelected = useCallback((clue: Clue) => {
