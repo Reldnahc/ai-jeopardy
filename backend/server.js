@@ -204,6 +204,14 @@ function startFinalJeopardy(gameId, game, broadcast) {
     broadcast(gameId, { type: "final-jeopardy" });
 }
 
+function isHostSocket(game, ws) {
+    const hostPlayer = game.players?.find(p => p.name === game.host);
+    return hostPlayer && hostPlayer.id === ws.id;
+}
+
+function requireHost(game, ws) {
+    return game && isHostSocket(game, ws);
+}
 
 wss.on('connection', (ws) => {
     ws.id = Math.random().toString(36).substr(2, 9); // Assign a unique ID to each socket
@@ -667,6 +675,8 @@ wss.on('connection', (ws) => {
 
             if (data.type === 'reset-buzzer') {
                 const { gameId } = data;
+                if (!requireHost(games[gameId], ws)) return;
+
                 const game = games[gameId];
                 if (!game) return;
 
@@ -685,6 +695,7 @@ wss.on('connection', (ws) => {
 
             if (data.type === 'mark-all-complete') {
                 const {gameId} = data;
+                if (!requireHost(games[gameId], ws)) return;
 
                 if (games[gameId]) {
                     const game = games[gameId];
@@ -721,15 +732,17 @@ wss.on('connection', (ws) => {
                     console.error(`[Server] Game ID ${gameId} not found when marking all clues complete.`);
                 }
             }
-            if (data.type === 'trigger-game-over') {
+            if (data.type === "trigger-game-over") {
                 const {gameId} = data;
+                if (!requireHost(games[gameId], ws)) return;
 
                 broadcast(gameId, {
-                    type: 'game-over',
+                    type: "game-over",
                 });
             }
-            if (data.type === 'clue-selected') {
+            if (data.type === "clue-selected") {
                 const {gameId, clue} = data;
+                if (!requireHost(games[gameId], ws)) return;
 
                 if (games[gameId]) {
                     games[gameId].selectedClue = {
@@ -743,13 +756,13 @@ wss.on('connection', (ws) => {
 
                     // Broadcast the selected clue to all players in the game
                     broadcast(gameId, {
-                        type: 'clue-selected',
+                        type: "clue-selected",
                         clue: games[gameId].selectedClue, // Send the clue and answer reveal status
                         clearedClues: Array.from(games[gameId].clearedClues),
                     });
 
-                    broadcast(gameId, {type: 'reset-buzzer'});
-                    broadcast(gameId, {type: 'buzzer-locked'});
+                    broadcast(gameId, {type: "reset-buzzer"});
+                    broadcast(gameId, {type: "buzzer-locked"});
                 } else {
                     console.error(`[Server] Game ID ${gameId} not found when selecting clue.`);
                 }
@@ -975,6 +988,7 @@ wss.on('connection', (ws) => {
 
             if (data.type === 'unlock-buzzer') {
                 const {gameId} = data;
+                if (!requireHost(games[gameId], ws)) return;
 
                 if (games[gameId]) {
                     games[gameId].buzzerLocked = false; // Unlock the buzzer
@@ -1016,6 +1030,7 @@ wss.on('connection', (ws) => {
 
             if (data.type === 'lock-buzzer') {
                 const {gameId} = data;
+                if (!requireHost(games[gameId], ws)) return;
 
                 if (games[gameId]) {
                     games[gameId].buzzerLocked = true; // Lock the buzzer
@@ -1025,6 +1040,7 @@ wss.on('connection', (ws) => {
 
             if (data.type === 'transition-to-second-board') {
                 const { gameId } = data;
+                if (!requireHost(games[gameId], ws)) return;
 
                 if (games[gameId]) {
                     const game = games[gameId];
