@@ -18,23 +18,6 @@ const app = express(); // Initialize Express app
 app.use(cors());
 app.use(bodyParser.json());
 
-const authenticateRequest = async (req, res, next) => {
-    const authHeader = req.headers.authorization;
-    if (!authHeader) {
-        return res.status(401).send("Unauthorized");
-    }
-
-    const token = authHeader.split(" ")[1];
-    const { data, error } = await supabase.auth.getUser(token);
-
-    if (error || !data) {
-        return res.status(401).send("Unauthorized");
-    }
-
-    req.user = data; // Attach the user to the request object
-    next();
-};
-
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
@@ -53,7 +36,35 @@ app.use(express.static(distPath));
 // Store game state
 const games = {};
 
-// --- Server-authoritative timer helpers (single active timer per game) ---
+const buildLobbyState = (gameId, ws) => {
+    const game = games[gameId];
+    if (!game) return null;
+
+    const you = game.players?.find((p) => p.id === ws.id) || null;
+
+    return {
+        type: 'lobby-state',
+        gameId,
+        players: game.players.map((p) => ({
+            name: p.name,
+            color: p.color,
+            text_color: p.text_color,
+        })),
+        host: game.host,
+        categories: normalizeCategories11(game.categories),
+        lockedCategories: game.lockedCategories,
+        inLobby: game.inLobby,
+        isGenerating: Boolean(game.isGenerating),
+        you: you
+            ? {
+                playerName: you.name,
+                playerKey: you.playerKey || null,
+                isHost: you.name === game.host,
+            }
+            : null,
+    };
+};
+
 const clearGameTimer = (game) => {
     if (!game) return;
     if (game.timerTimeout) {
@@ -302,23 +313,17 @@ wss.on('connection', (ws) => {
                 }
             }
             if (data.type === 'request-lobby-state'){
-                ws.send(JSON.stringify({
-                    type: 'lobby-state',
-                    gameId: data.gameId,
-                    players: games[data.gameId].players.map((p) => ({
-                        name: p.name,
-                        color: p.color,
-                        text_color: p.text_color,
-                    })),
-                    host: games[data.gameId].host,
-                    categories: normalizeCategories11(games[data.gameId].categories),
-                    lockedCategories: games[data.gameId].lockedCategories,
-                    inLobby: games[data.gameId].inLobby,
-                    isGenerating: Boolean(games[data.gameId].isGenerating),
-                }));
+                const gameId = data.gameId;
+                const snapshot = buildLobbyState(gameId, ws);
+                if (!snapshot) {
+                    ws.send(JSON.stringify({ type: 'error', message: 'Lobby does not exist!' }));
+                    return;
+                }
+                ws.send(JSON.stringify(snapshot));
             }
+
             if (data.type === 'create-lobby') {
-                const { host, categories } = data;
+                const { host, categories, playerKey  } = data;
 
                 let newGameId;
                 do {
@@ -338,9 +343,11 @@ wss.on('connection', (ws) => {
                     console.error("Color lookup failed:", e);
                 }
 
+                const stableKey = typeof playerKey === "string" && playerKey.trim() ? playerKey.trim() : null;
+
                 games[newGameId] = {
                     host,
-                    players: [{ id: ws.id, name: host, color, text_color }],
+                    players: [{ id: ws.id, name: host, color, text_color, playerKey: stableKey }],
                     inLobby: true,
                     categories: normalizeCategories11(categories),
                     lockedCategories: {
@@ -359,6 +366,8 @@ wss.on('connection', (ws) => {
                     categories: normalizeCategories11(categories),
                     players: [{ id: ws.id, name: host, color, text_color }],
                 }));
+
+                ws.send(JSON.stringify(buildLobbyState(newGameId, ws)));
             }
 
             if (data.type === "leave-lobby") {
@@ -404,7 +413,7 @@ wss.on('connection', (ws) => {
             }
 
             if (data.type === 'join-lobby') {
-                const { gameId, playerName } = data;
+                const { gameId, playerName, playerKey } = data;
 
                 if (!games[gameId]) {
                     ws.send(JSON.stringify({ type: 'error', message: 'Lobby does not exist!' }));
@@ -417,67 +426,75 @@ wss.on('connection', (ws) => {
                     return;
                 }
 
-                // 1. Try to find existing player by NAME
-                const existingPlayer = games[gameId].players.find(p => p.name === actualName);
+                const game = games[gameId];
 
-                if (existingPlayer) {
+                // Prefer stable identity (playerKey) for dedupe/reconnect.
+                const stableKey = typeof playerKey === "string" && playerKey.trim() ? playerKey.trim() : null;
+
+                // 1) Reconnect by playerKey when available.
+                const existingByKey = stableKey
+                    ? game.players.find((p) => p.playerKey && p.playerKey === stableKey)
+                    : null;
+
+                // 2) Fallback: reconnect by name (legacy clients).
+                const existingByName = game.players.find((p) => p.name === actualName);
+
+                if (existingByKey) {
+                    console.log(`[Server] PlayerKey reconnect for ${actualName} -> Lobby ${gameId}`);
+                    existingByKey.id = ws.id;
+                    existingByKey.name = actualName; // allow displayname changes
+                    existingByKey.online = true;
+                    ws.gameId = gameId;
+                } else if (existingByName) {
                     // RECONNECT: Update the socket ID to the new connection
                     console.log(`[Server] Player ${actualName} reconnected to Lobby ${gameId}`);
-                    existingPlayer.id = ws.id; // <--- CRITICAL FIX
-                    existingPlayer.online = true;
+                    existingByName.id = ws.id;
+                    existingByName.online = true;
+                    if (stableKey && !existingByName.playerKey) existingByName.playerKey = stableKey;
                     ws.gameId = gameId;
                 } else {
                     // NEW PLAYER: Add them to the list
                     const msg = await getColorFromPlayerName(actualName);
-                    const raceConditionCheck = games[gameId].players.find(p => p.name === actualName);
-
+                    const raceConditionCheck =
+                        game.players.find(p => p.name === actualName) ||
+                        (stableKey ? game.players.find(p => p.playerKey === stableKey) : null);
 
                     if (raceConditionCheck) {
                         // Treat it as a reconnect/update instead of a new push
                         raceConditionCheck.id = ws.id;
                         raceConditionCheck.online = true;
+                        if (stableKey && !raceConditionCheck.playerKey) raceConditionCheck.playerKey = stableKey;
                         ws.gameId = gameId;
                     } else {
                         // Safe to push new player
                         const color = msg?.color || "bg-blue-500";
                         const text_color = msg?.text_color || "text-white";
 
-                        games[gameId].players.push({
+                        game.players.push({
                             id: ws.id,
                             name: actualName,
                             color,
-                            text_color
+                            text_color,
+                            playerKey: stableKey,
                         });
                         ws.gameId = gameId;
                     }
                 }
 
-                // Always send state
-                ws.send(JSON.stringify({
-                    type: 'lobby-state',
-                    gameId,
-                    players: games[gameId].players.map((p) => ({
-                        name: p.name,
-                        color: p.color,
-                        text_color: p.text_color,
-                    })),
-                    host: games[gameId].host,
-                    categories: normalizeCategories11(games[gameId].categories),
-                    lockedCategories: games[gameId].lockedCategories,
-                    inLobby: games[gameId].inLobby,
-                    isGenerating: Boolean(games[gameId].isGenerating),
-                }));
+                // Always send authoritative snapshot (includes "you")
+                ws.send(JSON.stringify(buildLobbyState(gameId, ws)));
 
                 broadcast(gameId, {
                     type: 'player-list-update',
-                    players: games[gameId].players.map((p) => ({
+                    players: game.players.map((p) => ({
                         name: p.name,
                         color: p.color,
                         text_color: p.text_color,
                     })),
-                    host: games[gameId].host,
+                    host: game.host,
                 });
             }
+
 
             if (data.type === 'create-game') {
                 const {

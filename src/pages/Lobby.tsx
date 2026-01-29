@@ -1,4 +1,4 @@
-import React, {useEffect, useMemo, useRef, useState} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import { useLocation, useNavigate, useParams} from "react-router-dom";
 import { useWebSocket } from "../contexts/WebSocketContext.tsx";
 import LobbySidebar from "../components/lobby/LobbySidebar.tsx";
@@ -41,8 +41,10 @@ const Lobby: React.FC = () => {
     const [copySuccess, setCopySuccess] = useState(false);
     const [boardJson, setBoardJson] = useState<string>("");
     const [boardJsonError, setBoardJsonError] = useState<string | null>(null);
-    const [players, setPlayers] = useState<Player[]>(location.state?.players || []);
+    // Server is authoritative for lobby membership + host.
+    const [players, setPlayers] = useState<Player[]>([]);
     const [host, setHost] = useState<string | null>(null);
+    const [isHostServer, setIsHostServer] = useState<boolean>(false);
     const [selectedModel, setSelectedModel] = useState('gpt-5-mini'); // Default value for dropdown
     const [includeVisuals, setIncludeVisuals] = useState(false);
     const [lockedCategories, setLockedCategories] = useState<LockedCategories>({
@@ -57,7 +59,19 @@ const Lobby: React.FC = () => {
     const { showAlert } = useAlert();
     const { session, saveSession } = useGameSession();
 
-    const joinedLobbyRef = useRef<string | null>(null);
+    // Stable identity key (persists across refresh/reconnect) so the server can dedupe players.
+    const playerKey = useMemo(() => {
+        if (!gameId) return null;
+        const storageKey = `aj_playerKey_${gameId}`;
+        const existing = localStorage.getItem(storageKey);
+        if (existing && existing.trim()) return existing;
+        // Use crypto.randomUUID when available; fallback is fine for local-only identity.
+        const created = (globalThis.crypto && "randomUUID" in globalThis.crypto)
+            ? (globalThis.crypto as Crypto).randomUUID()
+            : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        localStorage.setItem(storageKey, created);
+        return created;
+    }, [gameId]);
 
     const effectivePlayerName = useMemo(() => {
         if (location.state?.playerName) return location.state.playerName;
@@ -65,7 +79,8 @@ const Lobby: React.FC = () => {
         if (profile?.displayname) return profile.displayname;
         return null;
     }, [location.state, session, gameId, profile]);
-    const isHost = location.state?.isHost || (session?.gameId === gameId && session?.isHost) || false;
+    // Do NOT trust location.state for host permissions; server will confirm via lobby-state.
+    const isHost = isHostServer;
 
     useEffect(() => {
         if (!gameId || !effectivePlayerName) return;
@@ -85,12 +100,10 @@ const Lobby: React.FC = () => {
         if (!gameId) return;
         if (!effectivePlayerName) return;
 
-        if (joinedLobbyRef.current === gameId) return;
-        joinedLobbyRef.current = gameId;
-
-        sendJson({ type: "join-lobby", gameId, playerName: effectivePlayerName });
-        sendJson({ type: "request-lobby-state", gameId });
-    }, [isSocketReady, gameId, effectivePlayerName, sendJson]);
+        // Always attempt to (re)join when the socket is ready; server dedupes via playerKey.
+        sendJson({ type: "join-lobby", gameId, playerName: effectivePlayerName, playerKey });
+        sendJson({ type: "request-lobby-state", gameId, playerKey });
+    }, [isSocketReady, gameId, effectivePlayerName, playerKey, sendJson]);
 
 
     useEffect(() => {
@@ -102,6 +115,7 @@ const Lobby: React.FC = () => {
             type: "join-game",
             gameId,
             playerName: effectivePlayerName,
+            playerKey,
         });
 
         navigate(`/game/${gameId}`, {
@@ -111,7 +125,7 @@ const Lobby: React.FC = () => {
                 host,
             },
         });
-    }, [allowLeave, isSocketReady, gameId, isHost, host, sendJson, navigate, effectivePlayerName]);
+    }, [allowLeave, isSocketReady, gameId, isHost, host, sendJson, navigate, effectivePlayerName, playerKey]);
 
     useEffect(() => {
         if (!isSocketReady) return;
@@ -152,10 +166,20 @@ const Lobby: React.FC = () => {
                             secondBoard: boolean[];
                             finalJeopardy: boolean[];
                         };
+                        you?: {
+                            isHost?: boolean;
+                            playerName?: string;
+                            playerKey?: string;
+                        };
                     };
 
-                    setPlayers(m.players);
-                    setHost(m.host);
+                    // Treat lobby-state as a snapshot: replace, don't merge.
+                    setPlayers(Array.isArray(m.players) ? m.players : []);
+                    setHost(m.host ?? null);
+
+                    const hostName = (m.host ?? "").trim();
+                    const youName = (m.you?.playerName ?? "").trim();
+                    setIsHostServer(Boolean(m.you?.isHost) || (hostName.length > 0 && youName.length > 0 && hostName === youName));
 
                     if (Array.isArray(m.categories)) {
                         setCategories({
@@ -179,7 +203,7 @@ const Lobby: React.FC = () => {
                         return;
                     }
 
-                    if (m.inLobby === false && profile?.displayname) {
+                    if (m.inLobby === false) {
                         setAllowLeave(true);
                         return;
                     }
@@ -188,7 +212,6 @@ const Lobby: React.FC = () => {
                     setLoadingMessage("");
                     return;
                 }
-
                 case "category-lock-updated": {
                     const m = message as unknown as {
                         boardType: unknown;
@@ -277,7 +300,8 @@ const Lobby: React.FC = () => {
                     const m = message as unknown as { isValid: boolean };
 
                     if (!m.isValid) {
-                        if (profile?.displayname) {
+                        // Lobby no longer exists (or already started). If we have an identity, attempt to join the game.
+                        if (effectivePlayerName) {
                             setIsLoading(true);
                             setLoadingMessage("Game already started. Joining game...");
                             setAllowLeave(true);
@@ -289,7 +313,7 @@ const Lobby: React.FC = () => {
                     }
 
                     setLoadingMessage("Syncing lobby state...");
-                    sendJson({ type: "request-lobby-state", gameId });
+                    sendJson({ type: "request-lobby-state", gameId, playerKey });
                     return;
                 }
 
@@ -301,7 +325,7 @@ const Lobby: React.FC = () => {
         sendJson({ type: "check-lobby", gameId });
 
         return unsubscribe;
-    }, [isSocketReady, subscribe, sendJson, gameId, navigate, profile]);
+    }, [isSocketReady, subscribe, sendJson, gameId, navigate, effectivePlayerName, playerKey]);
 
 
     const onToggleLock = (
@@ -365,7 +389,6 @@ const Lobby: React.FC = () => {
             return updated;
         });
     };
-
     const handleRandomizeCategory = (
         boardType: 'firstBoard' | 'secondBoard' | 'finalJeopardy',
         index?: number
