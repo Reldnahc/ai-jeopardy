@@ -1,30 +1,26 @@
-import React, { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import LockIcon from "../../icons/LockIcon.tsx";
 import RedoIcon from "../../icons/RedoIcon.tsx";
+
+export type LobbyBoardType = "firstBoard" | "secondBoard" | "finalJeopardy";
 
 interface CategoryBoardProps {
     title: string;
     categories: string[];
     isHost: boolean;
     lockedCategories: boolean[];
-    boardType: 'firstBoard' | 'secondBoard';
-    onChangeCategory: (
-        boardType: 'firstBoard' | 'secondBoard',
-        index: number,
-        value: string
-    ) => void;
-    onRandomizeCategory: (
-        boardType: 'firstBoard' | 'secondBoard',
-        index: number
-    ) => void;
-    onToggleLock: (
-        boardType: 'firstBoard' | 'secondBoard',
-        index: number
-    ) => void;
+    boardType: LobbyBoardType;
+
+    /** Optional per-input placeholder. Defaults to `Category {n}` except for Final Jeopardy. */
+    placeholder?: (index: number) => string;
+
+    onChangeCategory: (boardType: LobbyBoardType, index: number, value: string) => void;
+    onRandomizeCategory: (boardType: LobbyBoardType, index: number) => void;
+    onToggleLock: (boardType: LobbyBoardType, index: number) => void;
 }
 
-const MAX_FONT_PX = 19;  // ~1.2rem at 16px base
-const MIN_FONT_PX = 12;  // ~0.75rem
+const MAX_FONT_PX = 19; // ~1.2rem at 16px base
+const MIN_FONT_PX = 12; // ~0.75rem
 const STEP_PX = 0.5;
 
 function fitInputText(el: HTMLInputElement) {
@@ -48,6 +44,7 @@ const CategoryBoard: React.FC<CategoryBoardProps> = ({
                                                          isHost,
                                                          lockedCategories,
                                                          boardType,
+                                                         placeholder,
                                                          onChangeCategory,
                                                          onRandomizeCategory,
                                                          onToggleLock,
@@ -76,9 +73,12 @@ const CategoryBoard: React.FC<CategoryBoardProps> = ({
             });
         };
 
-        window.addEventListener('resize', onResize);
-        return () => window.removeEventListener('resize', onResize);
+        window.addEventListener("resize", onResize);
+        return () => window.removeEventListener("resize", onResize);
     }, []);
+
+    const defaultPlaceholder = (i: number) =>
+        boardType === "finalJeopardy" ? "Enter Final Jeopardy Category" : `Category ${i + 1}`;
 
     return (
         <div className="min-w-0">
@@ -87,20 +87,24 @@ const CategoryBoard: React.FC<CategoryBoardProps> = ({
             {categories.map((category, index) => (
                 <div key={index} className="flex items-center mb-3 gap-2.5 flex-nowrap">
                     <input
-                        ref={(el) => { inputRefs.current[index] = el; }}
+                        ref={(el) => {
+                            inputRefs.current[index] = el;
+                        }}
                         type="text"
-                        value={category || ''}
-                        disabled={lockedCategories[index]}
+                        value={category || ""}
+                        disabled={Boolean(lockedCategories[index])}
                         onChange={(e) => {
                             onChangeCategory(boardType, index, e.target.value);
                             if (inputRefs.current[index]) fitInputText(inputRefs.current[index]!);
                         }}
-                        placeholder={`Category ${index + 1}`}
+                        placeholder={(placeholder ?? defaultPlaceholder)(index)}
                         className={`
                             h-[48px] leading-none p-[10px] rounded border flex-1 min-w-0
-                            ${lockedCategories[index]
-                            ? "bg-gray-200 text-gray-500 border-gray-400 border-dashed cursor-not-allowed opacity-80"
-                            : "bg-gray-50 text-black border-gray-300"}
+                            ${
+                            lockedCategories[index]
+                                ? "bg-gray-200 text-gray-500 border-gray-400 border-dashed cursor-not-allowed opacity-80"
+                                : "bg-gray-50 text-black border-gray-300"
+                        }
                         `}
                     />
 
@@ -110,8 +114,9 @@ const CategoryBoard: React.FC<CategoryBoardProps> = ({
                                 onClick={() => onToggleLock(boardType, index)}
                                 disabled={!isHost}
                                 className={`text-[1rem] py-[10px] px-[15px] ${
-                                    lockedCategories[index] ? 'bg-red-600' : 'bg-indigo-500'
+                                    lockedCategories[index] ? "bg-red-600" : "bg-indigo-500"
                                 } text-white rounded cursor-pointer`}
+                                title={lockedCategories[index] ? "Unlock" : "Lock"}
                             >
                                 <LockIcon />
                             </button>
@@ -119,6 +124,7 @@ const CategoryBoard: React.FC<CategoryBoardProps> = ({
                             <button
                                 onClick={() => onRandomizeCategory(boardType, index)}
                                 className="text-[1rem] py-[10px] px-[15px] bg-blue-700 text-white rounded cursor-pointer"
+                                title="Randomize"
                             >
                                 <RedoIcon />
                             </button>

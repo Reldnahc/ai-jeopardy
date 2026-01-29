@@ -212,7 +212,7 @@ export default function Game() {
     useEffect(() => {
         if (!isSocketReady) return;
 
-        const unsubscribe = subscribe((message) => {
+        return subscribe((message) => {
             // message is already parsed JSON with a string `type`
             console.log(message);
 
@@ -257,7 +257,7 @@ export default function Game() {
                 }
 
                 if (m.selectedClue) {
-                    setSelectedClue({ ...m.selectedClue, showAnswer: m.selectedClue.isAnswerRevealed || false });
+                    setSelectedClue({...m.selectedClue, showAnswer: m.selectedClue.isAnswerRevealed || false});
                 } else {
                     setSelectedClue(null); // <-- important
                 }
@@ -352,14 +352,19 @@ export default function Game() {
 
             if (message.type === "clue-selected") {
                 const m = message as unknown as { clue: SelectedClueFromServer; clearedClues?: string[] };
-                setSelectedClue({ ...m.clue, showAnswer: Boolean(m.clue.isAnswerRevealed) });
+                setSelectedClue({...m.clue, showAnswer: Boolean(m.clue.isAnswerRevealed)});
                 if (m.clearedClues) setClearedClues(new Set(m.clearedClues));
                 return;
             }
 
 
             if (message.type === "timer-start") {
-                const m = message as unknown as { endTime: number; duration: number; timerVersion: number; timerKind?: string | null };
+                const m = message as unknown as {
+                    endTime: number;
+                    duration: number;
+                    timerVersion: number;
+                    timerKind?: string | null
+                };
                 timerVersionRef.current = m.timerVersion;
                 setTimerEndTime(m.endTime);
                 setTimerDuration(m.duration);
@@ -376,7 +381,7 @@ export default function Game() {
 
             if (message.type === "answer-revealed") {
                 const m = message as unknown as { clue?: SelectedClueFromServer };
-                if (m.clue) setSelectedClue({ ...m.clue, showAnswer: true });
+                if (m.clue) setSelectedClue({...m.clue, showAnswer: true});
                 resetLocalTimerState();
                 return;
             }
@@ -427,9 +432,7 @@ export default function Game() {
                 return;
             }
         });
-
-        return unsubscribe;
-    }, [isSocketReady, subscribe, onClueSelected, resetLocalTimerState]);
+    }, [isSocketReady, subscribe, onClueSelected, resetLocalTimerState, applyLockoutUntil]);
 
     if (!boardData) {
         return <p>Loading board... Please wait!</p>; // Display a loading message

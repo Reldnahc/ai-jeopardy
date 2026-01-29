@@ -4,8 +4,7 @@ import { useWebSocket } from "../contexts/WebSocketContext.tsx";
 import LobbySidebar from "../components/lobby/LobbySidebar.tsx";
 import LoadingScreen from "../components/common/LoadingScreen.tsx";
 import HostControls from "../components/lobby/HostControls.tsx";
-import FinalJeopardyCategory from "../components/lobby/FinalJeopardyCategory.tsx";
-import CategoryBoard from "../components/lobby/CategoryBoard.tsx";
+import CategoryBoard, { LobbyBoardType } from "../components/lobby/CategoryBoard.tsx";
 import {Player} from "../types/Lobby.ts";
 import {useProfile} from "../contexts/ProfileContext.tsx";
 import {useAlert} from "../contexts/AlertContext.tsx";
@@ -19,19 +18,47 @@ type LockedCategories = {
     finalJeopardy: boolean[];
 };
 
-//type BoardType = 'firstBoard' | 'secondBoard';
+type CategorySection = typeof CATEGORY_SECTIONS[number];
+type BoardType = CategorySection["key"];
+
+const CATEGORY_SECTIONS = [
+    { key: "firstBoard", title: "Jeopardy!", count: 5 },
+    { key: "secondBoard", title: "Double Jeopardy!", count: 5 },
+    { key: "finalJeopardy", title: "Final Jeopardy!", count: 1 },
+] as const;
+
+function buildInitial<T>(
+    make: (count: number) => T
+): Record<BoardType, T> {
+    return CATEGORY_SECTIONS.reduce<Record<BoardType, T>>(
+        (acc, section) => {
+            acc[section.key] = make(section.count);
+            return acc;
+        },
+        {} as Record<BoardType, T>
+    );
+}
+
+
+function flattenBySections(values: Record<BoardType, string[]>): string[] {
+    return CATEGORY_SECTIONS.flatMap((s) => (values[s.key] ?? []).slice(0, s.count));
+}
+
+function unflattenBySections(flat: string[]): Record<BoardType, string[]> {
+    let cursor = 0;
+    const out = {} as Record<BoardType, string[]>;
+    for (const s of CATEGORY_SECTIONS) {
+        out[s.key] = flat.slice(cursor, cursor + s.count);
+        cursor += s.count;
+    }
+    return out;
+}
 
 const Lobby: React.FC = () => {
     const location = useLocation();
-    const [categories, setCategories] = useState<{
-        firstBoard: string[];
-        secondBoard: string[];
-        finalJeopardy: string;
-    }>({
-        firstBoard: ['', '', '', '', ''],
-        secondBoard: ['', '', '', '', ''],
-        finalJeopardy: '',
-    });
+    const [categories, setCategories] = useState<Record<BoardType, string[]>>(
+        buildInitial((count) => Array(count).fill(""))
+    );
     const { gameId } = useParams<{ gameId: string }>();
     const [isLoading, setIsLoading] = useState(false);
     const [allowLeave, setAllowLeave] = useState(false);
@@ -48,9 +75,9 @@ const Lobby: React.FC = () => {
     const [selectedModel, setSelectedModel] = useState('gpt-5-mini'); // Default value for dropdown
     const [includeVisuals, setIncludeVisuals] = useState(false);
     const [lockedCategories, setLockedCategories] = useState<LockedCategories>({
-        firstBoard: Array(5).fill(false), // Default unlocked
-        secondBoard: Array(5).fill(false), // Default unlocked
-        finalJeopardy: Array(1).fill(false),
+        firstBoard: Array(CATEGORY_SECTIONS[0].count).fill(false),
+        secondBoard: Array(CATEGORY_SECTIONS[1].count).fill(false),
+        finalJeopardy: Array(CATEGORY_SECTIONS[2].count).fill(false),
     });
 
     const { isSocketReady, sendJson, subscribe } = useWebSocket();
@@ -110,7 +137,6 @@ const Lobby: React.FC = () => {
         sendJson({ type: "join-lobby", gameId, playerName: effectivePlayerName, playerKey });
         sendJson({ type: "request-lobby-state", gameId, playerKey });
     }, [isSocketReady, gameId, effectivePlayerName, playerKey, sendJson]);
-
 
     useEffect(() => {
         if (!allowLeave) return;
@@ -186,11 +212,7 @@ const Lobby: React.FC = () => {
                     setIsHostServer(Boolean(m.you?.isHost) || (hostName.length > 0 && youName.length > 0 && hostName === youName));
 
                     if (Array.isArray(m.categories)) {
-                        setCategories({
-                            firstBoard: m.categories.slice(0, 5),
-                            secondBoard: m.categories.slice(5, 10),
-                            finalJeopardy: m.categories[10] ?? "",
-                        });
+                        setCategories(unflattenBySections(m.categories));
                     }
 
                     if (m.lockedCategories) {
@@ -242,11 +264,7 @@ const Lobby: React.FC = () => {
                     };
 
                     setCategories((prev) => {
-                        if (m.boardType === "finalJeopardy") {
-                            return { ...prev, finalJeopardy: m.value ?? "" };
-                        }
-
-                        const nextBoard = [...prev[m.boardType]];
+                        const nextBoard = [...(prev[m.boardType] ?? [])];
                         if (m.index >= 0 && m.index < nextBoard.length) {
                             nextBoard[m.index] = m.value ?? "";
                         }
@@ -259,11 +277,7 @@ const Lobby: React.FC = () => {
                     const m = message as unknown as { categories: string[] };
 
                     if (Array.isArray(m.categories)) {
-                        setCategories({
-                            firstBoard: m.categories.slice(0, 5),
-                            secondBoard: m.categories.slice(5, 10),
-                            finalJeopardy: m.categories[10] ?? "",
-                        });
+                        setCategories(unflattenBySections(m.categories));
                     }
                     return;
                 }
@@ -296,7 +310,6 @@ const Lobby: React.FC = () => {
                 case "start-game": {
                     setIsLoading(false);
                     setAllowLeave(true);
-
                     return;
                 }
 
@@ -335,13 +348,9 @@ const Lobby: React.FC = () => {
         sendJson({ type: "check-lobby", gameId });
 
         return unsubscribe;
-    }, [isSocketReady, subscribe, sendJson, gameId, navigate, effectivePlayerName, playerKey]);
+    }, [isSocketReady, subscribe, sendJson, gameId, navigate, effectivePlayerName, playerKey, showAlert]);
 
-
-    const onToggleLock = (
-        boardType: "firstBoard" | "secondBoard" | "finalJeopardy",
-        index: number
-    ) => {
+    const onToggleLock = (boardType: LobbyBoardType, index: number) => {
         if (!isSocketReady) return;
         if (!gameId) return;
 
@@ -353,39 +362,18 @@ const Lobby: React.FC = () => {
         });
     };
 
-
     const handleDropdownChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         setSelectedModel(e.target.value);
     };
 
-    const onChangeCategory = (
-        boardType: "firstBoard" | "secondBoard" | "finalJeopardy",
-        index: number | undefined,
-        value: string
-    ) => {
+    const onChangeCategory = (boardType: LobbyBoardType, index: number, value: string) => {
         setCategories((prev) => {
-            if (boardType === "finalJeopardy") {
-                const updated = { ...prev, finalJeopardy: value };
-
-                if (isSocketReady && gameId) {
-                    sendJson({
-                        type: "update-category",
-                        gameId,
-                        boardType: "finalJeopardy",
-                        index: 0,
-                        value,
-                    });
-                }
-
-                return updated;
-            }
-
-            const updatedBoard = [...prev[boardType]];
-            if (index !== undefined) updatedBoard[index] = value;
+            const updatedBoard = [...(prev[boardType] ?? [])];
+            if (index >= 0 && index < updatedBoard.length) updatedBoard[index] = value;
 
             const updated = { ...prev, [boardType]: updatedBoard };
 
-            if (isSocketReady && gameId && index !== undefined) {
+            if (isSocketReady && gameId) {
                 sendJson({
                     type: "update-category",
                     gameId,
@@ -398,10 +386,8 @@ const Lobby: React.FC = () => {
             return updated;
         });
     };
-    const handleRandomizeCategory = (
-        boardType: 'firstBoard' | 'secondBoard' | 'finalJeopardy',
-        index?: number
-    ) => {
+
+    const handleRandomizeCategory = (boardType: LobbyBoardType, index: number) => {
         if (!isSocketReady) return;
         if (!gameId) return;
 
@@ -411,24 +397,38 @@ const Lobby: React.FC = () => {
             type: "randomize-category",
             gameId,
             boardType,
-            index: boardType === "finalJeopardy" ? 0 : index,
+            index,
             candidates,
         });
     };
+
+    function isObject(value: unknown): value is Record<string, unknown> {
+        return typeof value === "object" && value !== null;
+    }
 
     const tryValidateBoardJson = (raw: string): string | null => {
         if (!raw.trim()) return null; // empty means "use AI"
 
         try {
-            const parsed = JSON.parse(raw) as unknown;
+            const parsed: unknown = JSON.parse(raw);
 
-            // We only do minimal checks here because server is authoritative.
-            if (typeof parsed !== "object" || parsed === null) return "Board JSON must be an object.";
+            if (!isObject(parsed)) {
+                return "Board JSON must be an object.";
+            }
 
-            const p = parsed as any;
-            const bd = p.boardData && typeof p.boardData === "object" ? p.boardData : p;
+            // Accept either:
+            // { firstBoard, secondBoard, finalJeopardy }
+            // OR
+            // { boardData: { firstBoard, secondBoard, finalJeopardy } }
+            const boardData = isObject(parsed.boardData)
+                ? parsed.boardData
+                : parsed;
 
-            if (!bd.firstBoard || !bd.secondBoard || !bd.finalJeopardy) {
+            if (
+                !("firstBoard" in boardData) ||
+                !("secondBoard" in boardData) ||
+                !("finalJeopardy" in boardData)
+            ) {
                 return "Missing firstBoard / secondBoard / finalJeopardy.";
             }
 
@@ -438,9 +438,10 @@ const Lobby: React.FC = () => {
         }
     };
 
+
     const handleCreateGame = async () => {
         if (!profile) {
-            showAlert(
+            await showAlert(
                 <span>
                     <span className="text-red-500 font-bold text-xl">You need to be logged in to do this.</span><br/>
                 </span>,
@@ -460,7 +461,7 @@ const Lobby: React.FC = () => {
         const usingImportedBoard = boardJson.trim().length > 0;
 
         if (usingImportedBoard && localJsonError) {
-            showAlert(
+            await showAlert(
                 <span>
                     <span className="text-red-500 font-bold text-xl">Invalid board JSON</span><br/>
                     <span>{localJsonError}</span>
@@ -482,7 +483,7 @@ const Lobby: React.FC = () => {
                 categories.firstBoard.some((c) => !c.trim()) ||
                 categories.secondBoard.some((c) => !c.trim())
             ) {
-                showAlert(
+                await showAlert(
                     <span>
                         <span className="text-red-500 font-bold text-xl">Please fill in all the categories</span><br/>
                     </span>,
@@ -496,7 +497,6 @@ const Lobby: React.FC = () => {
                 return;
             }
         }
-
 
         try {
             setIsLoading(true);
@@ -512,7 +512,7 @@ const Lobby: React.FC = () => {
                 host: profile.displayname,
                 timeToBuzz,
                 timeToAnswer,
-                categories: [...categories.firstBoard, ...categories.secondBoard, categories.finalJeopardy],
+                categories: flattenBySections(categories),
                 selectedModel: usingImportedBoard ? undefined : selectedModel,
                 boardJson: boardJson.trim() ? boardJson : undefined,
                 includeVisuals,
@@ -548,7 +548,6 @@ const Lobby: React.FC = () => {
                         <div className="space-y-8">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 ">
                                 <div className="min-w-0">
-
                                     <CategoryBoard
                                         title="Jeopardy!"
                                         categories={categories.firstBoard}
@@ -561,7 +560,6 @@ const Lobby: React.FC = () => {
                                     />
                                 </div>
                                 <div className="min-w-0">
-
                                     <CategoryBoard
                                         title="Double Jeopardy!"
                                         categories={categories.secondBoard}
@@ -575,12 +573,14 @@ const Lobby: React.FC = () => {
                                 </div>
                             </div>
 
-                            <FinalJeopardyCategory
-                                category={categories.finalJeopardy}
+                            <CategoryBoard
+                                title="Final Jeopardy!"
+                                categories={categories.finalJeopardy}
                                 isHost={isHost}
+                                lockedCategories={lockedCategories.finalJeopardy}
+                                boardType="finalJeopardy"
                                 onChangeCategory={onChangeCategory}
                                 onRandomizeCategory={handleRandomizeCategory}
-                                lockedCategories={lockedCategories.finalJeopardy}
                                 onToggleLock={onToggleLock}
                             />
                         </div>
@@ -592,7 +592,6 @@ const Lobby: React.FC = () => {
                                 animate={{ opacity: 1 }}
                                 className="mt-8"
                             >
-
                                 <HostControls
                                     selectedModel={selectedModel}
                                     onModelChange={handleDropdownChange}
