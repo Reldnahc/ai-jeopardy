@@ -43,7 +43,7 @@ const buildLobbyState = (gameId, ws) => {
     const you = game.players?.find((p) => p.id === ws.id) || null;
 
     return {
-        type: 'lobby-state',
+        type: "lobby-state",
         gameId,
         players: game.players.map((p) => ({
             name: p.name,
@@ -63,6 +63,16 @@ const buildLobbyState = (gameId, ws) => {
             }
             : null,
     };
+};
+
+const getPlayerForSocket = (game, ws) => {
+    if (!game || !ws) return null;
+    return (game.players || []).find((p) => p.id === ws.id) || null;
+};
+
+const sendLobbySnapshot = (ws, gameId) => {
+    const snap = buildLobbyState(gameId, ws);
+    if (snap) ws.send(JSON.stringify(snap));
 };
 
 const clearGameTimer = (game) => {
@@ -272,28 +282,28 @@ function requireHost(game, ws) {
     return game && isHostSocket(game, ws);
 }
 
-wss.on('connection', (ws) => {
+wss.on("connection", (ws) => {
     ws.id = Math.random().toString(36).substr(2, 9); // Assign a unique ID to each socket
     console.log('New client connected');
     ws.isAlive = true; // Mark connection as alive when established
 
-    ws.on('pong', () => {
+    ws.on("pong", () => {
         ws.isAlive = true; // Mark as healthy when a pong is received
     });
 
-    ws.on('message', async (message) => {
+    ws.on("message", async (message) => {
         try {
             const text = typeof message === "string" ? message : message.toString("utf8");
             console.log("[Server] raw message:", text);
             const data = JSON.parse(text);
             console.log(`[Server] Received message from client ${ws.id}:`, data);
-            if (data.type === 'create-game' || data.type === 'join-game' ||
-                data.type === 'create-lobby' || data.type === 'join-lobby' ||
-                data.type === 'check-lobby') {
+            if (data.type === "create-game" || data.type === "join-game" ||
+                data.type === "create-lobby" || data.type === "join-lobby" ||
+                data.type === "check-lobby") {
                 // Assign the game ID to the WebSocket instance
                 ws.gameId = data.gameId;
             }
-            if (data.type === 'kick-player') {
+            if (data.type === "kick-player") {
                 const { gameId, targetPlayerName } = data;
 
                 const requester = games[gameId].players.find(p => p.id === ws.id);
@@ -312,7 +322,7 @@ wss.on('connection', (ws) => {
                     //TODO You might want to send a specific "kicked" message type
                 }
             }
-            if (data.type === 'request-lobby-state'){
+            if (data.type === "request-lobby-state"){
                 const gameId = data.gameId;
                 const snapshot = buildLobbyState(gameId, ws);
                 if (!snapshot) {
@@ -322,7 +332,7 @@ wss.on('connection', (ws) => {
                 ws.send(JSON.stringify(snapshot));
             }
 
-            if (data.type === 'create-lobby') {
+            if (data.type === "create-lobby") {
                 const { host, categories, playerKey  } = data;
 
                 let newGameId;
@@ -361,7 +371,7 @@ wss.on('connection', (ws) => {
                 };
 
                 ws.send(JSON.stringify({
-                    type: 'lobby-created',
+                    type: "lobby-created",
                     gameId: newGameId,
                     categories: normalizeCategories11(categories),
                     players: [{ id: ws.id, name: host, color, text_color }],
@@ -378,7 +388,7 @@ wss.on('connection', (ws) => {
                     (gameId && games[gameId] ? gameId : null) ??
                     (ws.gameId && games[ws.gameId] ? ws.gameId : null);
 
-                if (!effectiveGameId || !games[gameId] || !name) return;
+                if (!effectiveGameId || !games[effectiveGameId] || !name) return;
 
                 const game = games[effectiveGameId];
 
@@ -399,7 +409,7 @@ wss.on('connection', (ws) => {
                     game.host = game.players[0].name;
                 }
 
-                broadcast(gameId, {
+                broadcast(effectiveGameId, {
                     type: "player-list-update",
                     players: game.players.map((p) => ({
                         name: p.name,
@@ -412,11 +422,11 @@ wss.on('connection', (ws) => {
                 return;
             }
 
-            if (data.type === 'join-lobby') {
+            if (data.type === "join-lobby") {
                 const { gameId, playerName, playerKey } = data;
 
                 if (!games[gameId]) {
-                    ws.send(JSON.stringify({ type: 'error', message: 'Lobby does not exist!' }));
+                    ws.send(JSON.stringify({ type: "error", message: "Lobby does not exist!" }));
                     return;
                 }
 
@@ -485,7 +495,7 @@ wss.on('connection', (ws) => {
                 ws.send(JSON.stringify(buildLobbyState(gameId, ws)));
 
                 broadcast(gameId, {
-                    type: 'player-list-update',
+                    type: "player-list-update",
                     players: game.players.map((p) => ({
                         name: p.name,
                         color: p.color,
@@ -496,7 +506,7 @@ wss.on('connection', (ws) => {
             }
 
 
-            if (data.type === 'create-game') {
+            if (data.type === "create-game") {
                 const {
                     gameId,
                     categories,
@@ -516,12 +526,19 @@ wss.on('connection', (ws) => {
                     : Boolean(includeVisuals);
 
                 if (!games[gameId]) {
-                    broadcast(gameId, { type: 'create-board-failed', message: 'Game not found.' });
+                    broadcast(gameId, { type: "create-board-failed", message: "Game not found." });
+                    return;
+                }
+
+                // Host-only
+                if (!isHostSocket(games[gameId], ws)) {
+                    ws.send(JSON.stringify({ type: "error", message: "Only the host can start the game." }));
+                    sendLobbySnapshot(ws, gameId);
                     return;
                 }
 
                 // Always show loading UI briefly
-                broadcast(gameId, { type: 'trigger-loading' });
+                broadcast(gameId, { type: "trigger-loading" });
 
                 let boardData = null;
 
@@ -531,7 +548,7 @@ wss.on('connection', (ws) => {
                         const imported = parseBoardJson(boardJson);
                         const v = validateImportedBoardData(imported);
                         if (!v.ok) {
-                            broadcast(gameId, { type: 'create-board-failed', message: v.error });
+                            broadcast(gameId, { type: "create-board-failed", message: v.error });
                             games[gameId].isGenerating = false;
                             return;
                         }
@@ -592,7 +609,7 @@ wss.on('connection', (ws) => {
             }
 
 
-            if (data.type === 'check-lobby') {
+            if (data.type === "check-lobby") {
                 console.log("checking lobby: " + data.gameId);
                 const {gameId} = data;
                 let isValid = false;
@@ -600,32 +617,114 @@ wss.on('connection', (ws) => {
                     isValid = true;
                 }
 
-                ws.send(JSON.stringify({ type: 'check-lobby-response', isValid, gameId }));
+                ws.send(JSON.stringify({ type: "check-lobby-response", isValid, gameId }));
             }
 
-            if (data.type === 'check-cotd') {
+            if (data.type === "check-cotd") {
                 ws.send(JSON.stringify({ type: 'category-of-the-day', cotd }));
             }
 
-            if (data.type === 'toggle-lock-category') {
-                const { gameId, boardType, index, locked } = data;
+            if (data.type === "toggle-lock-category") {
+                const { gameId, boardType, index } = data;
+                const game = games[gameId];
+                if (!game) return;
 
-                if (games[gameId]) {
-
-                    // Update the specific lock state for the given boardType and index
-                    games[gameId].lockedCategories[boardType][index] = locked;
-
-                    // Notify all players in the game about the updated lock state
-                    broadcast(gameId, {
-                        type: 'category-lock-updated',
-                        boardType,
-                        index,
-                        locked,
-                    });
-                } else {
-                    console.error(`[Server] Game ID ${gameId} not found when toggling lock for a category.`);
+                if (!isHostSocket(game, ws)) {
+                    ws.send(JSON.stringify({ type: "error", message: "Only the host can toggle category locks." }));
+                    sendLobbySnapshot(ws, gameId);
+                    return;
                 }
+
+                const bt = boardType;
+                if (bt !== "firstBoard" && bt !== "secondBoard" && bt !== "finalJeopardy") return;
+
+                const idx = Number(index);
+                if (!Number.isFinite(idx)) return;
+                if ((bt === "firstBoard" || bt === "secondBoard") && (idx < 0 || idx > 4)) return;
+                if (bt === "finalJeopardy" && idx !== 0) return;
+
+                if (!game.lockedCategories) {
+                    game.lockedCategories = {
+                        firstBoard: Array(5).fill(false),
+                        secondBoard: Array(5).fill(false),
+                        finalJeopardy: Array(1).fill(false),
+                    };
+                }
+
+                const nextLocked = !Boolean(game.lockedCategories[bt][idx]);
+                game.lockedCategories[bt][idx] = nextLocked;
+
+                broadcast(gameId, { type: "category-lock-updated", boardType: bt, index: idx, locked: nextLocked });
             }
+
+
+
+            if (data.type === "randomize-category") {
+                const { gameId, boardType, index, candidates } = data;
+                const game = games[gameId];
+                if (!game) return;
+
+                // Anyone may request randomize, but server enforces locks + uniqueness.
+                const bt = boardType;
+                if (bt !== "firstBoard" && bt !== "secondBoard" && bt !== "finalJeopardy") return;
+
+                const idx = bt === "finalJeopardy" ? 0 : Number(index);
+                if (!Number.isFinite(idx)) return;
+                if ((bt === "firstBoard" || bt === "secondBoard") && (idx < 0 || idx > 4)) return;
+
+                // Lock enforcement
+                if ((bt === "firstBoard" || bt === "secondBoard") && game.lockedCategories?.[bt]?.[idx]) {
+                    ws.send(JSON.stringify({ type: "error", message: "That category is locked." }));
+                    sendLobbySnapshot(ws, gameId);
+                    return;
+                }
+                if (bt === "finalJeopardy" && game.lockedCategories?.finalJeopardy?.[0]) {
+                    ws.send(JSON.stringify({ type: "error", message: "That category is locked." }));
+                    sendLobbySnapshot(ws, gameId);
+                    return;
+                }
+
+                game.categories = normalizeCategories11(game.categories);
+
+                let globalIndex = -1;
+                if (bt === "firstBoard") globalIndex = idx;
+                else if (bt === "secondBoard") globalIndex = 5 + idx;
+                else globalIndex = 10;
+
+                const norm = (s) => String(s ?? "").trim().toLowerCase();
+                const used = new Set(
+                    game.categories
+                        .map((c, i) => (i === globalIndex ? "" : norm(c)))
+                        .filter((v) => v.length > 0)
+                );
+
+                const list = Array.isArray(candidates) ? candidates : [];
+                let chosen = "";
+
+                for (const c of list) {
+                    const v = norm(c);
+                    if (!v) continue;
+                    if (used.has(v)) continue;
+                    chosen = String(c ?? "").trim();
+                    break;
+                }
+
+                if (!chosen) {
+                    ws.send(JSON.stringify({ type: "error", message: "No unique random category available." }));
+                    sendLobbySnapshot(ws, gameId);
+                    return;
+                }
+
+                game.categories[globalIndex] = chosen;
+
+                broadcast(gameId, {
+                    type: "category-updated",
+                    boardType: bt,
+                    index: bt === "finalJeopardy" ? 0 : idx,
+                    value: chosen,
+                });
+            }
+
 
             if (data.type === "update-category") {
                 const { gameId, boardType, index, value } = data;
@@ -640,38 +739,65 @@ wss.on('connection', (ws) => {
 
                 const game = games[gameId];
 
-                // Enforce lock server-side (prevents bypass / stale UI)
-                if (
-                    (boardType === "firstBoard" || boardType === "secondBoard") &&
-                    game.lockedCategories?.[boardType]?.[index]
-                ) return;
+                const bt = boardType;
+                if (bt !== "firstBoard" && bt !== "secondBoard" && bt !== "finalJeopardy") return;
 
-                if (boardType === "finalJeopardy" && game.lockedCategories?.finalJeopardy?.[0]) return;
+                const idx = bt === "finalJeopardy" ? 0 : Number(index);
+                if (!Number.isFinite(idx)) return;
+                if ((bt === "firstBoard" || bt === "secondBoard") && (idx < 0 || idx > 4)) return;
+
+                // Enforce lock server-side (prevents bypass / stale UI)
+                if ((bt === "firstBoard" || bt === "secondBoard") && game.lockedCategories?.[bt]?.[idx]) {
+                    ws.send(JSON.stringify({ type: "error", message: "That category is locked." }));
+                    sendLobbySnapshot(ws, gameId);
+                    return;
+                }
+                if (bt === "finalJeopardy" && game.lockedCategories?.finalJeopardy?.[0]) {
+                    ws.send(JSON.stringify({ type: "error", message: "That category is locked." }));
+                    sendLobbySnapshot(ws, gameId);
+                    return;
+                }
 
                 game.categories = normalizeCategories11(game.categories);
 
                 // Map boardType/index -> global index in the flat 11 array
                 let globalIndex = -1;
-                if (boardType === "firstBoard") globalIndex = index;          // 0-4
-                else if (boardType === "secondBoard") globalIndex = 5 + index; // 5-9
-                else if (boardType === "finalJeopardy") globalIndex = 10;      // 10
+                if (bt === "firstBoard") globalIndex = idx;            // 0-4
+                else if (bt === "secondBoard") globalIndex = 5 + idx;  // 5-9
+                else globalIndex = 10;                                 // 10
 
                 if (globalIndex < 0 || globalIndex > 10) return;
 
-                game.categories[globalIndex] = String(value ?? "");
+                const nextVal = String(value ?? "").trim();
 
-                // Broadcast only the patch (no full array overwrite race)
+                // Uniqueness across all 11 (ignore empty)
+                const norm = (s) => String(s ?? "").trim().toLowerCase();
+                const nextNorm = norm(nextVal);
+
+                if (nextNorm.length > 0) {
+                    for (let i = 0; i < game.categories.length; i++) {
+                        if (i === globalIndex) continue;
+                        if (norm(game.categories[i]) === nextNorm) {
+                            ws.send(JSON.stringify({ type: "error", message: "Categories must be unique." }));
+                            sendLobbySnapshot(ws, gameId);
+                            return;
+                        }
+                    }
+                }
+
+                game.categories[globalIndex] = nextVal;
+
                 broadcast(gameId, {
                     type: "category-updated",
-                    boardType,
-                    index: boardType === "finalJeopardy" ? 0 : index,
+                    boardType: bt,
+                    index: bt === "finalJeopardy" ? 0 : idx,
                     value: game.categories[globalIndex],
                 });
 
-                console.log(`[Server] Category updated for game ${gameId}: ${boardType}[${index}] -> ${value}`);
+                console.log(`[Server] Category updated for game ${gameId}: ${bt}[${idx}] -> ${nextVal}`);
             }
 
-            if (data.type === 'update-categories') {
+            if (data.type === "update-categories") {
                 const { gameId, categories } = data;
 
                 if (games[gameId]) {
@@ -680,14 +806,14 @@ wss.on('connection', (ws) => {
 
 
                     broadcast(gameId, {
-                        type: 'categories-updated',
+                        type: "categories-updated",
                         categories: next,
                     });
 
                     console.log(`[Server] Categories updated for game ${gameId}:`, next);
                 } else {
                     ws.send(JSON.stringify({
-                        type: 'error',
+                        type: "error",
                         message: `Game ${gameId} not found while updating categories.`,
                     }));
                 }
@@ -749,7 +875,7 @@ wss.on('connection', (ws) => {
                 }
             }
 
-            if (data.type === 'reset-buzzer') {
+            if (data.type === "reset-buzzer") {
                 const { gameId } = data;
                 if (!requireHost(games[gameId], ws)) return;
 
@@ -764,13 +890,13 @@ wss.on('connection', (ws) => {
 
                 game.timerVersion = (game.timerVersion || 0) + 1;
 
-                broadcast(gameId, { type: 'reset-buzzer' });
-                broadcast(gameId, { type: 'buzzer-locked' });
-                broadcast(gameId, { type: 'timer-end', timerVersion: (games[gameId]?.timerVersion || 0) }); // client now clears on reset-buzzer anyway
+                broadcast(gameId, { type: "reset-buzzer" });
+                broadcast(gameId, { type: "buzzer-locked" });
+                broadcast(gameId, { type: "timer-end", timerVersion: (games[gameId]?.timerVersion || 0) }); // client now clears on reset-buzzer anyway
             }
 
 
-            if (data.type === 'mark-all-complete') {
+            if (data.type === "mark-all-complete") {
                 const {gameId} = data;
                 if (!requireHost(games[gameId], ws)) return;
 
@@ -801,7 +927,7 @@ wss.on('connection', (ws) => {
 
                         // Broadcast the updated cleared clues to all clients
                         broadcast(gameId, {
-                            type: 'all-clues-cleared',
+                            type: "all-clues-cleared",
                             clearedClues: Array.from(game.clearedClues), // Send the cleared clues as an array
                         });
                     }
@@ -1020,7 +1146,7 @@ wss.on('connection', (ws) => {
 
                     // Notify all players to display the answer
                     broadcast(gameId, {
-                        type: 'answer-revealed',
+                        type: "answer-revealed",
                         clue: games[gameId].selectedClue,
                     });
                 } else {
@@ -1070,14 +1196,14 @@ wss.on('connection', (ws) => {
             }
 
 
-            if (data.type === 'unlock-buzzer') {
+            if (data.type === "unlock-buzzer") {
                 const { gameId } = data;
                 const game = games[gameId];
                 if (!game) return;
                 if (!requireHost(game, ws)) return;
 
                 game.buzzerLocked = false;
-                broadcast(gameId, { type: 'buzzer-unlocked' });
+                broadcast(gameId, { type: "buzzer-unlocked" });
 
                 if (game.timeToBuzz !== -1) {
                     startGameTimer(
@@ -1089,15 +1215,15 @@ wss.on('connection', (ws) => {
                         ({ gameId, game, broadcast }) => {
                             if (!game.buzzerLocked && !game.buzzed) {
                                 game.buzzerLocked = true;
-                                broadcast(gameId, { type: 'buzzer-locked' });
-                                broadcast(gameId, { type: 'answer-revealed' });
+                                broadcast(gameId, { type: "buzzer-locked" });
+                                broadcast(gameId, { type: "answer-revealed" });
                             }
                         }
                     );
                 }
             }
 
-            if (data.type === 'lock-buzzer') {
+            if (data.type === "lock-buzzer") {
                 const {gameId} = data;
                 if (!requireHost(games[gameId], ws)) return;
 
@@ -1107,7 +1233,7 @@ wss.on('connection', (ws) => {
                 }
             }
 
-            if (data.type === 'transition-to-second-board') {
+            if (data.type === "transition-to-second-board") {
                 const { gameId } = data;
                 if (!requireHost(games[gameId], ws)) return;
 
@@ -1117,7 +1243,7 @@ wss.on('connection', (ws) => {
                     game.isFinalJeopardy = false;
                     game.finalJeopardyStage = null;
 
-                    broadcast(gameId, { type: 'transition-to-second-board' });
+                    broadcast(gameId, { type: "transition-to-second-board" });
                 } else {
                     console.error(`[Server] Game ID ${gameId} not found for board transition.`);
                 }
@@ -1199,7 +1325,7 @@ wss.on('connection', (ws) => {
                 }
             }
 
-            if (data.type === 'transition-to-final-jeopardy') {
+            if (data.type === "transition-to-final-jeopardy") {
                 const { gameId } = data;
 
                 if (games[gameId]) {
@@ -1211,14 +1337,14 @@ wss.on('connection', (ws) => {
                     game.wagers = {};
                     game.drawings = {};
 
-                    broadcast(gameId, { type: 'final-jeopardy' });
+                    broadcast(gameId, { type: "final-jeopardy" });
                 } else {
                     console.error(`[Server] Game ID ${gameId} not found for board transition.`);
                 }
             }
 
 
-            if (data.type === 'final-jeopardy-drawing') {
+            if (data.type === "final-jeopardy-drawing") {
                 const {gameId, player, drawing} = data;
 
                 if (games[gameId]) {
@@ -1241,7 +1367,7 @@ wss.on('connection', (ws) => {
 
                     // Broadcast that the player's drawing is submitted
                     broadcast(gameId, {
-                        type: 'final-jeopardy-drawing-submitted',
+                        type: "final-jeopardy-drawing-submitted",
                         player,
                     });
 

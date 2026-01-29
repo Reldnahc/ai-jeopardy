@@ -111,13 +111,6 @@ const Lobby: React.FC = () => {
         if (!isSocketReady) return;
         if (!gameId) return;
 
-        sendJson({
-            type: "join-game",
-            gameId,
-            playerName: effectivePlayerName,
-            playerKey,
-        });
-
         navigate(`/game/${gameId}`, {
             state: {
                 playerName: effectivePlayerName,
@@ -317,6 +310,12 @@ const Lobby: React.FC = () => {
                     return;
                 }
 
+                case "error": {
+                    // ...log it...
+                    if (gameId) sendJson({ type: "request-lobby-state", gameId, playerKey });
+                    return;
+                }
+
                 default:
                     return;
             }
@@ -339,8 +338,7 @@ const Lobby: React.FC = () => {
             type: "toggle-lock-category",
             gameId,
             boardType,
-            index,
-            locked: !lockedCategories[boardType][index],
+            index
         });
     };
 
@@ -393,53 +391,17 @@ const Lobby: React.FC = () => {
         boardType: 'firstBoard' | 'secondBoard' | 'finalJeopardy',
         index?: number
     ) => {
-        setCategories((prev) => {
-            const updatedCategories = { ...prev };
+        if (!isSocketReady) return;
+        if (!gameId) return;
 
-            if (boardType === 'finalJeopardy') {
-                let newCategory;
-                do {
-                    newCategory = getUniqueCategories(1)[0];
-                } while (
-                    prev.firstBoard.includes(newCategory) ||
-                    prev.secondBoard.includes(newCategory) ||
-                    prev.finalJeopardy === newCategory
-                    );
-                updatedCategories.finalJeopardy = newCategory;
-            } else if (index !== undefined) {
-                const board = [...updatedCategories[boardType]];
-                let newCategory;
-                do {
-                    newCategory = getUniqueCategories(1)[0];
-                } while (
-                    board.includes(newCategory) ||
-                    prev.firstBoard.includes(newCategory) ||
-                    prev.secondBoard.includes(newCategory)
-                    );
-                board[index] = newCategory;
-                updatedCategories[boardType] = board;
-            }
+        const candidates = getUniqueCategories(25);
 
-            if (isSocketReady && gameId) {
-                if (boardType === "finalJeopardy") {
-                    sendJson({
-                        type: "update-category",
-                        gameId,
-                        boardType: "finalJeopardy",
-                        index: 0,
-                        value: updatedCategories.finalJeopardy,
-                    });
-                } else if (index !== undefined) {
-                    sendJson({
-                        type: "update-category",
-                        gameId,
-                        boardType,
-                        index,
-                        value: updatedCategories[boardType][index],
-                    });
-                }
-            }
-            return updatedCategories;
+        sendJson({
+            type: "randomize-category",
+            gameId,
+            boardType,
+            index: boardType === "finalJeopardy" ? 0 : index,
+            candidates,
         });
     };
 
@@ -535,6 +497,7 @@ const Lobby: React.FC = () => {
             sendJson({
                 type: "create-game",
                 gameId,
+                playerKey,
                 host: profile.displayname,
                 timeToBuzz,
                 timeToAnswer,
