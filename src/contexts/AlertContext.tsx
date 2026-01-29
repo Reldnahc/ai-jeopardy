@@ -1,18 +1,18 @@
 import React, { createContext, useContext, useState, ReactNode } from "react";
 import Alert from "../components/common/Alert"; // Adjust path if needed
 
-interface AlertButton {
-    label: string; // The text to display on the button
-    actionValue: string; // Value to resolve the Promise with (e.g., "continue", "cancel")
-    styleClass?: string; // Optional custom styles for the button
-}
+export type AlertButton = {
+    label: string;
+    actionValue: string;
+    styleClass?: string;
+};
 
-interface AlertContextProps {
-    showAlert: (text: ReactNode, buttons: AlertButton[]) => Promise<string>; // Now returns a Promise
+export type AlertContextValue = {
+    showAlert: (text: ReactNode, buttons: AlertButton[]) => Promise<string>;
     closeAlert: () => void;
-}
+};
 
-export const AlertContext = createContext<AlertContextProps | undefined>(undefined);
+export const AlertContext = createContext<AlertContextValue | undefined>(undefined);
 
 export const useAlert = () => {
     const context = useContext(AlertContext);
@@ -26,7 +26,7 @@ export const AlertProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const [isOpen, setIsOpen] = useState(false);
     const [alertText, setAlertText] = useState<ReactNode>("");
     const [alertButtons, setAlertButtons] = useState<AlertButton[]>([]);
-    const [resolver, setResolver] = useState<(value: string) => void>(); // Stores the Promise resolver
+    const [resolver, setResolver] = useState<((value: string) => void) | null>(null);
 
     const showAlert = (text: ReactNode, buttons: AlertButton[]): Promise<string> => {
         setAlertText(text);
@@ -46,9 +46,7 @@ export const AlertProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     };
 
     const handleAction = (actionValue: string) => {
-        if (resolver) {
-            resolver(actionValue); // Resolve the Promise with the action value
-        }
+        if (resolver) resolver(actionValue);
         closeAlert(); // Close the alert
     };
 

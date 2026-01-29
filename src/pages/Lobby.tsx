@@ -5,33 +5,36 @@ import LobbySidebar from "../components/lobby/LobbySidebar.tsx";
 import LoadingScreen from "../components/common/LoadingScreen.tsx";
 import HostControls from "../components/lobby/HostControls.tsx";
 import CategoryBoard, { LobbyBoardType } from "../components/lobby/CategoryBoard.tsx";
-import {Player} from "../types/Lobby.ts";
 import {useProfile} from "../contexts/ProfileContext.tsx";
 import {useAlert} from "../contexts/AlertContext.tsx";
 import { motion } from 'framer-motion';
 import {getUniqueCategories} from "../categories/getUniqueCategories.ts";
 import {useGameSession} from "../hooks/useGameSession.ts";
 import { useBoardJsonImport } from "../hooks/lobby/useBoardJsonImport";
-import {
-    CATEGORY_SECTIONS,
-    buildInitial,
-    flattenBySections,
-    unflattenBySections,
-    type BoardType,
-} from "../utils/lobbySections";
+import {flattenBySections} from "../utils/lobbySections";
 import {useLobbyIdentity} from "../hooks/lobby/useLobbyIdentity.ts";
-
-type LockedCategories = {
-    firstBoard: boolean[]; // Jeopardy lock states
-    secondBoard: boolean[]; // Double Jeopardy lock states
-    finalJeopardy: boolean[];
-};
+import { useLobbySocketSync } from "../hooks/lobby/useLobbySocketSync";
 
 const Lobby: React.FC = () => {
     const location = useLocation();
-    const [categories, setCategories] = useState<Record<BoardType, string[]>>(
-        buildInitial((count) => Array(count).fill(""))
-    );
+    const { gameId } = useParams<{ gameId: string }>();
+    const [timeToBuzz, setTimeToBuzz] = useState(10);
+    const [timeToAnswer, setTimeToAnswer] = useState(10);
+    const [copySuccess, setCopySuccess] = useState(false);
+    const [selectedModel, setSelectedModel] = useState('gpt-5-mini'); // Default value for dropdown
+    const [includeVisuals, setIncludeVisuals] = useState(false);
+
+    const { sendJson } = useWebSocket();
+    const navigate = useNavigate();
+    const { profile } = useProfile();
+    const { showAlert } = useAlert();
+    const { session, saveSession } = useGameSession();
+
+    const { playerKey, effectivePlayerName } = useLobbyIdentity({
+        gameId,
+        locationStatePlayerName: location.state?.playerName,
+    });
+
     const {
         boardJson,
         setBoardJson,
@@ -41,43 +44,34 @@ const Lobby: React.FC = () => {
         usingImportedBoard,
     } = useBoardJsonImport();
 
-    const { gameId } = useParams<{ gameId: string }>();
-    const [isLoading, setIsLoading] = useState(false);
-    const [allowLeave, setAllowLeave] = useState(false);
-    const [loadingMessage, setLoadingMessage] = useState('');
-    const [timeToBuzz, setTimeToBuzz] = useState(10);
-    const [timeToAnswer, setTimeToAnswer] = useState(10);
-    const [copySuccess, setCopySuccess] = useState(false);
-    // Server is authoritative for lobby membership + host.
-    const [players, setPlayers] = useState<Player[]>([]);
-    const [host, setHost] = useState<string | null>(null);
-    const [isHostServer, setIsHostServer] = useState<boolean>(false);
-    const [selectedModel, setSelectedModel] = useState('gpt-5-mini'); // Default value for dropdown
-    const [includeVisuals, setIncludeVisuals] = useState(false);
-    const [lockedCategories, setLockedCategories] = useState<LockedCategories>({
-        firstBoard: Array(CATEGORY_SECTIONS[0].count).fill(false),
-        secondBoard: Array(CATEGORY_SECTIONS[1].count).fill(false),
-        finalJeopardy: Array(CATEGORY_SECTIONS[2].count).fill(false),
-    });
-
-    const { isSocketReady, sendJson, subscribe } = useWebSocket();
-    const navigate = useNavigate();
-    const { profile } = useProfile();
-    const { showAlert } = useAlert();
-    const { session, saveSession } = useGameSession();
-    const { playerKey, effectivePlayerName } = useLobbyIdentity({
+    const {
+        isSocketReady,
+        isLoading,
+        loadingMessage,
+        setManualLoading,
+        allowLeave,
+        players,
+        host,
+        isHostServer,
+        categories,
+        lockedCategories,
+        onPromoteHost,
+        onToggleLock,
+        onChangeCategory,
+        lobbyInvalid,
+    } = useLobbySocketSync({
         gameId,
-        locationStatePlayerName: location.state?.playerName,
+        playerKey,
+        effectivePlayerName,
+        showAlert,
     });
 
-    // Do NOT trust location.state for host permissions; server will confirm via lobby-state.
     const isHost = isHostServer;
 
-    const onPromoteHost = (playerName: string) => {
-        if (!isSocketReady) return;
-        if (!gameId) return;
-        sendJson({ type: "promote-host", gameId, targetPlayerName: playerName });
-    };
+    useEffect(() => {
+        if (!lobbyInvalid) return;
+        navigate("/");
+    }, [lobbyInvalid, navigate]);
 
     useEffect(() => {
         if (!gameId || !effectivePlayerName) return;
@@ -93,16 +87,6 @@ const Lobby: React.FC = () => {
     }, [gameId, effectivePlayerName, isHost, session?.gameId, session?.playerName, session?.isHost, saveSession]);
 
     useEffect(() => {
-        if (!isSocketReady) return;
-        if (!gameId) return;
-        if (!effectivePlayerName) return;
-
-        // Always attempt to (re)join when the socket is ready; server dedupes via playerKey.
-        sendJson({ type: "join-lobby", gameId, playerName: effectivePlayerName, playerKey });
-        sendJson({ type: "request-lobby-state", gameId, playerKey });
-    }, [isSocketReady, gameId, effectivePlayerName, playerKey, sendJson]);
-
-    useEffect(() => {
         if (!allowLeave) return;
         if (!isSocketReady) return;
         if (!gameId) return;
@@ -114,241 +98,10 @@ const Lobby: React.FC = () => {
                 host,
             },
         });
-    }, [allowLeave, isSocketReady, gameId, isHost, host, sendJson, navigate, effectivePlayerName, playerKey]);
-
-    useEffect(() => {
-        if (!isSocketReady) return;
-
-        setIsLoading(true);
-        setLoadingMessage("Joining lobby...");
-
-        const unsubscribe = subscribe((message) => {
-            console.log(message);
-
-            switch (message.type) {
-                case "player-list-update": {
-                    const m = message as unknown as {
-                        players: Player[];
-                        host: string;
-                    };
-
-                    const sortedPlayers = [...m.players].sort((a, b) => {
-                        if (a.name === m.host) return -1;
-                        if (b.name === m.host) return 1;
-                        return 0;
-                    });
-
-                    setPlayers(sortedPlayers);
-                    setHost(m.host);
-
-                    const hostName = (m.host ?? "").trim();
-                    const youName = (effectivePlayerName ?? "").trim();
-                    setIsHostServer(hostName.length > 0 && youName.length > 0 && hostName === youName);
-
-                    return;
-                }
-
-                case "lobby-state": {
-                    const m = message as unknown as {
-                        players: Player[];
-                        host: string;
-                        categories?: string[];
-                        inLobby?: boolean;
-                        isGenerating?: boolean;
-                        lockedCategories?: {
-                            firstBoard: boolean[];
-                            secondBoard: boolean[];
-                            finalJeopardy: boolean[];
-                        };
-                        you?: {
-                            isHost?: boolean;
-                            playerName?: string;
-                            playerKey?: string;
-                        };
-                    };
-
-                    // Treat lobby-state as a snapshot: replace, don't merge.
-                    setPlayers(Array.isArray(m.players) ? m.players : []);
-                    setHost(m.host ?? null);
-
-                    const hostName = (m.host ?? "").trim();
-                    const youName = (m.you?.playerName ?? "").trim();
-                    setIsHostServer(Boolean(m.you?.isHost) || (hostName.length > 0 && youName.length > 0 && hostName === youName));
-
-                    if (Array.isArray(m.categories)) {
-                        setCategories(unflattenBySections(m.categories));
-                    }
-
-                    if (m.lockedCategories) {
-                        setLockedCategories({
-                            firstBoard: m.lockedCategories.firstBoard,
-                            secondBoard: m.lockedCategories.secondBoard,
-                            finalJeopardy: m.lockedCategories.finalJeopardy,
-                        });
-                    }
-
-                    if (m.isGenerating) {
-                        setIsLoading(true);
-                        setLoadingMessage("Generating your questions...");
-                        return;
-                    }
-
-                    if (m.inLobby === false) {
-                        setAllowLeave(true);
-                        return;
-                    }
-
-                    setIsLoading(false);
-                    setLoadingMessage("");
-                    return;
-                }
-                case "category-lock-updated": {
-                    const m = message as unknown as {
-                        boardType: unknown;
-                        index: number;
-                        locked: boolean;
-                    };
-
-                    const bt = m.boardType;
-
-                    if (bt === "firstBoard" || bt === "secondBoard" || bt === "finalJeopardy") {
-                        setLockedCategories((prev) => {
-                            const updated: LockedCategories = { ...prev };
-                            updated[bt][m.index] = Boolean(m.locked);
-                            return updated;
-                        });
-                    }
-                    return;
-                }
-                case "category-updated": {
-                    const m = message as unknown as {
-                        boardType: "firstBoard" | "secondBoard" | "finalJeopardy";
-                        index: number;
-                        value: string;
-                    };
-
-                    setCategories((prev) => {
-                        const nextBoard = [...(prev[m.boardType] ?? [])];
-                        if (m.index >= 0 && m.index < nextBoard.length) {
-                            nextBoard[m.index] = m.value ?? "";
-                        }
-                        return { ...prev, [m.boardType]: nextBoard };
-                    });
-
-                    return;
-                }
-                case "categories-updated": {
-                    const m = message as unknown as { categories: string[] };
-
-                    if (Array.isArray(m.categories)) {
-                        setCategories(unflattenBySections(m.categories));
-                    }
-                    return;
-                }
-
-                case "trigger-loading": {
-                    setIsLoading(true);
-                    setLoadingMessage("Generating your questions");
-                    return;
-                }
-
-                case "create-board-failed": {
-                    setIsLoading(false);
-                    const m = message as unknown as { message?: string };
-                    showAlert(
-                        <span>
-                            <span className="text-red-500 font-bold text-xl">Failed to start game</span><br/>
-                            <span>{m.message ?? "Unknown error."}</span>
-                        </span>,
-                        [
-                            {
-                                label: "Okay",
-                                actionValue: "okay",
-                                styleClass: "bg-green-500 text-white hover:bg-green-600",
-                            }
-                        ]
-                    );
-                    return;
-                }
-
-                case "start-game": {
-                    setIsLoading(false);
-                    setAllowLeave(true);
-                    return;
-                }
-
-                case "check-lobby-response": {
-                    const m = message as unknown as { isValid: boolean };
-
-                    if (!m.isValid) {
-                        // Lobby no longer exists (or already started). If we have an identity, attempt to join the game.
-                        if (effectivePlayerName) {
-                            setIsLoading(true);
-                            setLoadingMessage("Game already started. Joining game...");
-                            setAllowLeave(true);
-                            return;
-                        }
-
-                        navigate("/");
-                        return;
-                    }
-
-                    setLoadingMessage("Syncing lobby state...");
-                    sendJson({ type: "request-lobby-state", gameId, playerKey });
-                    return;
-                }
-
-                case "error": {
-                    // ...log it...
-                    if (gameId) sendJson({ type: "request-lobby-state", gameId, playerKey });
-                    return;
-                }
-
-                default:
-                    return;
-            }
-        });
-
-        sendJson({ type: "check-lobby", gameId });
-
-        return unsubscribe;
-    }, [isSocketReady, subscribe, sendJson, gameId, navigate, effectivePlayerName, playerKey, showAlert]);
-
-    const onToggleLock = (boardType: LobbyBoardType, index: number) => {
-        if (!isSocketReady) return;
-        if (!gameId) return;
-
-        sendJson({
-            type: "toggle-lock-category",
-            gameId,
-            boardType,
-            index
-        });
-    };
+    }, [allowLeave, isSocketReady, gameId, isHost, host, navigate, effectivePlayerName]);
 
     const handleDropdownChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         setSelectedModel(e.target.value);
-    };
-
-    const onChangeCategory = (boardType: LobbyBoardType, index: number, value: string) => {
-        setCategories((prev) => {
-            const updatedBoard = [...(prev[boardType] ?? [])];
-            if (index >= 0 && index < updatedBoard.length) updatedBoard[index] = value;
-
-            const updated = { ...prev, [boardType]: updatedBoard };
-
-            if (isSocketReady && gameId) {
-                sendJson({
-                    type: "update-category",
-                    gameId,
-                    boardType,
-                    index,
-                    value,
-                });
-            }
-
-            return updated;
-        });
     };
 
     const handleRandomizeCategory = (boardType: LobbyBoardType, index: number) => {
@@ -365,7 +118,6 @@ const Lobby: React.FC = () => {
             candidates,
         });
     };
-
 
     const handleCreateGame = async () => {
         if (!profile) {
@@ -425,8 +177,7 @@ const Lobby: React.FC = () => {
         }
 
         try {
-            setIsLoading(true);
-            setLoadingMessage('Generating your questions');
+            setManualLoading("Generating your questions...");
 
             if (!isSocketReady) return;
             if (!gameId) return;
