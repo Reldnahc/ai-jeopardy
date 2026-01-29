@@ -34,7 +34,8 @@ export default function Game() {
     const [buzzerLocked, setBuzzerLocked] = useState(true);
     const [activeBoard, setActiveBoard] = useState<'firstBoard' | 'secondBoard' | 'finalJeopardy'>('firstBoard');
     const [scores, setScores] = useState<Record<string, number>>({});
-    const [buzzLockedOut, setBuzzLockedOut] = useState(false);//early buzz
+    const [buzzLockedOut, setBuzzLockedOut] = useState(false);
+    const lockoutTimeoutRef = useRef<number | null>(null);
     const [lastQuestionValue, setLastQuestionValue] = useState<number>(100);
     const [allWagersSubmitted, setAllWagersSubmitted] = useState(false);
     const [isFinalJeopardy, setIsFinalJeopardy] = useState(false);
@@ -139,20 +140,36 @@ export default function Game() {
         sendJson({ type: "mark-all-complete", gameId });
     };
 
-    const handleBuzz = () => {
-        if (buzzResult || buzzLockedOut) return; // Prevent buzzing if temporarily locked out
-        if (buzzerLocked) {
-            setBuzzLockedOut(true); // Temporarily lock out the player
-
-            // Unlock the player after 5 seconds
-            setTimeout(() => {
-                setBuzzLockedOut(false); // Reset lockout state
-            }, 1000);
-
-            return;
+    const applyLockoutUntil = useCallback((until: number) => {
+        if (lockoutTimeoutRef.current) {
+            window.clearTimeout(lockoutTimeoutRef.current);
+            lockoutTimeoutRef.current = null;
         }
+
+        const now = Date.now();
+        if (until > now) {
+            setBuzzLockedOut(true);
+            lockoutTimeoutRef.current = window.setTimeout(() => {
+                setBuzzLockedOut(false);
+                lockoutTimeoutRef.current = null;
+            }, until - now);
+        } else {
+            setBuzzLockedOut(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        return () => {
+            if (lockoutTimeoutRef.current) window.clearTimeout(lockoutTimeoutRef.current);
+        };
+    }, []);
+
+    const handleBuzz = () => {
         if (!gameId) return;
-        sendJson({ type: "buzz", gameId, effectivePlayerName });
+        if (buzzResult || buzzLockedOut) return;
+
+        // Always let server decide (including “buzz early” lockout)
+        sendJson({ type: "buzz", gameId });
     };
 
     const onClueSelected = useCallback((clue: Clue) => {
@@ -203,6 +220,7 @@ export default function Game() {
                 const m = message as unknown as {
                     players: Player[];
                     host: string;
+                    buzzerLocked?: boolean;
                     buzzResult?: string | null;
                     boardData: BoardData;
                     scores?: Record<string, number>;
@@ -223,6 +241,7 @@ export default function Game() {
                 setBuzzResult(m.buzzResult ? m.buzzResult : null);
                 setBoardData(m.boardData);
                 setScores(m.scores || {});
+                setBuzzerLocked(Boolean(m.buzzerLocked));
 
                 if (Array.isArray(m.clearedClues)) {
                     setClearedClues(new Set(m.clearedClues));
@@ -255,6 +274,13 @@ export default function Game() {
                 }
                 return;
             }
+
+            if (message.type === "buzz-denied") {
+                const m = message as unknown as { reason: string; lockoutUntil: number };
+                applyLockoutUntil(Number(m.lockoutUntil || 0));
+                return;
+            }
+
 
             if (message.type === "final-jeopardy") {
                 setActiveBoard("finalJeopardy");

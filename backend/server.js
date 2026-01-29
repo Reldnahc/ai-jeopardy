@@ -553,6 +553,7 @@ wss.on('connection', (ws) => {
                 // START GAME (same as your existing)
                 games[gameId].buzzed = null;
                 games[gameId].buzzerLocked = true;
+                games[gameId].buzzLockouts = {};
                 games[gameId].clearedClues = new Set();
                 games[gameId].boardData = boardData;
                 games[gameId].scores = {};
@@ -675,22 +676,59 @@ wss.on('connection', (ws) => {
                 }
             }
 
-
-            if (data.type === 'buzz') {
+            if (data.type === "buzz") {
                 const { gameId } = data;
                 const game = games[gameId];
                 if (!game) return;
 
-                if (!game.buzzed) {
-                    const player = game.players.find((p) => p.id === ws.id);
-                    if (player && player.name) {
-                        game.buzzed = player.name;
-                        broadcast(gameId, { type: 'buzz-result', playerName: player.name });
+                const player = game.players.find((p) => p.id === ws.id);
+                if (!player?.name) return;
 
-                        if (game.timeToAnswer !== -1) {
-                            startGameTimer(gameId, game, broadcast, game.timeToAnswer, "answer");
-                        }
-                    }
+                if (!game.buzzLockouts) game.buzzLockouts = {};
+
+                const now = Date.now();
+                const lockoutUntil = game.buzzLockouts[player.name] || 0;
+
+                // Already buzzed by someone else
+                if (game.buzzed) {
+                    ws.send(JSON.stringify({
+                        type: "buzz-denied",
+                        reason: "already-buzzed",
+                        lockoutUntil: lockoutUntil,
+                    }));
+                    return;
+                }
+
+                // Player is currently locked out (from early buzzing)
+                if (lockoutUntil > now) {
+                    ws.send(JSON.stringify({
+                        type: "buzz-denied",
+                        reason: "locked-out",
+                        lockoutUntil,
+                    }));
+                    return;
+                }
+
+                // Buzzer is locked => early buzz => apply lockout
+                if (game.buzzerLocked) {
+                    const EARLY_BUZZ_LOCKOUT_MS = 1000; // match your current behavior (was 1s)
+                    const until = now + EARLY_BUZZ_LOCKOUT_MS;
+                    game.buzzLockouts[player.name] = until;
+
+                    ws.send(JSON.stringify({
+                        type: "buzz-denied",
+                        reason: "early",
+                        lockoutUntil: until,
+                    }));
+                    return;
+                }
+
+                // Accept buzz
+                game.buzzed = player.name;
+                broadcast(gameId, { type: "buzz-result", playerName: player.name });
+
+                if (game.timeToAnswer !== -1) {
+                    startGameTimer(gameId, game, broadcast, game.timeToAnswer, "answer");
                 }
             }
 
@@ -703,6 +741,7 @@ wss.on('connection', (ws) => {
 
                 game.buzzed = null;
                 game.buzzerLocked = true;
+                games[gameId].buzzLockouts = {};
 
                 game.timerEndTime = null;
 
@@ -774,7 +813,7 @@ wss.on('connection', (ws) => {
                     // Reset buzzer state
                     games[gameId].buzzed = null;
                     games[gameId].buzzerLocked = true;
-
+                    games[gameId].buzzLockouts = {};
                     // Broadcast the selected clue to all players in the game
                     broadcast(gameId, {
                         type: "clue-selected",
@@ -789,7 +828,7 @@ wss.on('connection', (ws) => {
                 }
             }
 
-            if (data.type === 'join-game') {
+            if (data.type === "join-game") {
                 const { gameId, playerName } = data;
 
                 if (!playerName || !playerName.trim()) {
@@ -840,6 +879,11 @@ wss.on('connection', (ws) => {
                     }
                 }
 
+                const game = games[gameId];
+                const me = game.players.find(p => p.id === ws.id) || game.players.find(p => p.name === playerName);
+                const myName = me?.name;
+                const myLockoutUntil = myName ? (game.buzzLockouts?.[myName] || 0) : 0;
+
                 // 2. Hydrate Client State
                 // Send EVERYTHING needed to sync the client to right now
                 ws.send(JSON.stringify({
@@ -852,6 +896,7 @@ wss.on('connection', (ws) => {
                     })),
                     host: games[gameId].host,
                     buzzResult: games[gameId].buzzed,
+                    playerBuzzLockoutUntil: myLockoutUntil,
                     clearedClues: Array.from(games[gameId].clearedClues || new Set()),
                     boardData: games[gameId].boardData,
                     selectedClue: games[gameId].selectedClue || null,
