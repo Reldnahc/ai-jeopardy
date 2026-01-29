@@ -168,10 +168,6 @@ export default function Game() {
         preloadImages(urls);
     }, [boardData]);
 
-    if (!boardData) {
-        return <p>Loading board... Please wait!</p>; // Display a loading message
-    }
-
     return (
         <div
             className="flex h-screen w-screen overflow-hidden font-sans bg-gradient-to-r from-indigo-400 to-blue-700"
