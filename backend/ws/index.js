@@ -1,5 +1,6 @@
 import { createWsContext } from "./context.js";
 import { routeWsMessage } from "./router.js";
+import {handleSocketClose} from "./lifecycle.js";
 
 export const attachWebSocketServer = (wss) => {
     const ctx = createWsContext(wss);
@@ -13,20 +14,13 @@ export const attachWebSocketServer = (wss) => {
 
         ws.on("message", async (raw) => {
             try {
-                const handled = await routeWsMessage(ws, raw, ctx);
-                if (!handled) {
-                    // optional: log unknown types
-                    // console.log("[WS] Unhandled message:", raw?.toString?.() ?? raw);
-                }
+                await routeWsMessage(ws, raw, ctx);
             } catch (e) {
                 console.error("[WS] handler error:", e);
             }
         });
 
-        ws.on("close", () => {
-            // your existing disconnect logic goes here OR move it to a ctx helper
-            // typically: mark player offline, broadcast updates, schedule cleanup
-        });
+        ws.on("close", () => handleSocketClose(ws, ctx));
     });
 
     return ctx;

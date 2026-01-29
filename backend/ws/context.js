@@ -8,6 +8,7 @@ import { startGameTimer, clearGameTimer } from "../game/timer.js";
 import { validateImportedBoardData, parseBoardJson, normalizeCategories11 } from "../validation/boardImport.js";
 
 import { requireHost, isHostSocket } from "../auth/hostGuard.js";
+import {getColorFromPlayerName} from "../services/userService.js";
 
 export const createWsContext = (wss) => {
     const { broadcast, broadcastAll } = makeBroadcaster(wss);
@@ -41,5 +42,7 @@ export const createWsContext = (wss) => {
         // auth
         requireHost,
         isHostSocket,
+
+        getColorFromPlayerName,
     };
 };
