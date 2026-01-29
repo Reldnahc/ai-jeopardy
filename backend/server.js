@@ -809,7 +809,7 @@ wss.on('connection', (ws) => {
                 // 2. Hydrate Client State
                 // Send EVERYTHING needed to sync the client to right now
                 ws.send(JSON.stringify({
-                    type: 'game-state',
+                    type: "game-state",
                     gameId,
                     players: games[gameId].players.map(p => ({
                         name: p.name,
@@ -834,7 +834,7 @@ wss.on('connection', (ws) => {
 
                 // Notify others
                 broadcast(gameId, {
-                    type: 'player-list-update',
+                    type: "player-list-update",
                     players: games[gameId].players.map(p => ({
                         name: p.name,
                         color: p.color,
@@ -844,10 +844,10 @@ wss.on('connection', (ws) => {
                 });
             }
 
-            if (data.type === 'request-player-list') {
+            if (data.type === "request-player-list") {
                 const { gameId } = data;
                 ws.send(JSON.stringify({
-                    type: 'player-list-update',
+                    type: "player-list-update",
                     gameId,
                     players: games[gameId].players.map((p) => ({
                         name: p.name,
@@ -914,7 +914,7 @@ wss.on('connection', (ws) => {
 
 
 
-            if (data.type === 'reveal-answer') {
+            if (data.type === "reveal-answer") {
                 const {gameId} = data;
 
                 if (games[gameId] && games[gameId].selectedClue) {
@@ -924,27 +924,29 @@ wss.on('connection', (ws) => {
                     // Notify all players to display the answer
                     broadcast(gameId, {
                         type: 'answer-revealed',
+                        clue: games[gameId].selectedClue,
                     });
                 } else {
                     console.error(`[Server] Game ID ${gameId} not found or no clue selected when revealing answer.`);
                 }
             }
 
-            if (data.type === 'return-to-board') {
-                const {gameId} = data;
+            if (data.type === "return-to-board") {
+                const { gameId } = data;
+                const game = games[gameId];
+                if (!game) return;
 
-                if (games[gameId]) {
-                    games[gameId].selectedClue = null; // Clear the selected clue
-                    // Notify all clients to return to the board
-                    broadcast(gameId, {
-                        type: 'returned-to-board',
-                    });
-                } else {
-                    console.error(`[Server] Game ID ${gameId} not found when returning to board.`);
-                }
+                game.selectedClue = null;
+
+                broadcast(gameId, {
+                    type: "returned-to-board",
+                    selectedClue: null,
+                });
+
+                return;
             }
 
-            if (data.type === 'clue-cleared') {
+            if (data.type === "clue-cleared") {
                 const { gameId, clueId } = data;
 
                 if (games[gameId]) {
@@ -953,7 +955,7 @@ wss.on('connection', (ws) => {
                     if (!game.clearedClues) game.clearedClues = new Set();
                     game.clearedClues.add(clueId);
 
-                    broadcast(gameId, { type: 'clue-cleared', clueId });
+                    broadcast(gameId, { type: "clue-cleared", clueId });
 
                     if (game.activeBoard === "firstBoard" && isBoardFullyCleared(game, "firstBoard")) {
                         game.activeBoard = "secondBoard";

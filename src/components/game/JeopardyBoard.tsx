@@ -29,15 +29,12 @@ interface JeopardyBoardProps {
     buzzLockedOut: boolean;
     timerEndTime: number | null;
     timerDuration: number;
-    showAnswer: boolean;
-    setShowAnswer: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 const JeopardyBoard: React.FC<JeopardyBoardProps> =
     ({ boardData, isHost, onClueSelected, selectedClue, gameId, clearedClues, players, scores,
          currentPlayer, allWagersSubmitted, isFinalJeopardy, drawings, setBuzzerLocked,
-         setBuzzResult, handleBuzz, buzzerLocked, buzzResult, buzzLockedOut, timerEndTime, timerDuration,
-         showAnswer, setShowAnswer }) => {
+         setBuzzResult, handleBuzz, buzzerLocked, buzzResult, buzzLockedOut, timerEndTime, timerDuration}) => {
     const [localSelectedClue, setLocalSelectedClue] = useState<Clue | null>(null);
     const [showClue, setShowClue] = useState(false);
     const [hostCanSeeAnswer, setHostCanSeeAnswer] = useState(false);
@@ -46,6 +43,7 @@ const JeopardyBoard: React.FC<JeopardyBoardProps> =
     const [drawingSubmitted, setDrawingSubmitted] = useState<Record<string, boolean>>({});
     const { sendJson } = useWebSocket();
     const { showAlert } = useAlert();
+    const showAnswer = Boolean(localSelectedClue?.showAnswer);
 
         // @ts-expect-error works better this way
     const canvasRef = useRef< ReactSketchCanvas>(null);
@@ -70,19 +68,15 @@ const JeopardyBoard: React.FC<JeopardyBoardProps> =
             setLocalSelectedClue(selectedClue);
             setShowClue(true);
 
-            // If the host should see the answer immediately (not the only player), enable answer display
-            if (isHost && !isOnlyPersonPlaying) {
-                setHostCanSeeAnswer(true); // Track that the host can see the answer
-            } else {
-                setShowAnswer(!!selectedClue.showAnswer); // Update based on the state of the clue
-                setHostCanSeeAnswer(false); // Host can't see the answer pre-reveal if they are the only person playing
-            }
+            // host can see answer immediately if not solo-hosting
+            setHostCanSeeAnswer(isHost && !isOnlyPersonPlaying);
         } else {
             setLocalSelectedClue(null);
             setShowClue(false);
-            setShowAnswer(false);
+            setHostCanSeeAnswer(false);
         }
     }, [selectedClue, isHost, players]);
+
 
     const handleClueClick = (clue: Clue, clueId: string) => {
         console.log(localSelectedClue);
@@ -188,7 +182,6 @@ const JeopardyBoard: React.FC<JeopardyBoardProps> =
                     <SelectedClueDisplay
                         localSelectedClue={localSelectedClue}
                         showAnswer={showAnswer}
-                        setShowAnswer={setShowAnswer}
                         setShowClue={setShowClue}
                         isHost={isHost}
                         isFinalJeopardy={isFinalJeopardy}

@@ -32,7 +32,6 @@ export default function Game() {
     const [selectedClue, setSelectedClue] = useState<Clue | null>(null);
     const [clearedClues, setClearedClues] = useState<Set<string>>(new Set());
     const [buzzerLocked, setBuzzerLocked] = useState(true);
-    const [showAnswer, setShowAnswer] = useState(false);
     const [timerVersion, setTimerVersion] = useState<number | null>(null);
     const [activeBoard, setActiveBoard] = useState<'firstBoard' | 'secondBoard' | 'finalJeopardy'>('firstBoard');
     const [scores, setScores] = useState<Record<string, number>>({});
@@ -154,8 +153,6 @@ export default function Game() {
         if (isHost && clue) {
             if (!gameId) return;
             sendJson({ type: "clue-selected", gameId, clue });
-
-            setSelectedClue(clue); // Update the host's UI
             if (clue.value !== undefined) {
                 setLastQuestionValue(clue.value); // Set last question value based on clue's value
             }
@@ -232,10 +229,9 @@ export default function Game() {
                 }
 
                 if (m.selectedClue) {
-                    setSelectedClue({
-                        ...m.selectedClue,
-                        showAnswer: m.selectedClue.isAnswerRevealed || false,
-                    });
+                    setSelectedClue({ ...m.selectedClue, showAnswer: m.selectedClue.isAnswerRevealed || false });
+                } else {
+                    setSelectedClue(null); // <-- important
                 }
                 return;
             }
@@ -249,7 +245,6 @@ export default function Game() {
                 setWagers({});
 
                 setSelectedClue(null);
-                setShowAnswer(false);
                 setBuzzResult(null);
                 setTimerEndTime(null);
                 setTimerDuration(0);
@@ -313,12 +308,12 @@ export default function Game() {
             }
 
             if (message.type === "clue-selected") {
-                const m = message as unknown as { clue: Clue; clearedClues?: string[] };
-                setSelectedClue({ ...m.clue, showAnswer: false });
-
+                const m = message as unknown as { clue: SelectedClueFromServer; clearedClues?: string[] };
+                setSelectedClue({ ...m.clue, showAnswer: Boolean(m.clue.isAnswerRevealed) });
                 if (m.clearedClues) setClearedClues(new Set(m.clearedClues));
                 return;
             }
+
 
             if (message.type === "timer-start") {
                 const m = message as unknown as { endTime: number; duration: number; timerVersion: number };
@@ -338,12 +333,13 @@ export default function Game() {
             }
 
             if (message.type === "answer-revealed") {
-                setSelectedClue((prev) => (prev ? { ...prev, showAnswer: true } : prev));
-                setShowAnswer(true);
+                const m = message as unknown as { clue?: SelectedClueFromServer };
+                if (m.clue) setSelectedClue({ ...m.clue, showAnswer: true });
                 setTimerEndTime(null);
                 setTimerDuration(0);
                 return;
             }
+
 
             if (message.type === "all-clues-cleared") {
                 const m = message as unknown as { clearedClues?: string[] };
@@ -459,8 +455,6 @@ export default function Game() {
                             buzzLockedOut={buzzLockedOut}
                             timerEndTime={timerEndTime}
                             timerDuration={timerDuration}
-                            showAnswer={showAnswer}
-                            setShowAnswer={setShowAnswer}
                         />
                     </>
                 )}

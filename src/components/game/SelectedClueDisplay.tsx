@@ -11,7 +11,6 @@ import Timer from "./Timer.tsx";
 interface SelectedClueDisplayProps {
     localSelectedClue: Clue;
     showAnswer: boolean;
-    setShowAnswer: (value: boolean) => void;
     setShowClue: (value: boolean) => void;
     isHost: boolean;
     isFinalJeopardy: boolean;
@@ -37,7 +36,6 @@ interface SelectedClueDisplayProps {
 const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                                                                      localSelectedClue,
                                                                      showAnswer,
-                                                                     setShowAnswer,
                                                                      setShowClue,
                                                                      isHost,
                                                                      isFinalJeopardy,
@@ -252,7 +250,7 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                         disabled={isFinalJeopardy && !drawings}
                         onClick={() => {
                             if (!showAnswer) {
-                                setShowAnswer(true);
+                                // Server is authoritative: ask server to reveal.
                                 sendJson({ type: "reveal-answer", gameId });
                             } else {
                                 setShowClue(false);
@@ -268,6 +266,7 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                                     }
                                 }
                             }
+
                         }}
                         style={{ fontSize: "clamp(1rem, 2.5vw, 2rem)" }}
                         className={`mt-4 px-12 py-5 rounded-xl min-w-[22rem] font-bold shadow-2xl text-white transition duration-300 ease-in-out ${
