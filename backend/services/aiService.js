@@ -166,6 +166,7 @@ async function populateBoardVisuals(board, settings) {
                             thumbWidth: settings.commonsThumbWidth,
                             maxQueries: settings.maxImageSearchTries,
                             searchLimit: 5,
+                            trace: settings.trace,
                         }
                     );
 
@@ -183,6 +184,7 @@ async function populateBoardVisuals(board, settings) {
                             license: found.license,
                             licenseUrl: found.licenseUrl,
                             attribution: found.attribution,
+                            trace: settings.trace,
                         },
                         supabase
                     );
@@ -212,8 +214,9 @@ async function createBoardData(categories, model, host, options = {}) {
         commonsThumbWidth: 1600,
         ...options,
     };
+    const trace = settings.trace;
+    trace?.mark("aiService_enter", { model, includeVisuals: settings.includeVisuals });
     console.log("Beginning to create board data with categories: " + categories);
-
     //settings.includeVisuals = Boolean(options.includeVisuals);
 
     if (!categories || categories.length !== 11) {
@@ -321,25 +324,23 @@ async function createBoardData(categories, model, host, options = {}) {
         `;
 
 
-    const t0 = Date.now();
-    const mark = (label) => console.log(`[timing] ${label}: ${Date.now() - t0}ms`);
 
     const timed = async (label, fn) => {
         const start = Date.now();
-        mark(`${label} START`);
+        trace?.mark(`${label} START`);
         try {
             const out = await fn();
             const dur = Date.now() - start;
-            mark(`${label} END (+${dur}ms)`);
+            trace?.mark(`${label} END (+${dur}ms)`);
             return out;
         } catch (e) {
             const dur = Date.now() - start;
-            mark(`${label} FAIL (+${dur}ms)`);
+            trace?.mark(`${label} FAIL (+${dur}ms)`);
             throw e;
         }
     };
 
-    mark("createBoardData BEGIN");
+    trace?.mark("createBoardData BEGIN");
 
     try {
         // Fire ALL Single categories immediately
@@ -382,7 +383,7 @@ async function createBoardData(categories, model, host, options = {}) {
             return json;
         });
 
-        mark("ALL REQUESTS FIRED");
+        trace?.mark("ALL REQUESTS FIRED");
 
         // Await them all together (also timed)
         const [firstCategoryResults, secondCategoryResults, finalBuilt] = await timed(
@@ -395,7 +396,7 @@ async function createBoardData(categories, model, host, options = {}) {
                 ])
         );
 
-        mark("ALL RESULTS RECEIVED");
+        trace?.mark("ALL RESULTS RECEIVED");
 
         const firstBoard = { categories: firstCategoryResults };
         const secondBoard = { categories: secondCategoryResults };
@@ -407,10 +408,10 @@ async function createBoardData(categories, model, host, options = {}) {
 
         void saveBoardAsync({ supabase, host, board });
 
-        mark("createBoardData DONE");
+        trace?.mark("createBoardData DONE");
         return { firstBoard, secondBoard, finalJeopardy };
     } catch (error) {
-        mark("createBoardData ERROR");
+        trace?.mark("createBoardData ERROR");
         console.error("[Server] Error generating board data:", error?.message ?? error);
         console.error(error);
         throw error;

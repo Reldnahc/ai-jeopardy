@@ -1,10 +1,14 @@
+export type ClueMedia =
+    | { type: "image"; assetId: string };
+
 /** Represents a single clue/question on the board */
-export interface Clue {
-    value?: number; // The monetary value of the clue/question
-    question: string; // The clue/question text
-    answer: string; // The answer text
-    showAnswer?: boolean; // Indicates whether the answer has been revealed
-}
+export type Clue = {
+    value: number;
+    question: string;
+    answer: string;
+    showAnswer?: boolean;
+    media?: ClueMedia;
+};
 
 /** Represents a single category with its title and associated clues/questions */
 export interface Category {

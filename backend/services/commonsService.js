@@ -69,14 +69,20 @@ export async function pickCommonsImageForQueries(queries, opts = {}) {
         thumbWidth = 1600,
         maxQueries = 6,
         requireImageMime = true,
+        trace,
     } = opts;
+
+    trace?.mark("commons_pick_start", { queries: (queries ?? []).slice(0, 3) });
 
     const qList = (queries ?? []).filter(Boolean).slice(0, maxQueries);
 
     for (const q of qList) {
+        trace?.mark("commons_search_start", { q });
         const titles = await commonsSearchFiles(q, searchLimit);
+        trace?.mark("commons_search_end", { q, results: titles.length });
+        trace?.mark("commons_imageinfo_start", { q });
         const infos = await commonsGetImageInfos(titles, thumbWidth);
-
+        trace?.mark("commons_imageinfo_end", { q, infos: infos.length });
         const pick = infos.find((x) => {
             if (!x?.downloadUrl) return false;
             if (!requireImageMime) return true;
@@ -93,6 +99,6 @@ export async function pickCommonsImageForQueries(queries, opts = {}) {
             };
         }
     }
-
+    trace?.mark("commons_pick_none");
     return null;
 }

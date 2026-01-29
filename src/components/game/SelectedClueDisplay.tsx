@@ -59,7 +59,12 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                                                                      timerDuration
                                                                  }) => {
     const { sendJson } = useWebSocket();
-    const {deviceType} = useDeviceContext()
+    const {deviceType} = useDeviceContext();
+    const imageAssetId =
+        localSelectedClue?.media?.type === "image"
+            ? localSelectedClue.media.assetId
+            : null;
+
     return (
         <div className="absolute inset-0 h-[calc(100vh-5.5rem)] text-white flex flex-col justify-center items-center z-10 p-5">
             <div className="absolute left-8 top-0 ">
@@ -68,15 +73,39 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                 <BuzzAnimation playerName={buzzResult} />
 
                 <div className="text-center cursor-pointer w-full">
-                {/* Question */}
-                <h1
-                    style={{ fontSize: "clamp(0.75rem, 3vw, 4rem)" }}
-                    className="mb-1 md:max-w-[65vw] mx-auto"
-                >
-                    {localSelectedClue.question}
-                </h1>
+                    {imageAssetId ? (
+                        <div className="flex flex-col items-center gap-4 w-full">
+                            <img
+                                src={`/api/images/${imageAssetId}`}
+                                alt="Visual clue"
+                                className="max-h-[55vh] max-w-[85vw] object-contain rounded-lg shadow-2xl border border-white/20"
+                                loading="eager"
+                                decoding="async"
+                                draggable={false}
+                                onError={(e) => {
+                                    // Fail-soft: hide broken image if something goes wrong
+                                    (e.currentTarget as HTMLImageElement).style.display = "none";
+                                }}
+                            />
 
-                {/* Reserve space for the answer */}
+                            {/* Clue text below image, smaller than normal */}
+                            <p
+                                style={{ fontSize: "clamp(0.9rem, 2vw, 2rem)" }}
+                                className="md:max-w-[65vw] mx-auto leading-snug"
+                            >
+                                {localSelectedClue.question}
+                            </p>
+                        </div>
+                    ) : (
+                        <h1
+                            style={{ fontSize: "clamp(0.75rem, 3vw, 4rem)" }}
+                            className="mb-1 md:max-w-[65vw] mx-auto"
+                        >
+                            {localSelectedClue.question}
+                        </h1>
+                    )}
+
+                    {/* Reserve space for the answer */}
                 {(isFinalJeopardy ? (
                         <div className="flex justify-center items-center">
                             {(showAnswer || hostCanSeeAnswer) && (

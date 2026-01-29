@@ -12,6 +12,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { r2 } from "./services/r2Client.js";
+import { createTrace } from "./services/trace.js";
 
 const app = express(); // Initialize Express app
 app.use(cors());
@@ -405,6 +406,8 @@ wss.on('connection', (ws) => {
                     boardJson,
                     includeVisuals,
                 } = data;
+                const trace = createTrace("create-game", { gameId, host });
+                trace.mark("ws_received", { type: "create-game" });
 
                 const usingImportedBoard = Boolean(boardJson && boardJson.trim());
                 const effectiveIncludeVisuals = usingImportedBoard
@@ -435,10 +438,13 @@ wss.on('connection', (ws) => {
                     } else {
                         // AI FLOW
                         games[gameId].isGenerating = true;
+                        trace.mark("createBoardData_start");
                         boardData = await createBoardData(categories, selectedModel, host, {
                             includeVisuals: effectiveIncludeVisuals,
                             maxVisualCluesPerCategory: 2,
+                            trace,
                         });
+                        trace.mark("createBoardData_end");
                     }
                 } catch (e) {
                     console.error("[Server] create-game failed:", e);
@@ -471,10 +477,13 @@ wss.on('connection', (ws) => {
                 games[gameId].timeToAnswer = timeToAnswer;
                 games[gameId].isGenerating = false;
 
+                trace.mark("broadcast_game_state_start");
                 broadcast(gameId, {
                     type: 'start-game',
                     host: host,
                 });
+                trace.mark("broadcast_game_state_end");
+                trace.end({ success: true });
             }
 
 
