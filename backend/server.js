@@ -180,6 +180,31 @@ const parseBoardJson = (raw) => {
     return parsed;
 };
 
+function isBoardFullyCleared(game, boardKey) {
+    const board = game?.boardData?.[boardKey];
+    if (!board?.categories) return false;
+
+    for (const cat of board.categories) {
+        for (const clue of cat.values || []) {
+            const clueId = `${clue.value}-${clue.question}`;
+            if (!game.clearedClues?.has(clueId)) return false;
+        }
+    }
+    return true;
+}
+
+function startFinalJeopardy(gameId, game, broadcast) {
+    game.activeBoard = "finalJeopardy";
+    game.isFinalJeopardy = true;
+    game.finalJeopardyStage = "wager";
+
+    game.wagers = {};
+    game.drawings = {};
+
+    broadcast(gameId, { type: "final-jeopardy" });
+}
+
+
 wss.on('connection', (ws) => {
     ws.id = Math.random().toString(36).substr(2, 9); // Assign a unique ID to each socket
     console.log('New client connected');
@@ -266,7 +291,10 @@ wss.on('connection', (ws) => {
                         firstBoard: Array(5).fill(false),
                         secondBoard: Array(5).fill(false),
                         finalJeopardy: Array(1).fill(false),
-                    }
+                    },
+                    activeBoard: "firstBoard",
+                    isFinalJeopardy: false,
+                    finalJeopardyStage: null,
                 };
 
                 ws.send(JSON.stringify({
@@ -476,6 +504,9 @@ wss.on('connection', (ws) => {
                 games[gameId].timeToBuzz = timeToBuzz;
                 games[gameId].timeToAnswer = timeToAnswer;
                 games[gameId].isGenerating = false;
+                games[gameId].activeBoard = "firstBoard";
+                games[gameId].isFinalJeopardy = false;
+                games[gameId].finalJeopardyStage = null;
 
                 trace.mark("broadcast_game_state_start");
                 broadcast(gameId, {
@@ -794,7 +825,11 @@ wss.on('connection', (ws) => {
                     scores: games[gameId].scores,
                     // Sync timers
                     timerEndTime: games[gameId].timerEndTime,
-                    timerDuration: games[gameId].timeToAnswer
+                    timerDuration: games[gameId].timeToAnswer,
+                    activeBoard: games[gameId].activeBoard || "firstBoard",
+                    isFinalJeopardy: Boolean(games[gameId].isFinalJeopardy),
+                    finalJeopardyStage: games[gameId].finalJeopardyStage || null,
+                    wagers: games[gameId].wagers || {},
                 }));
 
                 // Notify others
@@ -910,24 +945,31 @@ wss.on('connection', (ws) => {
             }
 
             if (data.type === 'clue-cleared') {
-                const {gameId, clueId} = data;
+                const { gameId, clueId } = data;
 
                 if (games[gameId]) {
-                    // Add the cleared clue to the game's cleared clues set
-                    if (!games[gameId].clearedClues) {
-                        games[gameId].clearedClues = new Set();
-                    }
-                    games[gameId].clearedClues.add(clueId);
+                    const game = games[gameId];
 
-                    // Broadcast to all players that this clue has been cleared
-                    broadcast(gameId, {
-                        type: 'clue-cleared',
-                        clueId,
-                    });
+                    if (!game.clearedClues) game.clearedClues = new Set();
+                    game.clearedClues.add(clueId);
+
+                    broadcast(gameId, { type: 'clue-cleared', clueId });
+
+                    if (game.activeBoard === "firstBoard" && isBoardFullyCleared(game, "firstBoard")) {
+                        game.activeBoard = "secondBoard";
+                        game.isFinalJeopardy = false;
+                        game.finalJeopardyStage = null;
+                        broadcast(gameId, { type: "transition-to-second-board" });
+                    }
+
+                    if (game.activeBoard === "secondBoard" && isBoardFullyCleared(game, "secondBoard")) {
+                        startFinalJeopardy(gameId, game, broadcast);
+                    }
                 } else {
                     console.error(`[Server] Game ID ${gameId} not found when clearing clue.`);
                 }
             }
+
 
             if (data.type === 'unlock-buzzer') {
                 const {gameId} = data;
@@ -980,14 +1022,58 @@ wss.on('connection', (ws) => {
             }
 
             if (data.type === 'transition-to-second-board') {
-                const {gameId} = data;
+                const { gameId } = data;
 
                 if (games[gameId]) {
-                    broadcast(gameId, {type: 'transition-to-second-board'});
+                    const game = games[gameId];
+                    game.activeBoard = "secondBoard";
+                    game.isFinalJeopardy = false;
+                    game.finalJeopardyStage = null;
+
+                    broadcast(gameId, { type: 'transition-to-second-board' });
                 } else {
                     console.error(`[Server] Game ID ${gameId} not found for board transition.`);
                 }
             }
+
+            if (data.type === "mark-all-complete") {
+                const { gameId } = data;
+                const game = games[gameId];
+                if (!game) return;
+
+                if (!game.clearedClues) game.clearedClues = new Set();
+
+                const boardKey = game.activeBoard || "firstBoard";
+                const board = game.boardData?.[boardKey];
+
+                if (!board?.categories) return;
+
+                for (const cat of board.categories) {
+                    for (const clue of cat.values || []) {
+                        const clueId = `${clue.value}-${clue.question}`;
+                        game.clearedClues.add(clueId);
+                    }
+                }
+
+                // Broadcast an authoritative update that includes clearedClues
+                broadcast(gameId, {
+                    type: "cleared-clues-sync",
+                    clearedClues: Array.from(game.clearedClues),
+                });
+
+                // If you're doing server-side auto transitions, trigger them here too
+                // (use the same transition logic you use after clue-cleared)
+                if (game.activeBoard === "firstBoard" && isBoardFullyCleared(game, "firstBoard")) {
+                    game.activeBoard = "secondBoard";
+                    broadcast(gameId, { type: "transition-to-second-board" });
+                } else if (game.activeBoard === "secondBoard" && isBoardFullyCleared(game, "secondBoard")) {
+                    // however you start final jeopardy now
+                    startFinalJeopardy(gameId, game, broadcast);
+                }
+
+                return;
+            }
+
 
             if (data.type === 'update-score') {
                 const {gameId, player, delta} = data;

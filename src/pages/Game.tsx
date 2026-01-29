@@ -116,53 +116,6 @@ export default function Game() {
         boardDataRef.current = boardData;
     }, [boardData]);
 
-    useEffect(() => {
-
-        sendJson({
-            type: "update-cleared-clues",
-            gameId,
-            clearedClues: Array.from(clearedClues),
-        });
-
-
-        if (
-            activeBoard === 'firstBoard' && boardData.firstBoard.categories[0].category !== '' &&
-            boardData.firstBoard.categories.every((category: Category) =>
-                category.values.every((clue) => clearedClues.has(`${clue.value}-${clue.question}`))
-            )
-        ) {
-
-            sendJson({
-                type: "transition-to-second-board",
-                gameId
-            });
-            setActiveBoard('secondBoard');
-            setIsFinalJeopardy(false);
-
-
-        } else if (
-            activeBoard === 'secondBoard' && boardData.firstBoard.categories[0].category !== '' &&
-            boardData.secondBoard.categories.every((category: Category) =>
-                category.values.every((clue) => clearedClues.has(`${clue.value}-${clue.question}`))
-            )
-        ) {
-            sendJson({
-                type: "transition-to-final-jeopardy",
-                gameId
-            });
-            setActiveBoard('finalJeopardy');
-            setIsFinalJeopardy(true);
-        }
-    }, [clearedClues, gameId, activeBoard, boardData.firstBoard.categories, boardData.secondBoard.categories, sendJson]);
-
-    // const updateClearedClues = (newClearedClues: string[]) => {
-    //     setClearedClues((prev) => {
-    //         const updatedClues = new Set(prev);
-    //         newClearedClues.forEach((clue: string) => updatedClues.add(clue));
-    //         return updatedClues;
-    //     });
-    // };
-
     const handleScoreUpdate = (player: string, delta: number) => {
         if (isFinalJeopardy && allWagersSubmitted) {
             const w = Math.abs(wagers[player] ?? 0);
@@ -176,21 +129,9 @@ export default function Game() {
 
     };
 
-
     const markAllCluesComplete = () => {
         if (!gameId) return;
         sendJson({ type: "mark-all-complete", gameId });
-        // Update local state for cleared clues
-        if (activeBoard === 'firstBoard') {
-            const allClues = boardData.firstBoard.categories.flatMap((category: Category) => category.values.map((clue) => `${clue.value}-${clue.question}`)
-            );
-            setClearedClues(new Set(allClues));
-        } else if (activeBoard === 'secondBoard') {
-            const allClues = boardData.secondBoard.categories.flatMap((category: Category) => category.values.map((clue) => `${clue.value}-${clue.question}`)
-            );
-            setClearedClues(new Set(allClues.splice(0, 25)));
-        }
-
     };
 
     const handleBuzz = () => {
@@ -264,6 +205,10 @@ export default function Game() {
                     scores?: Record<string, number>;
                     clearedClues?: string[];
                     selectedClue?: SelectedClueFromServer;
+                    activeBoard?: "firstBoard" | "secondBoard" | "finalJeopardy";
+                    isFinalJeopardy?: boolean;
+                    finalJeopardyStage?: string | null;
+                    wagers?: Record<string, number>;
                 };
 
 
@@ -275,6 +220,15 @@ export default function Game() {
 
                 if (Array.isArray(m.clearedClues)) {
                     setClearedClues(new Set(m.clearedClues));
+                }
+
+                if (m.activeBoard) setActiveBoard(m.activeBoard);
+
+                const fj = m.activeBoard === "finalJeopardy" || m.isFinalJeopardy;
+                setIsFinalJeopardy(Boolean(fj));
+                if (fj) {
+                    setWagers(m.wagers || {});
+                    setAllWagersSubmitted(m.finalJeopardyStage !== "wager");
                 }
 
                 if (m.selectedClue) {
@@ -299,6 +253,12 @@ export default function Game() {
                 setBuzzResult(null);
                 setTimerEndTime(null);
                 setTimerDuration(0);
+                return;
+            }
+
+            if (message.type === "cleared-clues-sync") {
+                const m = message as { type: "cleared-clues-sync"; clearedClues: string[] };
+                setClearedClues(new Set(m.clearedClues ?? []));
                 return;
             }
 
@@ -407,8 +367,6 @@ export default function Game() {
 
             if (message.type === "transition-to-second-board") {
                 setActiveBoard("secondBoard");
-                setClearedClues(new Set());
-
                 setIsFinalJeopardy(false);
                 setAllWagersSubmitted(false);
                 setWagers({});
