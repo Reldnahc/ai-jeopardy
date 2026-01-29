@@ -53,10 +53,58 @@ app.use(express.static(distPath));
 // Store game state
 const games = {};
 
+// --- Server-authoritative timer helpers (single active timer per game) ---
+const clearGameTimer = (game) => {
+    if (!game) return;
+    if (game.timerTimeout) {
+        clearTimeout(game.timerTimeout);
+        game.timerTimeout = null;
+    }
+    game.timerEndTime = null;
+    game.timerDuration = null; // seconds
+    game.timerKind = null; // "buzz" | "answer" | null
+};
+
+const startGameTimer = (gameId, game, broadcast, durationSeconds, kind, onExpire) => {
+    if (!game) return;
+
+    // Cancel any previous timer and bump version so stale timeouts can't win
+    clearGameTimer(game);
+    game.timerVersion = (game.timerVersion || 0) + 1;
+
+    const endTime = Date.now() + durationSeconds * 1000;
+    game.timerEndTime = endTime;
+    game.timerDuration = durationSeconds;
+    game.timerKind = kind || null;
+
+    const currentVersion = game.timerVersion;
+
+    broadcast(gameId, {
+        type: "timer-start",
+        endTime,
+        duration: durationSeconds,
+        timerVersion: currentVersion,
+        timerKind: game.timerKind
+    });
+
+    game.timerTimeout = setTimeout(() => {
+        if (game.timerVersion !== currentVersion) return;
+
+        clearGameTimer(game);
+
+        if (typeof onExpire === "function") {
+            onExpire({ gameId, game, broadcast, timerVersion: currentVersion, timerKind: kind || null });
+        }
+
+        broadcast(gameId, { type: "timer-end", timerVersion: currentVersion, timerKind: kind || null });
+    }, durationSeconds * 1000);
+};
+
+
 let cotd =
     {
-    category: "",
-    description: ""
+        category: "",
+        description: ""
     };
 
 
@@ -630,46 +678,19 @@ wss.on('connection', (ws) => {
 
             if (data.type === 'buzz') {
                 const { gameId } = data;
+                const game = games[gameId];
+                if (!game) return;
 
-                games[gameId].timerVersion = (games[gameId].timerVersion || 0) + 1;
-                const currentVersion = games[gameId].timerVersion;
+                if (!game.buzzed) {
+                    const player = game.players.find((p) => p.id === ws.id);
+                    if (player && player.name) {
+                        game.buzzed = player.name;
+                        broadcast(gameId, { type: 'buzz-result', playerName: player.name });
 
-
-                if (games[gameId] && !games[gameId].buzzed) {
-                    const player = games[gameId].players.find(player => player.id === ws.id);
-                    if (player && player.name){
-                        games[gameId].buzzed = player.name;
-                        // Notify all players who buzzed first
-                        broadcast(gameId, {
-                            type: 'buzz-result',
-                            playerName: player.name,
-                        });
-                    }
-                }
-
-
-                // Only start timer if timeToBuzz is not -1 (infinite time)
-                if (games[gameId].timeToAnswer !== -1) {
-                    // Store the end time (current time + duration)
-                    const endTime = Date.now() + (games[gameId].timeToAnswer * 1000);
-                    games[gameId].timerEndTime = endTime;
-
-                    // Broadcast initial timer state to all players
-                    broadcast(gameId, {
-                        type: 'timer-start',
-                        endTime: endTime,
-                        duration: games[gameId].timeToAnswer,
-                        timerVersion: currentVersion
-                    });
-
-                    setTimeout(() => {
-                        // Only lock the buzzer if it hasn't been locked already
-                        if (games[gameId] && games[gameId].timerVersion === currentVersion
-                            && games[gameId].buzzed) {
-                            games[gameId].timerEndTime = null; // Clear the timer end time
-                            broadcast(gameId, {type: 'timer-end'});
+                        if (game.timeToAnswer !== -1) {
+                            startGameTimer(gameId, game, broadcast, game.timeToAnswer, "answer");
                         }
-                    }, games[gameId].timeToBuzz * 1000);
+                    }
                 }
             }
 
@@ -689,7 +710,7 @@ wss.on('connection', (ws) => {
 
                 broadcast(gameId, { type: 'reset-buzzer' });
                 broadcast(gameId, { type: 'buzzer-locked' });
-                broadcast(gameId, { type: 'timer-end' }); // client now clears on reset-buzzer anyway
+                broadcast(gameId, { type: 'timer-end', timerVersion: (games[gameId]?.timerVersion || 0) }); // client now clears on reset-buzzer anyway
             }
 
 
@@ -838,7 +859,8 @@ wss.on('connection', (ws) => {
                     scores: games[gameId].scores,
                     // Sync timers
                     timerEndTime: games[gameId].timerEndTime,
-                    timerDuration: games[gameId].timeToAnswer,
+                    timerDuration: games[gameId].timerDuration,
+                    timerVersion: games[gameId].timerVersion || 0,
                     activeBoard: games[gameId].activeBoard || "firstBoard",
                     isFinalJeopardy: Boolean(games[gameId].isFinalJeopardy),
                     finalJeopardyStage: games[gameId].finalJeopardyStage || null,
@@ -919,8 +941,8 @@ wss.on('connection', (ws) => {
                     host: game.host,
                 });
                 // After removal, re-check whether we can unblock Final Jeopardy
-               maybeBroadcastAllWagersSubmitted(gameId);
-               maybeBroadcastAllFinalDrawingsSubmitted(gameId);
+                maybeBroadcastAllWagersSubmitted(gameId);
+                maybeBroadcastAllFinalDrawingsSubmitted(gameId);
 
                 return;
             }
@@ -987,44 +1009,29 @@ wss.on('connection', (ws) => {
 
 
             if (data.type === 'unlock-buzzer') {
-                const {gameId} = data;
-                if (!requireHost(games[gameId], ws)) return;
+                const { gameId } = data;
+                const game = games[gameId];
+                if (!game) return;
+                if (!requireHost(game, ws)) return;
 
-                if (games[gameId]) {
-                    games[gameId].buzzerLocked = false; // Unlock the buzzer
+                game.buzzerLocked = false;
+                broadcast(gameId, { type: 'buzzer-unlocked' });
 
-                    games[gameId].timerVersion = (games[gameId].timerVersion || 0) + 1;
-                    const currentVersion = games[gameId].timerVersion;
-
-                    broadcast(gameId, {type: 'buzzer-unlocked'}); // Notify all players
-
-                    // Only start timer if timeToBuzz is not -1 (infinite time)
-                    if (games[gameId].timeToBuzz !== -1) {
-                        // Store the end time (current time + duration)
-                        const endTime = Date.now() + (games[gameId].timeToBuzz * 1000);
-                        games[gameId].timerEndTime = endTime;
-
-                        // Broadcast initial timer state to all players
-                        broadcast(gameId, {
-                            type: 'timer-start',
-                            endTime: endTime,
-                            duration: games[gameId].timeToBuzz,
-                            timerVersion: currentVersion
-                        });
-
-                        setTimeout(() => {
-                            // Only lock the buzzer if it hasn't been locked already
-                            if (games[gameId] && !games[gameId].buzzerLocked &&
-                                games[gameId].timerVersion === currentVersion
-                                && !games[gameId].buzzed) {
-                                games[gameId].buzzerLocked = true;
-                                games[gameId].timerEndTime = null; // Clear the timer end time
-                                broadcast(gameId, {type: 'buzzer-locked'});
-                                broadcast(gameId, {type: 'timer-end'});
-                                broadcast(gameId, {type: 'answer-revealed'});
+                if (game.timeToBuzz !== -1) {
+                    startGameTimer(
+                        gameId,
+                        game,
+                        broadcast,
+                        game.timeToBuzz,
+                        "buzz",
+                        ({ gameId, game, broadcast }) => {
+                            if (!game.buzzerLocked && !game.buzzed) {
+                                game.buzzerLocked = true;
+                                broadcast(gameId, { type: 'buzzer-locked' });
+                                broadcast(gameId, { type: 'answer-revealed' });
                             }
-                        }, games[gameId].timeToBuzz * 1000);
-                    }
+                        }
+                    );
                 }
             }
 

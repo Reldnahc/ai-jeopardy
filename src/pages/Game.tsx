@@ -32,7 +32,6 @@ export default function Game() {
     const [selectedClue, setSelectedClue] = useState<Clue | null>(null);
     const [clearedClues, setClearedClues] = useState<Set<string>>(new Set());
     const [buzzerLocked, setBuzzerLocked] = useState(true);
-    const [timerVersion, setTimerVersion] = useState<number | null>(null);
     const [activeBoard, setActiveBoard] = useState<'firstBoard' | 'secondBoard' | 'finalJeopardy'>('firstBoard');
     const [scores, setScores] = useState<Record<string, number>>({});
     const [buzzLockedOut, setBuzzLockedOut] = useState(false);//early buzz
@@ -43,6 +42,13 @@ export default function Game() {
     const [wagers, setWagers] = useState<Record<string, number>>({});
     const [timerEndTime, setTimerEndTime] = useState<number | null>(null);
     const [timerDuration, setTimerDuration] = useState<number>(-1); // default value
+    const timerVersionRef = useRef<number>(0);
+
+    const resetLocalTimerState = useCallback(() => {
+        setTimerEndTime(null);
+        setTimerDuration(0);
+    }, []);
+
     const [isGameOver, setIsGameOver] = useState(false); // New state to track if Final Jeopardy is finished
     const [boardData, setBoardData] = useState<BoardData>({
         firstBoard: { categories: [{ category: '', values: [] }] },
@@ -206,6 +212,9 @@ export default function Game() {
                     isFinalJeopardy?: boolean;
                     finalJeopardyStage?: string | null;
                     wagers?: Record<string, number>;
+                    timerEndTime?: number | null;
+                    timerDuration?: number | null;
+                    timerVersion?: number;
                 };
 
 
@@ -233,6 +242,17 @@ export default function Game() {
                 } else {
                     setSelectedClue(null); // <-- important
                 }
+
+                // Hydrate active timer (server-authoritative)
+                if (typeof m.timerVersion === "number") {
+                    timerVersionRef.current = m.timerVersion;
+                }
+                if (typeof m.timerEndTime === "number" && m.timerEndTime > Date.now()) {
+                    setTimerEndTime(m.timerEndTime);
+                    setTimerDuration(typeof m.timerDuration === "number" ? m.timerDuration : 0);
+                } else {
+                    resetLocalTimerState();
+                }
                 return;
             }
 
@@ -246,8 +266,7 @@ export default function Game() {
 
                 setSelectedClue(null);
                 setBuzzResult(null);
-                setTimerEndTime(null);
-                setTimerDuration(0);
+                resetLocalTimerState();
                 return;
             }
 
@@ -283,8 +302,7 @@ export default function Game() {
             if (message.type === "buzz-result") {
                 const m = message as unknown as { playerName: string };
                 setBuzzResult(m.playerName);
-                setTimerEndTime(null);
-                setTimerDuration(0);
+                resetLocalTimerState();
                 return;
             }
 
@@ -302,8 +320,7 @@ export default function Game() {
                 setBuzzResult(null);
                 setBuzzerLocked(true);
 
-                setTimerEndTime(null);
-                setTimerDuration(0);
+                resetLocalTimerState();
                 return;
             }
 
@@ -316,8 +333,8 @@ export default function Game() {
 
 
             if (message.type === "timer-start") {
-                const m = message as unknown as { endTime: number; duration: number; timerVersion: number };
-                setTimerVersion(m.timerVersion);
+                const m = message as unknown as { endTime: number; duration: number; timerVersion: number; timerKind?: string | null };
+                timerVersionRef.current = m.timerVersion;
                 setTimerEndTime(m.endTime);
                 setTimerDuration(m.duration);
                 return;
@@ -325,9 +342,8 @@ export default function Game() {
 
             if (message.type === "timer-end") {
                 const m = message as unknown as { timerVersion: number };
-                if (m.timerVersion === timerVersion) {
-                    setTimerEndTime(null);
-                    setTimerDuration(0);
+                if (m.timerVersion === timerVersionRef.current) {
+                    resetLocalTimerState();
                 }
                 return;
             }
@@ -335,8 +351,7 @@ export default function Game() {
             if (message.type === "answer-revealed") {
                 const m = message as unknown as { clue?: SelectedClueFromServer };
                 if (m.clue) setSelectedClue({ ...m.clue, showAnswer: true });
-                setTimerEndTime(null);
-                setTimerDuration(0);
+                resetLocalTimerState();
                 return;
             }
 
@@ -356,8 +371,7 @@ export default function Game() {
             if (message.type === "returned-to-board") {
                 setSelectedClue(null);
                 setBuzzResult(null);
-                setTimerEndTime(null);
-                setTimerDuration(0);
+                resetLocalTimerState();
                 return;
             }
 
@@ -389,7 +403,7 @@ export default function Game() {
         });
 
         return unsubscribe;
-    }, [isSocketReady, subscribe, timerVersion, onClueSelected]);
+    }, [isSocketReady, subscribe, onClueSelected, resetLocalTimerState]);
 
     if (!boardData) {
         return <p>Loading board... Please wait!</p>; // Display a loading message
@@ -424,7 +438,7 @@ export default function Game() {
                     markAllCluesComplete={markAllCluesComplete}
                     onLeaveGame={leaveGame}
                 />
-                )}
+            )}
             {/* Jeopardy Board Section */}
             <div
                 className="flex flex-1 justify-center items-center overflow-hidden p-0"
