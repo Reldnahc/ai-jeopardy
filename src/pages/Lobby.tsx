@@ -82,6 +82,12 @@ const Lobby: React.FC = () => {
     // Do NOT trust location.state for host permissions; server will confirm via lobby-state.
     const isHost = isHostServer;
 
+    const onPromoteHost = (playerName: string) => {
+        if (!isSocketReady) return;
+        if (!gameId) return;
+        sendJson({ type: "promote-host", gameId, targetPlayerName: playerName });
+    };
+
     useEffect(() => {
         if (!gameId || !effectivePlayerName) return;
 
@@ -144,6 +150,11 @@ const Lobby: React.FC = () => {
 
                     setPlayers(sortedPlayers);
                     setHost(m.host);
+
+                    const hostName = (m.host ?? "").trim();
+                    const youName = (effectivePlayerName ?? "").trim();
+                    setIsHostServer(hostName.length > 0 && youName.length > 0 && hostName === youName);
+
                     return;
                 }
 
@@ -526,6 +537,8 @@ const Lobby: React.FC = () => {
                             players={players}
                             copySuccess={copySuccess}
                             setCopySuccess={setCopySuccess}
+                            isHost={isHost}
+                            onPromoteHost={onPromoteHost}
                         />
                     </div>
 

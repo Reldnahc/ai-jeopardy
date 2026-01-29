@@ -36,6 +36,45 @@ app.use(express.static(distPath));
 // Store game state
 const games = {};
 
+const LOBBY_EMPTY_GRACE_MS = 60_000 * 2; // tune: 30s–120s
+
+const cancelLobbyCleanup = (game) => {
+    if (!game) return;
+    if (game.cleanupTimer) clearTimeout(game.cleanupTimer);
+    game.cleanupTimer = null;
+    game.emptySince = null;
+};
+
+const scheduleLobbyCleanupIfEmpty = (gameId) => {
+    const game = games[gameId];
+    if (!game) return;
+
+    // "Empty" = nobody online (or no players at all)
+    const hasOnline = (game.players || []).some(p => p?.online !== false);
+    const isEmpty = !hasOnline;
+
+    if (!isEmpty) {
+        cancelLobbyCleanup(game);
+        return;
+    }
+
+    if (game.cleanupTimer) return; // already scheduled
+
+    game.emptySince = Date.now();
+    game.cleanupTimer = setTimeout(() => {
+        const g = games[gameId];
+        if (!g) return;
+
+        const stillHasOnline = (g.players || []).some(p => p.online);
+        if (!stillHasOnline && g.inLobby) {
+            delete games[gameId];
+            console.log(`[Lobby ${gameId}] cleaned up after grace`);
+        } else {
+            cancelLobbyCleanup(g);
+        }
+    }, LOBBY_EMPTY_GRACE_MS);
+};
+
 const buildLobbyState = (gameId, ws) => {
     const game = games[gameId];
     if (!game) return null;
@@ -49,6 +88,7 @@ const buildLobbyState = (gameId, ws) => {
             name: p.name,
             color: p.color,
             text_color: p.text_color,
+            online: p?.online !== false,
         })),
         host: game.host,
         categories: normalizeCategories11(game.categories),
@@ -357,8 +397,9 @@ wss.on("connection", (ws) => {
 
                 games[newGameId] = {
                     host,
-                    players: [{ id: ws.id, name: host, color, text_color, playerKey: stableKey }],
+                    players: [{ id: ws.id, name: host, color, text_color, playerKey: stableKey, online: true }],
                     inLobby: true,
+                    createdAt: Date.now(),
                     categories: normalizeCategories11(categories),
                     lockedCategories: {
                         firstBoard: Array(5).fill(false),
@@ -368,6 +409,8 @@ wss.on("connection", (ws) => {
                     activeBoard: "firstBoard",
                     isFinalJeopardy: false,
                     finalJeopardyStage: null,
+                    emptySince: null,
+                    cleanupTimer: null,
                 };
 
                 ws.send(JSON.stringify({
@@ -403,11 +446,13 @@ wss.on("connection", (ws) => {
                 // If host left, reassign host (or delete lobby if empty)
                 if (game.host === name) {
                     if (game.players.length === 0) {
-                        delete games[effectiveGameId];
+                        scheduleLobbyCleanupIfEmpty(effectiveGameId);
                         return;
                     }
+
                     game.host = game.players[0].name;
                 }
+
 
                 broadcast(effectiveGameId, {
                     type: "player-list-update",
@@ -418,13 +463,13 @@ wss.on("connection", (ws) => {
                     })),
                     host: game.host,
                 });
+                scheduleLobbyCleanupIfEmpty(effectiveGameId);
 
                 return;
             }
 
             if (data.type === "join-lobby") {
                 const { gameId, playerName, playerKey } = data;
-
                 if (!games[gameId]) {
                     ws.send(JSON.stringify({ type: "error", message: "Lobby does not exist!" }));
                     return;
@@ -437,6 +482,7 @@ wss.on("connection", (ws) => {
                 }
 
                 const game = games[gameId];
+                cancelLobbyCleanup(game);
 
                 // Prefer stable identity (playerKey) for dedupe/reconnect.
                 const stableKey = typeof playerKey === "string" && playerKey.trim() ? playerKey.trim() : null;
@@ -480,14 +526,18 @@ wss.on("connection", (ws) => {
                         const color = msg?.color || "bg-blue-500";
                         const text_color = msg?.text_color || "text-white";
 
+                        cancelLobbyCleanup(game);
+
                         game.players.push({
                             id: ws.id,
                             name: actualName,
                             color,
                             text_color,
                             playerKey: stableKey,
+                            online: true,
                         });
                         ws.gameId = gameId;
+                        scheduleLobbyCleanupIfEmpty(gameId); // this will cancel if anyone is online
                     }
                 }
 
@@ -505,6 +555,43 @@ wss.on("connection", (ws) => {
                 });
             }
 
+            // server.js (inside ws.on("message", ...) after kick-player / request-lobby-state, etc.)
+            if (data.type === "promote-host") {
+                const { gameId, targetPlayerName } = data;
+
+                if (!gameId || !games[gameId]) return;
+                const game = games[gameId];
+
+                // Only allow in-lobby host promotion
+                if (!game.inLobby) return;
+
+                // Only current host socket can promote
+                if (!requireHost(game, ws)) return;
+
+                const target = String(targetPlayerName ?? "").trim();
+                if (!target) return;
+
+                const targetPlayer = (game.players || []).find((p) => p.name === target);
+                if (!targetPlayer) return;
+
+                // No-op if already host
+                if (game.host === target) return;
+
+                game.host = target;
+
+                broadcast(gameId, {
+                    type: "player-list-update",
+                    players: game.players.map((p) => ({
+                        name: p.name,
+                        color: p.color,
+                        text_color: p.text_color,
+                        online: p?.online !== false,
+                    })),
+                    host: game.host,
+                });
+
+                return;
+            }
 
             if (data.type === "create-game") {
                 const {
@@ -1392,19 +1479,13 @@ wss.on("connection", (ws) => {
         if (!player) return;
 
         if (game.inLobby) {
-            const leavingName = player.name;
-            console.log(`[Server] Player ${leavingName} disconnected in lobby (hard remove).`);
+            console.log(`[Server] Player ${player.name} disconnected in lobby (soft).`);
 
-            game.players = game.players.filter((p) => p.id !== ws.id);
+            player.online = false;
+            player.id = null; // optional, but keeps reconnect logic clean
 
-            // If host left, reassign host (or delete lobby if empty)
-            if (game.host === leavingName) {
-                if (game.players.length === 0) {
-                    delete games[gameId];
-                    return;
-                }
-                game.host = game.players[0].name;
-            }
+            // Do NOT delete / reassign host here. Host should remain host.
+            // Just broadcast updated list if you want the UI to reflect online state.
 
             broadcast(gameId, {
                 type: "player-list-update",
@@ -1412,11 +1493,13 @@ wss.on("connection", (ws) => {
                     name: p.name,
                     color: p.color,
                     text_color: p.text_color,
-                    online: true, // lobby should never have "offline" players
+                    online: Boolean(p.online),
                 })),
                 host: game.host,
             });
 
+            // Start grace cleanup only if nobody is online
+            scheduleLobbyCleanupIfEmpty(gameId);
             return;
         }
 

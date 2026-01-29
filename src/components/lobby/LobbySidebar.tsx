@@ -8,6 +8,8 @@ interface LobbySidebarProps {
     players: Player[];
     copySuccess: boolean;
     setCopySuccess: React.Dispatch<React.SetStateAction<boolean>>;
+    isHost: boolean;
+    onPromoteHost: (playerName: string) => void;
 }
 
 const LobbySidebar: React.FC<LobbySidebarProps> = ({
@@ -16,6 +18,8 @@ const LobbySidebar: React.FC<LobbySidebarProps> = ({
                                                        players,
                                                        copySuccess,
                                                        setCopySuccess,
+                                                       isHost,
+                                                       onPromoteHost
                                                    }) => {
     const copyGameIdToClipboard = () => {
         if (gameId) {
@@ -78,6 +82,19 @@ const LobbySidebar: React.FC<LobbySidebarProps> = ({
                                 {host === player.name && (
                                     <span className="text-yellow-500 text-sm -mt-2">Host</span>
                                 )}
+                                {isHost && host !== player.name && (
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onPromoteHost(player.name);
+                                        }}
+                                        className="mt-1 px-2 py-1 rounded bg-blue-600 text-white text-xs hover:bg-blue-500 w-fit"
+                                    >
+                                        Make Host
+                                    </button>
+                                )}
+
                             </div>
                         </li>
                     ))}
