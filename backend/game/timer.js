@@ -1,0 +1,45 @@
+export const clearGameTimer = (game) => {
+    if (!game) return;
+    if (game.timerTimeout) {
+        clearTimeout(game.timerTimeout);
+        game.timerTimeout = null;
+    }
+    game.timerEndTime = null;
+    game.timerDuration = null; // seconds
+    game.timerKind = null; // "buzz" | "answer" | null
+};
+
+export const startGameTimer = (gameId, game, broadcast, durationSeconds, kind, onExpire) => {
+    if (!game) return;
+
+    // Cancel any previous timer and bump version so stale timeouts can't win
+    clearGameTimer(game);
+    game.timerVersion = (game.timerVersion || 0) + 1;
+
+    const endTime = Date.now() + durationSeconds * 1000;
+    game.timerEndTime = endTime;
+    game.timerDuration = durationSeconds;
+    game.timerKind = kind || null;
+
+    const currentVersion = game.timerVersion;
+
+    broadcast(gameId, {
+        type: "timer-start",
+        endTime,
+        duration: durationSeconds,
+        timerVersion: currentVersion,
+        timerKind: game.timerKind,
+    });
+
+    game.timerTimeout = setTimeout(() => {
+        if (game.timerVersion !== currentVersion) return;
+
+        clearGameTimer(game);
+
+        if (typeof onExpire === "function") {
+            onExpire({ gameId, game, broadcast, timerVersion: currentVersion, timerKind: kind || null });
+        }
+
+        broadcast(gameId, { type: "timer-end", timerVersion: currentVersion, timerKind: kind || null });
+    }, durationSeconds * 1000);
+};

@@ -13,6 +13,12 @@ import { fileURLToPath } from "url";
 import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { r2 } from "./services/r2Client.js";
 import { createTrace } from "./services/trace.js";
+import { games } from "./state/gamesStore.js";
+import { scheduleLobbyCleanupIfEmpty, cancelLobbyCleanup } from "./lobby/cleanup.js";
+import { buildLobbyState, sendLobbySnapshot } from "./lobby/snapshot.js";
+import { startGameTimer } from "./game/timer.js";
+import { normalizeCategories11, validateImportedBoardData, parseBoardJson } from "./validation/boardImport.js";
+import { requireHost, isHostSocket } from "./auth/hostGuard.js";
 
 const app = express(); // Initialize Express app
 app.use(cors());
@@ -31,263 +37,11 @@ const __dirname = path.dirname(__filename);
 const distPath = path.join(__dirname, "..", "dist");
 app.use(express.static(distPath));
 
-
-
-// Store game state
-const games = {};
-
-const LOBBY_EMPTY_GRACE_MS = 60_000 * 2; // tune: 30s–120s
-
-const cancelLobbyCleanup = (game) => {
-    if (!game) return;
-    if (game.cleanupTimer) clearTimeout(game.cleanupTimer);
-    game.cleanupTimer = null;
-    game.emptySince = null;
-};
-
-const scheduleLobbyCleanupIfEmpty = (gameId) => {
-    const game = games[gameId];
-    if (!game) return;
-
-    // "Empty" = nobody online (or no players at all)
-    const hasOnline = (game.players || []).some(p => p?.online !== false);
-    const isEmpty = !hasOnline;
-
-    if (!isEmpty) {
-        cancelLobbyCleanup(game);
-        return;
-    }
-
-    if (game.cleanupTimer) return; // already scheduled
-
-    game.emptySince = Date.now();
-    game.cleanupTimer = setTimeout(() => {
-        const g = games[gameId];
-        if (!g) return;
-
-        const stillHasOnline = (g.players || []).some(p => p.online);
-        if (!stillHasOnline && g.inLobby) {
-            delete games[gameId];
-            console.log(`[Lobby ${gameId}] cleaned up after grace`);
-        } else {
-            cancelLobbyCleanup(g);
-        }
-    }, LOBBY_EMPTY_GRACE_MS);
-};
-
-const buildLobbyState = (gameId, ws) => {
-    const game = games[gameId];
-    if (!game) return null;
-
-    const you = game.players?.find((p) => p.id === ws.id) || null;
-
-    return {
-        type: "lobby-state",
-        gameId,
-        players: game.players.map((p) => ({
-            name: p.name,
-            color: p.color,
-            text_color: p.text_color,
-            online: p?.online !== false,
-        })),
-        host: game.host,
-        categories: normalizeCategories11(game.categories),
-        lockedCategories: game.lockedCategories,
-        inLobby: game.inLobby,
-        isGenerating: Boolean(game.isGenerating),
-        you: you
-            ? {
-                playerName: you.name,
-                playerKey: you.playerKey || null,
-                isHost: you.name === game.host,
-            }
-            : null,
-    };
-};
-
-const getPlayerForSocket = (game, ws) => {
-    if (!game || !ws) return null;
-    return (game.players || []).find((p) => p.id === ws.id) || null;
-};
-
-const sendLobbySnapshot = (ws, gameId) => {
-    const snap = buildLobbyState(gameId, ws);
-    if (snap) ws.send(JSON.stringify(snap));
-};
-
-const clearGameTimer = (game) => {
-    if (!game) return;
-    if (game.timerTimeout) {
-        clearTimeout(game.timerTimeout);
-        game.timerTimeout = null;
-    }
-    game.timerEndTime = null;
-    game.timerDuration = null; // seconds
-    game.timerKind = null; // "buzz" | "answer" | null
-};
-
-const startGameTimer = (gameId, game, broadcast, durationSeconds, kind, onExpire) => {
-    if (!game) return;
-
-    // Cancel any previous timer and bump version so stale timeouts can't win
-    clearGameTimer(game);
-    game.timerVersion = (game.timerVersion || 0) + 1;
-
-    const endTime = Date.now() + durationSeconds * 1000;
-    game.timerEndTime = endTime;
-    game.timerDuration = durationSeconds;
-    game.timerKind = kind || null;
-
-    const currentVersion = game.timerVersion;
-
-    broadcast(gameId, {
-        type: "timer-start",
-        endTime,
-        duration: durationSeconds,
-        timerVersion: currentVersion,
-        timerKind: game.timerKind
-    });
-
-    game.timerTimeout = setTimeout(() => {
-        if (game.timerVersion !== currentVersion) return;
-
-        clearGameTimer(game);
-
-        if (typeof onExpire === "function") {
-            onExpire({ gameId, game, broadcast, timerVersion: currentVersion, timerKind: kind || null });
-        }
-
-        broadcast(gameId, { type: "timer-end", timerVersion: currentVersion, timerKind: kind || null });
-    }, durationSeconds * 1000);
-};
-
-
 let cotd =
     {
         category: "",
         description: ""
     };
-
-
-// Ensure array exists and is 11 long
-const normalizeCategories11 = (arr) => {
-    const next = Array.isArray(arr) ? arr.slice(0, 11) : [];
-    while (next.length < 11) next.push("");
-    return next;
-};
-
-const isNonEmptyString = (v) => typeof v === "string" && v.trim().length > 0;
-
-const validateImportedBoardData = (boardData) => {
-    // Accept either:
-    // 1) { firstBoard, secondBoard, finalJeopardy }
-    // 2) { version, firstBoard, secondBoard, finalJeopardy }
-    const b = boardData && typeof boardData === "object" ? boardData : null;
-    if (!b) return { ok: false, error: "Board JSON must be an object." };
-
-    const firstBoard = b.firstBoard;
-    const secondBoard = b.secondBoard;
-    const finalJeopardy = b.finalJeopardy;
-
-    if (!firstBoard || !secondBoard || !finalJeopardy) {
-        return { ok: false, error: "Missing firstBoard, secondBoard, or finalJeopardy." };
-    }
-
-    // firstBoard.categories[5], secondBoard.categories[5]
-    const fbCats = firstBoard.categories;
-    const sbCats = secondBoard.categories;
-
-    if (!Array.isArray(fbCats) || fbCats.length !== 5) {
-        return { ok: false, error: "firstBoard.categories must be an array of length 5." };
-    }
-    if (!Array.isArray(sbCats) || sbCats.length !== 5) {
-        return { ok: false, error: "secondBoard.categories must be an array of length 5." };
-    }
-
-    // Each category has: category (string), values (array length 5)
-    const validateRoundCategories = (cats, roundName) => {
-        for (let i = 0; i < cats.length; i++) {
-            const c = cats[i];
-            if (!c || typeof c !== "object") return `${roundName}.categories[${i}] must be an object.`;
-            if (!isNonEmptyString(c.category)) return `${roundName}.categories[${i}].category must be a non-empty string.`;
-            if (!Array.isArray(c.values) || c.values.length !== 5) return `${roundName}.categories[${i}].values must be an array of length 5.`;
-
-            for (let j = 0; j < c.values.length; j++) {
-                const clue = c.values[j];
-                if (!clue || typeof clue !== "object") return `${roundName}.categories[${i}].values[${j}] must be an object.`;
-                if (typeof clue.value !== "number") return `${roundName}.categories[${i}].values[${j}].value must be a number.`;
-                if (!isNonEmptyString(clue.question)) return `${roundName}.categories[${i}].values[${j}].question must be a non-empty string.`;
-                if (!isNonEmptyString(clue.answer)) return `${roundName}.categories[${i}].values[${j}].answer must be a non-empty string.`;
-            }
-        }
-        return null;
-    };
-
-    const fbErr = validateRoundCategories(fbCats, "firstBoard");
-    if (fbErr) return { ok: false, error: fbErr };
-
-    const sbErr = validateRoundCategories(sbCats, "secondBoard");
-    if (sbErr) return { ok: false, error: sbErr };
-
-    // finalJeopardy.categories can be either:
-    // 1) object: { category: string, values: [{question, answer}] }
-    // 2) array:  [{ category: string, values: [{question, answer}] }]
-    let fjCats = finalJeopardy.categories;
-
-    if (!fjCats) {
-        return { ok: false, error: "finalJeopardy.categories is required." };
-    }
-
-    // Normalize array -> first element
-    if (Array.isArray(fjCats)) {
-        if (fjCats.length < 1) {
-            return { ok: false, error: "finalJeopardy.categories must have at least 1 category." };
-        }
-        fjCats = fjCats[0];
-    }
-
-    if (!fjCats || typeof fjCats !== "object") {
-        return { ok: false, error: "finalJeopardy.categories must be an object or an array." };
-    }
-
-    if (!isNonEmptyString(fjCats.category)) {
-        return { ok: false, error: "finalJeopardy.categories.category must be a non-empty string." };
-    }
-
-    if (!Array.isArray(fjCats.values) || fjCats.values.length < 1) {
-        return { ok: false, error: "finalJeopardy.categories.values must be an array with at least 1 clue." };
-    }
-
-    const fj = fjCats.values[0];
-    if (!fj || typeof fj !== "object") {
-        return { ok: false, error: "finalJeopardy.categories.values[0] must be an object." };
-    }
-    if (!isNonEmptyString(fj.question)) {
-        return { ok: false, error: "finalJeopardy.categories.values[0].question must be a non-empty string." };
-    }
-    if (!isNonEmptyString(fj.answer)) {
-        return { ok: false, error: "finalJeopardy.categories.values[0].answer must be a non-empty string." };
-    }
-
-    return { ok: true };
-};
-
-const parseBoardJson = (raw) => {
-    // raw can be:
-    // - stringified JSON
-    // - already-parsed object (if you later choose to send object)
-    let parsed;
-    if (typeof raw === "string") {
-        parsed = JSON.parse(raw);
-    } else {
-        parsed = raw;
-    }
-    // Allow wrapper format { version, boardData: {...} } if you ever want it:
-    if (parsed && typeof parsed === "object" && parsed.boardData && typeof parsed.boardData === "object") {
-        return parsed.boardData;
-    }
-    return parsed;
-};
 
 function isBoardFullyCleared(game, boardKey) {
     const board = game?.boardData?.[boardKey];
@@ -311,15 +65,6 @@ function startFinalJeopardy(gameId, game, broadcast) {
     game.drawings = {};
 
     broadcast(gameId, { type: "final-jeopardy" });
-}
-
-function isHostSocket(game, ws) {
-    const hostPlayer = game.players?.find(p => p.name === game.host);
-    return hostPlayer && hostPlayer.id === ws.id;
-}
-
-function requireHost(game, ws) {
-    return game && isHostSocket(game, ws);
 }
 
 wss.on("connection", (ws) => {
@@ -1641,6 +1386,7 @@ app.get("/api/images/:assetId", async (req, res) => {
         res.status(500).json({ error: "Failed to load image" });
     }
 });
+
 app.get("/test/image/:assetId", async (req, res) => {
     const { assetId } = req.params;
 
@@ -1666,6 +1412,7 @@ app.get("/test/image/:assetId", async (req, res) => {
     </html>
   `);
 });
+
 app.get("/api/image-assets/:assetId", async (req, res) => {
     const { assetId } = req.params;
 
