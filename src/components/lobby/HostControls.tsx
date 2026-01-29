@@ -1,5 +1,6 @@
 import { models } from '../../../shared/models.js';
 import { useProfile } from "../../contexts/ProfileContext.tsx";
+import React from "react";
 
 interface Model {
     value: string;
@@ -46,24 +47,21 @@ const HostControls: React.FC<HostControlsProps> = ({
                                                        setIncludeVisuals,
                                                    }) => {
     const { profile } = useProfile();
+
+    const usingImportedBoard = boardJson.trim().length > 0;
+
     // Group the models by price
     const groupedModels = models.reduce((groups, model) => {
-        if (!groups[model.price]) {
-            groups[model.price] = [];
-        }
+        if (!groups[model.price]) groups[model.price] = [];
         groups[model.price].push(model);
         return groups;
     }, {} as Record<number, Model[]>);
 
     function checkCantUseModel(model: Model) {
-        // Free models are always available
         if (model.price === 0) return false;
-
-        // Paid models: only admin/privileged
         const role = profile?.role;
         return !(role === "admin" || role === "privileged");
     }
-
 
     const handleTimeChange = (
         e: React.ChangeEvent<HTMLInputElement>,
@@ -72,11 +70,22 @@ const HostControls: React.FC<HostControlsProps> = ({
         const value = parseInt(e.target.value);
         if (isNaN(value)) return;
 
-        // Clamp value between 5 and 60
         const clampedValue = Math.min(Math.max(value, 5), 60);
         updateTime(clampedValue);
     };
 
+    const handlePasteFromClipboard = async () => {
+        try {
+            const text = await navigator.clipboard.readText();
+            setBoardJson(text);
+            setBoardJsonError(tryValidateBoardJson(text));
+        } catch (err) {
+            // Clipboard can fail if not HTTPS / permission denied
+            console.error("Clipboard paste failed:", err);
+            // Keep it simple: user can still Ctrl+V
+            setBoardJsonError("Could not read clipboard (permission denied or insecure context). Try Ctrl+V.");
+        }
+    };
 
     return (
         <div className="w-full">
@@ -85,17 +94,30 @@ const HostControls: React.FC<HostControlsProps> = ({
                     {/* Left: Custom Board JSON */}
                     <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-3 mb-2">
-                            <h3 className="text-lg font-semibold text-gray-800">Custom Board (Copy/Paste JSON)</h3>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setBoardJson("");
-                                    setBoardJsonError(null);
-                                }}
-                                className="px-3 py-1 rounded bg-gray-200 text-gray-800 hover:bg-gray-300"
-                            >
-                                Clear
-                            </button>
+                            <h3 className="text-lg font-semibold text-gray-800">
+                                Custom Board (Copy/Paste JSON)
+                            </h3>
+
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={handlePasteFromClipboard}
+                                    className="px-3 py-1 rounded bg-gray-200 text-gray-800 hover:bg-gray-300"
+                                >
+                                    Paste
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setBoardJson("");
+                                        setBoardJsonError(null);
+                                    }}
+                                    className="px-3 py-1 rounded bg-gray-200 text-gray-800 hover:bg-gray-300"
+                                >
+                                    Clear
+                                </button>
+                            </div>
                         </div>
 
                         <p className="text-sm text-gray-600 mb-2">
@@ -114,124 +136,148 @@ const HostControls: React.FC<HostControlsProps> = ({
                         />
 
                         {boardJsonError && boardJson.trim().length > 0 && (
-                            <div className="mt-2 text-sm text-red-600">
-                                {boardJsonError}
-                            </div>
+                            <div className="mt-2 text-sm text-red-600">{boardJsonError}</div>
                         )}
                     </div>
 
-                    {/* Right: Options + Start */}
+                    {/* Right: Settings + Start */}
                     <div className="w-full lg:w-[22rem] flex-shrink-0">
                         <div className="flex flex-col gap-4">
-                            {/* Model */}
-                            <div className="flex flex-col gap-2">
-                                <label className="text-gray-800 text-lg">Model Selection:</label>
-                                <select
-                                    value={selectedModel}
-                                    onChange={onModelChange}
-                                    className="p-2 rounded border border-gray-300 text-black w-full bg-white cursor-pointer"
-                                >
-                                    {Object.entries(groupedModels).map(([price, models]) => (
-                                        <optgroup
-                                            key={price}
-                                            label={price === "0" ? "Free Models" : "Premium Models"}
-                                        >
-                                            {models.map((model) => (
-                                                <option
-                                                    key={model.value}
-                                                    value={model.value}
-                                                    disabled={checkCantUseModel(model)}
-                                                >
-                                                    {model.label}
-                                                    {model.price > 0 && !(profile?.role === "admin" || profile?.role === "privileged")
-                                                        ? " (Locked)"
-                                                        : ""}
-                                                </option>
-                                            ))}
-                                        </optgroup>
-                                    ))}
-                                </select>
-                            </div>
+                            {/* Game Settings */}
+                            <div className="rounded border border-gray-200 bg-white p-3">
+                                <div className="text-gray-800 text-lg font-semibold mb-2">
+                                    Game Settings
+                                </div>
 
-                            {/* Timers */}
-                            <div className={isSoloLobby ? "opacity-50 pointer-events-none" : ""}>
-                                <div className="flex flex-col gap-3">
-                                    <div className="flex flex-col gap-2">
-                                        <label className="text-gray-800 text-lg">Time to Buzz:</label>
-                                        <div className="flex flex-wrap gap-2 items-center">
-                                            <input
-                                                type="number"
-                                                min="5"
-                                                max="60"
-                                                value={timeToBuzz === -1 ? '' : timeToBuzz}
-                                                onChange={(e) => handleTimeChange(e, setTimeToBuzz)}
-                                                disabled={timeToBuzz === -1}
-                                                placeholder="5-60"
-                                                className={`p-2 rounded border border-gray-300 text-black w-24 ${
-                                                    timeToBuzz === -1 ? 'bg-gray-100' : 'bg-white'
-                                                }`}
-                                            />
-                                            <span className="text-gray-600">seconds</span>
-
-                                            <div className="flex items-center ml-2">
+                                <div className={isSoloLobby ? "opacity-50 pointer-events-none" : ""}>
+                                    <div className="flex flex-col gap-3">
+                                        <div className="flex flex-col gap-2">
+                                            <label className="text-gray-800">Time to Buzz:</label>
+                                            <div className="flex flex-wrap gap-2 items-center">
                                                 <input
-                                                    type="checkbox"
-                                                    id="infiniteTime"
-                                                    checked={timeToBuzz === -1}
-                                                    onChange={() => setTimeToBuzz(timeToBuzz === -1 ? 30 : -1)}
-                                                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                                                    type="number"
+                                                    min="5"
+                                                    max="60"
+                                                    value={timeToBuzz === -1 ? "" : timeToBuzz}
+                                                    onChange={(e) => handleTimeChange(e, setTimeToBuzz)}
+                                                    disabled={timeToBuzz === -1}
+                                                    placeholder="5-60"
+                                                    className={`p-2 rounded border border-gray-300 text-black w-24 ${
+                                                        timeToBuzz === -1 ? "bg-gray-100" : "bg-white"
+                                                    }`}
                                                 />
-                                                <label htmlFor="infiniteTime" className="ml-2 text-gray-700">
-                                                    Infinite
-                                                </label>
+                                                <span className="text-gray-600">seconds</span>
+
+                                                <div className="flex items-center ml-2">
+                                                    <input
+                                                        type="checkbox"
+                                                        id="infiniteTime"
+                                                        checked={timeToBuzz === -1}
+                                                        onChange={() => setTimeToBuzz(timeToBuzz === -1 ? 30 : -1)}
+                                                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                                                    />
+                                                    <label htmlFor="infiniteTime" className="ml-2 text-gray-700">
+                                                        Infinite
+                                                    </label>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
 
-                                    <div className="flex flex-col gap-2">
-                                        <label className="text-gray-800 text-lg">Time to Answer:</label>
-                                        <div className="flex flex-wrap gap-2 items-center">
-                                            <input
-                                                type="number"
-                                                min="5"
-                                                max="60"
-                                                value={timeToAnswer === -1 ? '' : timeToAnswer}
-                                                onChange={(e) => handleTimeChange(e, setTimeToAnswer)}
-                                                disabled={timeToAnswer === -1}
-                                                placeholder="5-60"
-                                                className={`p-2 rounded border border-gray-300 text-black w-24 ${
-                                                    timeToAnswer === -1 ? 'bg-gray-100' : 'bg-white'
-                                                }`}
-                                            />
-                                            <span className="text-gray-600">seconds</span>
-
-                                            <div className="flex items-center ml-2">
+                                        <div className="flex flex-col gap-2">
+                                            <label className="text-gray-800">Time to Answer:</label>
+                                            <div className="flex flex-wrap gap-2 items-center">
                                                 <input
-                                                    type="checkbox"
-                                                    id="infiniteTime2"
-                                                    checked={timeToAnswer === -1}
-                                                    onChange={() => setTimeToAnswer(timeToAnswer === -1 ? 30 : -1)}
-                                                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                                                    type="number"
+                                                    min="5"
+                                                    max="60"
+                                                    value={timeToAnswer === -1 ? "" : timeToAnswer}
+                                                    onChange={(e) => handleTimeChange(e, setTimeToAnswer)}
+                                                    disabled={timeToAnswer === -1}
+                                                    placeholder="5-60"
+                                                    className={`p-2 rounded border border-gray-300 text-black w-24 ${
+                                                        timeToAnswer === -1 ? "bg-gray-100" : "bg-white"
+                                                    }`}
                                                 />
-                                                <label htmlFor="infiniteTime2" className="ml-2 text-gray-700">
-                                                    Infinite
-                                                </label>
+                                                <span className="text-gray-600">seconds</span>
+
+                                                <div className="flex items-center ml-2">
+                                                    <input
+                                                        type="checkbox"
+                                                        id="infiniteTime2"
+                                                        checked={timeToAnswer === -1}
+                                                        onChange={() => setTimeToAnswer(timeToAnswer === -1 ? 30 : -1)}
+                                                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                                                    />
+                                                    <label htmlFor="infiniteTime2" className="ml-2 text-gray-700">
+                                                        Infinite
+                                                    </label>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <input
-                                    type="checkbox"
-                                    id="includeVisuals"
-                                    checked={includeVisuals}
-                                    onChange={(e) => setIncludeVisuals(e.target.checked)}
-                                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
-                                />
-                                <label htmlFor="includeVisuals" className="text-gray-700">
-                                    Enable Visual Clues (Wikimedia Commons)
-                                </label>
+
+                            {/* Model Settings */}
+                            <div
+                                className={`rounded border border-gray-200 bg-white p-3 ${
+                                    usingImportedBoard ? "opacity-50 pointer-events-none" : ""
+                                }`}
+                            >
+                                <div className="text-gray-800 text-lg font-semibold mb-2">
+                                    Model Settings
+                                </div>
+
+                                {usingImportedBoard && (
+                                    <div className="text-sm text-gray-600 mb-2">
+                                        Model settings are disabled because pasted board JSON will be used.
+                                    </div>
+                                )}
+
+                                <div className="flex flex-col gap-2">
+                                    <label className="text-gray-800">Model Selection:</label>
+                                    <select
+                                        value={selectedModel}
+                                        onChange={onModelChange}
+                                        disabled={usingImportedBoard}
+                                        className="p-2 rounded border border-gray-300 text-black w-full bg-white cursor-pointer"
+                                    >
+                                        {Object.entries(groupedModels).map(([price, models]) => (
+                                            <optgroup
+                                                key={price}
+                                                label={price === "0" ? "Free Models" : "Premium Models"}
+                                            >
+                                                {models.map((model) => (
+                                                    <option
+                                                        key={model.value}
+                                                        value={model.value}
+                                                        disabled={checkCantUseModel(model)}
+                                                    >
+                                                        {model.label}
+                                                        {model.price > 0 &&
+                                                        !(profile?.role === "admin" || profile?.role === "privileged")
+                                                            ? " (Locked)"
+                                                            : ""}
+                                                    </option>
+                                                ))}
+                                            </optgroup>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="flex items-center gap-2 mt-3">
+                                    <input
+                                        type="checkbox"
+                                        id="includeVisuals"
+                                        checked={includeVisuals}
+                                        onChange={(e) => setIncludeVisuals(e.target.checked)}
+                                        disabled={usingImportedBoard}
+                                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                                    />
+                                    <label htmlFor="includeVisuals" className="text-gray-700">
+                                        Enable Visual Clues (Wikimedia Commons)
+                                    </label>
+                                </div>
                             </div>
 
                             <button

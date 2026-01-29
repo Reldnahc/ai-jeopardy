@@ -22,10 +22,13 @@ const Avatar: React.FC<AvatarProps> = ({
                 width: avatarSize,
                 height: avatarSize,
                 fontSize: `${parseInt(size) * 2}px`, // Dynamically scale font size
-                lineHeight: avatarSize, // Ensure centering
+
             }}
         >
-            {name?.charAt(0).toUpperCase()}
+            <span className="relative top-[-1px]">
+              {name?.charAt(0).toUpperCase()}
+            </span>
+
         </div>
     );
 };

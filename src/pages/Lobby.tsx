@@ -516,7 +516,7 @@ const Lobby: React.FC = () => {
                 timeToBuzz,
                 timeToAnswer,
                 categories: [...categories.firstBoard, ...categories.secondBoard, categories.finalJeopardy],
-                selectedModel,
+                selectedModel: usingImportedBoard ? undefined : selectedModel,
                 boardJson: boardJson.trim() ? boardJson : undefined,
                 includeVisuals,
             });

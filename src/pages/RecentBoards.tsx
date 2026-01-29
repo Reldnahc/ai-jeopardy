@@ -45,12 +45,11 @@ const RecentBoards = () => {
         setLoading(false);
     };
 
-    // Reset boards and fetch filtered data whenever the filter changes
     useEffect(() => {
-        setBoards([]); // Clear previous boards
-        setHasMoreBoards(true); // Reset scrollable flag
-        fetchBoards(0); // Fetch new boards with the current filter
+        setBoards([]);
+        setHasMoreBoards(true);
     }, [filterModel]);
+
 
     // Infinite scrolling logic
     useEffect(() => {
@@ -90,7 +89,7 @@ const RecentBoards = () => {
                             <button
                                 key={model.value}
                                 onClick={() => setFilterModel(model.value === filterModel ? null : model.value)}
-                                className={`px-4 py-2 rounded-full transition-all duration-300 text-sm sm:text-base font-semibold shadow-md ${
+                                className={`px-3 py-1.5 rounded-md text-xs sm:text-sm font-semibold shadow-md ${
                                     filterModel === model.value
                                         ? "bg-blue-500 text-white border border-blue-600 scale-105 ring-2 ring-blue-300"
                                         : "bg-gray-200 text-gray-700 hover:bg-gray-300 hover:scale-105"
@@ -102,7 +101,7 @@ const RecentBoards = () => {
                         {/* Clear Filter Button */}
                         <button
                             onClick={() => setFilterModel(null)}
-                            className="px-4 py-2 rounded-full bg-red-500 hover:bg-red-600 text-white shadow-md hover:scale-105 transition-all duration-300 text-sm sm:text-base font-semibold"
+                            className="px-4 py-2 rounded-md bg-red-500 hover:bg-red-600 text-white shadow-md hover:scale-105 transition-all duration-300 text-sm sm:text-base font-semibold"
                         >
                             Clear Filter
                         </button>
