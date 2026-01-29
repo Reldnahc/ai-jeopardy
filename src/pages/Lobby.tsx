@@ -12,8 +12,8 @@ import {getUniqueCategories} from "../categories/getUniqueCategories.ts";
 import {useGameSession} from "../hooks/useGameSession.ts";
 import { useBoardJsonImport } from "../hooks/lobby/useBoardJsonImport";
 import {flattenBySections} from "../utils/lobbySections";
-import {useLobbyIdentity} from "../hooks/lobby/useLobbyIdentity.ts";
 import { useLobbySocketSync } from "../hooks/lobby/useLobbySocketSync";
+import {usePlayerIdentity} from "../hooks/usePlayerIdentity.ts";
 
 const Lobby: React.FC = () => {
     const location = useLocation();
@@ -30,7 +30,7 @@ const Lobby: React.FC = () => {
     const { showAlert } = useAlert();
     const { session, saveSession } = useGameSession();
 
-    const { playerKey, effectivePlayerName } = useLobbyIdentity({
+    const { playerKey, effectivePlayerName } = usePlayerIdentity({
         gameId,
         locationStatePlayerName: location.state?.playerName,
     });

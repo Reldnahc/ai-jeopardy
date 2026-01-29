@@ -21,20 +21,21 @@ interface JeopardyBoardProps {
     allWagersSubmitted: boolean;
     isFinalJeopardy: boolean;
     drawings: Record<string, DrawingPath[]> | null;
-    setBuzzerLocked: React.Dispatch<React.SetStateAction<boolean>>;
-    setBuzzResult: React.Dispatch<React.SetStateAction<string | null>>;
     handleBuzz: () => void;
     buzzerLocked: boolean;
     buzzResult: string | null;
     buzzLockedOut: boolean;
+    resetBuzzer: () => void;
+    unlockBuzzer?: () => void;
+
     timerEndTime: number | null;
     timerDuration: number;
 }
 
 const JeopardyBoard: React.FC<JeopardyBoardProps> =
     ({ boardData, isHost, onClueSelected, selectedClue, gameId, clearedClues, players, scores,
-         currentPlayer, allWagersSubmitted, isFinalJeopardy, drawings, setBuzzerLocked,
-         setBuzzResult, handleBuzz, buzzerLocked, buzzResult, buzzLockedOut, timerEndTime, timerDuration}) => {
+         currentPlayer, allWagersSubmitted, isFinalJeopardy, drawings, resetBuzzer,
+          unlockBuzzer, handleBuzz, buzzerLocked, buzzResult, buzzLockedOut, timerEndTime, timerDuration}) => {
     const [localSelectedClue, setLocalSelectedClue] = useState<Clue | null>(null);
     const [showClue, setShowClue] = useState(false);
     const [hostCanSeeAnswer, setHostCanSeeAnswer] = useState(false);
@@ -193,8 +194,8 @@ const JeopardyBoard: React.FC<JeopardyBoardProps> =
                         setDrawingSubmitted={setDrawingSubmitted}
                         hostCanSeeAnswer={hostCanSeeAnswer}
                         players={players}
-                        setBuzzerLocked={setBuzzerLocked}
-                        setBuzzResult={setBuzzResult}
+                        resetBuzzer={resetBuzzer}
+                        unlockBuzzer={unlockBuzzer}
                         handleBuzz={handleBuzz}
                         buzzerLocked={buzzerLocked}
                         buzzResult={buzzResult}

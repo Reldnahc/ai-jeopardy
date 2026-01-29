@@ -23,8 +23,8 @@ interface SelectedClueDisplayProps {
     setDrawingSubmitted: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
     hostCanSeeAnswer: boolean;
     players: Player[];
-    setBuzzerLocked: React.Dispatch<React.SetStateAction<boolean>>;
-    setBuzzResult: React.Dispatch<React.SetStateAction<string | null>>;
+    resetBuzzer: () => void;
+    unlockBuzzer?: () => void;
     handleBuzz: () => void;
     buzzerLocked: boolean;
     buzzResult: string | null;
@@ -47,8 +47,8 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                                                                      setDrawingSubmitted,
                                                                      hostCanSeeAnswer,
                                                                      players,
-                                                                     setBuzzerLocked,
-                                                                     setBuzzResult,
+                                                                     resetBuzzer,
+                                                                     unlockBuzzer,
                                                                      handleBuzz,
                                                                      buzzerLocked,
                                                                      buzzResult,
@@ -227,11 +227,11 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                         onClick={() => {
                             if (buzzerLocked) {
                                 sendJson({ type: "unlock-buzzer", gameId });
-                                setBuzzerLocked(false);
+                                unlockBuzzer?.();
+
                             } else {
                                 sendJson({ type: "reset-buzzer", gameId });
-                                setBuzzResult(null);
-                                setBuzzerLocked(true);
+                                resetBuzzer();
                             }
 
                         }}
