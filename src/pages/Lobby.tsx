@@ -1,5 +1,5 @@
-import React, {useEffect, useMemo, useState} from 'react';
-import { useLocation, useNavigate, useParams} from "react-router-dom";
+import React, {useEffect, useState} from 'react';
+import {useLocation, useNavigate, useParams} from "react-router-dom";
 import { useWebSocket } from "../contexts/WebSocketContext.tsx";
 import LobbySidebar from "../components/lobby/LobbySidebar.tsx";
 import LoadingScreen from "../components/common/LoadingScreen.tsx";
@@ -11,6 +11,15 @@ import {useAlert} from "../contexts/AlertContext.tsx";
 import { motion } from 'framer-motion';
 import {getUniqueCategories} from "../categories/getUniqueCategories.ts";
 import {useGameSession} from "../hooks/useGameSession.ts";
+import { useBoardJsonImport } from "../hooks/lobby/useBoardJsonImport";
+import {
+    CATEGORY_SECTIONS,
+    buildInitial,
+    flattenBySections,
+    unflattenBySections,
+    type BoardType,
+} from "../utils/lobbySections";
+import {useLobbyIdentity} from "../hooks/lobby/useLobbyIdentity.ts";
 
 type LockedCategories = {
     firstBoard: boolean[]; // Jeopardy lock states
@@ -18,47 +27,20 @@ type LockedCategories = {
     finalJeopardy: boolean[];
 };
 
-type CategorySection = typeof CATEGORY_SECTIONS[number];
-type BoardType = CategorySection["key"];
-
-const CATEGORY_SECTIONS = [
-    { key: "firstBoard", title: "Jeopardy!", count: 5 },
-    { key: "secondBoard", title: "Double Jeopardy!", count: 5 },
-    { key: "finalJeopardy", title: "Final Jeopardy!", count: 1 },
-] as const;
-
-function buildInitial<T>(
-    make: (count: number) => T
-): Record<BoardType, T> {
-    return CATEGORY_SECTIONS.reduce<Record<BoardType, T>>(
-        (acc, section) => {
-            acc[section.key] = make(section.count);
-            return acc;
-        },
-        {} as Record<BoardType, T>
-    );
-}
-
-
-function flattenBySections(values: Record<BoardType, string[]>): string[] {
-    return CATEGORY_SECTIONS.flatMap((s) => (values[s.key] ?? []).slice(0, s.count));
-}
-
-function unflattenBySections(flat: string[]): Record<BoardType, string[]> {
-    let cursor = 0;
-    const out = {} as Record<BoardType, string[]>;
-    for (const s of CATEGORY_SECTIONS) {
-        out[s.key] = flat.slice(cursor, cursor + s.count);
-        cursor += s.count;
-    }
-    return out;
-}
-
 const Lobby: React.FC = () => {
     const location = useLocation();
     const [categories, setCategories] = useState<Record<BoardType, string[]>>(
         buildInitial((count) => Array(count).fill(""))
     );
+    const {
+        boardJson,
+        setBoardJson,
+        boardJsonError,
+        setBoardJsonError,
+        validate: tryValidateBoardJson,
+        usingImportedBoard,
+    } = useBoardJsonImport();
+
     const { gameId } = useParams<{ gameId: string }>();
     const [isLoading, setIsLoading] = useState(false);
     const [allowLeave, setAllowLeave] = useState(false);
@@ -66,8 +48,6 @@ const Lobby: React.FC = () => {
     const [timeToBuzz, setTimeToBuzz] = useState(10);
     const [timeToAnswer, setTimeToAnswer] = useState(10);
     const [copySuccess, setCopySuccess] = useState(false);
-    const [boardJson, setBoardJson] = useState<string>("");
-    const [boardJsonError, setBoardJsonError] = useState<string | null>(null);
     // Server is authoritative for lobby membership + host.
     const [players, setPlayers] = useState<Player[]>([]);
     const [host, setHost] = useState<string | null>(null);
@@ -85,27 +65,11 @@ const Lobby: React.FC = () => {
     const { profile } = useProfile();
     const { showAlert } = useAlert();
     const { session, saveSession } = useGameSession();
+    const { playerKey, effectivePlayerName } = useLobbyIdentity({
+        gameId,
+        locationStatePlayerName: location.state?.playerName,
+    });
 
-    // Stable identity key (persists across refresh/reconnect) so the server can dedupe players.
-    const playerKey = useMemo(() => {
-        if (!gameId) return null;
-        const storageKey = `aj_playerKey_${gameId}`;
-        const existing = localStorage.getItem(storageKey);
-        if (existing && existing.trim()) return existing;
-        // Use crypto.randomUUID when available; fallback is fine for local-only identity.
-        const created = (globalThis.crypto && "randomUUID" in globalThis.crypto)
-            ? (globalThis.crypto as Crypto).randomUUID()
-            : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-        localStorage.setItem(storageKey, created);
-        return created;
-    }, [gameId]);
-
-    const effectivePlayerName = useMemo(() => {
-        if (location.state?.playerName) return location.state.playerName;
-        if (session?.gameId === gameId && session?.playerName) return session.playerName;
-        if (profile?.displayname) return profile.displayname;
-        return null;
-    }, [location.state, session, gameId, profile]);
     // Do NOT trust location.state for host permissions; server will confirm via lobby-state.
     const isHost = isHostServer;
 
@@ -402,42 +366,6 @@ const Lobby: React.FC = () => {
         });
     };
 
-    function isObject(value: unknown): value is Record<string, unknown> {
-        return typeof value === "object" && value !== null;
-    }
-
-    const tryValidateBoardJson = (raw: string): string | null => {
-        if (!raw.trim()) return null; // empty means "use AI"
-
-        try {
-            const parsed: unknown = JSON.parse(raw);
-
-            if (!isObject(parsed)) {
-                return "Board JSON must be an object.";
-            }
-
-            // Accept either:
-            // { firstBoard, secondBoard, finalJeopardy }
-            // OR
-            // { boardData: { firstBoard, secondBoard, finalJeopardy } }
-            const boardData = isObject(parsed.boardData)
-                ? parsed.boardData
-                : parsed;
-
-            if (
-                !("firstBoard" in boardData) ||
-                !("secondBoard" in boardData) ||
-                !("finalJeopardy" in boardData)
-            ) {
-                return "Missing firstBoard / secondBoard / finalJeopardy.";
-            }
-
-            return null;
-        } catch {
-            return "Invalid JSON (can’t parse).";
-        }
-    };
-
 
     const handleCreateGame = async () => {
         if (!profile) {
@@ -457,8 +385,6 @@ const Lobby: React.FC = () => {
 
         const localJsonError = tryValidateBoardJson(boardJson);
         setBoardJsonError(localJsonError);
-
-        const usingImportedBoard = boardJson.trim().length > 0;
 
         if (usingImportedBoard && localJsonError) {
             await showAlert(
