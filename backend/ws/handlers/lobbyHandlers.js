@@ -1,4 +1,250 @@
+//TODO MOVE THESE SOMEWHERE ELSE AND INJST VIA CTX
+
+function collectImageAssetIdsFromBoard(boardData) {
+    const ids = new Set();
+
+    const collect = (categories) => {
+        (categories ?? []).forEach((cat) => {
+            (cat.values ?? []).forEach((clue) => {
+                const media = clue?.media;
+                if (media?.type === "image" && typeof media.assetId === "string" && media.assetId.trim()) {
+                    ids.add(media.assetId.trim());
+                }
+            });
+        });
+    };
+
+    collect(boardData?.firstBoard?.categories);
+    collect(boardData?.secondBoard?.categories);
+    collect(boardData?.finalJeopardy?.categories);
+
+    return Array.from(ids);
+}
+
+function playerStableId(p) {
+    return (typeof p.playerKey === "string" && p.playerKey.trim()) ? p.playerKey.trim() : p.name;
+}
+
 export const lobbyHandlers = {
+    "create-game": async ({ ws, data, ctx }) => { //Fired from lobby logic all done in lobby. it belongs here.
+        const { gameId } = data ?? {};
+
+        // Use server-authoritative host name for trace context (no client spoofing)
+        const serverHost = gameId && ctx.games?.[gameId]?.host ? ctx.games[gameId].host : undefined;
+        const trace = ctx.createTrace("create-game", { gameId, host: serverHost });
+        trace.mark("ws_received", { type: "create-game" });
+
+        if (!gameId) {
+            ws.send(JSON.stringify({ type: "error", message: "create-game missing gameId" }));
+            return;
+        }
+
+        if (!ctx.games[gameId]) {
+            ctx.broadcast(gameId, { type: "create-board-failed", message: "Game not found." });
+            return;
+        }
+
+        // Host-only (prevents spoofing)
+        if (!ctx.isHostSocket(ctx.games[gameId], ws)) {
+            ws.send(JSON.stringify({ type: "error", message: "Only the host can start the game." }));
+            ctx.sendLobbySnapshot(ws, gameId);
+            return;
+        }
+
+        if (!ctx.games[gameId].lobbySettings) {
+            ctx.games[gameId].lobbySettings = {
+                timeToBuzz: 10,
+                timeToAnswer: 10,
+                selectedModel: "gpt-5.2",
+                reasoningEffort: "off",
+                visualMode: "off", // "off" | "commons" | "brave"
+                boardJson: "",
+            };
+        }
+
+        const s = ctx.games[gameId].lobbySettings;
+
+        const host = ctx.games[gameId].host;
+        const categories = ctx.games[gameId].categories;
+
+        const selectedModel = s.selectedModel;
+        const timeToBuzz = s.timeToBuzz;
+        const timeToAnswer = s.timeToAnswer;
+        const reasoningEffort = s.reasoningEffort;
+
+        const boardJson = typeof s.boardJson === "string" ? s.boardJson : "";
+        const usingImportedBoard = Boolean(boardJson && boardJson.trim());
+
+        // Visual policy:
+        // - If importing board JSON => visuals always enabled, provider forced to "commons"
+        // - Otherwise => visualMode controls includeVisuals + provider
+        const visualMode = s.visualMode;
+        const effectiveIncludeVisuals = usingImportedBoard ? true : (visualMode !== "off");
+
+        // Provider selection (server authoritative)
+        const requestedProvider = visualMode === "brave" ? "brave" : "commons";
+
+        // TODO: replace with real server-side entitlement check
+        const canUseBrave = true;
+
+        const effectiveImageProvider =
+            effectiveIncludeVisuals
+                ? (requestedProvider === "brave" && canUseBrave ? "brave" : "commons")
+                : undefined;
+
+        trace.mark("visual_settings", {
+            usingImportedBoard,
+            includeVisuals: effectiveIncludeVisuals,
+            requestedProvider,
+            effectiveImageProvider,
+            canUseBrave,
+            visualMode,
+        });
+
+        // Optional: if lobby not active, refuse (prevents double-starts)
+        if (!ctx.games[gameId].inLobby) {
+            ws.send(JSON.stringify({ type: "error", message: "Game has already started." }));
+            return;
+        }
+
+        ctx.broadcast(gameId, { type: "trigger-loading" });
+
+        let boardData = null;
+
+        try {
+            if (usingImportedBoard) {
+                const imported = ctx.parseBoardJson(boardJson);
+                const v = ctx.validateImportedBoardData(imported);
+                if (!v.ok) {
+                    ctx.broadcast(gameId, { type: "create-board-failed", message: v.error });
+                    ctx.games[gameId].isGenerating = false;
+                    return;
+                }
+                boardData = imported;
+            } else {
+                ctx.games[gameId].isGenerating = true;
+                trace.mark("createBoardData_start");
+
+                boardData = await ctx.createBoardData(categories, selectedModel, host, {
+                    includeVisuals: effectiveIncludeVisuals,
+                    imageProvider: effectiveImageProvider,
+                    maxVisualCluesPerCategory: 2,
+                    reasoningEffort,
+                    trace,
+                });
+
+                trace.mark("createBoardData_end");
+            }
+        } catch (e) {
+            console.error("[Server] create-game failed:", e);
+            ctx.broadcast(gameId, {
+                type: "create-board-failed",
+                message: "Invalid board JSON or generation failed.",
+            });
+            ctx.games[gameId].isGenerating = false;
+            return;
+        }
+
+        if (!ctx.games[gameId] || !boardData) {
+            ctx.broadcast(gameId, {
+                type: "create-board-failed",
+                message: "Board data was empty.",
+            });
+            ctx.games[gameId].isGenerating = false;
+            return;
+        }
+
+        // If lobby flipped during generation, just abort cleanly
+        if (!ctx.games[gameId].inLobby) {
+            ctx.games[gameId].isGenerating = false;
+            return;
+        }
+
+        ctx.games[gameId].buzzed = null;
+        ctx.games[gameId].buzzerLocked = true;
+        ctx.games[gameId].buzzLockouts = {};
+        ctx.games[gameId].clearedClues = new Set();
+        ctx.games[gameId].boardData = boardData;
+        ctx.games[gameId].scores = {};
+        ctx.games[gameId].inLobby = false;
+        ctx.games[gameId].timeToBuzz = timeToBuzz;
+        ctx.games[gameId].timeToAnswer = timeToAnswer;
+        ctx.games[gameId].isGenerating = false;
+        ctx.games[gameId].activeBoard = "firstBoard";
+        ctx.games[gameId].isFinalJeopardy = false;
+        ctx.games[gameId].finalJeopardyStage = null;
+
+        trace.mark("broadcast_game_state_start");
+        const assetIds = collectImageAssetIdsFromBoard(boardData);
+
+        // Track preload status server-side (online players only)
+        const onlinePlayers = (ctx.games[gameId].players ?? []).filter((p) => p.online);
+        ctx.games[gameId].preload = {
+            active: true,
+            required: onlinePlayers.map(playerStableId),
+            done: [],
+            createdAt: Date.now(),
+        };
+
+        trace.mark("broadcast_preload_images_start", { imageCount: assetIds.length });
+        ctx.broadcast(gameId, {
+            type: "preload-images",
+            assetIds,
+        });
+        trace.mark("broadcast_preload_images_end", { imageCount: assetIds.length });
+
+        // IMPORTANT: do NOT flip inLobby yet and do NOT broadcast start-game yet.
+        // We wait until everyone acks.
+        trace.end({ success: true });
+
+        trace.mark("broadcast_game_state_end");
+        trace.end({ success: true });
+    },
+
+    "preload-done": async ({ ws, data, ctx }) => {
+        const { gameId, playerKey, playerName } = data ?? {};
+        if (!gameId || !ctx.games?.[gameId]) return;
+
+        const game = ctx.games[gameId];
+        if (!game.preload?.active) return;
+
+        // Identify who is asking
+        const stable = (typeof playerKey === "string" && playerKey.trim())
+            ? playerKey.trim()
+            : String(playerName ?? "").trim();
+
+        if (!stable) return;
+
+        // Only accept from players currently in the game list
+        const isKnown = (game.players ?? []).some((p) => playerStableId(p) === stable);
+        if (!isKnown) return;
+
+        // Mark done
+        if (!game.preload.done.includes(stable)) {
+            game.preload.done.push(stable);
+        }
+
+        // Recompute who is required (online only)
+        const requiredNow = (game.players ?? []).filter((p) => p.online).map(playerStableId);
+
+        const doneSet = new Set(game.preload.done);
+        const allDone = requiredNow.every((id) => doneSet.has(id));
+
+        if (!allDone) return;
+
+        // Phase 2: everyone is ready → start game
+        game.preload.active = false;
+
+        // Flip lobby state now
+        game.inLobby = false;
+
+        ctx.broadcast(gameId, {
+            type: "start-game",
+            host: game.host,
+        });
+    },
+
+
     "create-lobby": async ({ ws, data, ctx }) => {
         const { host, categories, playerKey  } = data;
 

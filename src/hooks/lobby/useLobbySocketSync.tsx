@@ -47,6 +47,8 @@ export function useLobbySocketSync({
     const [isHostServer, setIsHostServer] = useState(false);
 
     const [allowLeave, setAllowLeave] = useState(false);
+    const [preloadAssetIds, setPreloadAssetIds] = useState<string[] | null>(null);
+    const [isPreloadingImages, setIsPreloadingImages] = useState(false);
 
     const [categories, setCategories] = useState<Record<BoardType, string[]>>(() => ({
         firstBoard: Array(CATEGORY_SECTIONS[0].count).fill(""),
@@ -264,6 +266,8 @@ export function useLobbySocketSync({
 
                 case "create-board-failed": {
                     setIsLoading(false);
+                    setIsPreloadingImages(false);
+                    setPreloadAssetIds(null);
 
                     const m = message as unknown as { message?: string };
 
@@ -287,10 +291,22 @@ export function useLobbySocketSync({
                     return;
                 }
 
-
                 case "start-game": {
+                    setIsPreloadingImages(false);
+                    setPreloadAssetIds(null);
+
                     setIsLoading(false);
                     setAllowLeave(true);
+                    return;
+                }
+
+                case "preload-images": {
+                    const m = message as unknown as { assetIds?: string[] };
+                    setAllowLeave(false);
+
+                    // Start client-side preload in Lobby.tsx via returned state
+                    setPreloadAssetIds(Array.isArray(m.assetIds) ? m.assetIds : []);
+                    setIsPreloadingImages(true);
                     return;
                 }
 
@@ -370,5 +386,7 @@ export function useLobbySocketSync({
         requestLobbyState,
         lobbySettings,
         updateLobbySettings,
+        preloadAssetIds,
+        isPreloadingImages
     };
 }

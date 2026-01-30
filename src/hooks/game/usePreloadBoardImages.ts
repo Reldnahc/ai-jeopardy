@@ -124,3 +124,68 @@ export function usePreloadBoardImages(boardData: BoardData | null | undefined, e
         };
     }, [boardData, enabled]);
 }
+
+export function usePreloadImageAssetIds(
+    assetIds: string[] | null | undefined,
+    enabled: boolean,
+    onDone?: () => void
+) {
+    const requestedRef = useRef<Set<string>>(new Set());
+    const doneCalledRef = useRef(false);
+
+    useEffect(() => {
+        if (!enabled) return;
+        if (!assetIds || assetIds.length === 0) return;
+
+        const controller = new AbortController();
+        const { signal } = controller;
+        const CONCURRENCY = 8;
+
+        const queue = assetIds
+            .map((id) => `/api/images/${id}`)
+            .filter((url) => {
+                if (requestedRef.current.has(url)) return false;
+                requestedRef.current.add(url);
+                return true;
+            });
+
+        if (!queue.length) {
+            if (!doneCalledRef.current) {
+                doneCalledRef.current = true;
+                onDone?.();
+            }
+            return;
+        }
+
+        let inFlight = 0;
+        let index = 0;
+        let completed = 0;
+
+        const pump = () => {
+            if (signal.aborted) return;
+
+            while (inFlight < CONCURRENCY && index < queue.length) {
+                const url = queue[index++];
+                inFlight++;
+
+                preloadOne(url, signal).finally(() => {
+                    inFlight--;
+                    completed++;
+
+                    if (completed >= queue.length && !doneCalledRef.current) {
+                        doneCalledRef.current = true;
+                        onDone?.();
+                        return;
+                    }
+
+                    pump();
+                });
+            }
+        };
+
+        pump();
+
+        return () => controller.abort();
+        // IMPORTANT: use assetIds identity carefully; lobby will set once.
+    }, [enabled, onDone, assetIds]);
+}

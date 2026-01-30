@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {useLocation, useNavigate, useParams} from "react-router-dom";
 import { useWebSocket } from "../contexts/WebSocketContext.tsx";
 import LobbySidebar from "../components/lobby/LobbySidebar.tsx";
@@ -12,6 +12,7 @@ import {getUniqueCategories} from "../categories/getUniqueCategories.ts";
 import {useGameSession} from "../hooks/useGameSession.ts";
 import { useLobbySocketSync } from "../hooks/lobby/useLobbySocketSync";
 import {usePlayerIdentity} from "../hooks/usePlayerIdentity.ts";
+import {usePreloadImageAssetIds} from "../hooks/game/usePreloadBoardImages.ts";
 
 const Lobby: React.FC = () => {
     const location = useLocation();
@@ -47,6 +48,8 @@ const Lobby: React.FC = () => {
         lobbySettings,
         updateLobbySettings,
         lobbyInvalid,
+        preloadAssetIds,
+        isPreloadingImages,
     } = useLobbySocketSync({
         gameId,
         playerKey,
@@ -60,6 +63,12 @@ const Lobby: React.FC = () => {
         if (!lobbyInvalid) return;
         navigate("/");
     }, [lobbyInvalid, navigate]);
+
+    useEffect(() => {
+        // Any time a new preload request comes in, allow a new ack to be sent.
+        preloadAckSentRef.current = false;
+    }, [preloadAssetIds]);
+
 
     useEffect(() => {
         if (!gameId || !effectivePlayerName) return;
@@ -112,6 +121,24 @@ const Lobby: React.FC = () => {
 
     const boardJson = lobbySettings?.boardJson ?? "";
     const usingImportedBoard = Boolean(boardJson.trim());
+
+
+    const preloadAckSentRef = useRef(false);
+
+    usePreloadImageAssetIds(preloadAssetIds, isPreloadingImages, () => {
+        if (preloadAckSentRef.current) return;
+        preloadAckSentRef.current = true;
+
+        // Tell server we’re ready
+        sendJson({
+            type: "preload-done",
+            gameId,
+            playerName: effectivePlayerName,
+            playerKey: playerKey,
+        });
+
+        // keep loading UI until start-game arrives
+    });
 
     const handleRandomizeCategory = (boardType: LobbyBoardType, index: number) => {
         if (!isSocketReady) return;
