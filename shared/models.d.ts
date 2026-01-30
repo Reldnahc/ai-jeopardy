@@ -4,6 +4,7 @@ export type Model = {
     value: string;
     label: string;
     provider: Provider;
+    supportsReasoningEffort:? boolean;
     price: number;
     disabled: boolean;
 };

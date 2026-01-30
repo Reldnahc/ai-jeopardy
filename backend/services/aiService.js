@@ -21,38 +21,48 @@ const providerApiMap = {
     anthropic: callAnthropic,
 };
 
-function callOpenAi(model, prompt) {
-    return openai.chat.completions.create({
-        model: model,
-        messages: [{role: "user", content: prompt}],
+function callOpenAi(model, prompt, options = {}) {
+    const modelDef = modelsByValue[model];
+    const effort = options?.reasoningEffort;
+
+    const includeReasoningEffort =
+        modelDef?.supportsReasoningEffort === true &&
+        (effort === "low" || effort === "medium" || effort === "high");
+
+    const payload = {
+        model,
+        messages: [{ role: "user", content: prompt }],
         response_format: { type: "json_object" },
+    };
+
+    if (includeReasoningEffort) {
+        payload.reasoning_effort = effort;
+    }
+
+    return openai.chat.completions.create(payload);
+}
+
+function callDeepseek(model, prompt, options = {}) {
+    return deepseek.chat.completions.create({
+        model,
+        messages: [{ role: "user", content: prompt }],
     });
 }
 
-function callDeepseek(model, prompt) {
-    return deepseek.chat.completions.create({
-        model: model,
-        messages: [{role: "user", content: prompt}],
-    });
-}
-function callAnthropic(model, prompt) {
+function callAnthropic(model, prompt, options = {}) {
     return anthropic.messages.create({
-        model: model,
+        model,
         system: "Respond only with valid JSON as described. Do not include any other text.",
         max_tokens: 2000,
         messages: [
             {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": prompt
-                    }
-                ]
-            }
-        ]
+                role: "user",
+                content: [{ type: "text", text: prompt }],
+            },
+        ],
     });
 }
+
 
 async function createCategoryOfTheDay() {
     console.log("Creating new Category of the day.");
@@ -69,7 +79,7 @@ async function createCategoryOfTheDay() {
             "description": "description",
         }
     `;
-    const response = await callOpenAi("gpt-4o-mini", prompt, 1);
+    const response = await callOpenAi("gpt-4o-mini", prompt, {});
     let data;
     if (response.choices && response.choices[0]) {
         data = JSON.parse(response.choices[0].message.content.replace(/```(?:json)?/g, "").trim());
@@ -222,6 +232,7 @@ async function createBoardData(categories, model, host, options = {}) {
         maxVisualCluesPerCategory: 2,
         maxImageSearchTries: 6,
         commonsThumbWidth: 1600,
+        reasoningEffort: "off",
         // Hint for image pickers to prefer photo-style results.
         preferPhotos: true,
         ...options,
@@ -359,7 +370,11 @@ async function createBoardData(categories, model, host, options = {}) {
         // Fire ALL Single categories immediately
         const firstCategoryPromises = firstCategories.map((cat, i) =>
             timed(`SINGLE C${i + 1} (${cat})`, async () => {
-                const r = await apiCall(model, categoryPrompt(cat, false));
+                const requestOptions = {
+                    reasoningEffort: settings.reasoningEffort, // "off" | "low" | "medium" | "high"
+                };
+
+                const r = await apiCall(model, categoryPrompt(cat, false), requestOptions);
                 const json = parseProviderJson(r);
 
                 if (!json || typeof json.category !== "string" || !Array.isArray(json.values)) {
@@ -373,7 +388,11 @@ async function createBoardData(categories, model, host, options = {}) {
         // Fire ALL Double categories immediately
         const secondCategoryPromises = secondCategories.map((cat, i) =>
             timed(`DOUBLE C${i + 1} (${cat})`, async () => {
-                const r = await apiCall(model, categoryPrompt(cat, true));
+                const requestOptions = {
+                    reasoningEffort: settings.reasoningEffort, // "off" | "low" | "medium" | "high"
+                };
+
+                const r = await apiCall(model, categoryPrompt(cat, true), requestOptions);
                 const json = parseProviderJson(r);
 
                 if (!json || typeof json.category !== "string" || !Array.isArray(json.values)) {
@@ -386,7 +405,10 @@ async function createBoardData(categories, model, host, options = {}) {
 
         // Fire Final immediately too
         const finalPromise = timed(`FINAL (${finalCategory})`, async () => {
-            const r = await apiCall(model, finalPrompt(finalCategory));
+            const requestOptions = {
+                reasoningEffort: settings.reasoningEffort, // "off" | "low" | "medium" | "high"
+            };
+            const r = await apiCall(model, finalPrompt(finalCategory), requestOptions);
             const json = parseProviderJson(r);
 
             if (!json || typeof json.category !== "string" || !Array.isArray(json.values)) {

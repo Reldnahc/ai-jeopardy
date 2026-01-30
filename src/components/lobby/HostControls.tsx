@@ -2,6 +2,8 @@ import { models } from '../../../shared/models.js';
 import { useProfile } from "../../contexts/ProfileContext.tsx";
 import React from "react";
 
+type ReasoningEffortSetting = "off" | "low" | "medium" | "high";
+
 interface Model {
     value: string;
     label: string;
@@ -27,6 +29,8 @@ interface HostControlsProps {
     onCreateGame: () => void;
     visualMode: "off" | "commons" | "brave";
     setVisualMode: (value: "off" | "commons" | "brave") => void;
+    reasoningEffort: "off" | "low" | "medium" | "high";
+    setReasoningEffort: (value: "off" | "low" | "medium" | "high") => void;
 }
 
 const HostControls: React.FC<HostControlsProps> = ({
@@ -45,8 +49,13 @@ const HostControls: React.FC<HostControlsProps> = ({
                                                        onCreateGame,
                                                        visualMode,
                                                        setVisualMode,
+                                                       reasoningEffort,
+                                                       setReasoningEffort,
                                                    }) => {
     const { profile } = useProfile();
+
+    const selectedModelDef = models.find(m => m.value === selectedModel);
+    const modelSupportsReasoningEffort = selectedModelDef?.supportsReasoningEffort === true;
 
     const usingImportedBoard = boardJson.trim().length > 0;
 
@@ -266,7 +275,29 @@ const HostControls: React.FC<HostControlsProps> = ({
                                         ))}
                                     </select>
                                 </div>
+                                {/* Reasoning Effort - Only shown if supported and not using an imported board */}
+                                {modelSupportsReasoningEffort && !usingImportedBoard && (
+                                    <div className="flex flex-col gap-2 mt-4 pt-3 border-t border-gray-100">
+                                        <label className="text-sm font-medium text-gray-700">Reasoning Effort</label>
 
+                                        <div className="flex p-1 bg-gray-100 rounded-lg w-full">
+                                            {(["off", "low", "medium", "high"] as ReasoningEffortSetting[]).map((level) => (
+                                                <button
+                                                    key={level}
+                                                    type="button"
+                                                    onClick={() => setReasoningEffort(level)}
+                                                    className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all duration-200 ${
+                                                        reasoningEffort === level
+                                                            ? "bg-white text-blue-600 shadow-sm"
+                                                            : "text-gray-500 hover:text-gray-700"
+                                                    }`}
+                                                >
+                                                    {level.charAt(0).toUpperCase() + level.slice(1)}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                                 <div className="flex flex-col gap-2 mt-3">
                                     <div className="flex items-center gap-2">
                                         <input

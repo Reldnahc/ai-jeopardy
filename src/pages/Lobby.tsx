@@ -22,6 +22,7 @@ const Lobby: React.FC = () => {
     const [timeToAnswer, setTimeToAnswer] = useState(10);
     const [copySuccess, setCopySuccess] = useState(false);
     const [selectedModel, setSelectedModel] = useState('gpt-5.2'); // Default value for dropdown
+    const [reasoningEffort, setReasoningEffort] = useState<"off" | "low" | "medium" | "high">("off");
     const [visualMode, setVisualMode] = useState<"off" | "commons" | "brave">("off");
 
     const { sendJson } = useWebSocket();
@@ -193,6 +194,7 @@ const Lobby: React.FC = () => {
                 selectedModel: usingImportedBoard ? undefined : selectedModel,
                 boardJson: boardJson.trim() ? boardJson : undefined,
                 includeVisuals: visualMode !== "off",
+                reasoningEffort,
                 imageProvider: visualMode === "off" ? undefined : (visualMode === "brave" ? "brave" : "commons"),
             });
         } catch (error) {
@@ -286,6 +288,8 @@ const Lobby: React.FC = () => {
                                     tryValidateBoardJson={tryValidateBoardJson}
                                     visualMode={visualMode}
                                     setVisualMode={setVisualMode}
+                                    reasoningEffort={reasoningEffort}
+                                    setReasoningEffort={setReasoningEffort}
                                 />
                             </motion.div>
                         )}

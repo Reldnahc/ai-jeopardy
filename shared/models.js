@@ -3,6 +3,7 @@ export const models = [
         value: "gpt-5.2",
         label: "GPT-5.2",
         provider: "openai",
+        supportsReasoningEffort: true,
         price: 0,
         disabled: false,
     },

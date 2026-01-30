@@ -9,7 +9,8 @@ export const gameHandlers = {
             timeToAnswer,
             boardJson,
             includeVisuals,
-            imageProvider, // NEW
+            imageProvider,
+            reasoningEffort
         } = data;
 
         const trace = ctx.createTrace("create-game", { gameId, host });
@@ -71,6 +72,7 @@ export const gameHandlers = {
                     includeVisuals: effectiveIncludeVisuals,
                     imageProvider: effectiveImageProvider, // NEW
                     maxVisualCluesPerCategory: 2,
+                    reasoningEffort: reasoningEffort,
                     trace,
                 });
 
