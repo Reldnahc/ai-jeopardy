@@ -2,7 +2,7 @@
 import {
     checkAllFinalDrawingsSubmitted,
     checkAllWagersSubmitted,
-} from "../domain/finalJeopardy.js";
+} from "../game/finalJeopardy.js";
 
 /**
  * Handles a socket disconnect in a server-authoritative way.

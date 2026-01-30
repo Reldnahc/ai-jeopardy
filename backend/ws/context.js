@@ -9,6 +9,11 @@ import { validateImportedBoardData, parseBoardJson, normalizeCategories11 } from
 
 import { requireHost, isHostSocket } from "../auth/hostGuard.js";
 import {getColorFromPlayerName} from "../services/userService.js";
+import {createTrace} from "../services/trace.js";
+import {createBoardData} from "../services/aiService.js";
+import {checkAllFinalDrawingsSubmitted, checkAllWagersSubmitted} from "../game/finalJeopardy.js";
+import {isBoardFullyCleared, startFinalJeopardy} from "../game/stageTransition.js";
+import {getCOTD} from "../state/cotdStore.js";
 
 export const createWsContext = (wss) => {
     const { broadcast, broadcastAll } = makeBroadcaster(wss);
@@ -44,5 +49,12 @@ export const createWsContext = (wss) => {
         isHostSocket,
 
         getColorFromPlayerName,
+        createTrace,
+        createBoardData,
+        checkAllWagersSubmitted,
+        checkAllFinalDrawingsSubmitted,
+        isBoardFullyCleared,
+        startFinalJeopardy,
+        getCOTD,
     };
 };

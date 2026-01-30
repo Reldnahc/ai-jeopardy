@@ -6,6 +6,7 @@ export const attachWebSocketServer = (wss) => {
     const ctx = createWsContext(wss);
 
     wss.on("connection", (ws) => {
+        ws.id = crypto.randomUUID();
         ws.isAlive = true;
 
         ws.on("pong", () => {
