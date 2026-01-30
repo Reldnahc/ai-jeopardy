@@ -28,7 +28,7 @@ export async function commonsGetImageInfos(fileTitles, thumbWidth = 1600) {
     url.searchParams.set("action", "query");
     url.searchParams.set("format", "json");
     url.searchParams.set("prop", "imageinfo");
-    // NOTE: add "size" so we get width/height (helps scoring)
+    // include size so we can score by width/height
     url.searchParams.set("iiprop", "url|extmetadata|mime|size");
     url.searchParams.set("iiurlwidth", String(thumbWidth));
     url.searchParams.set("titles", fileTitles.join("|"));
@@ -41,6 +41,12 @@ export async function commonsGetImageInfos(fileTitles, thumbWidth = 1600) {
             if (!ii) return null;
 
             const ext = ii.extmetadata ?? {};
+            const description =
+                ext?.ImageDescription?.value ??
+                ext?.ObjectName?.value ??
+                ext?.Headline?.value ??
+                null;
+
             return {
                 title: p?.title ?? null,
                 downloadUrl: ii.thumburl || ii.url,
@@ -48,6 +54,7 @@ export async function commonsGetImageInfos(fileTitles, thumbWidth = 1600) {
                 mime: ii.mime || null,
                 width: typeof ii.width === "number" ? ii.width : null,
                 height: typeof ii.height === "number" ? ii.height : null,
+                description,
                 license: ext?.LicenseShortName?.value ?? null,
                 licenseUrl: ext?.LicenseUrl?.value ?? null,
                 artist: ext?.Artist?.value ?? null,
@@ -67,29 +74,22 @@ export function buildCommonsAttribution(meta) {
     return parts.length ? parts.join(" | ") : null;
 }
 
-// --- NEW: scoring helpers ---
+// --- scoring helpers (prefer photo-like assets) ---
 
 function mimeScore(mime, preferPhotos) {
     const m = String(mime ?? "").toLowerCase();
-
-    // Photo-ish formats generally best for Jeopardy visuals
     if (m === "image/jpeg") return preferPhotos ? 80 : 60;
     if (m === "image/webp") return preferPhotos ? 75 : 55;
     if (m === "image/png") return preferPhotos ? 55 : 55;
-
-    // Often not what we want as a "visual clue"
     if (m === "image/svg+xml") return preferPhotos ? -40 : 5;
     if (m === "image/gif") return preferPhotos ? -25 : -10;
-
-    // Unknown image formats: neutral-ish
     if (m.startsWith("image/")) return 20;
     return -999;
 }
 
-function keywordPenalty(title) {
-    const t = String(title ?? "").toLowerCase();
+function textPenalty(title, description) {
+    const t = `${title ?? ""} ${description ?? ""}`.toLowerCase();
 
-    // Strong "not a photo clue" signals
     const bad = [
         "logo",
         "icon",
@@ -102,24 +102,24 @@ function keywordPenalty(title) {
         "coat of arms",
         "coat_of_arms",
         "pictogram",
-        "svg",
         "vector",
         "clipart",
-        "animation",
+        "infographic",
+        "chart",
+        "graph",
     ];
 
-    let penalty = 0;
+    let score = 0;
     for (const w of bad) {
-        if (t.includes(w)) penalty -= 30;
+        if (t.includes(w)) score -= 30;
     }
 
-    // Mild "likely a photo straight from a camera" signals
     const good = ["dsc", "img_", "pict", "photo", "photograph", "jpg", "jpeg"];
     for (const w of good) {
-        if (t.includes(w)) penalty += 8;
+        if (t.includes(w)) score += 8;
     }
 
-    return penalty;
+    return score;
 }
 
 function sizeScore(width, height) {
@@ -127,15 +127,11 @@ function sizeScore(width, height) {
     const h = typeof height === "number" ? height : 0;
     if (!w || !h) return 0;
 
-    // Too tiny is bad for UI clarity
     if (w < 500 || h < 500) return -30;
 
-    // Prefer reasonably large assets
-    const megapixels = (w * h) / 1_000_000;
-    // cap so huge images don't dominate
-    const mpBoost = Math.min(40, Math.round(megapixels * 8));
+    const mp = (w * h) / 1_000_000;
+    const mpBoost = Math.min(40, Math.round(mp * 8));
 
-    // Prefer sane aspect ratios for your clue layout
     const ar = w / h;
     let arBoost = 0;
     if (ar >= 0.75 && ar <= 1.6) arBoost = 12;
@@ -145,26 +141,22 @@ function sizeScore(width, height) {
     return mpBoost + arBoost;
 }
 
-function scoreCandidate(info, { preferPhotos }) {
+function scoreCommonsCandidate(info, { preferPhotos }) {
     let score = 0;
-
     score += mimeScore(info?.mime, preferPhotos);
     score += sizeScore(info?.width, info?.height);
-    score += keywordPenalty(info?.title);
-
-    // Must have something to fetch
+    score += textPenalty(info?.title, info?.description);
     if (!info?.downloadUrl) score -= 999;
-
     return score;
 }
 
 export async function pickCommonsImageForQueries(queries, opts = {}) {
     const {
-        searchLimit = 8,          // slightly higher to give scoring options
+        searchLimit = 8,
         thumbWidth = 1600,
         maxQueries = 6,
         requireImageMime = true,
-        preferPhotos = true,      // NEW: on by default
+        preferPhotos = true,
         trace,
     } = opts;
 
@@ -176,12 +168,9 @@ export async function pickCommonsImageForQueries(queries, opts = {}) {
         trace?.mark("commons_search_start", { q });
         const titles = await commonsSearchFiles(q, searchLimit);
         trace?.mark("commons_search_end", { q, results: titles.length });
-
         trace?.mark("commons_imageinfo_start", { q });
         const infos = await commonsGetImageInfos(titles, thumbWidth);
         trace?.mark("commons_imageinfo_end", { q, infos: infos.length });
-
-        // Keep only image/* if requested
         const imageInfos = infos.filter((x) => {
             if (!x?.downloadUrl) return false;
             if (!requireImageMime) return true;
@@ -190,19 +179,17 @@ export async function pickCommonsImageForQueries(queries, opts = {}) {
 
         if (!imageInfos.length) continue;
 
-        // NEW: score + pick best
         let best = null;
         let bestScore = -Infinity;
-
         for (const info of imageInfos) {
-            const s = scoreCandidate(info, { preferPhotos });
+            const s = scoreCommonsCandidate(info, { preferPhotos });
             if (s > bestScore) {
                 bestScore = s;
                 best = info;
             }
         }
 
-        trace?.mark("commons_pick_scored", {
+        trace?.mark?.("commons_pick_scored", {
             q,
             bestScore,
             bestTitle: best?.title ?? null,
@@ -220,7 +207,6 @@ export async function pickCommonsImageForQueries(queries, opts = {}) {
             };
         }
     }
-
     trace?.mark("commons_pick_none");
     return null;
 }

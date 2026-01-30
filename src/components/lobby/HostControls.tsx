@@ -25,8 +25,8 @@ interface HostControlsProps {
     setTimeToBuzz: (time: number) => void;
     setTimeToAnswer: (time: number) => void;
     onCreateGame: () => void;
-    includeVisuals: boolean;
-    setIncludeVisuals: (value: boolean) => void;
+    visualMode: "off" | "commons" | "brave";
+    setVisualMode: (value: "off" | "commons" | "brave") => void;
 }
 
 const HostControls: React.FC<HostControlsProps> = ({
@@ -43,12 +43,14 @@ const HostControls: React.FC<HostControlsProps> = ({
                                                        setTimeToBuzz,
                                                        setTimeToAnswer,
                                                        onCreateGame,
-                                                       includeVisuals,
-                                                       setIncludeVisuals,
+                                                       visualMode,
+                                                       setVisualMode,
                                                    }) => {
     const { profile } = useProfile();
 
     const usingImportedBoard = boardJson.trim().length > 0;
+
+    const canUseBrave = profile?.role === "admin";
 
     // Group the models by price
     const groupedModels = models.reduce((groups, model) => {
@@ -265,18 +267,36 @@ const HostControls: React.FC<HostControlsProps> = ({
                                     </select>
                                 </div>
 
-                                <div className="flex items-center gap-2 mt-3">
-                                    <input
-                                        type="checkbox"
-                                        id="includeVisuals"
-                                        checked={includeVisuals}
-                                        onChange={(e) => setIncludeVisuals(e.target.checked)}
-                                        disabled={usingImportedBoard}
-                                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
-                                    />
-                                    <label htmlFor="includeVisuals" className="text-gray-700">
-                                        Enable Visual Clues (Wikimedia Commons)
-                                    </label>
+                                <div className="flex flex-col gap-2 mt-3">
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="checkbox"
+                                            id="includeVisualsCommons"
+                                            checked={visualMode === "commons"}
+                                            onChange={(e) => setVisualMode(e.target.checked ? "commons" : "off")}
+                                            disabled={usingImportedBoard}
+                                            className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                                        />
+                                        <label htmlFor="includeVisualsCommons" className="text-gray-700">
+                                            Enable Visual Clues (Wikimedia Commons)
+                                        </label>
+                                    </div>
+
+                                    {canUseBrave && (
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="checkbox"
+                                                id="includeVisualsBrave"
+                                                checked={visualMode === "brave"}
+                                                onChange={(e) => setVisualMode(e.target.checked ? "brave" : "off")}
+                                                disabled={usingImportedBoard}
+                                                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                                            />
+                                            <label htmlFor="includeVisualsBrave" className="text-gray-700">
+                                                Enable Visual Clues (Brave Image Search)
+                                            </label>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 

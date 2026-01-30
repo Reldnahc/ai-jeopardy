@@ -91,27 +91,131 @@ function normalizeBraveResult(item) {
     return { imageUrl, sourceUrl, title, type, width, height };
 }
 
+function safeHost(u) {
+    try {
+        return new URL(u).hostname.toLowerCase();
+    } catch {
+        return "";
+    }
+}
+
+function urlExt(u) {
+    try {
+        const p = new URL(u).pathname.toLowerCase();
+        const m = p.match(/\.([a-z0-9]+)$/);
+        return m ? m[1] : "";
+    } catch {
+        return "";
+    }
+}
+
+function domainScore(host) {
+    if (!host) return 0;
+    if (host.endsWith("wikimedia.org") || host.endsWith("wikipedia.org")) return 80;
+
+    const good = [
+        "staticflickr.com",
+        "live.staticflickr.com",
+        "flickr.com",
+        "smugmug.com",
+        "imgur.com",
+        "i.imgur.com",
+        "upload.wikimedia.org",
+        "cdn.britannica.com",
+    ];
+    for (const d of good) {
+        if (host === d || host.endsWith(`.${d}`)) return 35;
+    }
+
+    const bad = [
+        "pinterest.com",
+        "pinimg.com",
+        "instagram.com",
+        "cdninstagram.com",
+        "facebook.com",
+        "fbcdn.net",
+        "twitter.com",
+        "twimg.com",
+        "tiktok.com",
+        "tiktokcdn.com",
+        "gettyimages.com",
+        "googleusercontent.com",
+        "shutterstock.com",
+        "istockphoto.com",
+        "alamy.com",
+        "dreamstime.com",
+        "depositphotos.com",
+    ];
+    for (const d of bad) {
+        if (host === d || host.endsWith(`.${d}`)) return -80;
+    }
+
+    return 0;
+}
+
 function scoreBraveCandidate(c, { preferPhotos }) {
     let score = 0;
     const t = String(c?.title ?? "").toLowerCase();
     const type = String(c?.type ?? "").toLowerCase();
 
-    if (type.includes("jpeg") || type.includes("jpg")) score += preferPhotos ? 60 : 40;
-    if (type.includes("webp")) score += preferPhotos ? 55 : 35;
-    if (type.includes("png")) score += 25;
-    if (type.includes("svg")) score -= preferPhotos ? 50 : 10;
-    if (type.includes("gif")) score -= 25;
+    const imgHost = safeHost(c?.imageUrl);
+    const srcHost = safeHost(c?.sourceUrl);
+    const ext = urlExt(c?.imageUrl);
 
-    const bad = ["logo", "icon", "diagram", "map", "flag", "vector", "svg", "clipart", "infographic"];
-    for (const w of bad) if (t.includes(w)) score -= 30;
+    score += domainScore(imgHost);
+    if (srcHost && srcHost === imgHost) score += 5;
+
+    const kind = type || ext;
+    if (kind.includes("jpeg") || kind.includes("jpg")) score += preferPhotos ? 70 : 50;
+    if (kind.includes("webp")) score += preferPhotos ? 65 : 45;
+    if (kind.includes("png")) score += preferPhotos ? 35 : 35;
+    if (kind.includes("svg")) score -= preferPhotos ? 60 : 10;
+    if (kind.includes("gif")) score -= 30;
+
+    if (!ext) score -= 12;
+    if (String(c?.imageUrl ?? "").includes("?")) score -= 4;
+
+    const stocky = ["getty", "shutterstock", "alamy", "istock", "depositphotos", "dreamstime", "stock photo", "stock image"];
+    for (const w2 of stocky) if (t.includes(w2)) score -= 40;
+
+    const bad = [
+        "logo",
+        "icon",
+        "diagram",
+        "map",
+        "flag",
+        "vector",
+        "svg",
+        "clipart",
+        "infographic",
+        "schematic",
+        "chart",
+        "graph",
+        "symbol",
+        "seal",
+        "coat of arms",
+    ];
+    for (const wBad of bad) if (t.includes(wBad)) score -= 30;
+
+    const good = ["dsc", "img_", "pict", "photo", "photograph", "jpg", "jpeg"];
+    for (const wGood of good) if (t.includes(wGood)) score += 6;
 
     const w = typeof c?.width === "number" ? c.width : 0;
     const h = typeof c?.height === "number" ? c.height : 0;
     if (w && h) {
-        if (w < 500 || h < 500) score -= 25;
+        if (w < 500 || h < 500) score -= 20;
         const mp = (w * h) / 1_000_000;
-        score += Math.min(30, Math.round(mp * 4));
+        score += Math.min(25, Math.round(mp * 4));
+
+        const ar = w / h;
+        if (ar >= 0.75 && ar <= 1.6) score += 10;
+        else if (ar >= 0.6 && ar <= 2.0) score += 3;
+        else score -= 8;
+    } else {
+        score -= 6;
     }
+
+    if (!c?.imageUrl) score -= 999;
 
     return score;
 }

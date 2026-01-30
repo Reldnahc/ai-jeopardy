@@ -9,7 +9,9 @@ export const gameHandlers = {
             timeToAnswer,
             boardJson,
             includeVisuals,
+            imageProvider, // NEW
         } = data;
+
         const trace = ctx.createTrace("create-game", { gameId, host });
         trace.mark("ws_received", { type: "create-game" });
 
@@ -18,26 +20,41 @@ export const gameHandlers = {
             ? true
             : Boolean(includeVisuals);
 
+        const rawProvider = String(imageProvider ?? "commons").toLowerCase();
+        const requestedProvider = rawProvider === "brave" ? "brave" : "commons";
+        //TODO
+        const canUseBrave = true;
+
+        const effectiveImageProvider =
+            effectiveIncludeVisuals
+                ? (requestedProvider === "brave" && canUseBrave ? "brave" : "commons")
+                : undefined;
+
+        trace.mark("visual_settings", {
+            usingImportedBoard,
+            includeVisuals: effectiveIncludeVisuals,
+            requestedProvider,
+            effectiveImageProvider,
+            canUseBrave,
+        });
+
         if (!ctx.games[gameId]) {
             ctx.broadcast(gameId, { type: "create-board-failed", message: "Game not found." });
             return;
         }
 
-        // Host-only
         if (!ctx.isHostSocket(ctx.games[gameId], ws)) {
             ws.send(JSON.stringify({ type: "error", message: "Only the host can start the game." }));
             ctx.sendLobbySnapshot(ws, gameId);
             return;
         }
 
-        // Always show loading UI briefly
         ctx.broadcast(gameId, { type: "trigger-loading" });
 
         let boardData = null;
 
         try {
             if (typeof boardJson === "string" && boardJson.trim().length > 0) {
-                // IMPORT FLOW
                 const imported = ctx.parseBoardJson(boardJson);
                 const v = ctx.validateImportedBoardData(imported);
                 if (!v.ok) {
@@ -47,37 +64,42 @@ export const gameHandlers = {
                 }
                 boardData = imported;
             } else {
-                // AI FLOW
                 ctx.games[gameId].isGenerating = true;
                 trace.mark("createBoardData_start");
+
                 boardData = await ctx.createBoardData(categories, selectedModel, host, {
                     includeVisuals: effectiveIncludeVisuals,
+                    imageProvider: effectiveImageProvider, // NEW
                     maxVisualCluesPerCategory: 2,
                     trace,
                 });
+
                 trace.mark("createBoardData_end");
             }
         } catch (e) {
             console.error("[Server] create-game failed:", e);
-            ctx.broadcast(gameId, { type: 'create-board-failed', message: 'Invalid board JSON or generation failed.' });
+            ctx.broadcast(gameId, {
+                type: "create-board-failed",
+                message: "Invalid board JSON or generation failed.",
+            });
             ctx.games[gameId].isGenerating = false;
             return;
         }
 
         if (!ctx.games[gameId] || !boardData) {
-            console.log("error starting game: " + gameId + " board data failed to create");
-            ctx.broadcast(gameId, { type: 'create-board-failed', message: 'Board data was empty.' });
+            ctx.broadcast(gameId, {
+                type: "create-board-failed",
+                message: "Board data was empty.",
+            });
             ctx.games[gameId].isGenerating = false;
             return;
         }
 
         if (!ctx.games[gameId].inLobby) {
-            console.log("error moving from lobby to game. game already in progress.");
             ctx.games[gameId].isGenerating = false;
             return;
         }
 
-        // START GAME (same as your existing)
         ctx.games[gameId].buzzed = null;
         ctx.games[gameId].buzzerLocked = true;
         ctx.games[gameId].buzzLockouts = {};
@@ -94,12 +116,13 @@ export const gameHandlers = {
 
         trace.mark("broadcast_game_state_start");
         ctx.broadcast(gameId, {
-            type: 'start-game',
-            host: host,
+            type: "start-game",
+            host,
         });
         trace.mark("broadcast_game_state_end");
         trace.end({ success: true });
     },
+
 
     "join-game": async ({ ws, data, ctx }) => {
         const { gameId, playerName } = data;

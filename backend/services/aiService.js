@@ -218,7 +218,7 @@ async function createBoardData(categories, model, host, options = {}) {
         includeVisuals: false,
         // Choose where visual clue images come from: "commons" or "brave".
         // (For now, pick ONE; we do not combine sources.)
-        imageProvider: "brave",
+        imageProvider: "commons",
         maxVisualCluesPerCategory: 2,
         maxImageSearchTries: 6,
         commonsThumbWidth: 1600,

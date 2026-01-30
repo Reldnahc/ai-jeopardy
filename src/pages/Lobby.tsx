@@ -21,8 +21,8 @@ const Lobby: React.FC = () => {
     const [timeToBuzz, setTimeToBuzz] = useState(10);
     const [timeToAnswer, setTimeToAnswer] = useState(10);
     const [copySuccess, setCopySuccess] = useState(false);
-    const [selectedModel, setSelectedModel] = useState('gpt-5-mini'); // Default value for dropdown
-    const [includeVisuals, setIncludeVisuals] = useState(false);
+    const [selectedModel, setSelectedModel] = useState('gpt-5.2'); // Default value for dropdown
+    const [visualMode, setVisualMode] = useState<"off" | "commons" | "brave">("off");
 
     const { sendJson } = useWebSocket();
     const navigate = useNavigate();
@@ -192,7 +192,8 @@ const Lobby: React.FC = () => {
                 categories: flattenBySections(categories),
                 selectedModel: usingImportedBoard ? undefined : selectedModel,
                 boardJson: boardJson.trim() ? boardJson : undefined,
-                includeVisuals,
+                includeVisuals: visualMode !== "off",
+                imageProvider: visualMode === "off" ? undefined : (visualMode === "brave" ? "brave" : "commons"),
             });
         } catch (error) {
             console.error('Failed to generate board data:', error);
@@ -283,8 +284,8 @@ const Lobby: React.FC = () => {
                                     boardJsonError={boardJsonError}
                                     setBoardJsonError={setBoardJsonError}
                                     tryValidateBoardJson={tryValidateBoardJson}
-                                    includeVisuals={includeVisuals}
-                                    setIncludeVisuals={setIncludeVisuals}
+                                    visualMode={visualMode}
+                                    setVisualMode={setVisualMode}
                                 />
                             </motion.div>
                         )}
