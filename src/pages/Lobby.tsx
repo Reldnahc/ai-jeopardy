@@ -10,20 +10,14 @@ import {useAlert} from "../contexts/AlertContext.tsx";
 import { motion } from 'framer-motion';
 import {getUniqueCategories} from "../categories/getUniqueCategories.ts";
 import {useGameSession} from "../hooks/useGameSession.ts";
-import { useBoardJsonImport } from "../hooks/lobby/useBoardJsonImport";
-import {flattenBySections} from "../utils/lobbySections";
 import { useLobbySocketSync } from "../hooks/lobby/useLobbySocketSync";
 import {usePlayerIdentity} from "../hooks/usePlayerIdentity.ts";
 
 const Lobby: React.FC = () => {
     const location = useLocation();
     const { gameId } = useParams<{ gameId: string }>();
-    const [timeToBuzz, setTimeToBuzz] = useState(10);
-    const [timeToAnswer, setTimeToAnswer] = useState(10);
     const [copySuccess, setCopySuccess] = useState(false);
-    const [selectedModel, setSelectedModel] = useState('gpt-5.2'); // Default value for dropdown
-    const [reasoningEffort, setReasoningEffort] = useState<"off" | "low" | "medium" | "high">("off");
-    const [visualMode, setVisualMode] = useState<"off" | "commons" | "brave">("off");
+    const [boardJsonError, setBoardJsonError] = useState<string | null>(null);
 
     const { sendJson } = useWebSocket();
     const navigate = useNavigate();
@@ -35,15 +29,6 @@ const Lobby: React.FC = () => {
         gameId,
         locationStatePlayerName: location.state?.playerName,
     });
-
-    const {
-        boardJson,
-        setBoardJson,
-        boardJsonError,
-        setBoardJsonError,
-        validate: tryValidateBoardJson,
-        usingImportedBoard,
-    } = useBoardJsonImport();
 
     const {
         isSocketReady,
@@ -59,6 +44,8 @@ const Lobby: React.FC = () => {
         onPromoteHost,
         onToggleLock,
         onChangeCategory,
+        lobbySettings,
+        updateLobbySettings,
         lobbyInvalid,
     } = useLobbySocketSync({
         gameId,
@@ -101,9 +88,30 @@ const Lobby: React.FC = () => {
         });
     }, [allowLeave, isSocketReady, gameId, isHost, host, navigate, effectivePlayerName]);
 
-    const handleDropdownChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        setSelectedModel(e.target.value);
+    const tryValidateBoardJson = (raw: string): string | null => {
+        if (!raw.trim()) return null; // empty means "use AI"
+
+        try {
+            const parsed = JSON.parse(raw) as unknown;
+
+            // We only do minimal checks here because server is authoritative.
+            if (typeof parsed !== "object" || parsed === null) return "Board JSON must be an object.";
+
+            const p = parsed as any;
+            const bd = p.boardData && typeof p.boardData === "object" ? p.boardData : p;
+
+            if (!bd.firstBoard || !bd.secondBoard || !bd.finalJeopardy) {
+                return "Missing firstBoard / secondBoard / finalJeopardy.";
+            }
+
+            return null;
+        } catch {
+            return "Invalid JSON (can’t parse).";
+        }
     };
+
+    const boardJson = lobbySettings?.boardJson ?? "";
+    const usingImportedBoard = Boolean(boardJson.trim());
 
     const handleRandomizeCategory = (boardType: LobbyBoardType, index: number) => {
         if (!isSocketReady) return;
@@ -183,19 +191,10 @@ const Lobby: React.FC = () => {
             if (!isSocketReady) return;
             if (!gameId) return;
 
+            // Server authoritative: create-game only needs gameId.
             sendJson({
                 type: "create-game",
                 gameId,
-                playerKey,
-                host: profile.displayname,
-                timeToBuzz,
-                timeToAnswer,
-                categories: flattenBySections(categories),
-                selectedModel: usingImportedBoard ? undefined : selectedModel,
-                boardJson: boardJson.trim() ? boardJson : undefined,
-                includeVisuals: visualMode !== "off",
-                reasoningEffort,
-                imageProvider: visualMode === "off" ? undefined : (visualMode === "brave" ? "brave" : "commons"),
             });
         } catch (error) {
             console.error('Failed to generate board data:', error);
@@ -273,23 +272,13 @@ const Lobby: React.FC = () => {
                                 className="mt-8"
                             >
                                 <HostControls
-                                    selectedModel={selectedModel}
-                                    onModelChange={handleDropdownChange}
                                     onCreateGame={handleCreateGame}
-                                    timeToBuzz={timeToBuzz}
-                                    setTimeToBuzz={setTimeToBuzz}
-                                    timeToAnswer={timeToAnswer}
-                                    setTimeToAnswer={setTimeToAnswer}
                                     isSoloLobby={players.length <= 1}
-                                    boardJson={boardJson}
-                                    setBoardJson={setBoardJson}
                                     boardJsonError={boardJsonError}
                                     setBoardJsonError={setBoardJsonError}
                                     tryValidateBoardJson={tryValidateBoardJson}
-                                    visualMode={visualMode}
-                                    setVisualMode={setVisualMode}
-                                    reasoningEffort={reasoningEffort}
-                                    setReasoningEffort={setReasoningEffort}
+                                    lobbySettings={lobbySettings}
+                                    updateLobbySettings={updateLobbySettings}
                                 />
                             </motion.div>
                         )}

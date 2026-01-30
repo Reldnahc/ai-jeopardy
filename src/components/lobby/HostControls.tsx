@@ -1,6 +1,7 @@
 import { models } from '../../../shared/models.js';
 import { useProfile } from "../../contexts/ProfileContext.tsx";
 import React from "react";
+import type { LobbySettings } from "../../hooks/lobby/useLobbySocketSync.tsx";
 
 type ReasoningEffortSetting = "off" | "low" | "medium" | "high";
 
@@ -12,47 +13,61 @@ interface Model {
 }
 
 interface HostControlsProps {
-    selectedModel: string;
-    timeToBuzz: number;
-    timeToAnswer: number;
+    lobbySettings: LobbySettings | null;
+    updateLobbySettings: (patch: Partial<LobbySettings>) => void;
+
     isSoloLobby: boolean;
 
-    boardJson: string;
-    setBoardJson: (value: string) => void;
     boardJsonError: string | null;
     setBoardJsonError: (value: string | null) => void;
     tryValidateBoardJson: (raw: string) => string | null;
 
-    onModelChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
-    setTimeToBuzz: (time: number) => void;
-    setTimeToAnswer: (time: number) => void;
     onCreateGame: () => void;
-    visualMode: "off" | "commons" | "brave";
-    setVisualMode: (value: "off" | "commons" | "brave") => void;
-    reasoningEffort: "off" | "low" | "medium" | "high";
-    setReasoningEffort: (value: "off" | "low" | "medium" | "high") => void;
 }
 
 const HostControls: React.FC<HostControlsProps> = ({
-                                                       selectedModel,
-                                                       timeToBuzz,
-                                                       timeToAnswer,
+                                                       lobbySettings,
+                                                       updateLobbySettings,
                                                        isSoloLobby,
-                                                       boardJson,
-                                                       setBoardJson,
                                                        boardJsonError,
                                                        setBoardJsonError,
                                                        tryValidateBoardJson,
-                                                       onModelChange,
-                                                       setTimeToBuzz,
-                                                       setTimeToAnswer,
                                                        onCreateGame,
-                                                       visualMode,
-                                                       setVisualMode,
-                                                       reasoningEffort,
-                                                       setReasoningEffort,
                                                    }) => {
     const { profile } = useProfile();
+
+    // Server-authoritative settings (hydrated from lobby snapshot)
+    const selectedModel = lobbySettings?.selectedModel ?? "gpt-5.2";
+    const timeToBuzz = lobbySettings?.timeToBuzz ?? 10;
+    const timeToAnswer = lobbySettings?.timeToAnswer ?? 10;
+    const visualMode = lobbySettings?.visualMode ?? "off";
+    const reasoningEffort = lobbySettings?.reasoningEffort ?? "off";
+    const boardJson = lobbySettings?.boardJson ?? "";
+
+    const onModelChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        updateLobbySettings({ selectedModel: e.target.value });
+    };
+
+    const setTimeToBuzz = (time: number) => {
+        updateLobbySettings({ timeToBuzz: time });
+    };
+
+    const setTimeToAnswer = (time: number) => {
+        updateLobbySettings({ timeToAnswer: time });
+    };
+
+    const setVisualMode = (value: "off" | "commons" | "brave") => {
+        updateLobbySettings({ visualMode: value });
+    };
+
+    const setReasoningEffort = (value: "off" | "low" | "medium" | "high") => {
+        updateLobbySettings({ reasoningEffort: value });
+    };
+
+    const setBoardJson = (value: string) => {
+        updateLobbySettings({ boardJson: value });
+    };
+
 
     const selectedModelDef = models.find(m => m.value === selectedModel);
     const modelSupportsReasoningEffort = selectedModelDef?.supportsReasoningEffort === true;

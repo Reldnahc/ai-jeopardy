@@ -11,6 +11,15 @@ type LockedCategories = {
     finalJeopardy: boolean[];
 };
 
+export type LobbySettings = {
+    timeToBuzz: number;
+    timeToAnswer: number;
+    selectedModel: string;
+    reasoningEffort: "off" | "low" | "medium" | "high";
+    visualMode: "off" | "commons" | "brave";
+    boardJson: string;
+};
+
 type UseLobbySocketSyncArgs = {
     gameId?: string;
     playerKey: string | null;
@@ -50,6 +59,8 @@ export function useLobbySocketSync({
         secondBoard: Array(CATEGORY_SECTIONS[1].count).fill(false),
         finalJeopardy: Array(CATEGORY_SECTIONS[2].count).fill(false),
     });
+
+    const [lobbySettings, setLobbySettings] = useState<LobbySettings | null>(null);
 
     // --- outbound helpers (these stay stable and keep Lobby.tsx simple)
     const setManualLoading = useCallback((message: string) => {
@@ -99,6 +110,15 @@ export function useLobbySocketSync({
         if (!isSocketReady || !gameId) return;
         sendJson({ type: "request-lobby-state", gameId, playerKey });
     }, [isSocketReady, gameId, playerKey, sendJson]);
+
+    const updateLobbySettings = useCallback(
+        (patch: Partial<LobbySettings>) => {
+            if (!isSocketReady || !gameId) return;
+            sendJson({ type: "update-lobby-settings", gameId, patch });
+        },
+        [isSocketReady, gameId, sendJson]
+    );
+
 
     // --- join / request snapshot (moved from Lobby.tsx)
 
@@ -152,6 +172,7 @@ export function useLobbySocketSync({
                         isGenerating?: boolean;
                         lockedCategories?: LockedCategories;
                         you?: { isHost?: boolean; playerName?: string; playerKey?: string };
+                        lobbySettings?: LobbySettings | null;
                     };
 
                     setPlayers(Array.isArray(m.players) ? m.players : []);
@@ -171,6 +192,10 @@ export function useLobbySocketSync({
                             secondBoard: m.lockedCategories.secondBoard,
                             finalJeopardy: m.lockedCategories.finalJeopardy,
                         });
+                    }
+
+                    if (m.lobbySettings) {
+                        setLobbySettings(m.lobbySettings);
                     }
 
                     if (m.isGenerating) {
@@ -222,6 +247,12 @@ export function useLobbySocketSync({
                 case "categories-updated": {
                     const m = message as unknown as { categories: string[] };
                     if (Array.isArray(m.categories)) setCategories(unflattenBySections(m.categories));
+                    return;
+                }
+
+                case "lobby-settings-updated": {
+                    const m = message as unknown as { lobbySettings?: LobbySettings | null };
+                    if (m.lobbySettings) setLobbySettings(m.lobbySettings);
                     return;
                 }
 
@@ -337,5 +368,7 @@ export function useLobbySocketSync({
         onToggleLock,
         onChangeCategory,
         requestLobbyState,
+        lobbySettings,
+        updateLobbySettings,
     };
 }

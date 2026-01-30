@@ -20,6 +20,7 @@ export const buildLobbyState = (gameId, ws) => {
         categories: normalizeCategories11(game.categories),
         lockedCategories: game.lockedCategories,
         inLobby: game.inLobby,
+        lobbySettings: game.lobbySettings ?? null,
         isGenerating: Boolean(game.isGenerating),
         you: you
             ? {

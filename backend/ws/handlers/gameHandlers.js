@@ -1,29 +1,63 @@
 export const gameHandlers = {
     "create-game": async ({ ws, data, ctx }) => {
-        const {
-            gameId,
-            categories,
-            selectedModel,
-            host,
-            timeToBuzz,
-            timeToAnswer,
-            boardJson,
-            includeVisuals,
-            imageProvider,
-            reasoningEffort
-        } = data;
+        const { gameId } = data ?? {};
 
-        const trace = ctx.createTrace("create-game", { gameId, host });
+        // Use server-authoritative host name for trace context (no client spoofing)
+        const serverHost = gameId && ctx.games?.[gameId]?.host ? ctx.games[gameId].host : undefined;
+        const trace = ctx.createTrace("create-game", { gameId, host: serverHost });
         trace.mark("ws_received", { type: "create-game" });
 
-        const usingImportedBoard = Boolean(boardJson && boardJson.trim());
-        const effectiveIncludeVisuals = usingImportedBoard
-            ? true
-            : Boolean(includeVisuals);
+        if (!gameId) {
+            ws.send(JSON.stringify({ type: "error", message: "create-game missing gameId" }));
+            return;
+        }
 
-        const rawProvider = String(imageProvider ?? "commons").toLowerCase();
-        const requestedProvider = rawProvider === "brave" ? "brave" : "commons";
-        //TODO
+        if (!ctx.games[gameId]) {
+            ctx.broadcast(gameId, { type: "create-board-failed", message: "Game not found." });
+            return;
+        }
+
+        // Host-only (prevents spoofing)
+        if (!ctx.isHostSocket(ctx.games[gameId], ws)) {
+            ws.send(JSON.stringify({ type: "error", message: "Only the host can start the game." }));
+            ctx.sendLobbySnapshot(ws, gameId);
+            return;
+        }
+
+        if (!ctx.games[gameId].lobbySettings) {
+            ctx.games[gameId].lobbySettings = {
+                timeToBuzz: 10,
+                timeToAnswer: 10,
+                selectedModel: "gpt-5.2",
+                reasoningEffort: "off",
+                visualMode: "off", // "off" | "commons" | "brave"
+                boardJson: "",
+            };
+        }
+
+        const s = ctx.games[gameId].lobbySettings;
+
+        const host = ctx.games[gameId].host;
+        const categories = ctx.games[gameId].categories;
+
+        const selectedModel = s.selectedModel;
+        const timeToBuzz = s.timeToBuzz;
+        const timeToAnswer = s.timeToAnswer;
+        const reasoningEffort = s.reasoningEffort;
+
+        const boardJson = typeof s.boardJson === "string" ? s.boardJson : "";
+        const usingImportedBoard = Boolean(boardJson && boardJson.trim());
+
+        // Visual policy:
+        // - If importing board JSON => visuals always enabled, provider forced to "commons"
+        // - Otherwise => visualMode controls includeVisuals + provider
+        const visualMode = s.visualMode;
+        const effectiveIncludeVisuals = usingImportedBoard ? true : (visualMode !== "off");
+
+        // Provider selection (server authoritative)
+        const requestedProvider = visualMode === "brave" ? "brave" : "commons";
+
+        // TODO: replace with real server-side entitlement check
         const canUseBrave = true;
 
         const effectiveImageProvider =
@@ -37,16 +71,12 @@ export const gameHandlers = {
             requestedProvider,
             effectiveImageProvider,
             canUseBrave,
+            visualMode,
         });
 
-        if (!ctx.games[gameId]) {
-            ctx.broadcast(gameId, { type: "create-board-failed", message: "Game not found." });
-            return;
-        }
-
-        if (!ctx.isHostSocket(ctx.games[gameId], ws)) {
-            ws.send(JSON.stringify({ type: "error", message: "Only the host can start the game." }));
-            ctx.sendLobbySnapshot(ws, gameId);
+        // Optional: if lobby not active, refuse (prevents double-starts)
+        if (!ctx.games[gameId].inLobby) {
+            ws.send(JSON.stringify({ type: "error", message: "Game has already started." }));
             return;
         }
 
@@ -55,7 +85,7 @@ export const gameHandlers = {
         let boardData = null;
 
         try {
-            if (typeof boardJson === "string" && boardJson.trim().length > 0) {
+            if (usingImportedBoard) {
                 const imported = ctx.parseBoardJson(boardJson);
                 const v = ctx.validateImportedBoardData(imported);
                 if (!v.ok) {
@@ -70,9 +100,9 @@ export const gameHandlers = {
 
                 boardData = await ctx.createBoardData(categories, selectedModel, host, {
                     includeVisuals: effectiveIncludeVisuals,
-                    imageProvider: effectiveImageProvider, // NEW
+                    imageProvider: effectiveImageProvider,
                     maxVisualCluesPerCategory: 2,
-                    reasoningEffort: reasoningEffort,
+                    reasoningEffort,
                     trace,
                 });
 
@@ -97,11 +127,13 @@ export const gameHandlers = {
             return;
         }
 
+        // If lobby flipped during generation, just abort cleanly
         if (!ctx.games[gameId].inLobby) {
             ctx.games[gameId].isGenerating = false;
             return;
         }
 
+        // ✅ Start game: server is the source of truth for all state below
         ctx.games[gameId].buzzed = null;
         ctx.games[gameId].buzzerLocked = true;
         ctx.games[gameId].buzzLockouts = {};
@@ -119,11 +151,12 @@ export const gameHandlers = {
         trace.mark("broadcast_game_state_start");
         ctx.broadcast(gameId, {
             type: "start-game",
-            host,
+            host, // server host
         });
         trace.mark("broadcast_game_state_end");
         trace.end({ success: true });
     },
+
 
 
     "join-game": async ({ ws, data, ctx }) => {
