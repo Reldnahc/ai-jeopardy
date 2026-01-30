@@ -228,7 +228,7 @@ export function useLobbySocketSync({
 
                 case "trigger-loading": {
                     setIsLoading(true);
-                    setLoadingMessage("Generating your questions");
+                    setLoadingMessage("Generating your questions...");
                     return;
                 }
 
