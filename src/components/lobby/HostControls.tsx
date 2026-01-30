@@ -59,7 +59,12 @@ const HostControls: React.FC<HostControlsProps> = ({
 
     const usingImportedBoard = boardJson.trim().length > 0;
 
-    const canUseBrave = profile?.role === "admin";
+    const canUseBrave = profile?.role === "admin" || profile?.role === "privileged";
+
+    const isReasoningLevelLocked = (level: ReasoningEffortSetting) => {
+        if (level === "off" || level === "low") return false;
+        return !(profile?.role === "admin" || profile?.role === "privileged");
+    };
 
     // Group the models by price
     const groupedModels = models.reduce((groups, model) => {
@@ -280,21 +285,28 @@ const HostControls: React.FC<HostControlsProps> = ({
                                     <div className="flex flex-col gap-2 mt-4 pt-3 border-t border-gray-100">
                                         <label className="text-sm font-medium text-gray-700">Reasoning Effort</label>
 
-                                        <div className="flex p-1 bg-gray-100 rounded-lg w-full">
-                                            {(["off", "low", "medium", "high"] as ReasoningEffortSetting[]).map((level) => (
-                                                <button
-                                                    key={level}
-                                                    type="button"
-                                                    onClick={() => setReasoningEffort(level)}
-                                                    className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all duration-200 ${
-                                                        reasoningEffort === level
-                                                            ? "bg-white text-blue-600 shadow-sm"
-                                                            : "text-gray-500 hover:text-gray-700"
-                                                    }`}
-                                                >
-                                                    {level.charAt(0).toUpperCase() + level.slice(1)}
-                                                </button>
-                                            ))}
+                                        <div className="flex p-1 bg-gray-100 rounded-lg w-full gap-1">
+                                            {(["off", "low", "medium", "high"] as ReasoningEffortSetting[]).map((level) => {
+                                                const locked = isReasoningLevelLocked(level);
+                                                return (
+                                                    <button
+                                                        key={level}
+                                                        type="button"
+                                                        disabled={locked}
+                                                        onClick={() => setReasoningEffort(level)}
+                                                        className={`flex-1 py-1.5 text-[10px] font-medium rounded-md transition-all duration-200 flex flex-col items-center justify-center ${
+                                                            reasoningEffort === level
+                                                                ? "bg-white text-blue-600 shadow-sm"
+                                                                : locked
+                                                                    ? "text-gray-400 cursor-not-allowed opacity-60"
+                                                                    : "text-gray-500 hover:text-gray-700"
+                                                        }`}
+                                                    >
+                                                        <span>{level.charAt(0).toUpperCase() + level.slice(1)}</span>
+                                                        {locked && <span className="text-[8px] uppercase font-bold text-gray-400">Locked</span>}
+                                                    </button>
+                                                );
+                                            })}
                                         </div>
                                     </div>
                                 )}
