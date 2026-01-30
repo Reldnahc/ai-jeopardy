@@ -124,6 +124,9 @@ export default function Game() {
         boardDataRef.current = boardData;
     }, [boardData]);
 
+    console.log("Current boardData state:", boardData);
+    usePreloadBoardImages(boardData, Boolean(boardData));
+
     const handleBuzz = () => {
         if (!gameId) return;
         if (buzzResult || buzzLockedOut) return;
@@ -132,7 +135,6 @@ export default function Game() {
         sendJson({ type: "buzz", gameId });
     };
 
-    usePreloadBoardImages(boardData, Boolean(boardData));
 
     const onClueSelected = useCallback((clue: Clue) => {
         if (isHost && clue) {

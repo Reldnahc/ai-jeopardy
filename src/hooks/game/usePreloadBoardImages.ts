@@ -7,9 +7,13 @@ type BoardData = {
     finalJeopardy: { categories: Category[] };
 };
 
-function collectImageAssetIds(boardData: BoardData | null | undefined): string[] {
+function collectImageAssetIds(boardData: any): string[] {
     if (!boardData) return [];
 
+    // DEBUG: Log the incoming data structure to verify it matches expectations
+    console.log("[Preloader] Extracting IDs from boardData:", boardData);
+
+    // Defensive check: handle if boardData is the whole object or just an array
     const allCats: Category[] = [
         ...(boardData.firstBoard?.categories ?? []),
         ...(boardData.secondBoard?.categories ?? []),
@@ -21,21 +25,22 @@ function collectImageAssetIds(boardData: BoardData | null | undefined): string[]
     for (const cat of allCats) {
         for (const clue of cat.values ?? []) {
             const media = (clue as Clue).media;
-            if (media?.type === "image" && typeof media.assetId === "string" && media.assetId.trim()) {
-                ids.add(media.assetId);
+            if (media?.type === "image" && media.assetId?.trim()) {
+                ids.add(media.assetId.trim());
             }
         }
     }
 
+    console.log(`[Preloader] Found ${ids.size} unique image IDs.`);
     return Array.from(ids);
 }
 
 async function preloadOne(url: string, signal: AbortSignal): Promise<void> {
-    // Prefer Image() so the browser treats it as an image request and warms decode/cache.
-    await new Promise<void>((resolve) => {
+    return new Promise<void>((resolve) => {
         if (signal.aborted) return resolve();
 
         const img = new Image();
+        console.log(`[Preloader] Starting download: ${url}`);
 
         const cleanup = () => {
             img.onload = null;
@@ -44,43 +49,38 @@ async function preloadOne(url: string, signal: AbortSignal): Promise<void> {
 
         img.onload = async () => {
             cleanup();
-            // decode() makes “instant display” more reliable (image can be in cache but not decoded yet)
-            // Some browsers may throw; ignore.
             try {
-                if (typeof img.decode === "function") await img.decode();
-            } catch {
-                //ignore
+                if (typeof img.decode === "function") {
+                    await img.decode();
+                    console.log(`[Preloader] Decoded and cached: ${url}`);
+                }
+            } catch (e) {
+                console.warn(`[Preloader] Decode failed for ${url}, but image is cached.`);
             }
             resolve();
         };
 
         img.onerror = () => {
             cleanup();
-            resolve(); // don’t fail the whole preload pipeline
+            console.error(`[Preloader] Failed to load: ${url}`);
+            resolve();
         };
 
         img.src = url;
     });
 }
 
-/**
- * Preload all clue images from boardData with concurrency limiting + caching.
- * - Does NOT block render.
- * - Avoids re-downloading already requested images.
- */
 export function usePreloadBoardImages(boardData: BoardData | null | undefined, enabled: boolean) {
     const requestedRef = useRef<Set<string>>(new Set());
 
     useEffect(() => {
-        if (!enabled) return;
+        if (!enabled || !boardData) return;
 
         const ids = collectImageAssetIds(boardData);
         if (!ids.length) return;
 
         const controller = new AbortController();
         const { signal } = controller;
-
-        // Tune this. 4–8 is usually sane.
         const CONCURRENCY = 6;
 
         const queue = ids
@@ -91,7 +91,12 @@ export function usePreloadBoardImages(boardData: BoardData | null | undefined, e
                 return true;
             });
 
-        if (!queue.length) return;
+        if (!queue.length) {
+            console.log("[Preloader] All found images already requested/cached.");
+            return;
+        }
+
+        console.log(`[Preloader] Queueing ${queue.length} new images.`);
 
         let inFlight = 0;
         let index = 0;
@@ -103,7 +108,6 @@ export function usePreloadBoardImages(boardData: BoardData | null | undefined, e
                 const url = queue[index++];
                 inFlight++;
 
-                // Schedule off the critical path when possible
                 const run = () => {
                     preloadOne(url, signal).finally(() => {
                         inFlight--;
@@ -111,10 +115,7 @@ export function usePreloadBoardImages(boardData: BoardData | null | undefined, e
                     });
                 };
 
-                // requestIdleCallback helps avoid jank on slower machines.
-                // Fallback to setTimeout.
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const ric = (window as any).requestIdleCallback as undefined | ((cb: () => void) => void);
+                const ric = (window as any).requestIdleCallback;
                 if (ric) ric(run);
                 else setTimeout(run, 0);
             }
@@ -122,6 +123,9 @@ export function usePreloadBoardImages(boardData: BoardData | null | undefined, e
 
         pump();
 
-        return () => controller.abort();
+        return () => {
+            console.log("[Preloader] Aborting active preloads (component unmount or data change).");
+            controller.abort();
+        };
     }, [boardData, enabled]);
 }
