@@ -81,7 +81,7 @@ export function usePreloadBoardImages(boardData: BoardData | null | undefined, e
 
         const controller = new AbortController();
         const { signal } = controller;
-        const CONCURRENCY = 6;
+        const CONCURRENCY = 8;
 
         const queue = ids
             .map((id) => `/api/images/${id}`)
@@ -108,16 +108,11 @@ export function usePreloadBoardImages(boardData: BoardData | null | undefined, e
                 const url = queue[index++];
                 inFlight++;
 
-                const run = () => {
-                    preloadOne(url, signal).finally(() => {
-                        inFlight--;
-                        pump();
-                    });
-                };
-
-                const ric = (window as any).requestIdleCallback;
-                if (ric) ric(run);
-                else setTimeout(run, 0);
+                // Remove ric/setTimeout to start requests immediately
+                preloadOne(url, signal).finally(() => {
+                    inFlight--;
+                    pump();
+                });
             }
         };
 

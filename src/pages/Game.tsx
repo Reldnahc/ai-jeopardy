@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useRef, useState} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useLocation, useNavigate, useParams} from 'react-router-dom';
 import JeopardyBoard from '../components/game/JeopardyBoard.tsx';
 import {Clue} from "../types.ts";
@@ -124,8 +124,15 @@ export default function Game() {
         boardDataRef.current = boardData;
     }, [boardData]);
 
-    console.log("Current boardData state:", boardData);
-    usePreloadBoardImages(boardData, Boolean(boardData));
+    // Memoize the board data so the preloader doesn't reset on every re-render
+    const memoizedBoardData = useMemo(() => boardData, [
+        // Only change if the actual content (like categories length) changes
+        boardData?.firstBoard?.categories?.length,
+        boardData?.secondBoard?.categories?.length,
+        boardData?.finalJeopardy?.categories?.length
+    ]);
+
+    usePreloadBoardImages(memoizedBoardData, Boolean(memoizedBoardData));
 
     const handleBuzz = () => {
         if (!gameId) return;
