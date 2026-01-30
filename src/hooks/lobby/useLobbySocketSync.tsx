@@ -41,6 +41,7 @@ export function useLobbySocketSync({
 
     const [isLoading, setIsLoading] = useState(false);
     const [loadingMessage, setLoadingMessage] = useState("");
+    const [loadingProgress, setLoadingProgress] = useState<number | null>(null);
 
     const [players, setPlayers] = useState<Player[]>([]);
     const [host, setHost] = useState<string | null>(null);
@@ -172,6 +173,7 @@ export function useLobbySocketSync({
                         categories?: string[];
                         inLobby?: boolean;
                         isGenerating?: boolean;
+                        generationProgress?: number | null;
                         lockedCategories?: LockedCategories;
                         you?: { isHost?: boolean; playerName?: string; playerKey?: string };
                         lobbySettings?: LobbySettings | null;
@@ -203,6 +205,7 @@ export function useLobbySocketSync({
                     if (m.isGenerating) {
                         setIsLoading(true);
                         setLoadingMessage("Generating your questions...");
+                        setLoadingProgress(typeof m.generationProgress === "number" ? m.generationProgress : 0);
                         return;
                     }
 
@@ -227,6 +230,13 @@ export function useLobbySocketSync({
                             return updated;
                         });
                     }
+                    return;
+                }
+
+                case "generation-progress": {
+                    const m = message as unknown as { progress?: unknown };
+                    const p = typeof m.progress === "number" ? m.progress : 0;
+                    setLoadingProgress(Math.max(0, Math.min(1, p)));
                     return;
                 }
 
@@ -261,6 +271,7 @@ export function useLobbySocketSync({
                 case "trigger-loading": {
                     setIsLoading(true);
                     setLoadingMessage("Generating your questions...");
+                    setLoadingProgress(0);
                     return;
                 }
 
@@ -367,6 +378,7 @@ export function useLobbySocketSync({
         setManualLoading,
         clearLoading,
         loadingMessage,
+        loadingProgress,
         allowLeave,
 
         players,

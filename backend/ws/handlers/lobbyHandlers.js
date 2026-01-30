@@ -108,6 +108,15 @@ export const lobbyHandlers = {
         }
 
         ctx.broadcast(gameId, { type: "trigger-loading" });
+        ctx.games[gameId].generationDone = 0;
+        ctx.games[gameId].generationTotal = 0;
+        ctx.games[gameId].generationProgress = 0;
+        ctx.broadcast(gameId, {
+            type: "generation-progress",
+            progress: 0,
+            done: 0,
+            total: 0,
+        });
 
         let boardData = null;
 
@@ -131,7 +140,24 @@ export const lobbyHandlers = {
                     maxVisualCluesPerCategory: 2,
                     reasoningEffort,
                     trace,
+
+                    onProgress: ({ done, total, progress }) => {
+                        const g = ctx.games?.[gameId];
+                        if (!g) return;
+
+                        g.generationDone = done;
+                        g.generationTotal = total;
+                        g.generationProgress = progress;
+
+                        ctx.broadcast(gameId, {
+                            type: "generation-progress",
+                            progress,
+                            done,
+                            total,
+                        });
+                    },
                 });
+
 
                 trace.mark("createBoardData_end");
             }
@@ -142,6 +168,9 @@ export const lobbyHandlers = {
                 message: "Invalid board JSON or generation failed.",
             });
             ctx.games[gameId].isGenerating = false;
+            ctx.games[gameId].generationDone = null;
+            ctx.games[gameId].generationTotal = null;
+            ctx.games[gameId].generationProgress = null;
             return;
         }
 
@@ -151,12 +180,18 @@ export const lobbyHandlers = {
                 message: "Board data was empty.",
             });
             ctx.games[gameId].isGenerating = false;
+            ctx.games[gameId].generationDone = null;
+            ctx.games[gameId].generationTotal = null;
+            ctx.games[gameId].generationProgress = null;
             return;
         }
 
         // If lobby flipped during generation, just abort cleanly
         if (!ctx.games[gameId].inLobby) {
             ctx.games[gameId].isGenerating = false;
+            ctx.games[gameId].generationDone = null;
+            ctx.games[gameId].generationTotal = null;
+            ctx.games[gameId].generationProgress = null;
             return;
         }
 
@@ -192,6 +227,11 @@ export const lobbyHandlers = {
             assetIds,
         });
         trace.mark("broadcast_preload_images_end", { imageCount: assetIds.length });
+
+
+        if (assetIds.length === 0) {
+            ctx.broadcast(gameId, { type: "start-game" });
+        }
 
         // IMPORTANT: do NOT flip inLobby yet and do NOT broadcast start-game yet.
         // We wait until everyone acks.

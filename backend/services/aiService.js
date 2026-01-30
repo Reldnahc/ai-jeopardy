@@ -21,6 +21,17 @@ const providerApiMap = {
     anthropic: callAnthropic,
 };
 
+function clamp01(n) {
+    return Math.max(0, Math.min(1, n));
+}
+
+function plannedVisualSlots(settings) {
+    if (!settings.includeVisuals) return 0;
+    const maxPerCat = Number(settings.maxVisualCluesPerCategory ?? 0);
+    if (!Number.isFinite(maxPerCat) || maxPerCat <= 0) return 0;
+    return 10 * maxPerCat; // 5 + 5 categories
+}
+
 function callOpenAi(model, prompt, options = {}) {
     const modelDef = modelsByValue[model];
     const effort = options?.reasoningEffort;
@@ -137,13 +148,17 @@ function stripVisualWording(question) {
         .trim();
 }
 
-async function populateBoardVisuals(board, settings) {
+async function populateBoardVisuals(board, settings, progressTick) {
     if (!settings.includeVisuals) return;
 
     // Image provider is intentionally swappable: use either Commons OR Brave.
     // (Not both in one run—keep it deterministic and avoid extra cost.)
     const imageProvider = String(settings.imageProvider ?? "commons").toLowerCase();
-    const pickImageForQueries = imageProvider === "brave" ? pickBraveImageForQueries : pickCommonsImageForQueries;
+    const pickImageForQueries = imageProvider === "brave"
+        ? pickBraveImageForQueries
+        : pickCommonsImageForQueries;
+
+    const maxPerCategory = Number(settings.maxVisualCluesPerCategory ?? 0);
 
     // Only first + second boards (NO final jeopardy visuals)
     const rounds = [
@@ -154,16 +169,20 @@ async function populateBoardVisuals(board, settings) {
     for (const categories of rounds) {
         for (const cat of categories) {
             const values = Array.isArray(cat?.values) ? cat.values : [];
+
+            // We only attempt image finding for clues that have a visual spec.
             const visualClues = values
                 .filter((c) => c?.visual?.commonsSearchQueries?.length)
-                .slice(0, settings.maxVisualCluesPerCategory);
+                .slice(0, maxPerCategory);
+
+            let attemptedSlots = 0;
 
             for (const clue of visualClues) {
+                attemptedSlots += 1;
                 try {
                     const found = await pickImageForQueries(
                         clue.visual.commonsSearchQueries,
                         {
-                            // Commons may use thumbWidth; Brave ignores it safely.
                             maxQueries: settings.maxImageSearchTries,
                             searchLimit: 5,
                             preferPhotos: settings.preferPhotos,
@@ -172,12 +191,12 @@ async function populateBoardVisuals(board, settings) {
                     );
 
                     if (!found) {
-                        // Could not resolve; remove visual wording
                         clue.question = stripVisualWording(clue.question);
                         delete clue.visual;
                         continue;
                     }
 
+                    // "Caching" here is ingesting to R2 (dedupe + upload + DB)
                     const assetId = await ingestImageToR2FromUrl(
                         found.downloadUrl,
                         {
@@ -196,7 +215,17 @@ async function populateBoardVisuals(board, settings) {
                     // Fail-soft: keep clue as text
                     clue.question = stripVisualWording(clue.question);
                     delete clue.visual;
+                } finally {
+                    // ✅ One progress unit per completed visual slot attempt (success OR fail)
+                    if (typeof progressTick === "function") progressTick(1);
                 }
+            }
+
+            // ✅ Maintain stable progress: if AI provided fewer than maxPerCategory visuals,
+            // count the remainder as "skipped slots" so the bar doesn't stall.
+            const remainingSlots = Math.max(0, maxPerCategory - attemptedSlots);
+            if (remainingSlots > 0 && typeof progressTick === "function") {
+                progressTick(remainingSlots);
             }
 
             // Cleanup any remaining visual specs if they exceed maxVisualCluesPerCategory
@@ -205,6 +234,10 @@ async function populateBoardVisuals(board, settings) {
             }
         }
     }
+
+    // ✅ EXACTLY ONE "image caching complete" update.
+    // At this point, all ingestion to R2 is complete for this run.
+    if (typeof progressTick === "function") progressTick(1);
 }
 
 async function createBoardData(categories, model, host, options = {}) {
@@ -219,6 +252,7 @@ async function createBoardData(categories, model, host, options = {}) {
         reasoningEffort: "off",
         // Hint for image pickers to prefer photo-style results.
         preferPhotos: true,
+        onProgress: undefined,
         ...options,
     };
     const trace = settings.trace;
@@ -241,6 +275,28 @@ async function createBoardData(categories, model, host, options = {}) {
 
     const apiCall = providerApiMap[modelDef.provider];
     if (!apiCall) throw new Error(`No API handler for provider: ${modelDef.provider}`);
+
+    const total =
+        11 + (settings.includeVisuals ? (plannedVisualSlots(settings) + 1) : 0); // +1 for cache tick
+    let done = 0;
+
+    const report = () => {
+        const progress = total > 0 ? clamp01(done / total) : 0;
+        try {
+            settings.onProgress?.({ done, total, progress });
+        } catch {
+            // never fail generation because of progress reporting
+        }
+    };
+
+    // initial 0%
+    report();
+
+    const tick = (n = 1) => {
+        done += n;
+        if (done > total) done = total;
+        report();
+    };
 
     const valuesFor = (double) => (double ? [400, 800, 1200, 1600, 2000] : [200, 400, 600, 800, 1000]);
 
@@ -366,6 +422,9 @@ async function createBoardData(categories, model, host, options = {}) {
                 }
 
                 return json;
+            }).then((json) => {
+                tick(1);
+                return json
             })
         );
 
@@ -384,6 +443,9 @@ async function createBoardData(categories, model, host, options = {}) {
                 }
 
                 return json;
+            }).then((json) => {
+                tick(1);
+                return json
             })
         );
 
@@ -400,6 +462,9 @@ async function createBoardData(categories, model, host, options = {}) {
             }
 
             return json;
+        }).then((json) => {
+            tick(1);
+            return json
         });
 
         trace?.mark("ALL REQUESTS FIRED");
@@ -423,7 +488,7 @@ async function createBoardData(categories, model, host, options = {}) {
 
         const board = { host, model, firstBoard, secondBoard, finalJeopardy };
 
-        await populateBoardVisuals(board, settings);
+        await populateBoardVisuals(board, settings,  (n) => tick(n));
 
         void saveBoardAsync({ supabase, host, board });
 

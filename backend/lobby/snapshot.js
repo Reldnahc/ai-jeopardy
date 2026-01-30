@@ -22,6 +22,9 @@ export const buildLobbyState = (gameId, ws) => {
         inLobby: game.inLobby,
         lobbySettings: game.lobbySettings ?? null,
         isGenerating: Boolean(game.isGenerating),
+        generationProgress: typeof game.generationProgress === "number" ? game.generationProgress : null,
+        generationDone: typeof game.generationDone === "number" ? game.generationDone : null,
+        generationTotal: typeof game.generationTotal === "number" ? game.generationTotal : null,
         you: you
             ? {
                 playerName: you.name,

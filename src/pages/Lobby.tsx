@@ -35,6 +35,7 @@ const Lobby: React.FC = () => {
         isSocketReady,
         isLoading,
         loadingMessage,
+        loadingProgress,
         setManualLoading,
         allowLeave,
         players,
@@ -230,7 +231,7 @@ const Lobby: React.FC = () => {
     };
 
     return isLoading ? (
-        <LoadingScreen message={loadingMessage}/>
+        <LoadingScreen message={loadingMessage} progress={loadingProgress ?? 0} />
     ) : (
         <div className="min-h-[calc(100vh-5.5rem)] bg-gradient-to-r from-indigo-400 to-blue-700 p-6">
             <div className="bg-white rounded-xl shadow-2xl overflow-hidden w-full max-w-6xl mx-auto">
