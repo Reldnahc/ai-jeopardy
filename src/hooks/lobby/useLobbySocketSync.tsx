@@ -80,21 +80,20 @@ export function useLobbySocketSync({
 
     const onChangeCategory = useCallback(
         (boardType: LobbyBoardType, index: number, value: string) => {
+
             setCategories((prev) => {
                 const updatedBoard = [...(prev[boardType] ?? [])];
                 if (index >= 0 && index < updatedBoard.length) updatedBoard[index] = value;
-
-                const updated = { ...prev, [boardType]: updatedBoard };
-
-                if (isSocketReady && gameId) {
-                    sendJson({ type: "update-category", gameId, boardType, index, value });
-                }
-
-                return updated;
+                return { ...prev, [boardType]: updatedBoard };
             });
+
+            if (gameId) {
+                sendJson({ type: "update-category", gameId, boardType, index, value });
+            }
         },
-        [isSocketReady, gameId, sendJson]
+        [gameId, sendJson]
     );
+
 
     const requestLobbyState = useCallback(() => {
         if (!isSocketReady || !gameId) return;

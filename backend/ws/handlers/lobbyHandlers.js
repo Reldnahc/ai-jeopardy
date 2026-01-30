@@ -325,74 +325,81 @@ export const lobbyHandlers = {
     },
 
     "update-category": async ({ ws, data, ctx }) => {
-        const { gameId, boardType, index, value } = data;
+        try {
+            const { gameId, boardType, index, value } = data ?? {};
 
-        if (!ctx.games[gameId]) {
-            ws.send(JSON.stringify({
-                type: "error",
-                message: `Game ${gameId} not found while updating category.`,
-            }));
-            return;
-        }
-
-        const game = ctx.games[gameId];
-
-        const bt = boardType;
-        if (bt !== "firstBoard" && bt !== "secondBoard" && bt !== "finalJeopardy") return;
-
-        const idx = bt === "finalJeopardy" ? 0 : Number(index);
-        if (!Number.isFinite(idx)) return;
-        if ((bt === "firstBoard" || bt === "secondBoard") && (idx < 0 || idx > 4)) return;
-
-        // Enforce lock server-side (prevents bypass / stale UI)
-        if ((bt === "firstBoard" || bt === "secondBoard") && game.lockedCategories?.[bt]?.[idx]) {
-            ws.send(JSON.stringify({ type: "error", message: "That category is locked." }));
-            ctx.sendLobbySnapshot(ws, gameId);
-            return;
-        }
-        if (bt === "finalJeopardy" && game.lockedCategories?.finalJeopardy?.[0]) {
-            ws.send(JSON.stringify({ type: "error", message: "That category is locked." }));
-            ctx.sendLobbySnapshot(ws, gameId);
-            return;
-        }
-
-        game.categories = ctx.normalizeCategories11(game.categories);
-
-        // Map boardType/index -> global index in the flat 11 array
-        let globalIndex;
-        if (bt === "firstBoard") globalIndex = idx;            // 0-4
-        else if (bt === "secondBoard") globalIndex = 5 + idx;  // 5-9
-        else globalIndex = 10;                                 // 10
-
-        if (globalIndex < 0 || globalIndex > 10) return;
-
-        const nextVal = String(value ?? "").trim();
-
-        // Uniqueness across all 11 (ignore empty)
-        const norm = (s) => String(s ?? "").trim().toLowerCase();
-        const nextNorm = norm(nextVal);
-
-        if (nextNorm.length > 0) {
-            for (let i = 0; i < game.categories.length; i++) {
-                if (i === globalIndex) continue;
-                if (norm(game.categories[i]) === nextNorm) {
-                    ws.send(JSON.stringify({ type: "error", message: "Categories must be unique." }));
-                    ctx.sendLobbySnapshot(ws, gameId);
-                    return;
-                }
+            if (!gameId) {
+                ws.send(JSON.stringify({ type: "error", message: "update-category missing gameId" }));
+                return;
             }
+
+            const game = ctx.games?.[gameId];
+            if (!game) {
+                ws.send(JSON.stringify({ type: "error", message: `Game ${gameId} not found.` }));
+                return;
+            }
+
+            const bt = boardType;
+            if (bt !== "firstBoard" && bt !== "secondBoard" && bt !== "finalJeopardy") {
+                ws.send(JSON.stringify({ type: "error", message: `Invalid boardType: ${String(bt)}` }));
+                ctx.sendLobbySnapshot(ws, gameId);
+                return;
+            }
+
+            const idx = bt === "finalJeopardy" ? 0 : Number(index);
+            if (!Number.isFinite(idx)) {
+                ws.send(JSON.stringify({ type: "error", message: `Invalid index: ${String(index)}` }));
+                ctx.sendLobbySnapshot(ws, gameId);
+                return;
+            }
+
+            if ((bt === "firstBoard" || bt === "secondBoard") && (idx < 0 || idx > 4)) {
+                ws.send(JSON.stringify({ type: "error", message: `Index out of range for ${bt}.` }));
+                ctx.sendLobbySnapshot(ws, gameId);
+                return;
+            }
+
+            // Enforce lock server-side
+            if ((bt === "firstBoard" || bt === "secondBoard") && game.lockedCategories?.[bt]?.[idx]) {
+                ws.send(JSON.stringify({ type: "error", message: "That category is locked." }));
+                ctx.sendLobbySnapshot(ws, gameId);
+                return;
+            }
+            if (bt === "finalJeopardy" && game.lockedCategories?.finalJeopardy?.[0]) {
+                ws.send(JSON.stringify({ type: "error", message: "That category is locked." }));
+                ctx.sendLobbySnapshot(ws, gameId);
+                return;
+            }
+
+            // Map boardType/index -> global index in the flat 11 array
+            const globalIndex =
+                bt === "firstBoard" ? idx :
+                    bt === "secondBoard" ? 5 + idx :
+                        10;
+
+            if (!Array.isArray(game.categories) || globalIndex < 0 || globalIndex > 10) {
+                ws.send(JSON.stringify({ type: "error", message: "Server error: invalid categories state." }));
+                ctx.sendLobbySnapshot(ws, gameId);
+                return;
+            }
+
+            // Keep user intent; only strip leading whitespace
+            const nextVal = String(value ?? "").replace(/^\s+/, "");
+            game.categories[globalIndex] = nextVal;
+
+            // One short log line (optional)
+            console.log("[update-category]", gameId, bt, idx, "->", nextVal.slice(0, 60));
+
+            ctx.broadcast(gameId, {
+                type: "category-updated",
+                boardType: bt,
+                index: bt === "finalJeopardy" ? 0 : idx,
+                value: nextVal,
+            });
+        } catch (err) {
+            console.error("[update-category] crash", err);
+            ws.send(JSON.stringify({ type: "error", message: "Server error while updating category." }));
         }
-
-        game.categories[globalIndex] = nextVal;
-
-        ctx.broadcast(gameId, {
-            type: "category-updated",
-            boardType: bt,
-            index: bt === "finalJeopardy" ? 0 : idx,
-            value: game.categories[globalIndex],
-        });
-
-        console.log(`[Server] Category updated for game ${gameId}: ${bt}[${idx}] -> ${nextVal}`);
     },
 
     "update-categories": async ({ ws, data, ctx }) => {

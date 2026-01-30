@@ -291,6 +291,7 @@ async function createBoardData(categories, model, host, options = {}) {
         - Difficulty strictly increases with value.
         - Clues are factual and unambiguous.
         - Do NOT include the category title verbatim in any clue or answer.
+        - Do NOT include the answer in the clue.
         - Clues are statements (no question marks).
         - Answers are phrased as questions and end with a ?.
         - No repeated facts/answers/phrasing.
