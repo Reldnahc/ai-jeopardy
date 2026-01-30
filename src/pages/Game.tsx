@@ -1,7 +1,7 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {useLocation, useNavigate, useParams} from 'react-router-dom';
 import JeopardyBoard from '../components/game/JeopardyBoard.tsx';
-import {Category, Clue} from "../types.ts";
+import {Clue} from "../types.ts";
 import Sidebar from "../components/game/Sidebar.tsx";
 import FinalScoreScreen from "../components/game/FinalScoreScreen.tsx";
 import {useWebSocket} from "../contexts/WebSocketContext.tsx";
@@ -10,6 +10,7 @@ import MobileSidebar from "../components/game/MobileSidebar.tsx";
 import {useGameSession} from "../hooks/useGameSession.ts";
 import {useGameSocketSync} from "../hooks/game/useGameSocketSync.ts";
 import {usePlayerIdentity} from "../hooks/usePlayerIdentity.ts";
+import {usePreloadBoardImages} from "../hooks/game/usePreloadBoardImages.ts";
 
 export default function Game() {
     const {gameId} = useParams<{ gameId: string }>();
@@ -131,6 +132,8 @@ export default function Game() {
         sendJson({ type: "buzz", gameId });
     };
 
+    usePreloadBoardImages(boardData, Boolean(boardData));
+
     const onClueSelected = useCallback((clue: Clue) => {
         if (isHost && clue) {
             if (!gameId) return;
@@ -140,33 +143,6 @@ export default function Game() {
             }
         }
     },[isHost, gameId, sendJson]);
-
-    function preloadImages(urls: string[]) {
-        urls.forEach((url) => {
-            const img = new Image();
-            img.src = url;
-        });
-    }
-
-    useEffect(() => {
-        const urls: string[] = [];
-
-        const collect = (categories?: Category[]) => {
-            categories?.forEach((cat) =>
-                cat.values.forEach((clue) => {
-                    if (clue.media?.type === "image") {
-                        urls.push(`/api/images/${clue.media.assetId}`);
-                    }
-                })
-            );
-        };
-
-        collect(boardData.firstBoard.categories);
-        collect(boardData.secondBoard.categories);
-        collect(boardData.finalJeopardy.categories);
-
-        preloadImages(urls);
-    }, [boardData]);
 
     return (
         <div
