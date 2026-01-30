@@ -104,22 +104,6 @@ function parseProviderJson(response) {
     throw new Error("Unknown AI response shape (cannot parse JSON).");
 }
 
-async function mapWithConcurrency(items, limit, mapper) {
-    const results = new Array(items.length);
-    let idx = 0;
-
-    const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
-        while (true) {
-            const i = idx++;
-            if (i >= items.length) return;
-            results[i] = await mapper(items[i], i);
-        }
-    });
-
-    await Promise.all(workers);
-    return results;
-}
-
 const saveBoardAsync = async ({ supabase, host, board }) => {
     try {
         const profileRes = await supabase
