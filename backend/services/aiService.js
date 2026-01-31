@@ -630,7 +630,82 @@ async function createBoardData(categories, model, host, options = {}) {
     }
 }
 
+// --- Fast judge for spoken answers (STT -> verdict) ---
+function normalizeJeopardyText(s) {
+    return String(s || "")
+        .toLowerCase()
+        .replace(/^\s*(what|who|where|when)\s+(is|are|was|were)\s+/i, "")
+        .replace(/^\s*(it'?s|it is|they are|that'?s|that is)\s+/i, "")
+        .replace(/[^a-z0-9\s]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+}
+
+/**
+ * Judge whether a spoken transcript matches the expected answer for a clue.
+ * Returns: { verdict: "correct"|"incorrect"|"needs_host", confidence: number, normalizedTranscript: string }
+ */
+async function judgeClueAnswerFast({ clueQuestion, expectedAnswer, transcript }) {
+    const normT = normalizeJeopardyText(transcript);
+    const normA = normalizeJeopardyText(expectedAnswer);
+
+    // Cheap fast-path: exact normalized match
+    if (normT && normA && normT === normA) {
+        return { verdict: "correct", confidence: 0.98, normalizedTranscript: normT };
+    }
+
+    const model = "gpt-4o-mini";
+
+    const prompt = `
+        You are judging a Jeopardy-style answer.
+        
+        Inputs:
+        - clue_question: the clue prompt shown to players
+        - expected_answer: canonical answer for scoring
+        - transcript: player's spoken answer (speech-to-text)
+        
+        Rules:
+        - Be lenient on articles ("a", "an", "the"), punctuation, minor paraphrases, pluralization, and common synonyms.
+        - For numbers/dates/names, allow common spoken variants.
+        - If clearly correct -> "correct"
+        - If clearly wrong -> "incorrect"
+        - If ambiguous / incomplete / uncertain -> "needs_host"
+        
+        Return STRICT JSON ONLY:
+        { "verdict": "correct"|"incorrect"|"needs_host", "confidence": 0 to 1, "normalizedTranscript": string }
+        
+        clue_question: ${JSON.stringify(String(clueQuestion || ""))}
+        expected_answer: ${JSON.stringify(String(expectedAnswer || ""))}
+        transcript: ${JSON.stringify(String(transcript || ""))}
+        normalized_transcript_hint: ${JSON.stringify(normT)}
+        normalized_answer_hint: ${JSON.stringify(normA)}
+        `;
+
+    const r = await callOpenAi(model, prompt, { reasoningEffort: "off" });
+    const content = r?.choices?.[0]?.message?.content || "{}";
+
+    let parsed;
+    try { parsed = JSON.parse(content); } catch { parsed = {}; }
+
+    const verdict = parsed?.verdict;
+    const confidence = Number(parsed?.confidence);
+    const normalizedTranscript = typeof parsed?.normalizedTranscript === "string"
+        ? parsed.normalizedTranscript
+        : normT;
+
+    if (verdict !== "correct" && verdict !== "incorrect" && verdict !== "needs_host") {
+        return { verdict: "incorrect", confidence: 0.2, normalizedTranscript };
+    }
+
+    return {
+        verdict,
+        confidence: Number.isFinite(confidence) ? Math.max(0, Math.min(1, confidence)) : 0.5,
+        normalizedTranscript,
+    };
+}
+
 export {
     createBoardData,
-    createCategoryOfTheDay
+    createCategoryOfTheDay,
+    judgeClueAnswerFast
 };

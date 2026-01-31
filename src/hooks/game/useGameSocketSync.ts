@@ -19,6 +19,43 @@ type ActiveBoard = "firstBoard" | "secondBoard" | "finalJeopardy";
 
 type SelectedClueFromServer = Clue & { isAnswerRevealed?: boolean };
 
+type AnswerCaptureStartMsg = {
+    type: "answer-capture-start";
+    gameId: string;
+    playerName: string;
+    answerSessionId: string;
+    clueKey: string;
+    durationMs: number;
+    deadlineAt: number;
+};
+
+type AnswerTranscriptMsg = {
+    type: "answer-transcript";
+    gameId: string;
+    answerSessionId: string;
+    playerName: string;
+    transcript: string;
+    isFinal: boolean;
+};
+
+type AnswerResultMsg = {
+    type: "answer-result";
+    gameId: string;
+    answerSessionId: string;
+    playerName: string;
+    transcript: string;
+    verdict: "correct" | "incorrect" | "needs_host";
+    confidence: number;
+    suggestedDelta: number;
+};
+
+type AnswerErrorMsg = {
+    type: "answer-error";
+    gameId: string;
+    answerSessionId?: string;
+    message: string;
+};
+
 type GameStateMessage = {
     type: "game-state";
     players: Player[];
@@ -80,6 +117,11 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
 
     const [narrationEnabled, setNarrationEnabled] = useState(false);
     const [ttsReady, setTtsReady] = useState<TtsReady | null>(null);
+
+    const [answerCapture, setAnswerCapture] = useState<AnswerCaptureStartMsg | null>(null);
+    const [answerTranscript, setAnswerTranscript] = useState<AnswerTranscriptMsg | null>(null);
+    const [answerResult, setAnswerResult] = useState<AnswerResultMsg | null>(null);
+    const [answerError, setAnswerError] = useState<string | null>(null);
 
     const makeRequestId = () =>
         (globalThis.crypto && "randomUUID" in globalThis.crypto)
@@ -221,6 +263,34 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
                 return;
             }
 
+            if (message.type === "answer-capture-start") {
+                const m = message as unknown as AnswerCaptureStartMsg;
+                setAnswerCapture(m);
+                setAnswerTranscript(null);
+                setAnswerResult(null);
+                setAnswerError(null);
+                return;
+            }
+
+            if (message.type === "answer-transcript") {
+                const m = message as unknown as AnswerTranscriptMsg;
+                setAnswerTranscript(m);
+                return;
+            }
+
+            if (message.type === "answer-result") {
+                const m = message as unknown as AnswerResultMsg;
+                setAnswerResult(m);
+                // keep answerCapture so UI can still show who answered; you can clear later on return-to-board
+                return;
+            }
+
+            if (message.type === "answer-error") {
+                const m = message as unknown as AnswerErrorMsg;
+                setAnswerError(String(m.message || "Answer error"));
+                return;
+            }
+
             if (message.type === "final-jeopardy") {
                 setActiveBoard("finalJeopardy");
                 setIsFinalJeopardy(true);
@@ -340,6 +410,10 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
             if (message.type === "returned-to-board") {
                 setSelectedClue(null);
                 setBuzzResult(null);
+                setAnswerCapture(null);
+                setAnswerTranscript(null);
+                setAnswerResult(null);
+                setAnswerError(null);
                 resetLocalTimerState();
                 return;
             }
@@ -456,5 +530,10 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
         narrationEnabled,
         requestTts,
         ttsReady,
+
+        answerCapture,
+        answerTranscript,
+        answerResult,
+        answerError,
     };
 }

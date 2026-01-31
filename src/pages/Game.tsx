@@ -52,6 +52,10 @@ export default function Game() {
         narrationEnabled,
         requestTts,
         ttsReady,
+        answerCapture,
+        answerTranscript,
+        answerResult,
+        answerError,
     } = useGameSocketSync({ gameId, playerName: effectivePlayerName });
 
     // Persistent WebSocket connection
@@ -69,7 +73,9 @@ export default function Game() {
     const toggleAudioMuted = useCallback(() => {
         setAudioMuted((prev) => {
             const next = !prev;
-            try { localStorage.setItem("aj_audioMuted", next ? "1" : "0"); } catch {}
+            try { localStorage.setItem("aj_audioMuted", next ? "1" : "0"); } catch {
+                //ignore
+            }
 
             if (audioRef.current) {
                 audioRef.current.muted = next;
@@ -364,6 +370,11 @@ export default function Game() {
                             buzzLockedOut={buzzLockedOut}
                             timerEndTime={timerEndTime}
                             timerDuration={timerDuration}
+                            answerCapture={answerCapture}
+                            answerTranscript={answerTranscript}
+                            answerResult={answerResult}
+                            answerError={answerError}
+                            effectivePlayerName={effectivePlayerName}
                         />
                     </>
                 )}

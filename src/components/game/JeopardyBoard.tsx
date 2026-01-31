@@ -30,12 +30,40 @@ interface JeopardyBoardProps {
 
     timerEndTime: number | null;
     timerDuration: number;
+    answerCapture: {
+        playerName: string;
+        answerSessionId: string;
+        clueKey: string;
+        durationMs: number;
+        deadlineAt: number;
+    } | null;
+
+    answerTranscript: {
+        playerName: string;
+        transcript: string;
+        isFinal: boolean;
+        answerSessionId: string;
+    } | null;
+
+    answerResult: {
+        playerName: string;
+        transcript: string;
+        verdict: "correct" | "incorrect";
+        confidence: number;
+        suggestedDelta: number;
+        answerSessionId: string;
+    } | null;
+
+    answerError: string | null;
+    effectivePlayerName: string | null;
+
 }
 
 const JeopardyBoard: React.FC<JeopardyBoardProps> =
     ({ boardData, isHost, onClueSelected, selectedClue, gameId, clearedClues, players, scores,
          currentPlayer, allWagersSubmitted, isFinalJeopardy, drawings, resetBuzzer,
-          unlockBuzzer, handleBuzz, buzzerLocked, buzzResult, buzzLockedOut, timerEndTime, timerDuration}) => {
+          unlockBuzzer, handleBuzz, buzzerLocked, buzzResult, buzzLockedOut, timerEndTime, timerDuration,
+          answerCapture, answerTranscript, answerResult, answerError, effectivePlayerName}) => {
     const [localSelectedClue, setLocalSelectedClue] = useState<Clue | null>(null);
     const [showClue, setShowClue] = useState(false);
     const [hostCanSeeAnswer, setHostCanSeeAnswer] = useState(false);
@@ -202,6 +230,11 @@ const JeopardyBoard: React.FC<JeopardyBoardProps> =
                         buzzLockedOut={buzzLockedOut}
                         timerEndTime={timerEndTime}
                         timerDuration={timerDuration}
+                        answerCapture={answerCapture}
+                        answerTranscript={answerTranscript}
+                        answerResult={answerResult}
+                        answerError={answerError}
+                        effectivePlayerName={effectivePlayerName}
                     />
                 )}
             </div>

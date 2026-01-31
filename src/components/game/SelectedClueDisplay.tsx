@@ -31,6 +31,34 @@ interface SelectedClueDisplayProps {
     buzzLockedOut: boolean;
     timerEndTime: number | null;
     timerDuration: number;
+    answerCapture: {
+        playerName: string;
+        answerSessionId: string;
+        clueKey: string;
+        durationMs: number;
+        deadlineAt: number;
+    } | null;
+
+    answerTranscript: {
+        playerName: string;
+        transcript: string;
+        isFinal: boolean;
+        answerSessionId: string;
+
+    } | null;
+
+    answerResult: {
+        playerName: string;
+        transcript: string;
+        verdict: "correct" | "incorrect";
+        confidence: number;
+        suggestedDelta: number;
+        answerSessionId: string;
+    } | null;
+
+    answerError: string | null;
+    effectivePlayerName: string | null;
+
 }
 
 const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
@@ -54,7 +82,12 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                                                                      buzzResult,
                                                                      buzzLockedOut,
                                                                      timerEndTime,
-                                                                     timerDuration
+                                                                     timerDuration,
+                                                                     answerCapture,
+                                                                     answerTranscript,
+                                                                     answerResult,
+                                                                     answerError,
+                                                                     effectivePlayerName
                                                                  }) => {
     const { sendJson } = useWebSocket();
     const {deviceType} = useDeviceContext();
@@ -62,6 +95,209 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
         localSelectedClue?.media?.type === "image"
             ? localSelectedClue.media.assetId
             : null;
+
+    const recorderRef = React.useRef<MediaRecorder | null>(null);
+    const chunksRef = React.useRef<BlobPart[]>([]);
+    const sentSessionRef = React.useRef<string | null>(null);
+
+    async function blobToBase64(blob: Blob): Promise<string> {
+        const ab = await blob.arrayBuffer();
+        const bytes = new Uint8Array(ab);
+        let binary = "";
+        const chunkSize = 0x8000;
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+            binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+        }
+        return btoa(binary);
+    }
+
+    function pickMimeType(): string {
+        const preferred = "audio/webm;codecs=opus";
+        if (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(preferred)) return preferred;
+        if (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported("audio/webm")) return "audio/webm";
+        return ""; // let browser pick
+    }
+    const isAnsweringPlayer =
+        !!answerCapture &&
+        !!effectivePlayerName &&
+        answerCapture.playerName === effectivePlayerName;
+
+    useEffect(() => {
+        // Only the selected player records
+        if (!answerCapture || !isAnsweringPlayer) return;
+
+        // Don’t resend for same session
+        if (sentSessionRef.current === answerCapture.answerSessionId) return;
+
+        let cancelled = false;
+
+        const start = async () => {
+            let stream: MediaStream | null = null;
+            let audioCtx: AudioContext | null = null;
+            let analyser: AnalyserNode | null = null;
+            let source: MediaStreamAudioSourceNode | null = null;
+            let vadTimer: number | null = null;
+
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true,
+                    },
+                });
+
+                const mime = pickMimeType();
+
+                chunksRef.current = [];
+                const rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+                recorderRef.current = rec;
+
+                // --- VAD setup (detect when they've spoken, then stop after silence) ---
+                const END_SILENCE_MS = 900;     // stop after this much silence *after speech*
+                const VAD_INTERVAL_MS = 80;     // how often to sample audio
+                const RMS_THRESHOLD = 0.018;    // tweak: lower = more sensitive, higher = less sensitive
+
+                audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+                source = audioCtx.createMediaStreamSource(stream);
+                analyser = audioCtx.createAnalyser();
+                analyser.fftSize = 2048;
+                source.connect(analyser);
+
+                const data = new Float32Array(analyser.fftSize);
+
+                let hasSpoken = false;
+                let lastVoiceAt = 0;
+
+                const computeRms = () => {
+                    if (!analyser) return 0;
+                    analyser.getFloatTimeDomainData(data);
+                    let sum = 0;
+                    for (let i = 0; i < data.length; i++) sum += data[i] * data[i];
+                    return Math.sqrt(sum / data.length);
+                };
+
+                const scheduleVadTick = () => {
+                    if (cancelled) return;
+                    if (!recorderRef.current) return;
+
+                    const level = computeRms();
+                    const now = Date.now();
+
+                    if (level > RMS_THRESHOLD) {
+                        hasSpoken = true;
+                        lastVoiceAt = now;
+                    }
+
+                    // Only stop early after we've heard speech, then a silence gap
+                    if (hasSpoken && now - lastVoiceAt >= END_SILENCE_MS) {
+                        try {
+                            if (rec.state !== "inactive") rec.stop();
+                        } catch {
+                            // ignore
+                        }
+                        return;
+                    }
+
+                    vadTimer = window.setTimeout(scheduleVadTick, VAD_INTERVAL_MS);
+                };
+
+                rec.ondataavailable = (e) => {
+                    if (e.data && e.data.size > 0) chunksRef.current.push(e.data);
+                };
+
+                rec.onstop = async () => {
+                    // Stop VAD timer
+                    if (vadTimer) {
+                        window.clearTimeout(vadTimer);
+                        vadTimer = null;
+                    }
+
+                    // Cleanup audio graph
+                    try { source?.disconnect(); } catch { /* ignore */ }
+                    try { analyser?.disconnect(); } catch { /* ignore */ }
+                    try { await audioCtx?.close(); } catch { /* ignore */ }
+
+                    // Stop tracks
+                    try {
+                        stream?.getTracks().forEach((t) => t.stop());
+                    } catch {
+                        // ignore
+                    }
+
+                    if (cancelled) return;
+
+                    const blob = new Blob(chunksRef.current, { type: rec.mimeType || "audio/webm" });
+                    chunksRef.current = [];
+
+                    // Mark sent now so we never duplicate
+                    sentSessionRef.current = answerCapture.answerSessionId;
+
+                    const dataBase64 = await blobToBase64(blob);
+
+                    console.log("[mic] sending", {
+                        bytes: blob.size,
+                        mime: blob.type,
+                        session: answerCapture.answerSessionId,
+                    });
+
+                    sendJson({
+                        type: "answer-audio-blob",
+                        gameId,
+                        answerSessionId: answerCapture.answerSessionId,
+                        mimeType: blob.type,
+                        dataBase64,
+                    });
+                };
+
+                // Start recording; collect chunks every 250ms
+                rec.start(250);
+
+                // Start VAD loop
+                vadTimer = window.setTimeout(scheduleVadTick, VAD_INTERVAL_MS);
+
+                // Hard stop: always stop a bit early to beat server window
+                const BUFFER_MS = 800;
+                const hardStopInMs = Math.max(500, (answerCapture.durationMs || 6500) - BUFFER_MS);
+
+                window.setTimeout(() => {
+                    try {
+                        if (rec.state !== "inactive") rec.stop();
+                    } catch {
+                        // ignore
+                    }
+                }, hardStopInMs);
+
+            } catch (err) {
+                console.error("Mic capture failed:", err);
+
+                // Cleanup if getUserMedia fails partway
+                try { stream?.getTracks().forEach((t) => t.stop()); } catch { /* ignore */ }
+                try { source?.disconnect(); } catch { /* ignore */ }
+                try { analyser?.disconnect(); } catch { /* ignore */ }
+                try { await audioCtx?.close(); } catch { /* ignore */ }
+
+                // If mic fails, do nothing — backend timeout will mark incorrect
+            }
+        };
+
+        void start();
+
+        return () => {
+            cancelled = true;
+
+            try {
+                const rec = recorderRef.current;
+                if (rec && rec.state !== "inactive") rec.stop();
+            } catch {
+                // ignore
+            }
+
+            recorderRef.current = null;
+            chunksRef.current = [];
+        };
+    }, [answerCapture, isAnsweringPlayer, gameId, sendJson]);
+
 
     useEffect(() => {
         if (localSelectedClue?.media?.type === "image") {
@@ -204,11 +440,40 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                         </div>
                     </div>
                 )}
+                    {answerCapture && !showAnswer && (
+                        <div className="mt-4 text-center">
+                            <div className="text-lg font-bold">
+                                {answerCapture.playerName} is answering…
+                            </div>
+
+                            {isAnsweringPlayer && (
+                                <div className="text-sm opacity-80 mt-1">Recording your mic now…</div>
+                            )}
+
+                            {answerTranscript && answerTranscript.answerSessionId === answerCapture.answerSessionId && (
+                                <div className="mt-2 text-base italic opacity-90">
+                                    “{answerTranscript.transcript}”
+                                </div>
+                            )}
+
+                            {answerResult && answerResult.answerSessionId === answerCapture.answerSessionId && (
+                                <div className="mt-3 text-xl font-bold">
+                                    {answerResult.verdict === "correct" ? "✅ Correct" :
+                                        answerResult.verdict === "incorrect" ? "❌ Incorrect" :
+                                            "⚠️ Host decision"}
+                                </div>
+                            )}
+
+                            {answerError && (
+                                <div className="mt-2 text-sm text-red-200">{answerError}</div>
+                            )}
+                        </div>
+                    )}
 
                 {/*!isHost &&*/ !isFinalJeopardy && !showAnswer && (
                     <button
                         onClick={handleBuzz}
-                        disabled={!!buzzResult || buzzLockedOut}
+                        disabled={!!buzzResult || buzzLockedOut || !!answerCapture}
                         style={{ fontSize: "clamp(1.5rem, 3vw, 2.5rem)" }}
 
                         className={`mt-4 px-12 py-5 rounded-xl font-bold shadow-2xl min-w-64 intext-white transition duration-300 ease-in-out ${
@@ -222,7 +487,7 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                         {buzzLockedOut ? "Locked Out" : buzzerLocked ? "Buzz Early" : "Buzz!"}
                     </button>
                 )}
-                {false &&  !showAnswer && !isFinalJeopardy && (
+                {false && isHost &&  !showAnswer && !isFinalJeopardy && (
                     <button
                         onClick={() => {
                             if (buzzerLocked) {
@@ -244,8 +509,7 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                         {buzzerLocked ? "Unlock Buzzer" : "Reset Buzzer"}
                     </button>
                 )}
-                {/* Button to reveal answer or return to board */}
-                {false && (
+                {false && isHost && (
                     <button
                         disabled={isFinalJeopardy && !drawings}
                         onClick={() => {

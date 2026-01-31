@@ -82,6 +82,11 @@ export const gameHandlers = {
             finalJeopardyStage: ctx.games[gameId].finalJeopardyStage || null,
             wagers: ctx.games[gameId].wagers || {},
             lobbySettings: ctx.games[gameId].lobbySettings || null,
+            phase: game.phase || null,
+            answeringPlayer: game.answeringPlayerKey || null,
+            answerSessionId: game.answerSessionId || null,
+            answerDeadlineAt: game.answerDeadlineAt || null,
+            answerClueKey: game.answerClueKey || null,
         }));
 
         // Notify others
@@ -202,9 +207,95 @@ export const gameHandlers = {
         game.buzzed = player.name;
         ctx.broadcast(gameId, { type: "buzz-result", playerName: player.name });
 
-        if (game.timeToAnswer !== -1) {
-            ctx.startGameTimer(gameId, game, ctx.broadcast, game.timeToAnswer, "answer");
-        }
+// Start server-authoritative answer capture session
+        const boardKey = game.activeBoard || "firstBoard";
+        const v = String(game.selectedClue?.value ?? "");
+        const q = String(game.selectedClue?.question ?? "").trim();
+        const clueKey = `${boardKey}:${v}:${q}`;
+
+        game.phase = "ANSWER_CAPTURE";
+        game.answeringPlayerKey = player.name;
+        game.answerClueKey = clueKey;
+        game.answerSessionId = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+        game.answerTranscript = null;
+        game.answerVerdict = null;
+        game.answerConfidence = null;
+
+// Clear any prior capture window
+        ctx.clearAnswerWindow(game);
+
+// Choose a fixed recording window (keep it short for latency/cost)
+        const RECORD_MS = 9000;
+        const deadlineAt = Date.now() + RECORD_MS;
+
+        ctx.broadcast(gameId, {
+            type: "answer-capture-start",
+            gameId,
+            playerName: player.name,
+            answerSessionId: game.answerSessionId,
+            clueKey,
+            durationMs: RECORD_MS,
+            deadlineAt,
+        });
+
+        // Start window timer (if it expires, we publish needs_host so the game never deadlocks)
+        ctx.startAnswerWindow(gameId, game, ctx.broadcast, RECORD_MS, () => {
+            const g = ctx.games[gameId];
+            if (!g) return;
+
+            // stale protection
+            // Allow if session matches and we haven't already processed a final result from audio.
+            if (game.phase !== "ANSWER_CAPTURE" && game.phase !== "RESULT") {
+                ws.send(JSON.stringify({
+                    type: "answer-error",
+                    gameId,
+                    answerSessionId: g.answerSessionId,
+                    message: `Not accepting answers right now (phase=${String(game.phase)})`
+                }));
+                return;
+            }
+
+            // If we already produced a transcript from audio (not timeout), don’t accept again
+            if (game.answerTranscript && game.answerTranscript.trim()) {
+                ws.send(JSON.stringify({
+                    type: "answer-error",
+                    gameId,
+                    answerSessionId: g.answerSessionId,
+                    message: "Answer already received."
+                }));
+                return;
+            }
+
+
+            g.phase = "RESULT";
+            g.answerTranscript = "";
+            g.answerVerdict = "incorrect";
+            g.answerConfidence = 0.0;
+
+            const parseValue = (val) => {
+                const n = Number(String(val || "").replace(/[^0-9]/g, ""));
+                return Number.isFinite(n) ? n : 0;
+            };
+            const clueValue = parseValue(g.selectedClue?.value);
+
+            ctx.broadcast(gameId, {
+                type: "answer-result",
+                gameId,
+                answerSessionId: g.answerSessionId,
+                playerName: g.answeringPlayerKey,
+                transcript: "",
+                verdict: "incorrect",
+                confidence: 0.0,
+                suggestedDelta: -clueValue,
+            });
+
+        });
+
+        // Keep your existing visual timer if you want (UI countdown). It won’t control logic now.
+        //TODO REIMPLEMENT UI TIMER
+        // if (game.timeToAnswer !== -1) {
+        //     ctx.startGameTimer(gameId, game, ctx.broadcast, game.timeToAnswer, "answer");
+        // }
     },
 
     "unlock-buzzer": async ({ ws, data, ctx }) => {
@@ -226,6 +317,176 @@ export const gameHandlers = {
             ctx.games[gameId].buzzerLocked = true; // Lock the buzzer
             ctx.broadcast(gameId, {type: 'buzzer-locked'}); // Notify all players
         }
+    },
+
+    "answer-audio-blob": async ({ ws, data, ctx }) => {
+        const { gameId, answerSessionId, mimeType, dataBase64 } = data || {};
+        const game = ctx.games?.[gameId];
+        if (!game) return;
+
+        //Must be in capture phase
+        if (game.phase !== "ANSWER_CAPTURE") {
+            ws.send(JSON.stringify({
+                type: "answer-error",
+                gameId,
+                answerSessionId,
+                message: `Not accepting answers right now (phase=${String(game.phase)}, buzzed=${String(game.buzzed)}, selectedClue=${Boolean(game.selectedClue)})`
+            }));
+            return;
+        }
+
+
+        // Session must match (stale protection)
+        if (!answerSessionId || answerSessionId !== game.answerSessionId) {
+            ws.send(JSON.stringify({ type: "answer-error", gameId, answerSessionId, message: "Stale or invalid answer session." }));
+            return;
+        }
+
+        // Only the selected answering player may submit audio
+        const player = game.players?.find((p) => p.id === ws.id);
+        if (!player?.name || player.name !== game.answeringPlayerKey) {
+            ws.send(JSON.stringify({ type: "answer-error", gameId, answerSessionId, message: "You are not the answering player." }));
+            return;
+        }
+
+        // Basic payload validation / size limits
+        if (typeof dataBase64 !== "string" || !dataBase64.trim()) {
+            ws.send(JSON.stringify({ type: "answer-error", gameId, answerSessionId, message: "Missing audio data." }));
+            return;
+        }
+
+        // Decode base64
+        let buf;
+        try {
+            buf = Buffer.from(dataBase64, "base64");
+        } catch {
+            ws.send(JSON.stringify({ type: "answer-error", gameId, answerSessionId, message: "Invalid base64 audio." }));
+            return;
+        }
+
+        // Hard cap: keep small to avoid WS abuse (tune later)
+        const MAX_BYTES = 2_000_000; // 2MB
+        if (buf.length > MAX_BYTES) {
+            ws.send(JSON.stringify({ type: "answer-error", gameId, answerSessionId, message: "Audio too large." }));
+            return;
+        }
+
+        // Stop the answer window (prevents timeout firing)
+        ctx.clearAnswerWindow(game);
+
+        ctx.broadcast(gameId, { type: "answer-capture-ended", gameId, answerSessionId });
+
+        // Move to judging phase
+        game.phase = "JUDGING";
+
+        // --- STT ---
+        let transcript = "";
+        try {
+            const stt = await ctx.transcribeAnswerAudio({ buffer: buf, mimeType });
+            transcript = String(stt?.text || "").trim();
+            if (!transcript) {
+                const parseValue = (val) => {
+                    const n = Number(String(val || "").replace(/[^0-9]/g, ""));
+                    return Number.isFinite(n) ? n : 0;
+                };
+                const clueValue = parseValue(game.selectedClue?.value);
+
+                game.phase = "RESULT";
+                game.answerTranscript = "";
+                game.answerVerdict = "incorrect";
+                game.answerConfidence = 0.0;
+
+                ctx.broadcast(gameId, {
+                    type: "answer-result",
+                    gameId,
+                    answerSessionId,
+                    playerName: player.name,
+                    transcript: "",
+                    verdict: "incorrect",
+                    confidence: 0.0,
+                    suggestedDelta: -clueValue,
+                });
+                return;
+            }
+        } catch (e) {
+            console.error("[answer-audio-blob] STT failed:", e?.message || e);
+            const parseValue = (val) => {
+                const n = Number(String(val || "").replace(/[^0-9]/g, ""));
+                return Number.isFinite(n) ? n : 0;
+            };
+            const clueValue = parseValue(game.selectedClue?.value);
+
+            game.phase = "RESULT";
+            game.answerTranscript = "";
+            game.answerVerdict = "incorrect";
+            game.answerConfidence = 0.0;
+
+            ctx.broadcast(gameId, {
+                type: "answer-result",
+                gameId,
+                answerSessionId,
+                playerName: player.name,
+                transcript: "",
+                verdict: "incorrect",
+                confidence: 0.0,
+                suggestedDelta: -clueValue,
+            });
+            return;
+
+        }
+
+        ctx.broadcast(gameId, {
+            type: "answer-transcript",
+            gameId,
+            answerSessionId,
+            playerName: player.name,
+            transcript,
+            isFinal: true,
+        });
+
+        // --- JUDGE ---
+        let verdict = "incorrect";
+        let confidence = 0.0;
+
+        try {
+            const expectedAnswer = String(game.selectedClue?.answer || "");
+            const clueQuestion = String(game.selectedClue?.question || "");
+            const judged = await ctx.judgeClueAnswerFast({ clueQuestion, expectedAnswer, transcript });
+
+            verdict = judged?.verdict || "needs_host";
+            confidence = Number(judged?.confidence || 0);
+        } catch (e) {
+            console.error("[answer-audio-blob] judge failed:", e?.message || e);
+            verdict = "needs_host";
+            confidence = 0.0;
+        }
+
+        // Suggest delta but do NOT mutate scores yet (keeps this ripple-free)
+        const parseValue = (val) => {
+            const n = Number(String(val || "").replace(/[^0-9]/g, ""));
+            return Number.isFinite(n) ? n : 0;
+        };
+        const clueValue = parseValue(game.selectedClue?.value);
+        const suggestedDelta =
+            verdict === "correct" ? clueValue :
+                verdict === "incorrect" ? -clueValue :
+                    0;
+
+        game.phase = "RESULT";
+        game.answerTranscript = transcript;
+        game.answerVerdict = verdict;
+        game.answerConfidence = confidence;
+
+        ctx.broadcast(gameId, {
+            type: "answer-result",
+            gameId,
+            answerSessionId,
+            playerName: player.name,
+            transcript,
+            verdict,
+            confidence,
+            suggestedDelta,
+        });
     },
 
     "reset-buzzer": async ({ ws, data, ctx }) => {
@@ -338,8 +599,13 @@ export const gameHandlers = {
         const { gameId } = data;
         const game = ctx.games[gameId];
         if (!game) return;
+        if (!ctx.requireHost(game, ws)) return;
 
-        ctx.cancelAutoUnlock(game);
+        ctx.clearAnswerWindow(game);
+        game.phase = null;
+        game.answeringPlayerKey = null;
+        game.answerSessionId = null;
+        game.answerClueKey = null;
 
         if (game.selectedClue) {
             game.selectedClue.isAnswerRevealed = true;
@@ -351,8 +617,11 @@ export const gameHandlers = {
         const game = ctx.games[gameId];
         if (!game) return;
 
-        ctx.cancelAutoUnlock(game);
-
+        ctx.clearAnswerWindow(game);
+        game.phase = null;
+        game.answeringPlayerKey = null;
+        game.answerSessionId = null;
+        game.answerClueKey = null;
         game.selectedClue = null;
 
         ctx.broadcast(gameId, {

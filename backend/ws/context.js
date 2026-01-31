@@ -8,13 +8,14 @@ import { validateImportedBoardData, parseBoardJson, normalizeCategories11 } from
 import { requireHost, isHostSocket } from "../auth/hostGuard.js";
 import {getColorFromPlayerName, playerStableId} from "../services/userService.js";
 import {createTrace} from "../services/trace.js";
-import {createBoardData} from "../services/aiService.js";
+import {createBoardData, judgeClueAnswerFast} from "../services/aiService.js";
 import { getRoleForUserId, verifySupabaseAccessToken } from "../services/userService.js";
 import {checkAllFinalDrawingsSubmitted, checkAllWagersSubmitted} from "../game/finalJeopardy.js";
 import {isBoardFullyCleared, startFinalJeopardy} from "../game/stageTransition.js";
 import {getCOTD} from "../state/cotdStore.js";
 import {collectImageAssetIdsFromBoard} from "../services/imageAssetService.js";
 import { supabase } from "../config/database.js";
+import { transcribeAnswerAudio } from "../services/sttService.js";
 
 import {
     applyNewGameState,
@@ -32,6 +33,7 @@ import {
 import {ensureTtsAsset} from "../services/ttsAssetService.js";
 import {createTtsDurationService} from "../services/ttsDurationService.js";
 import {r2} from "../services/r2Client.js";
+import {clearAnswerWindow, startAnswerWindow} from "../game/answerWindow.js";
 
 export const createWsContext = (wss) => {
     const { broadcast, broadcastAll } = makeBroadcaster(wss);
@@ -136,6 +138,14 @@ export const createWsContext = (wss) => {
         isHostSocket,
         getRoleForUserId,
         verifySupabaseAccessToken,
+
+        // answer capture window
+        startAnswerWindow,
+        clearAnswerWindow,
+
+        // inference
+        transcribeAnswerAudio,
+        judgeClueAnswerFast,
 
         //create-game
         getGameOrFail,
