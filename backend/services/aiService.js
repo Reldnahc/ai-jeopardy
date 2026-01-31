@@ -6,6 +6,7 @@ import { modelsByValue } from "../../shared/models.js";
 import { pickCommonsImageForQueries } from "./commonsService.js";
 import { pickBraveImageForQueries } from "./braveImageService.js";
 import { ingestImageToR2FromUrl } from "./imageAssetService.js";
+import { ensureTtsAsset } from "./ttsAssetService.js";
 
 // Initialize AI clients
 const openai = new OpenAI();
@@ -323,6 +324,47 @@ async function createBoardData(categories, model, host, options = {}) {
     };
 
     const limitVisuals = settings.includeVisuals ? makeLimiter(2) : null;
+    const limitTts = settings.narrationEnabled ? makeLimiter(3) : null;
+
+    const ttsPromises = [];
+    const ttsIds = new Set();
+
+    const enqueueCategoryTts = (json) => {
+        if (!settings.narrationEnabled || !limitTts) return;
+
+        for (const clue of (json?.values ?? [])) {
+            const v = typeof clue?.value === "number" ? clue.value : null;
+            const q = String(clue?.question ?? "").trim();
+            if (!q) continue;
+
+            const prefix = v ? `For ${v} dollars. ` : "";
+            const text = `${prefix}${q}`.trim();
+
+            // Start the async job NOW (do not await here)
+            const p = limitTts(async () => {
+                try {
+                    const asset = await ensureTtsAsset(
+                        {
+                            text,
+                            textType: "text",
+                            voiceId: "Matthew",
+                            engine: "standard",
+                            outputFormat: "mp3",
+                        },
+                        supabase,
+                        trace
+                    );
+
+                    ttsIds.add(asset.id);
+                } catch (e) {
+                    // Don’t fail board generation if TTS has a transient issue
+                    console.error("[TTS] ensureTtsAsset failed:", e?.message ?? e);
+                }
+            });
+
+            ttsPromises.push(p);
+        }
+    };
 
     const valuesFor = (double) => (double ? [400, 800, 1200, 1600, 2000] : [200, 400, 600, 800, 1000]);
 
@@ -463,12 +505,15 @@ async function createBoardData(categories, model, host, options = {}) {
             }).then(async (json) => {
                 tick(1);
 
+                enqueueCategoryTts(json);
+
                 if (settings.includeVisuals && limitVisuals) {
                     await limitVisuals(() => populateCategoryVisuals(json, settings, (n) => tick(n)));
                 }
 
                 return json;
             })
+
         );
 
         // Fire ALL Double categories immediately
@@ -488,6 +533,8 @@ async function createBoardData(categories, model, host, options = {}) {
                 return json;
             }).then(async (json) => {
                 tick(1);
+
+                enqueueCategoryTts(json);
 
                 if (settings.includeVisuals && limitVisuals) {
                     await limitVisuals(() => populateCategoryVisuals(json, settings, (n) => tick(n)));
@@ -513,6 +560,8 @@ async function createBoardData(categories, model, host, options = {}) {
         }).then(async (json) => {
             tick(1);
 
+            enqueueCategoryTts(json);
+
             if (settings.includeVisuals && limitVisuals) {
                 await limitVisuals(() => populateCategoryVisuals(json, settings, (n) => tick(n)));
             }
@@ -532,6 +581,10 @@ async function createBoardData(categories, model, host, options = {}) {
                     finalPromise,
                 ])
         );
+        console.log(ttsPromises);
+        if (settings.narrationEnabled && ttsPromises.length > 0) {
+            await timed("AWAIT ALL TTS", async () => Promise.all(ttsPromises));
+        }
 
         trace?.mark("ALL RESULTS RECEIVED");
 
@@ -547,7 +600,12 @@ async function createBoardData(categories, model, host, options = {}) {
         void saveBoardAsync({ supabase, host, board });
 
         trace?.mark("createBoardData DONE");
-        return { firstBoard, secondBoard, finalJeopardy };
+        return {
+            firstBoard,
+            secondBoard,
+            finalJeopardy,
+            ttsAssetIds: Array.from(ttsIds),
+        };
     } catch (error) {
         trace?.mark("createBoardData ERROR");
         console.error("[Server] Error generating board data:", error?.message ?? error);

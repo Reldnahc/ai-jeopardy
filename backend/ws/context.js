@@ -18,7 +18,7 @@ import { supabase } from "../config/database.js";
 
 import {
     applyNewGameState,
-    clearGenerationProgress,
+    clearGenerationProgress, ensureBoardTtsAssets,
     ensureHostOrFail,
     ensureLobbySettings, getBoardDataOrFail,
     getGameOrFail,
@@ -79,6 +79,7 @@ export const createWsContext = (wss) => {
         safeAbortGeneration,
         applyNewGameState,
         setupPreloadHandshake,
+        ensureBoardTtsAssets,
         getBoardDataOrFail,
         ensureTtsAsset,
 

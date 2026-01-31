@@ -25,12 +25,12 @@ export const attachWebSocketServer = (wss) => {
             // Log without breaking the router contract
             try {
                 const data = JSON.parse(text);
-                console.log("[WS:IN]", {
-                    socketId: ws.id,
-                    gameId: ws.gameId,
-                    type: data?.type,
-                    payload: data,
-                });
+                // console.log("[WS:IN]", {
+                //     socketId: ws.id,
+                //     gameId: ws.gameId,
+                //     type: data?.type,
+                //     payload: data,
+                // });
             } catch {
                 console.log("[WS:IN]", {
                     socketId: ws.id,
