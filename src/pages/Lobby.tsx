@@ -12,7 +12,7 @@ import {getUniqueCategories} from "../categories/getUniqueCategories.ts";
 import {useGameSession} from "../hooks/useGameSession.ts";
 import { useLobbySocketSync } from "../hooks/lobby/useLobbySocketSync";
 import {usePlayerIdentity} from "../hooks/usePlayerIdentity.ts";
-import {usePreloadImageAssetIds} from "../hooks/game/usePreloadBoardImages.ts";
+import { usePreloadAudioAssetIds, usePreloadImageAssetIds } from "../hooks/game/usePreloadBoardImages.ts";
 
 const Lobby: React.FC = () => {
     const location = useLocation();
@@ -51,6 +51,8 @@ const Lobby: React.FC = () => {
         lobbyInvalid,
         preloadAssetIds,
         isPreloadingImages,
+        preloadTtsAssetIds,
+        isPreloadingAudio
     } = useLobbySocketSync({
         gameId,
         playerKey,
@@ -66,10 +68,14 @@ const Lobby: React.FC = () => {
     }, [lobbyInvalid, navigate]);
 
     useEffect(() => {
-        // Any time a new preload request comes in, allow a new ack to be sent.
         preloadAckSentRef.current = false;
+        imagesDoneRef.current = false;
     }, [preloadAssetIds]);
 
+    useEffect(() => {
+        preloadAckSentRef.current = false;
+        audioDoneRef.current = false;
+    }, [preloadTtsAssetIds]);
 
     useEffect(() => {
         if (!gameId || !effectivePlayerName) return;
@@ -125,21 +131,37 @@ const Lobby: React.FC = () => {
 
 
     const preloadAckSentRef = useRef(false);
+    const imagesDoneRef = useRef(false);
+    const audioDoneRef = useRef(false);
 
-    usePreloadImageAssetIds(preloadAssetIds, isPreloadingImages, () => {
+    const trySendPreloadAck = () => {
         if (preloadAckSentRef.current) return;
+
+        const imagesDone = !isPreloadingImages || imagesDoneRef.current || !preloadAssetIds || preloadAssetIds.length === 0;
+        const audioDone = !isPreloadingAudio || audioDoneRef.current || !preloadTtsAssetIds || preloadTtsAssetIds.length === 0;
+
+        if (!imagesDone || !audioDone) return;
+
         preloadAckSentRef.current = true;
 
-        // Tell server we’re ready
         sendJson({
             type: "preload-done",
             gameId,
             playerName: effectivePlayerName,
             playerKey: playerKey,
         });
+    };
 
-        // keep loading UI until start-game arrives
+    usePreloadImageAssetIds(preloadAssetIds, isPreloadingImages, () => {
+        imagesDoneRef.current = true;
+        trySendPreloadAck();
     });
+
+    usePreloadAudioAssetIds(preloadTtsAssetIds, isPreloadingAudio, () => {
+        audioDoneRef.current = true;
+        trySendPreloadAck();
+    });
+
 
     const handleRandomizeCategory = (boardType: LobbyBoardType, index: number) => {
         if (!isSocketReady) return;

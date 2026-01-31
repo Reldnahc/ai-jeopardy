@@ -150,8 +150,76 @@ export function applyNewGameState({ game, boardData, timeToBuzz, timeToAnswer })
     game.finalJeopardyStage = null;
 }
 
-export function setupPreloadHandshake({ ctx, gameId, game, boardData, trace }) {
+export async function setupPreloadHandshake({ ctx, gameId, game, boardData, trace }) {
     const assetIds = ctx.collectImageAssetIdsFromBoard(boardData);
+
+    const narrationEnabled = Boolean(game?.lobbySettings?.narrationEnabled);
+    let ttsAssetIds = [];
+
+    const collectNarrationTexts = () => {
+        const texts = [];
+        const boards = [
+            boardData?.firstBoard?.categories ?? [],
+            boardData?.secondBoard?.categories ?? [],
+            boardData?.finalJeopardy?.categories ?? [],
+        ];
+
+        for (const cats of boards) {
+            for (const cat of cats) {
+                for (const clue of (cat.values ?? [])) {
+                    const v = typeof clue.value === "number" ? clue.value : null;
+                    const q = String(clue.question ?? "").trim();
+                    if (!q) continue;
+
+                    // Match your in-game narration style
+                    const prefix = v ? `For ${v} dollars. ` : "";
+                    texts.push(`${prefix}${q}`.trim());
+                }
+            }
+        }
+
+        // Dedupe texts (extra safe; you already dedupe by sha anyway)
+        return Array.from(new Set(texts));
+    };
+
+    // Create TTS assets up-front so clients can preload MP3s instantly.
+    if (narrationEnabled) {
+        const texts = collectNarrationTexts();
+
+        trace?.mark?.("tts_preload_ensure_start", { count: texts.length });
+
+        const CONCURRENCY = 3;
+        const out = [];
+        let i = 0;
+
+        const worker = async () => {
+            while (i < texts.length) {
+                const idx = i++;
+                const text = texts[idx];
+
+                const a = await ctx.ensureTtsAsset(
+                    {
+                        text,
+                        textType: "text",
+                        voiceId: "Matthew",
+                        engine: "standard",
+                        outputFormat: "mp3",
+                    },
+                    ctx.supabase,
+                    trace
+                );
+
+                out.push(a.id);
+            }
+        };
+
+        const workers = Array.from({ length: Math.min(CONCURRENCY, texts.length) }, () => worker());
+        await Promise.all(workers);
+
+        ttsAssetIds = out;
+
+        trace?.mark?.("tts_preload_ensure_end", { count: ttsAssetIds.length });
+    }
 
     // Track preload status server-side (online players only)
     const onlinePlayers = (game.players ?? []).filter((p) => p.online);
@@ -163,16 +231,26 @@ export function setupPreloadHandshake({ ctx, gameId, game, boardData, trace }) {
         createdAt: Date.now(),
     };
 
-    trace?.mark?.("broadcast_preload_images_start", { imageCount: assetIds.length });
-    ctx.broadcast(gameId, { type: "preload-images", assetIds });
-    trace?.mark?.("broadcast_preload_images_end", { imageCount: assetIds.length });
+    trace?.mark?.("broadcast_preload_images_start", {
+        imageCount: assetIds.length,
+        ttsCount: ttsAssetIds.length,
+    });
 
-    if (assetIds.length === 0) {
+    // Backwards-compatible message type; just add ttsAssetIds
+    ctx.broadcast(gameId, { type: "preload-images", assetIds, ttsAssetIds });
+
+    trace?.mark?.("broadcast_preload_images_end", {
+        imageCount: assetIds.length,
+        ttsCount: ttsAssetIds.length,
+    });
+
+    if (assetIds.length === 0 && ttsAssetIds.length === 0) {
         ctx.broadcast(gameId, { type: "start-game" });
     }
 
-    return assetIds;
+    return { assetIds, ttsAssetIds };
 }
+
 
 export async function getBoardDataOrFail({
                                              ctx,

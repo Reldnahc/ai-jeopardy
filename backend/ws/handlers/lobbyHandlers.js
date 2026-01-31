@@ -89,7 +89,7 @@ export const lobbyHandlers = {
         trace.mark("broadcast_game_state_start");
 
         // Preload workflow
-        ctx.setupPreloadHandshake({ ctx, gameId, game, boardData, trace });
+        await ctx.setupPreloadHandshake({ ctx, gameId, game, boardData, trace });
 
         // IMPORTANT: do NOT flip inLobby yet and do NOT broadcast start-game yet.
         // We wait until everyone acks.

@@ -52,6 +52,9 @@ export function useLobbySocketSync({
     const [preloadAssetIds, setPreloadAssetIds] = useState<string[] | null>(null);
     const [isPreloadingImages, setIsPreloadingImages] = useState(false);
 
+    const [preloadTtsAssetIds, setPreloadTtsAssetIds] = useState<string[] | null>(null);
+    const [isPreloadingAudio, setIsPreloadingAudio] = useState(false);
+
     const [categories, setCategories] = useState<Record<BoardType, string[]>>(() => ({
         firstBoard: Array(CATEGORY_SECTIONS[0].count).fill(""),
         secondBoard: Array(CATEGORY_SECTIONS[1].count).fill(""),
@@ -313,12 +316,16 @@ export function useLobbySocketSync({
                 }
 
                 case "preload-images": {
-                    const m = message as unknown as { assetIds?: string[] };
+                    const m = message as unknown as { assetIds?: string[]; ttsAssetIds?: string[] };
+
                     setAllowLeave(false);
 
-                    // Start client-side preload in Lobby.tsx via returned state
                     setPreloadAssetIds(Array.isArray(m.assetIds) ? m.assetIds : []);
                     setIsPreloadingImages(true);
+
+                    setPreloadTtsAssetIds(Array.isArray(m.ttsAssetIds) ? m.ttsAssetIds : []);
+                    setIsPreloadingAudio(true);
+
                     return;
                 }
 
@@ -400,6 +407,8 @@ export function useLobbySocketSync({
         lobbySettings,
         updateLobbySettings,
         preloadAssetIds,
-        isPreloadingImages
+        isPreloadingImages,
+        preloadTtsAssetIds,
+        isPreloadingAudio
     };
 }
