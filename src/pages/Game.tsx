@@ -58,6 +58,44 @@ export default function Game() {
     const { sendJson } = useWebSocket();
     const { deviceType } = useDeviceContext();
     const audioRef = useRef<HTMLAudioElement | null>(null);
+    const [audioMuted, setAudioMuted] = useState<boolean>(() => {
+        try {
+            return localStorage.getItem("aj_audioMuted") === "1";
+        } catch {
+            return false;
+        }
+    });
+
+    const toggleAudioMuted = useCallback(() => {
+        setAudioMuted((prev) => {
+            const next = !prev;
+            try {
+                localStorage.setItem("aj_audioMuted", next ? "1" : "0");
+            } catch {
+                // ignore
+            }
+
+            if (next && audioRef.current) {
+                audioRef.current.pause();
+                audioRef.current.currentTime = 0;
+            }
+
+            return next;
+        });
+    }, []);
+    const narratedKeysRef = useRef<Set<string>>(new Set());
+    const lastRequestedKeyRef = useRef<string | null>(null);
+    const prevSocketReadyRef = useRef<boolean>(false);
+
+    const clueOpenKey = useMemo(() => {
+        if (!selectedClue) return null;
+
+        const v = String(selectedClue.value);
+        const q = (selectedClue.question ?? "").trim();
+        return `${activeBoard}:${v}:${q}`;
+    }, [activeBoard, selectedClue]);
+
+
     const activeTtsRequestIdRef = useRef<string | null>(null);
     const boardDataRef = useRef(boardData);
 
@@ -107,19 +145,56 @@ export default function Game() {
     }, []);
 
     useEffect(() => {
-        if (!narrationEnabled) return;
-        if (!selectedClue) return;
+        const wasReady = prevSocketReadyRef.current;
+        const nowReady = Boolean(isSocketReady);
+        prevSocketReadyRef.current = nowReady;
 
-        // Build a simple narration string
+        if (!wasReady && nowReady) {
+            // Treat this as a (re)hydration moment.
+            lastRequestedKeyRef.current = null;
+            narratedKeysRef.current.clear();
+        }
+    }, [isSocketReady]);
+
+    useEffect(() => {
+        if (!narrationEnabled) {
+            lastRequestedKeyRef.current = null;
+            return;
+        }
+
+        if (audioMuted) {
+            lastRequestedKeyRef.current = null;
+            return;
+        }
+
+        // No clue open
+        if (!clueOpenKey || !selectedClue) {
+            lastRequestedKeyRef.current = null;
+            return;
+        }
+
+        // Prevent repeats if the selected clue object is recreated.
+        if (lastRequestedKeyRef.current === clueOpenKey) return;
+
+        // Only narrate a clue once per client session.
+        if (narratedKeysRef.current.has(clueOpenKey)) {
+            lastRequestedKeyRef.current = clueOpenKey;
+            return;
+        }
+
         const valuePart = `For ${selectedClue.value} dollars. `;
         const text = `${valuePart}${selectedClue.question ?? ""}`.trim();
         if (!text) return;
 
-        activeTtsRequestIdRef.current = requestTts({text, textType: "text", voiceId: "Matthew"});
-    }, [narrationEnabled, selectedClue, requestTts]);
+        activeTtsRequestIdRef.current = requestTts({ text, textType: "text", voiceId: "Matthew" });
+        narratedKeysRef.current.add(clueOpenKey);
+        lastRequestedKeyRef.current = clueOpenKey;
+    }, [narrationEnabled, audioMuted, clueOpenKey, selectedClue, requestTts]);
 
     useEffect(() => {
         if (!ttsReady) return;
+
+        if (audioMuted) return;
 
         // Ignore stale responses
         if (ttsReady.requestId && activeTtsRequestIdRef.current && ttsReady.requestId !== activeTtsRequestIdRef.current) {
@@ -138,7 +213,7 @@ export default function Game() {
             // autoplay policies can block play(); ignore safely
             console.debug("TTS play blocked:", e);
         }
-    }, [ttsReady]);
+    }, [ttsReady, audioMuted]);
 
     useEffect(() => {
         if (!gameId || !effectivePlayerName) return;
@@ -215,6 +290,9 @@ export default function Game() {
                     players={players}
                     scores={scores}
                     buzzResult={buzzResult}
+                    narrationEnabled={narrationEnabled}
+                    audioMuted={audioMuted}
+                    onToggleAudioMuted={toggleAudioMuted}
                     lastQuestionValue={lastQuestionValue}
                     handleScoreUpdate={handleScoreUpdate}
                     onLeaveGame={leaveGame}
@@ -226,6 +304,9 @@ export default function Game() {
                     players={players}
                     scores={scores}
                     buzzResult={buzzResult}
+                    narrationEnabled={narrationEnabled}
+                    audioMuted={audioMuted}
+                    onToggleAudioMuted={toggleAudioMuted}
                     lastQuestionValue={lastQuestionValue}
                     activeBoard={activeBoard}
                     handleScoreUpdate={handleScoreUpdate}

@@ -13,6 +13,9 @@ interface SidebarProps {
     handleScoreUpdate: (player: string, delta: number) => void;
     markAllCluesComplete: () => void;
     buzzResult: string | null;
+    narrationEnabled: boolean;
+    audioMuted: boolean;
+    onToggleAudioMuted: () => void;
     onLeaveGame: () => void;
 }
 
@@ -26,6 +29,9 @@ const Sidebar: React.FC<SidebarProps> = ({
                                              handleScoreUpdate,
                                              markAllCluesComplete,
                                              buzzResult,
+                                             narrationEnabled,
+                                             audioMuted,
+                                             onToggleAudioMuted,
                                              onLeaveGame,
                                          }) => {
 
@@ -45,21 +51,46 @@ const Sidebar: React.FC<SidebarProps> = ({
                 >
                     Leave Game
                 </button>
+
+                {narrationEnabled && (
+                    <button
+                        className={`w-full mb-3 px-4 py-2 rounded-lg font-bold flex items-center justify-center gap-2 ${audioMuted
+                            ? "bg-gray-700 text-white hover:bg-gray-800"
+                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+                        onClick={onToggleAudioMuted}
+                    >
+                        {audioMuted ? (
+                            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v8.06c1.48-.74 2.5-2.26 2.5-4.03z" />
+                                <path d="M19 12c0 2.5-1.5 4.66-3.66 5.65l.74 1.5C18.74 18.01 20.5 15.18 20.5 12s-1.76-6.01-4.42-7.15l-.74 1.5C17.5 7.34 19 9.5 19 12z" />
+                                <path d="M4 9v6h4l5 5V4L8 9H4z" />
+                                <path d="M21 3.8 19.6 2.4 2.4 19.6 3.8 21 21 3.8z" />
+                            </svg>
+                        ) : (
+                            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                <path d="M4 9v6h4l5 5V4L8 9H4z" />
+                                <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v8.06c1.48-.74 2.5-2.26 2.5-4.03z" />
+                                <path d="M19 12c0 2.5-1.5 4.66-3.66 5.65l.74 1.5C18.74 18.01 20.5 15.18 20.5 12s-1.76-6.01-4.42-7.15l-.74 1.5C17.5 7.34 19 9.5 19 12z" />
+                            </svg>
+                        )}
+                        {audioMuted ? "Unmute Narration" : "Mute Narration"}
+                    </button>
+                )}
                 <div>
                     <h2 className="text-2xl mt-3 font-extrabold bg-gradient-to-r from-[#1e88e5] via-[#3d5afe] to-[#5c6bc0] text-white px-5 py-5 rounded-lg text-center flex items-center gap-2.5 shadow-md mb-3">
                         Players
                     </h2>
                     <ul className="list-none p-0 m-0">
                         {players.map((player) => (
-                                <li
+                            <li
                                 key={player.name}
                                 className={`flex items-center p-2.5 rounded-lg mb-2 text-base shadow-sm text-blue-500 
                                 ${player.online === false ? "opacity-50" : ""}
                                 ${host === player.name
-                                        ? "bg-yellow-200 border-yellow-500 border-2"
-                                        : buzzResult === player.name
-                                            ? "bg-red-300 border-red-500 border-2"
-                                            : `bg-gray-100`}
+                                    ? "bg-yellow-200 border-yellow-500 border-2"
+                                    : buzzResult === player.name
+                                        ? "bg-red-300 border-red-500 border-2"
+                                        : `bg-gray-100`}
                                             `}
                             >
                                 <Avatar name={player.name} size="8" color={player.color} textColor={player.text_color} />

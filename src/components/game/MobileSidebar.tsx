@@ -12,6 +12,9 @@ interface MobileSidebarProps {
     lastQuestionValue: number;
     handleScoreUpdate: (player: string, delta: number) => void;
     buzzResult: string | null;
+    narrationEnabled: boolean;
+    audioMuted: boolean;
+    onToggleAudioMuted: () => void;
     onLeaveGame: () => void;
 }
 
@@ -23,6 +26,9 @@ const MobileSidebar: React.FC<MobileSidebarProps> = ({
                                                          lastQuestionValue,
                                                          handleScoreUpdate,
                                                          buzzResult,
+                                                         narrationEnabled,
+                                                         audioMuted,
+                                                         onToggleAudioMuted,
                                                          onLeaveGame
                                                      }) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -108,6 +114,28 @@ const MobileSidebar: React.FC<MobileSidebarProps> = ({
                                     ))}
                                 </ul>
                             </div>
+
+                            {narrationEnabled && (
+                                <button
+                                    className={`w-full mb-2 px-4 py-2 rounded-lg font-bold flex items-center justify-center gap-2 ${audioMuted
+                                        ? "bg-gray-800 text-white hover:bg-gray-900"
+                                        : "bg-white/90 text-gray-800 hover:bg-white"}`}
+                                    onClick={onToggleAudioMuted}
+                                >
+                                    {audioMuted ? (
+                                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                            <path d="M4 9v6h4l5 5V4L8 9H4z" />
+                                            <path d="M21 3.8 19.6 2.4 2.4 19.6 3.8 21 21 3.8z" />
+                                        </svg>
+                                    ) : (
+                                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                            <path d="M4 9v6h4l5 5V4L8 9H4z" />
+                                            <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v8.06c1.48-.74 2.5-2.26 2.5-4.03z" />
+                                        </svg>
+                                    )}
+                                    {audioMuted ? "Unmute Narration" : "Mute Narration"}
+                                </button>
+                            )}
                             <button
                                 className="w-full mb-3 px-4 py-2 rounded-lg bg-red-600 text-white font-bold hover:bg-red-700"
                                 onClick={() => {
