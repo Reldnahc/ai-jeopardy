@@ -14,6 +14,8 @@ import {checkAllFinalDrawingsSubmitted, checkAllWagersSubmitted} from "../game/f
 import {isBoardFullyCleared, startFinalJeopardy} from "../game/stageTransition.js";
 import {getCOTD} from "../state/cotdStore.js";
 import {collectImageAssetIdsFromBoard} from "../services/imageAssetService.js";
+import { supabase } from "../config/database.js";
+
 import {
     applyNewGameState,
     clearGenerationProgress,
@@ -27,6 +29,7 @@ import {
     safeAbortGeneration,
     setupPreloadHandshake
 } from "./handlers/game/createGameHelpers.js";
+import {ensureTtsAsset} from "../services/ttsAssetService.js";
 
 export const createWsContext = (wss) => {
     const { broadcast, broadcastAll } = makeBroadcaster(wss);
@@ -77,6 +80,7 @@ export const createWsContext = (wss) => {
         applyNewGameState,
         setupPreloadHandshake,
         getBoardDataOrFail,
+        ensureTtsAsset,
 
         getColorFromPlayerName,
         createTrace,
@@ -88,5 +92,6 @@ export const createWsContext = (wss) => {
         getCOTD,
         collectImageAssetIdsFromBoard,
         playerStableId,
+        supabase,
     };
 };

@@ -176,6 +176,7 @@ export const lobbyHandlers = {
                 selectedModel: "gpt-5-mini",
                 reasoningEffort: "off",
                 visualMode: "off", // "off" | "commons" | "brave"
+                narrationEnabled: false,
                 boardJson: "",
             },
             lockedCategories: {
@@ -357,6 +358,7 @@ export const lobbyHandlers = {
                     selectedModel: "gpt-5-mini",
                     reasoningEffort: "off",
                     visualMode: "off",
+                    narrationEnabled: false,
                     boardJson: "",
                 };
             }
@@ -385,6 +387,10 @@ export const lobbyHandlers = {
 
             if (typeof p.boardJson === "string") {
                 game.lobbySettings.boardJson = p.boardJson;
+            }
+
+            if (typeof p.narrationEnabled === "boolean") {
+                game.lobbySettings.narrationEnabled = p.narrationEnabled;
             }
 
             // Broadcast authoritative update to everyone

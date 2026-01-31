@@ -3,6 +3,7 @@ import { useWebSocket } from "../../contexts/WebSocketContext";
 import type { Player } from "../../types/Lobby";
 import type { Category, Clue } from "../../types";
 import type { DrawingPath } from "../../utils/drawingUtils";
+import {LobbySettings} from "../lobby/useLobbySocketSync.tsx";
 
 type BoardData = {
     firstBoard: { categories: Category[] };
@@ -31,12 +32,15 @@ type GameStateMessage = {
     timerEndTime?: number | null;
     timerDuration?: number | null;
     timerVersion?: number;
+    lobbySettings?: LobbySettings | null;
 };
 
 type UseGameSocketSyncArgs = {
     gameId?: string;
     playerName: string | null; // effectivePlayerName
 };
+
+type TtsReady = { requestId?: string; assetId: string; url: string };
 
 export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs) {
     const { isSocketReady, sendJson, subscribe } = useWebSocket();
@@ -69,6 +73,30 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
     const [wagers, setWagers] = useState<Record<string, number>>({});
     const [drawings, setDrawings] = useState<Record<string, DrawingPath[]> | null>(null);
     const [isGameOver, setIsGameOver] = useState(false);
+
+    const [narrationEnabled, setNarrationEnabled] = useState(false);
+    const [ttsReady, setTtsReady] = useState<TtsReady | null>(null);
+
+    const makeRequestId = () =>
+        (globalThis.crypto && "randomUUID" in globalThis.crypto)
+            ? globalThis.crypto.randomUUID()
+            : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+    const requestTts = useCallback((args: { text: string; textType?: "text" | "ssml"; voiceId?: string }) => {
+        if (!gameId) return null;
+
+        const requestId = makeRequestId();
+        sendJson({
+            type: "tts-ensure",
+            gameId,
+            requestId,
+            text: args.text,
+            textType: args.textType || "text",
+            voiceId: args.voiceId || "Matthew",
+        });
+
+        return requestId;
+    }, [gameId, sendJson]);
 
     const resetBuzzer = useCallback(() => {
         if (!gameId) return;
@@ -147,6 +175,7 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
                 setBoardData(m.boardData);
                 setScores(m.scores ?? {});
                 setBuzzerLocked(Boolean(m.buzzerLocked));
+                setNarrationEnabled(Boolean(m.lobbySettings?.narrationEnabled));
 
                 if (Array.isArray(m.clearedClues)) {
                     setClearedClues(new Set(m.clearedClues));
@@ -244,6 +273,23 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
                 setBuzzResult(null);
                 setBuzzerLocked(true);
                 resetLocalTimerState();
+                return;
+            }
+
+            if (message.type === "tts-ready") {
+                const m = message as unknown as { requestId?: string; assetId: string; url: string };
+                setTtsReady({ requestId: m.requestId, assetId: m.assetId, url: m.url });
+                return;
+            }
+
+            if (message.type === "tts-error") {
+                console.error(message);
+                return;
+            }
+
+            if (message.type === "lobby-settings-updated") {
+                const m = message as unknown as { lobbySettings?: { narrationEnabled?: boolean } | null };
+                setNarrationEnabled(Boolean(m.lobbySettings?.narrationEnabled));
                 return;
             }
 
@@ -402,5 +448,9 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
         markAllCluesComplete,
         updateScore,
         leaveGame,
+
+        narrationEnabled,
+        requestTts,
+        ttsReady,
     };
 }

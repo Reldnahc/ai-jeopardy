@@ -46,6 +46,19 @@ export function registerHttpRoutes(app, { distPath }) {
         }
     });
 
+    app.get("/api/image-assets/:assetId", async (req, res) => {
+        const { assetId } = req.params;
+
+        const { data, error } = await supabase
+            .from("image_assets")
+            .select("*")
+            .eq("id", assetId)
+            .single();
+
+        if (error || !data) return res.status(404).json({ error: "Not found" });
+        res.json(data);
+    });
+
     app.get("/test/image/:assetId", async (req, res) => {
         const { assetId } = req.params;
 
@@ -72,17 +85,78 @@ export function registerHttpRoutes(app, { distPath }) {
     `);
     });
 
-    app.get("/api/image-assets/:assetId", async (req, res) => {
+    // --- TTS -----------------------------------------------------------------
+
+    app.get("/api/tts/:assetId", async (req, res) => {
+        try {
+            const { assetId } = req.params;
+
+            const { data, error } = await supabase
+                .from("tts_assets")
+                .select("storage_key, content_type")
+                .eq("id", assetId)
+                .single();
+
+            if (error || !data) {
+                return res.status(404).json({ error: "TTS asset not found" });
+            }
+
+            const storageKey = data.storage_key;
+            const contentType = data.content_type || "audio/mpeg";
+
+            const cmd = new GetObjectCommand({
+                Bucket: process.env.R2_BUCKET,
+                Key: storageKey,
+            });
+
+            const obj = await r2.send(cmd);
+
+            res.setHeader("Content-Type", contentType);
+            res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+
+            obj.Body.pipe(res);
+        } catch (e) {
+            console.error("GET /api/tts/:assetId failed:", e);
+            res.status(500).json({ error: "Failed to load tts audio" });
+        }
+    });
+
+    app.get("/api/tts-assets/:assetId", async (req, res) => {
         const { assetId } = req.params;
 
         const { data, error } = await supabase
-            .from("image_assets")
+            .from("tts_assets")
             .select("*")
             .eq("id", assetId)
             .single();
 
         if (error || !data) return res.status(404).json({ error: "Not found" });
         res.json(data);
+    });
+
+    app.get("/test/tts/:assetId", async (req, res) => {
+        const { assetId } = req.params;
+
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        res.send(`
+      <!doctype html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <title>TTS Test</title>
+          <style>
+            body { font-family: system-ui, sans-serif; padding: 24px; }
+            code { background: #f3f3f3; padding: 2px 6px; border-radius: 6px; }
+          </style>
+        </head>
+        <body>
+          <h2>R2 TTS Serve Test</h2>
+          <p>assetId: <code>${assetId}</code></p>
+          <p>URL: <code>/api/tts/${assetId}</code></p>
+          <audio controls src="/api/tts/${assetId}"></audio>
+        </body>
+      </html>
+    `);
     });
 
     // --- SPA fallback --------------------------------------------------------

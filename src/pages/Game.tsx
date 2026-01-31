@@ -49,12 +49,16 @@ export default function Game() {
         markAllCluesComplete,
         resetBuzzer,
         unlockBuzzer,
+        narrationEnabled,
+        requestTts,
+        ttsReady,
     } = useGameSocketSync({ gameId, playerName: effectivePlayerName });
 
     // Persistent WebSocket connection
     const { sendJson } = useWebSocket();
     const { deviceType } = useDeviceContext();
-
+    const audioRef = useRef<HTMLAudioElement | null>(null);
+    const activeTtsRequestIdRef = useRef<string | null>(null);
     const boardDataRef = useRef(boardData);
 
     const handleScoreUpdate = (player: string, delta: number) => {
@@ -89,6 +93,52 @@ export default function Game() {
         navigate("/");
     }, [gameId, effectivePlayerName, isSocketReady, sendJson, clearSession, navigate]);
 
+    useEffect(() => {
+        audioRef.current = new Audio();
+        audioRef.current.preload = "auto";
+
+        return () => {
+            if (audioRef.current) {
+                audioRef.current.pause();
+                audioRef.current.src = "";
+                audioRef.current = null;
+            }
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!narrationEnabled) return;
+        if (!selectedClue) return;
+
+        // Build a simple narration string
+        const valuePart = `For ${selectedClue.value} dollars. `;
+        const text = `${valuePart}${selectedClue.question ?? ""}`.trim();
+        if (!text) return;
+
+        activeTtsRequestIdRef.current = requestTts({text, textType: "text", voiceId: "Matthew"});
+    }, [narrationEnabled, selectedClue, requestTts]);
+
+    useEffect(() => {
+        if (!ttsReady) return;
+
+        // Ignore stale responses
+        if (ttsReady.requestId && activeTtsRequestIdRef.current && ttsReady.requestId !== activeTtsRequestIdRef.current) {
+            return;
+        }
+
+        const a = audioRef.current;
+        if (!a) return;
+
+        try {
+            a.pause();
+            a.currentTime = 0;
+            a.src = ttsReady.url;
+            void a.play();
+        } catch (e) {
+            // autoplay policies can block play(); ignore safely
+            console.debug("TTS play blocked:", e);
+        }
+    }, [ttsReady]);
 
     useEffect(() => {
         if (!gameId || !effectivePlayerName) return;

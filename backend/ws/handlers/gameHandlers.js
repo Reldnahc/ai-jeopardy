@@ -81,6 +81,7 @@ export const gameHandlers = {
             isFinalJeopardy: Boolean(ctx.games[gameId].isFinalJeopardy),
             finalJeopardyStage: ctx.games[gameId].finalJeopardyStage || null,
             wagers: ctx.games[gameId].wagers || {},
+            lobbySettings: ctx.games[gameId].lobbySettings || null,
         }));
 
         // Notify others
@@ -482,6 +483,64 @@ export const gameHandlers = {
             if (evt) ctx.broadcast(gameId, evt);
         } else {
             console.error(`[Server] Game ID ${gameId} not found when submitting final jeopardy drawing.`);
+        }
+    },
+    "tts-ensure": async ({ ws, data, ctx }) => {
+        const { gameId, text, textType, voiceId, requestId } = data ?? {};
+
+        if (!gameId || !text || !text.trim()) return;
+
+        const game = ctx.games?.[gameId];
+        if (!game) return;
+
+        // 🔒 server-authoritative toggle
+        if (!game.lobbySettings?.narrationEnabled) {
+            ws.send(JSON.stringify({
+                type: "tts-error",
+                requestId,
+                message: "Narration disabled"
+            }));
+            return;
+        }
+
+        // Optional: per-socket rate limit
+        // if (!ctx.rateLimit(ws, "tts", 5, 60_000)) {
+        //     ws.send(JSON.stringify({
+        //         type: "tts-error",
+        //         requestId,
+        //         message: "TTS rate limit exceeded"
+        //     }));
+        //     return;
+        // }
+
+        const trace = ctx.createTrace("tts-ensure", { gameId });
+
+        try {
+            const asset = await ctx.ensureTtsAsset(
+                {
+                    text,
+                    textType: textType || "text",
+                    voiceId: voiceId || "Matthew",
+                    engine: "standard",
+                    outputFormat: "mp3",
+                },
+                ctx.supabase,
+                trace
+            );
+
+            ws.send(JSON.stringify({
+                type: "tts-ready",
+                requestId,
+                assetId: asset.id,
+                url: `/api/tts/${asset.id}`,
+            }));
+        } catch (e) {
+            console.error("tts-ensure failed:", e);
+            ws.send(JSON.stringify({
+                type: "tts-error",
+                requestId,
+                message: "Failed to generate narration"
+            }));
         }
     },
 };

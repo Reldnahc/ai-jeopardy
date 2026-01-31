@@ -17,6 +17,7 @@ export type LobbySettings = {
     selectedModel: string;
     reasoningEffort: "off" | "low" | "medium" | "high";
     visualMode: "off" | "commons" | "brave";
+    narrationEnabled: boolean,
     boardJson: string;
 };
 

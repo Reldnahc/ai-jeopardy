@@ -31,6 +31,7 @@ export function ensureLobbySettings(game) {
         selectedModel: "gpt-5-mini",
         reasoningEffort: "off",
         visualMode: "off", // "off" | "commons" | "brave"
+        narrationEnabled: false,
         boardJson: "",
     };
 
