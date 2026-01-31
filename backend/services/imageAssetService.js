@@ -7,8 +7,8 @@ import { r2 } from "./r2Client.js";
 const UA = "AI-Jeopardy/1.0";
 
 const MAX_WIDTH = 1024;   // was 1280
-const QUALITY = 70;       // was 82
-const EFFORT = 5;         // 0-6 (6 is slowest/best compression)
+const QUALITY = 50;       // was 82
+const EFFORT = 3;         // 0-6 (6 is slowest/best compression)
 
 export async function ingestImageToR2FromUrl(imageUrl, meta, supabase, trace) {
     if (!process.env.R2_BUCKET) throw new Error("Missing R2_BUCKET env var");

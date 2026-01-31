@@ -7,7 +7,7 @@ type BoardData = {
     finalJeopardy: { categories: Category[] };
 };
 
-function collectImageAssetIds(boardData: any): string[] {
+function collectImageAssetIds(boardData: BoardData): string[] {
     if (!boardData) return [];
 
     // DEBUG: Log the incoming data structure to verify it matches expectations
@@ -55,7 +55,7 @@ async function preloadOne(url: string, signal: AbortSignal): Promise<void> {
                     console.log(`[Preloader] Decoded and cached: ${url}`);
                 }
             } catch (e) {
-                console.warn(`[Preloader] Decode failed for ${url}, but image is cached.`);
+                console.warn(`[Preloader] Decode failed for ${url}, but image is cached.` + e);
             }
             resolve();
         };

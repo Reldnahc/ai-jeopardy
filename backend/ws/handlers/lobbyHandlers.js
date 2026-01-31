@@ -101,7 +101,6 @@ export const lobbyHandlers = {
             visualMode,
         });
 
-        // Optional: if lobby not active, refuse (prevents double-starts)
         if (!ctx.games[gameId].inLobby) {
             ws.send(JSON.stringify({ type: "error", message: "Game has already started." }));
             return;

@@ -79,8 +79,6 @@ async function createCategoryOfTheDay() {
     console.log("Creating new Category of the day.");
     const prompt = `
         Create a category of the day.
-        Think of as many trivia categories as you can. Randomly choose one of these categories.
-        Try not to choose the same category you have already chosen.
         create a description for the category.
         the description should be a short single sentence description of the category.
         it should be worded in a fun expressive and brief way.
@@ -216,12 +214,10 @@ async function populateBoardVisuals(board, settings, progressTick) {
                     clue.question = stripVisualWording(clue.question);
                     delete clue.visual;
                 } finally {
-                    // ✅ One progress unit per completed visual slot attempt (success OR fail)
                     if (typeof progressTick === "function") progressTick(1);
                 }
             }
 
-            // ✅ Maintain stable progress: if AI provided fewer than maxPerCategory visuals,
             // count the remainder as "skipped slots" so the bar doesn't stall.
             const remainingSlots = Math.max(0, maxPerCategory - attemptedSlots);
             if (remainingSlots > 0 && typeof progressTick === "function") {
@@ -235,7 +231,6 @@ async function populateBoardVisuals(board, settings, progressTick) {
         }
     }
 
-    // ✅ EXACTLY ONE "image caching complete" update.
     // At this point, all ingestion to R2 is complete for this run.
     if (typeof progressTick === "function") progressTick(1);
 }
@@ -277,7 +272,7 @@ async function createBoardData(categories, model, host, options = {}) {
     if (!apiCall) throw new Error(`No API handler for provider: ${modelDef.provider}`);
 
     const total =
-        11 + (settings.includeVisuals ? (plannedVisualSlots(settings) + 1) : 0); // +1 for cache tick
+        11 + (settings.includeVisuals ? (plannedVisualSlots(settings) + 2) : 0); // +1 for cache tick
     let done = 0;
 
     const report = () => {
@@ -307,10 +302,22 @@ async function createBoardData(categories, model, host, options = {}) {
             ? `
         VISUAL CLUES (optional):
         - Make up to ${settings.maxVisualCluesPerCategory} of the 5 clues visual.
-        - ONLY choose subjects very likely to have a clear file on Wikimedia Commons.
+        - It is okay and recommended to choose none. 
+        - ONLY choose subjects who are easy to find an exact picture of examples include (famous people, famous places, everyday object).
+        - Visual clues should still include a text clue. It should reference the image, but the clue should be solvable without the image.
         - If a clue is visual, add:
           "visual": { "commonsSearchQueries": ["...", "..."] }
         - No URLs.`
+            : "";
+
+        const reasoningRules = settings.reasoningEffort !== "off"
+            ? `
+        VERIFICATION STEP:
+        - Once you are finished fact check each of the questions. 
+        - Make sure that each clue and answer has proper punctuation. 
+        - Every answer needs to end with a ?.
+        - Replace anything that is not upto standard or breaks the JSON format.
+        - If you replace anything, fact check again.`
             : "";
 
         const outputSchema = settings.includeVisuals
@@ -355,10 +362,10 @@ async function createBoardData(categories, model, host, options = {}) {
         - Exactly 5 values.
         - Values must be exactly ${JSON.stringify(values)} in ascending order.
         - No markdown. No extra text. Valid JSON only.
+        
+        ${reasoningRules}
         `.trim();
-    };
-
-
+        };
 
     const finalPrompt = (category) => `
         You are a professional Jeopardy clue writer.
