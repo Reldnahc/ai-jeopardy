@@ -33,3 +33,41 @@ export async function getColorFromPlayerName(username) {
 
     return data;
 }
+
+
+export async function getRoleForUserId(userId) {
+    if (!userId) return "default";
+
+    const { data, error } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", userId)
+        .single();
+
+    if (error) {
+        console.error("[getRoleForUserId] Error:", error.message);
+        return "default";
+    }
+
+    const role = typeof data?.role === "string" ? data.role : "Default";
+    return role.toLowerCase(); // normalize: "admin" | "privileged" | "default"
+}
+
+export async function verifySupabaseAccessToken(accessToken) {
+    if (!accessToken || typeof accessToken !== "string") return null;
+
+    try {
+        // With service-role key on server, this validates the JWT and returns the user
+        const { data, error } = await supabase.auth.getUser(accessToken);
+
+        if (error) {
+            console.error("[verifySupabaseAccessToken] Invalid token:", error.message);
+            return null;
+        }
+
+        return data?.user ?? null;
+    } catch (e) {
+        console.error("[verifySupabaseAccessToken] Exception:", e);
+        return null;
+    }
+}

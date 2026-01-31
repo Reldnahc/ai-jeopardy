@@ -66,8 +66,45 @@ export const lobbyHandlers = {
 
         const host = ctx.games[gameId].host;
         const categories = ctx.games[gameId].categories;
+        const role = (ws.auth?.role ?? "default").toLowerCase();
 
         const selectedModel = s.selectedModel;
+        const m = ctx.modelsByValue[selectedModel];
+        // Unknown model? reject (prevents passing arbitrary provider/model ids)
+        if (!m) {
+            ws.send(JSON.stringify({ type: "error", message: "Unknown model selected." }));
+            ctx.sendLobbySnapshot(ws, gameId);
+            return;
+        }
+
+        // Disabled models are never allowed (server authoritative)
+        if (m.disabled) {
+            ws.send(JSON.stringify({ type: "error", message: "That model is currently disabled." }));
+            // Optional: force lobby setting back to a free default
+            ctx.games[gameId].lobbySettings.selectedModel = "gpt-5-mini";
+            ctx.sendLobbySnapshot(ws, gameId);
+            ws.send(JSON.stringify({ type: "error", message: "That model is disabled." }));
+            return;
+        }
+
+        const isPaidModel = Number(m.price ?? 0) > 0;
+
+        // If paid, require authed + privileged role
+        if (isPaidModel) {
+            const allowed = role === "admin" || role === "privileged";
+
+            if (!allowed) {
+                ws.send(JSON.stringify({
+                    type: "error",
+                    message: "Your account is not allowed to use paid models.",
+                }));
+                // Optional: force downgrade
+                ctx.games[gameId].lobbySettings.selectedModel = "gpt-5-mini";
+                ctx.sendLobbySnapshot(ws, gameId);
+                return;
+            }
+        }
+
         const timeToBuzz = s.timeToBuzz;
         const timeToAnswer = s.timeToAnswer;
         const reasoningEffort = s.reasoningEffort;
@@ -84,8 +121,7 @@ export const lobbyHandlers = {
         // Provider selection (server authoritative)
         const requestedProvider = visualMode === "brave" ? "brave" : "commons";
 
-        // TODO: replace with real server-side entitlement check
-        const canUseBrave = true;
+        const canUseBrave = role === "admin" || role === "privileged";
 
         const effectiveImageProvider =
             effectiveIncludeVisuals

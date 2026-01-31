@@ -8,6 +8,11 @@ export const attachWebSocketServer = (wss) => {
     wss.on("connection", (ws) => {
         ws.id = crypto.randomUUID();
         ws.isAlive = true;
+        ws.auth = {
+            isAuthed: false,
+            userId: null,
+            role: "default",
+        };
 
         ws.on("pong", () => {
             ws.isAlive = true;

@@ -2,6 +2,7 @@ import React, {
     createContext, useContext, useRef, useEffect, useState,
     useCallback, useMemo
 } from "react";
+import {supabase} from "../supabaseClient.ts";
 type WSMessage = { type: string; [key: string]: unknown };
 type Listener = (msg: WSMessage) => void;
 
@@ -54,6 +55,15 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         ws.onopen = () => {
             console.log("[WS] connected");
             connectingRef.current = false;
+            // Authenticate this socket with Supabase access token
+            (async () => {
+                const { data } = await supabase.auth.getSession();
+                const token = data.session?.access_token;
+                if (token) {
+                    ws.send(JSON.stringify({ type: "auth", accessToken: token }));
+                }
+            })();
+
             setIsSocketReady(true);
             flushQueue();
         };
@@ -153,6 +163,21 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             connectingRef.current = false;
         };
     }, [ensureSocket]);
+
+    useEffect(() => {
+        const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+            const ws = socketRef.current;
+            if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+            const token = session?.access_token;
+            if (token) {
+                ws.send(JSON.stringify({ type: "auth", accessToken: token }));
+            }
+        });
+
+        return () => sub.subscription.unsubscribe();
+    }, []);
+
 
     useEffect(() => {
         const interval = setInterval(() => {

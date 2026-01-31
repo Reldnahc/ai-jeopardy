@@ -6,7 +6,7 @@ export type Model = {
     provider: Provider;
     supportsReasoningEffort:? boolean;
     price: number;
-    disabled: boolean;
+    disabled?: boolean;
 };
 
 export const models: Model[];
