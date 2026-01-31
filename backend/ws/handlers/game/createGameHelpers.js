@@ -229,9 +229,14 @@ export async function setupPreloadHandshake({ ctx, gameId, game, boardData, trac
         imageAssetCount: assetIds.length,
     });
 
-    const ttsAssetIds = Array.isArray(boardData?.ttsAssetIds)
-        ? boardData.ttsAssetIds
+    const baseTts = Array.isArray(boardData?.ttsAssetIds) ? boardData.ttsAssetIds : [];
+    const extra = (game?.welcomeTtsAssetId && typeof game.welcomeTtsAssetId === "string")
+        ? [game.welcomeTtsAssetId]
         : [];
+
+    // de-dupe
+    const ttsAssetIds = Array.from(new Set([...baseTts, ...extra]));
+
 
     trace?.mark("preload_tts_collected", {
         ttsAssetCount: ttsAssetIds.length,

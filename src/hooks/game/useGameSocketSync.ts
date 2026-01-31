@@ -44,7 +44,7 @@ type AnswerResultMsg = {
     answerSessionId: string;
     playerName: string;
     transcript: string;
-    verdict: "correct" | "incorrect" | "needs_host";
+    verdict: "correct" | "incorrect";
     confidence: number;
     suggestedDelta: number;
 };
@@ -74,6 +74,11 @@ type GameStateMessage = {
     timerDuration?: number | null;
     timerVersion?: number;
     lobbySettings?: LobbySettings | null;
+    phase?: string | null;
+    selectorKey?: string | null;
+    selectorName?: string | null;
+    welcomeTtsAssetId?: string | null;
+    welcomeEndsAt?: number | null;
 };
 
 type UseGameSocketSyncArgs = {
@@ -122,6 +127,13 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
     const [answerTranscript, setAnswerTranscript] = useState<AnswerTranscriptMsg | null>(null);
     const [answerResult, setAnswerResult] = useState<AnswerResultMsg | null>(null);
     const [answerError, setAnswerError] = useState<string | null>(null);
+
+    const [phase, setPhase] = useState<string | null>(null);
+    const [selectorKey, setSelectorKey] = useState<string | null>(null);
+    const [selectorName, setSelectorName] = useState<string | null>(null);
+    const [welcomeTtsAssetId, setWelcomeTtsAssetId] = useState<string | null>(null);
+    const [welcomeEndsAt, setWelcomeEndsAt] = useState<number | null>(null);
+
 
     const makeRequestId = () =>
         (globalThis.crypto && "randomUUID" in globalThis.crypto)
@@ -222,6 +234,11 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
                 setScores(m.scores ?? {});
                 setBuzzerLocked(Boolean(m.buzzerLocked));
                 setNarrationEnabled(Boolean(m.lobbySettings?.narrationEnabled));
+                setPhase(m.phase ?? null);
+                setSelectorKey(m.selectorKey ?? null);
+                setSelectorName(m.selectorName ?? null);
+                setWelcomeTtsAssetId(m.welcomeTtsAssetId ?? null);
+                setWelcomeEndsAt(m.welcomeEndsAt ?? null);
 
                 if (Array.isArray(m.clearedClues)) {
                     setClearedClues(new Set(m.clearedClues));
@@ -306,7 +323,17 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
                 setClearedClues(new Set(m.clearedClues ?? []));
                 return;
             }
-
+            if (message.type === "phase-changed") {
+                const m = message as unknown as {
+                    phase?: string | null;
+                    selectorKey?: string | null;
+                    selectorName?: string | null;
+                };
+                setPhase(m.phase ?? null);
+                setSelectorKey(m.selectorKey ?? null);
+                setSelectorName(m.selectorName ?? null);
+                return;
+            }
             if (message.type === "all-wagers-submitted") {
                 const m = message as unknown as { wagers: Record<string, number> };
                 setAllWagersSubmitted(true);
@@ -535,5 +562,10 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
         answerTranscript,
         answerResult,
         answerError,
+        phase,
+        selectorKey,
+        selectorName,
+        welcomeTtsAssetId,
+        welcomeEndsAt,
     };
 }

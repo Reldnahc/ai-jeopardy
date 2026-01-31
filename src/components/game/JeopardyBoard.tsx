@@ -10,7 +10,7 @@ import {useAlert} from "../../contexts/AlertContext.tsx"; // Import the selected
 
 interface JeopardyBoardProps {
     boardData: Category[];
-    isHost: boolean;
+    canSelectClue: boolean;
     onClueSelected: (clue: Clue) => void;
     selectedClue: Clue | null;
     gameId: string;
@@ -60,7 +60,7 @@ interface JeopardyBoardProps {
 }
 
 const JeopardyBoard: React.FC<JeopardyBoardProps> =
-    ({ boardData, isHost, onClueSelected, selectedClue, gameId, clearedClues, players, scores,
+    ({ boardData, canSelectClue, onClueSelected, selectedClue, gameId, clearedClues, players, scores,
          currentPlayer, allWagersSubmitted, isFinalJeopardy, drawings, resetBuzzer,
           unlockBuzzer, handleBuzz, buzzerLocked, buzzResult, buzzLockedOut, timerEndTime, timerDuration,
           answerCapture, answerTranscript, answerResult, answerError, effectivePlayerName}) => {
@@ -82,7 +82,7 @@ const JeopardyBoard: React.FC<JeopardyBoardProps> =
 
     // Automatically submit $0 wager upfront if the player has $0 or less
     useEffect(() => {
-        if (isHost)
+        if (canSelectClue)
             return;
         console.log(isFinalJeopardy);
         console.log(scores[currentPlayer]);
@@ -93,23 +93,23 @@ const JeopardyBoard: React.FC<JeopardyBoardProps> =
 
     useEffect(() => {
         if (selectedClue) {
-            const isOnlyPersonPlaying = players.length === 1 && isHost;
+            const isOnlyPersonPlaying = players.length === 1 && canSelectClue;
             setLocalSelectedClue(selectedClue);
             setShowClue(true);
 
             // host can see answer immediately if not solo-hosting
-            setHostCanSeeAnswer(isHost && !isOnlyPersonPlaying);
+            setHostCanSeeAnswer(canSelectClue && !isOnlyPersonPlaying);
         } else {
             setLocalSelectedClue(null);
             setShowClue(false);
             setHostCanSeeAnswer(false);
         }
-    }, [selectedClue, isHost, players]);
+    }, [selectedClue, canSelectClue, players]);
 
 
     const handleClueClick = (clue: Clue, clueId: string) => {
         console.log(localSelectedClue);
-        if (isHost && clue && !localSelectedClue && !clearedClues.has(clueId)) {
+        if (canSelectClue && clue && !localSelectedClue && !clearedClues.has(clueId)) {
             onClueSelected(clue);
         }
     };
@@ -185,7 +185,7 @@ const JeopardyBoard: React.FC<JeopardyBoardProps> =
                         <WagerInput
                             players={players}
                             currentPlayer={currentPlayer}
-                            isHost={isHost}
+                            isHost={canSelectClue}
                             scores={scores}
                             wagers={wagers}
                             wagerSubmitted={wagerSubmitted}
@@ -199,7 +199,7 @@ const JeopardyBoard: React.FC<JeopardyBoardProps> =
                 {!showClue && !isFinalJeopardy && (
                     <JeopardyGrid
                         boardData={boardData}
-                        isHost={isHost}
+                        isHost={canSelectClue}
                         clearedClues={clearedClues}
                         handleClueClick={handleClueClick}
                         isFinalJeopardy={isFinalJeopardy}
@@ -212,7 +212,7 @@ const JeopardyBoard: React.FC<JeopardyBoardProps> =
                         localSelectedClue={localSelectedClue}
                         showAnswer={showAnswer}
                         setShowClue={setShowClue}
-                        isHost={isHost}
+                        isHost={canSelectClue}
                         isFinalJeopardy={isFinalJeopardy}
                         gameId={gameId}
                         currentPlayer={currentPlayer}

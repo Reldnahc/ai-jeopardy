@@ -83,6 +83,10 @@ export const gameHandlers = {
             wagers: ctx.games[gameId].wagers || {},
             lobbySettings: ctx.games[gameId].lobbySettings || null,
             phase: game.phase || null,
+            selectorKey: game.selectorKey || null,
+            selectorName: game.selectorName || null,
+            welcomeTtsAssetId: game.welcomeTtsAssetId || null,
+            welcomeEndsAt: typeof game.welcomeEndsAt === "number" ? game.welcomeEndsAt : null,
             answeringPlayer: game.answeringPlayerKey || null,
             answerSessionId: game.answerSessionId || null,
             answerDeadlineAt: game.answerDeadlineAt || null,
@@ -553,7 +557,33 @@ export const gameHandlers = {
         const { gameId, clue } = data;
         const game = ctx.games[gameId];
         if (!game) return;
-        if (!ctx.requireHost(game, ws)) return;
+        // Selector-only authority (AI-hosted game)
+        const caller = ctx.getPlayerForSocket(game, ws);
+        const callerStable = caller ? ctx.playerStableId(caller) : null;
+
+        console.log("[CLUE SELECT ATTEMPT]", {
+            phase: game.phase,
+            selectorKey: game.selectorKey,
+            selectorName: game.selectorName,
+            callerStable,
+            callerName: caller?.name,
+        });
+
+        if (game.phase !== "board") {
+            console.warn("[CLUE SELECT BLOCKED] wrong phase");
+            return;
+        }
+
+        if (!callerStable) {
+            console.warn("[CLUE SELECT BLOCKED] no callerStable");
+            return;
+        }
+
+        if (callerStable !== game.selectorKey) {
+            console.warn("[CLUE SELECT BLOCKED] not selector");
+            return;
+        }
+
 
         // Any previous clue’s scheduled unlock should be canceled
         ctx.cancelAutoUnlock(game);

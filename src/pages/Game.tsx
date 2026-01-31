@@ -20,7 +20,7 @@ export default function Game() {
     const playerName = location.state?.playerName || '';
     const [lastQuestionValue, setLastQuestionValue] = useState<number>(100);
 
-    const { effectivePlayerName } = usePlayerIdentity({
+    const { effectivePlayerName, playerKey } = usePlayerIdentity({
         gameId,
         locationStatePlayerName: location.state?.playerName,
         allowProfileFallback: true,
@@ -56,6 +56,11 @@ export default function Game() {
         answerTranscript,
         answerResult,
         answerError,
+        phase,
+        selectorKey,
+        selectorName,
+        welcomeTtsAssetId,
+        //welcomeEndsAt,
     } = useGameSocketSync({ gameId, playerName: effectivePlayerName });
 
     // Persistent WebSocket connection
@@ -84,6 +89,13 @@ export default function Game() {
             return next;
         });
     }, []);
+
+    const canSelectClue = Boolean(
+        phase === "board" &&
+        selectorName  &&
+        playerKey  &&
+        selectorKey === playerKey
+    );
 
     const narratedKeysRef = useRef<Set<string>>(new Set());
     const lastRequestedKeyRef = useRef<string | null>(null);
@@ -241,6 +253,22 @@ export default function Game() {
         }
     }, [ttsReady, audioMuted]);
 
+    const playedWelcomeRef = useRef<string | null>(null);
+
+    useEffect(() => {
+        if (phase !== "welcome") return;
+        if (!welcomeTtsAssetId) return;
+
+        // don't replay
+        if (playedWelcomeRef.current === welcomeTtsAssetId) return;
+        playedWelcomeRef.current = welcomeTtsAssetId;
+
+        // if muted, do nothing (server still gates unlock via phase)
+        if (audioMuted) return;
+
+        playAudioUrl(`/api/tts/${welcomeTtsAssetId}`);
+    }, [phase, welcomeTtsAssetId, audioMuted, playAudioUrl]);
+
     useEffect(() => {
         if (!gameId || !effectivePlayerName) return;
 
@@ -295,14 +323,14 @@ export default function Game() {
 
 
     const onClueSelected = useCallback((clue: Clue) => {
-        if (isHost && clue) {
+        if (canSelectClue  && clue) {
             if (!gameId) return;
             sendJson({ type: "clue-selected", gameId, clue });
             if (clue.value !== undefined) {
                 setLastQuestionValue(clue.value); // Set last question value based on clue's value
             }
         }
-    },[isHost, gameId, sendJson]);
+    },[canSelectClue, gameId, sendJson]);
 
     return (
         <div
@@ -351,7 +379,7 @@ export default function Game() {
                         {/* Jeopardy Board */}
                         <JeopardyBoard
                             boardData={boardData[activeBoard].categories}
-                            isHost={isHost}
+                            canSelectClue={canSelectClue}
                             onClueSelected={onClueSelected}
                             selectedClue={selectedClue || null}
                             gameId={gameId || ''}

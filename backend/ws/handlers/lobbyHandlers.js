@@ -86,6 +86,49 @@ export const lobbyHandlers = {
 
         ctx.applyNewGameState({ game, boardData, timeToBuzz, timeToAnswer });
 
+        // --- AI authority bootstrapping (selector + welcome audio) ---
+        // Pick a starting selector (random online player; fallback to first player)
+        const online = (game.players ?? []).filter((p) => p?.online !== false);
+        const pool = online.length > 0 ? online : (game.players ?? []);
+        const pick = pool.length > 0
+            ? pool[Math.floor(Math.random() * pool.length)]
+            : null;
+
+        if (pick) {
+            game.selectorKey = pick.playerKey;
+            game.selectorName = pick.name;
+        } else {
+            game.selectorKey = null;
+            game.selectorName = null;
+        }
+
+        // Prepare welcome TTS so it can be preloaded in the same handshake
+        // (If narration is disabled, we still create the asset for now; you can gate later.)
+        if (game.selectorName) {
+            const welcomeText = `Welcome to AI Jeopardy. ${game.selectorName} will be starting us off today.`;
+            try {
+                const ensured = await ctx.ensureTtsAsset(
+                    { text: welcomeText },
+                    ctx.supabase,
+                    trace
+                );
+                game.welcomeTtsAssetId = ensured?.id ?? null;
+            } catch (e) {
+                console.error("[create-game] welcome TTS failed:", e);
+                game.welcomeTtsAssetId = null;
+            }
+        } else {
+            game.welcomeTtsAssetId = null;
+        }
+
+        // Phase will be set when preload finishes (in preload-done)
+        game.phase = null;
+        game.welcomeEndsAt = null;
+        if (game.welcomeTimer) {
+            clearTimeout(game.welcomeTimer);
+            game.welcomeTimer = null;
+        }
+
         trace.mark("broadcast_game_state_start");
 
         // Preload workflow
@@ -133,11 +176,54 @@ export const lobbyHandlers = {
 
         // Flip lobby state now
         game.inLobby = false;
+        if (!game.lobbyHost) game.lobbyHost = game.host;
+        game.host = "AI Jeopardy";
+
+        // Start in welcome phase if we have welcome audio; otherwise go straight to board
+        const hasWelcome = typeof game.welcomeTtsAssetId === "string" && game.welcomeTtsAssetId.trim();
+        if (game.welcomeTimer) {
+            clearTimeout(game.welcomeTimer);
+            game.welcomeTimer = null;
+        }
+
+        if (hasWelcome) {
+            game.phase = "welcome";
+
+            let durationMs = null;
+            try {
+                durationMs = await ctx.getTtsDurationMs(game.welcomeTtsAssetId);
+            } catch (e) {
+                console.error("[preload-done] welcome duration lookup failed:", e);
+            }
+
+            const waitMs = Math.max(0, (durationMs ?? 0) + 250);
+            game.welcomeEndsAt = Date.now() + waitMs;
+
+            game.welcomeTimer = setTimeout(() => {
+                const g = ctx.games?.[gameId];
+                if (!g) return;
+                if (g.phase !== "welcome") return;
+
+                g.phase = "board";
+                g.welcomeTimer = null;
+
+                ctx.broadcast(gameId, {
+                    type: "phase-changed",
+                    phase: "board",
+                    selectorKey: g.selectorKey ?? null,
+                    selectorName: g.selectorName ?? null,
+                });
+            }, waitMs);
+        } else {
+            game.phase = "board";
+            game.welcomeEndsAt = null;
+        }
 
         ctx.broadcast(gameId, {
             type: "start-game",
             host: game.host,
         });
+
     },
 
 

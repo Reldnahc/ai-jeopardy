@@ -110,6 +110,7 @@ export const createWsContext = (wss) => {
         modelsByValue,
         supabase,
         r2,
+        getTtsDurationMs: (assetId) => ttsDuration.getDurationMs(assetId),
 
         // comms
         broadcast,
