@@ -9,6 +9,10 @@ type BoardData = {
     firstBoard: { categories: Category[] };
     secondBoard: { categories: Category[] };
     finalJeopardy: { categories: Category[] };
+    // Optional narration precompute output. When present, the client can play audio instantly
+    // without sending a WS "tts-ensure" for each clue.
+    ttsAssetIds?: string[];
+    ttsByClueKey?: Record<string, string>;
 };
 
 type ActiveBoard = "firstBoard" | "secondBoard" | "finalJeopardy";

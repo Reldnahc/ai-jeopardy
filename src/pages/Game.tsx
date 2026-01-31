@@ -131,6 +131,20 @@ export default function Game() {
         navigate("/");
     }, [gameId, effectivePlayerName, isSocketReady, sendJson, clearSession, navigate]);
 
+    const playAudioUrl = useCallback((url: string) => {
+        const a = audioRef.current;
+        if (!a) return;
+
+        try {
+            a.pause();
+            a.currentTime = 0;
+            a.src = url;
+            void a.play();
+        } catch (e) {
+            console.debug("TTS play blocked:", e);
+        }
+    }, []);
+
     useEffect(() => {
         audioRef.current = new Audio();
         audioRef.current.preload = "auto";
@@ -182,6 +196,16 @@ export default function Game() {
             return;
         }
 
+        // ✅ FAST PATH: if server provided mapping, play immediately (no WS noise)
+        const mappedAssetId = (boardData as any)?.ttsByClueKey?.[clueOpenKey];
+        if (typeof mappedAssetId === "string" && mappedAssetId.trim()) {
+            playAudioUrl(`/api/tts/${mappedAssetId.trim()}`);
+            narratedKeysRef.current.add(clueOpenKey);
+            lastRequestedKeyRef.current = clueOpenKey;
+            return;
+        }
+
+        // Fallback: old on-demand behavior
         const valuePart = `For ${selectedClue.value} dollars. `;
         const text = `${valuePart}${selectedClue.question ?? ""}`.trim();
         if (!text) return;
@@ -189,7 +213,7 @@ export default function Game() {
         activeTtsRequestIdRef.current = requestTts({ text, textType: "text", voiceId: "Matthew" });
         narratedKeysRef.current.add(clueOpenKey);
         lastRequestedKeyRef.current = clueOpenKey;
-    }, [narrationEnabled, audioMuted, clueOpenKey, selectedClue, requestTts]);
+    }, [narrationEnabled, audioMuted, clueOpenKey, selectedClue, requestTts, boardData, playAudioUrl]);
 
     useEffect(() => {
         if (!ttsReady) return;
@@ -208,7 +232,7 @@ export default function Game() {
             a.pause();
             a.currentTime = 0;
             a.src = ttsReady.url;
-            void a.play();
+            playAudioUrl(ttsReady.url);
         } catch (e) {
             // autoplay policies can block play(); ignore safely
             console.debug("TTS play blocked:", e);

@@ -329,7 +329,19 @@ async function createBoardData(categories, model, host, options = {}) {
     const ttsPromises = [];
     const ttsIds = new Set();
 
-    const enqueueCategoryTts = (json) => {
+    // Mapping: clueKey -> ttsAssetId
+    // clueKey format matches the client: "<boardType>:<value>:<question>".
+    const ttsByClueKey = Object.create(null);
+
+    const clueKeyFor = (boardType, clue) => {
+        const v = typeof clue?.value === "number" ? clue.value : null;
+        const q = String(clue?.question ?? "").trim();
+        // If we can't form a key, bail.
+        if (!q) return null;
+        return `${boardType}:${v ?? "?"}:${q}`;
+    };
+
+    const enqueueCategoryTts = (boardType, json) => {
         if (!settings.narrationEnabled || !limitTts) return;
 
         for (const clue of (json?.values ?? [])) {
@@ -356,6 +368,9 @@ async function createBoardData(categories, model, host, options = {}) {
                     );
 
                     ttsIds.add(asset.id);
+
+                    const k = clueKeyFor(boardType, clue);
+                    if (k) ttsByClueKey[k] = asset.id;
                 } catch (e) {
                     // Don’t fail board generation if TTS has a transient issue
                     console.error("[TTS] ensureTtsAsset failed:", e?.message ?? e);
@@ -505,7 +520,7 @@ async function createBoardData(categories, model, host, options = {}) {
             }).then(async (json) => {
                 tick(1);
 
-                enqueueCategoryTts(json);
+                enqueueCategoryTts("firstBoard", json);
 
                 if (settings.includeVisuals && limitVisuals) {
                     await limitVisuals(() => populateCategoryVisuals(json, settings, (n) => tick(n)));
@@ -534,7 +549,7 @@ async function createBoardData(categories, model, host, options = {}) {
             }).then(async (json) => {
                 tick(1);
 
-                enqueueCategoryTts(json);
+                enqueueCategoryTts("secondBoard", json);
 
                 if (settings.includeVisuals && limitVisuals) {
                     await limitVisuals(() => populateCategoryVisuals(json, settings, (n) => tick(n)));
@@ -560,7 +575,7 @@ async function createBoardData(categories, model, host, options = {}) {
         }).then(async (json) => {
             tick(1);
 
-            enqueueCategoryTts(json);
+            enqueueCategoryTts("finalJeopardy", json);
 
             if (settings.includeVisuals && limitVisuals) {
                 await limitVisuals(() => populateCategoryVisuals(json, settings, (n) => tick(n)));
@@ -581,7 +596,7 @@ async function createBoardData(categories, model, host, options = {}) {
                     finalPromise,
                 ])
         );
-        console.log(ttsPromises);
+
         if (settings.narrationEnabled && ttsPromises.length > 0) {
             await timed("AWAIT ALL TTS", async () => Promise.all(ttsPromises));
         }
@@ -605,6 +620,7 @@ async function createBoardData(categories, model, host, options = {}) {
             secondBoard,
             finalJeopardy,
             ttsAssetIds: Array.from(ttsIds),
+            ttsByClueKey,
         };
     } catch (error) {
         trace?.mark("createBoardData ERROR");
