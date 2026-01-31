@@ -1,5 +1,5 @@
 export const lobbyHandlers = {
-    "create-game": async ({ ws, data, ctx }) => { //Fired from lobby logic all done in lobby. it belongs here.
+    "create-game": async ({ ws, data, ctx }) => {
         const { gameId } = data ?? {};
 
         // Use server-authoritative host name for trace context (no client spoofing)
@@ -7,99 +7,36 @@ export const lobbyHandlers = {
         const trace = ctx.createTrace("create-game", { gameId, host: serverHost });
         trace.mark("ws_received", { type: "create-game" });
 
-        if (!gameId) {
-            ws.send(JSON.stringify({ type: "error", message: "create-game missing gameId" }));
-            return;
-        }
-
-        if (!ctx.games[gameId]) {
-            ctx.broadcast(gameId, { type: "create-board-failed", message: "Game not found." });
-            return;
-        }
+        const game = ctx.getGameOrFail({ ws, ctx, gameId });
+        if (!game) return;
 
         // Host-only (prevents spoofing)
-        if (!ctx.isHostSocket(ctx.games[gameId], ws)) {
-            ws.send(JSON.stringify({ type: "error", message: "Only the host can start the game." }));
-            ctx.sendLobbySnapshot(ws, gameId);
-            return;
-        }
+        if (!ctx.ensureHostOrFail({ ws, ctx, gameId, game })) return;
 
-        if (!ctx.games[gameId].lobbySettings) {
-            ctx.games[gameId].lobbySettings = {
-                timeToBuzz: 10,
-                timeToAnswer: 10,
-                selectedModel: "gpt-5-mini",
-                reasoningEffort: "off",
-                visualMode: "off", // "off" | "commons" | "brave"
-                boardJson: "",
-            };
-        }
+        const s = ctx.ensureLobbySettings(game);
 
-        const s = ctx.games[gameId].lobbySettings;
-
-        const host = ctx.games[gameId].host;
-        const categories = ctx.games[gameId].categories;
-        const role = (ws.auth?.role ?? "default").toLowerCase();
+        const host = game.host;
+        const categories = game.categories;
+        const role = ctx.normalizeRole(ws);
 
         const selectedModel = s.selectedModel;
-        const m = ctx.modelsByValue[selectedModel];
-        // Unknown model? reject (prevents passing arbitrary provider/model ids)
-        if (!m) {
-            ws.send(JSON.stringify({ type: "error", message: "Unknown model selected." }));
-            ctx.sendLobbySnapshot(ws, gameId);
-            return;
-        }
-
-        // Disabled models are never allowed (server authoritative)
-        if (m.disabled) {
-            ws.send(JSON.stringify({ type: "error", message: "That model is currently disabled." }));
-            // Optional: force lobby setting back to a free default
-            ctx.games[gameId].lobbySettings.selectedModel = "gpt-5-mini";
-            ctx.sendLobbySnapshot(ws, gameId);
-            ws.send(JSON.stringify({ type: "error", message: "That model is disabled." }));
-            return;
-        }
-
-        const isPaidModel = Number(m.price ?? 0) > 0;
-
-        // If paid, require authed + privileged role
-        if (isPaidModel) {
-            const allowed = role === "admin" || role === "privileged";
-
-            if (!allowed) {
-                ws.send(JSON.stringify({
-                    type: "error",
-                    message: "Your account is not allowed to use paid models.",
-                }));
-                // Optional: force downgrade
-                ctx.games[gameId].lobbySettings.selectedModel = "gpt-5-mini";
-                ctx.sendLobbySnapshot(ws, gameId);
-                return;
-            }
-        }
+        const modelInfo = ctx.resolveModelOrFail({ ws, ctx, gameId, game, selectedModel, role });
+        if (!modelInfo) return;
 
         const timeToBuzz = s.timeToBuzz;
         const timeToAnswer = s.timeToAnswer;
         const reasoningEffort = s.reasoningEffort;
 
         const boardJson = typeof s.boardJson === "string" ? s.boardJson : "";
-        const usingImportedBoard = Boolean(boardJson && boardJson.trim());
-
-        // Visual policy:
-        // - If importing board JSON => visuals always enabled, provider forced to "commons"
-        // - Otherwise => visualMode controls includeVisuals + provider
         const visualMode = s.visualMode;
-        const effectiveIncludeVisuals = usingImportedBoard ? true : (visualMode !== "off");
 
-        // Provider selection (server authoritative)
-        const requestedProvider = visualMode === "brave" ? "brave" : "commons";
-
-        const canUseBrave = role === "admin" || role === "privileged";
-
-        const effectiveImageProvider =
-            effectiveIncludeVisuals
-                ? (requestedProvider === "brave" && canUseBrave ? "brave" : "commons")
-                : undefined;
+        const {
+            usingImportedBoard,
+            effectiveIncludeVisuals,
+            requestedProvider,
+            canUseBrave,
+            effectiveImageProvider,
+        } = ctx.resolveVisualPolicy({ role, boardJson, visualMode });
 
         trace.mark("visual_settings", {
             usingImportedBoard,
@@ -110,140 +47,52 @@ export const lobbyHandlers = {
             visualMode,
         });
 
-        if (!ctx.games[gameId].inLobby) {
+        if (!game.inLobby) {
             ws.send(JSON.stringify({ type: "error", message: "Game has already started." }));
             return;
         }
 
-        ctx.broadcast(gameId, { type: "trigger-loading" });
-        ctx.games[gameId].generationDone = 0;
-        ctx.games[gameId].generationTotal = 0;
-        ctx.games[gameId].generationProgress = 0;
-        ctx.broadcast(gameId, {
-            type: "generation-progress",
-            progress: 0,
-            done: 0,
-            total: 0,
+        ctx. resetGenerationProgressAndNotify({ ctx, gameId, game });
+
+        const boardData = await ctx.getBoardDataOrFail({
+            ctx,
+            game,
+            gameId,
+            categories,
+            selectedModel,
+            host,
+            boardJson,
+            effectiveIncludeVisuals,
+            effectiveImageProvider,
+            reasoningEffort,
+            trace,
         });
 
-        let boardData = null;
-
-        try {
-            if (usingImportedBoard) {
-                const imported = ctx.parseBoardJson(boardJson);
-                const v = ctx.validateImportedBoardData(imported);
-                if (!v.ok) {
-                    ctx.broadcast(gameId, { type: "create-board-failed", message: v.error });
-                    ctx.games[gameId].isGenerating = false;
-                    return;
-                }
-                boardData = imported;
-            } else {
-                ctx.games[gameId].isGenerating = true;
-                trace.mark("createBoardData_start");
-
-                boardData = await ctx.createBoardData(categories, selectedModel, host, {
-                    includeVisuals: effectiveIncludeVisuals,
-                    imageProvider: effectiveImageProvider,
-                    maxVisualCluesPerCategory: 2,
-                    reasoningEffort,
-                    trace,
-
-                    onProgress: ({ done, total, progress }) => {
-                        const g = ctx.games?.[gameId];
-                        if (!g) return;
-
-                        g.generationDone = done;
-                        g.generationTotal = total;
-                        g.generationProgress = progress;
-
-                        ctx.broadcast(gameId, {
-                            type: "generation-progress",
-                            progress,
-                            done,
-                            total,
-                        });
-                    },
-                });
-
-
-                trace.mark("createBoardData_end");
-            }
-        } catch (e) {
-            console.error("[Server] create-game failed:", e);
-            ctx.broadcast(gameId, {
-                type: "create-board-failed",
-                message: "Invalid board JSON or generation failed.",
-            });
-            ctx.games[gameId].isGenerating = false;
-            ctx.games[gameId].generationDone = null;
-            ctx.games[gameId].generationTotal = null;
-            ctx.games[gameId].generationProgress = null;
-            return;
-        }
-
-        if (!ctx.games[gameId] || !boardData) {
+        // game might have been deleted / board failed
+        if (!ctx.games?.[gameId] || !boardData) {
             ctx.broadcast(gameId, {
                 type: "create-board-failed",
                 message: "Board data was empty.",
             });
-            ctx.games[gameId].isGenerating = false;
-            ctx.games[gameId].generationDone = null;
-            ctx.games[gameId].generationTotal = null;
-            ctx.games[gameId].generationProgress = null;
+            ctx.safeAbortGeneration(game);
             return;
         }
 
         // If lobby flipped during generation, just abort cleanly
-        if (!ctx.games[gameId].inLobby) {
-            ctx.games[gameId].isGenerating = false;
-            ctx.games[gameId].generationDone = null;
-            ctx.games[gameId].generationTotal = null;
-            ctx.games[gameId].generationProgress = null;
+        if (!game.inLobby) {
+            ctx.safeAbortGeneration(game);
             return;
         }
 
-        ctx.games[gameId].buzzed = null;
-        ctx.games[gameId].buzzerLocked = true;
-        ctx.games[gameId].buzzLockouts = {};
-        ctx.games[gameId].clearedClues = new Set();
-        ctx.games[gameId].boardData = boardData;
-        ctx.games[gameId].scores = {};
-        ctx.games[gameId].inLobby = false;
-        ctx.games[gameId].timeToBuzz = timeToBuzz;
-        ctx.games[gameId].timeToAnswer = timeToAnswer;
-        ctx.games[gameId].isGenerating = false;
-        ctx.games[gameId].activeBoard = "firstBoard";
-        ctx.games[gameId].isFinalJeopardy = false;
-        ctx.games[gameId].finalJeopardyStage = null;
+        ctx.applyNewGameState({ game, boardData, timeToBuzz, timeToAnswer });
 
         trace.mark("broadcast_game_state_start");
-        const assetIds = ctx.collectImageAssetIdsFromBoard(boardData);
 
-        // Track preload status server-side (online players only)
-        const onlinePlayers = (ctx.games[gameId].players ?? []).filter((p) => p.online);
-        ctx.games[gameId].preload = {
-            active: true,
-            required: onlinePlayers.map(ctx.playerStableId),
-            done: [],
-            createdAt: Date.now(),
-        };
-
-        trace.mark("broadcast_preload_images_start", { imageCount: assetIds.length });
-        ctx.broadcast(gameId, {
-            type: "preload-images",
-            assetIds,
-        });
-        trace.mark("broadcast_preload_images_end", { imageCount: assetIds.length });
-
-        if (assetIds.length === 0) {
-            ctx.broadcast(gameId, { type: "start-game" });
-        }
+        // Preload workflow
+        ctx.setupPreloadHandshake({ ctx, gameId, game, boardData, trace });
 
         // IMPORTANT: do NOT flip inLobby yet and do NOT broadcast start-game yet.
         // We wait until everyone acks.
-        trace.end({ success: true });
-
         trace.mark("broadcast_game_state_end");
         trace.end({ success: true });
     },
