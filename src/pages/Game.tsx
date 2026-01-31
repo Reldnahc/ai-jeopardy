@@ -69,20 +69,16 @@ export default function Game() {
     const toggleAudioMuted = useCallback(() => {
         setAudioMuted((prev) => {
             const next = !prev;
-            try {
-                localStorage.setItem("aj_audioMuted", next ? "1" : "0");
-            } catch {
-                // ignore
-            }
+            try { localStorage.setItem("aj_audioMuted", next ? "1" : "0"); } catch {}
 
-            if (next && audioRef.current) {
-                audioRef.current.pause();
-                audioRef.current.currentTime = 0;
+            if (audioRef.current) {
+                audioRef.current.muted = next;
             }
 
             return next;
         });
     }, []);
+
     const narratedKeysRef = useRef<Set<string>>(new Set());
     const lastRequestedKeyRef = useRef<string | null>(null);
     const prevSocketReadyRef = useRef<boolean>(false);
@@ -134,16 +130,16 @@ export default function Game() {
     const playAudioUrl = useCallback((url: string) => {
         const a = audioRef.current;
         if (!a) return;
-
         try {
             a.pause();
+            a.muted = audioMuted;
             a.currentTime = 0;
             a.src = url;
             void a.play();
         } catch (e) {
             console.debug("TTS play blocked:", e);
         }
-    }, []);
+    }, [audioMuted]);
 
     useEffect(() => {
         audioRef.current = new Audio();

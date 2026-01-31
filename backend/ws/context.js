@@ -30,14 +30,84 @@ import {
     setupPreloadHandshake
 } from "./handlers/game/createGameHelpers.js";
 import {ensureTtsAsset} from "../services/ttsAssetService.js";
+import {createTtsDurationService} from "../services/ttsDurationService.js";
+import {r2} from "../services/r2Client.js";
 
 export const createWsContext = (wss) => {
     const { broadcast, broadcastAll } = makeBroadcaster(wss);
+
+    const ttsDuration = createTtsDurationService({ supabase, r2 });
+
+    function cancelAutoUnlock(game) {
+        if (game?.autoUnlockTimer) {
+            clearTimeout(game.autoUnlockTimer);
+            game.autoUnlockTimer = null;
+        }
+        game.autoUnlockClueKey = null;
+    }
+
+    function doUnlockBuzzerAuthoritative({ gameId, game }) {
+        if (!game) return;
+
+        // If already unlocked or clue changed, ignore
+        if (!game.buzzerLocked) return;
+
+        game.buzzerLocked = false;
+        broadcast(gameId, { type: "buzzer-unlocked" });
+
+        if (game.timeToBuzz !== -1) {
+            startGameTimer(
+                gameId,
+                game,
+                broadcast,
+                game.timeToBuzz,
+                "buzz",
+                ({ gameId, game }) => {
+                    if (!game.buzzerLocked && !game.buzzed) {
+                        game.buzzerLocked = true;
+                        broadcast(gameId, { type: "buzzer-locked" });
+                        broadcast(gameId, { type: "answer-revealed" });
+                    }
+                }
+            );
+        }
+    }
+
+    async function scheduleAutoUnlockForClue({ gameId, game, clueKey, ttsAssetId }) {
+        if (!game) return;
+
+        cancelAutoUnlock(game);
+
+        // if no asset id, just unlock immediately (never deadlock)
+        if (!ttsAssetId) {
+            doUnlockBuzzerAuthoritative({ gameId, game });
+            return;
+        }
+
+        const durationMs = await ttsDuration.getDurationMs(ttsAssetId);
+
+        // If we couldn't compute duration, unlock immediately (still safe)
+        const waitMs = Math.max(0, (durationMs ?? 0) + 150); // +buffer for decode/play
+        game.autoUnlockClueKey = clueKey;
+
+        game.autoUnlockTimer = setTimeout(() => {
+            const g = games?.[gameId];
+            if (!g) return;
+
+            // Only unlock if we're still on the same clue
+            if (g.autoUnlockClueKey !== clueKey) return;
+
+            g.autoUnlockTimer = null;
+            doUnlockBuzzerAuthoritative({ gameId, game: g });
+        }, waitMs);
+    }
 
     return {
         wss,
         games,
         modelsByValue,
+        supabase,
+        r2,
 
         // comms
         broadcast,
@@ -93,6 +163,9 @@ export const createWsContext = (wss) => {
         getCOTD,
         collectImageAssetIdsFromBoard,
         playerStableId,
-        supabase,
+
+        cancelAutoUnlock,
+        scheduleAutoUnlockForClue,
+        doUnlockBuzzerAuthoritative,
     };
 };

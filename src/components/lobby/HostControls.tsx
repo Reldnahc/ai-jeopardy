@@ -179,7 +179,7 @@ const HostControls: React.FC<HostControlsProps> = ({
                                     Game Settings
                                 </div>
 
-                                <div className={isSoloLobby ? "opacity-50 pointer-events-none" : ""}>
+                                <div className={isSoloLobby ? "" : ""}>
                                     <div className="flex flex-col gap-3">
                                         <div className="flex flex-col gap-2">
                                             <label className="text-gray-800">Time to Buzz:</label>
@@ -197,19 +197,6 @@ const HostControls: React.FC<HostControlsProps> = ({
                                                     }`}
                                                 />
                                                 <span className="text-gray-600">seconds</span>
-
-                                                <div className="flex items-center ml-2">
-                                                    <input
-                                                        type="checkbox"
-                                                        id="infiniteTime"
-                                                        checked={timeToBuzz === -1}
-                                                        onChange={() => setTimeToBuzz(timeToBuzz === -1 ? 30 : -1)}
-                                                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
-                                                    />
-                                                    <label htmlFor="infiniteTime" className="ml-2 text-gray-700">
-                                                        Infinite
-                                                    </label>
-                                                </div>
                                             </div>
                                         </div>
 
@@ -229,19 +216,6 @@ const HostControls: React.FC<HostControlsProps> = ({
                                                     }`}
                                                 />
                                                 <span className="text-gray-600">seconds</span>
-
-                                                <div className="flex items-center ml-2">
-                                                    <input
-                                                        type="checkbox"
-                                                        id="infiniteTime2"
-                                                        checked={timeToAnswer === -1}
-                                                        onChange={() => setTimeToAnswer(timeToAnswer === -1 ? 30 : -1)}
-                                                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
-                                                    />
-                                                    <label htmlFor="infiniteTime2" className="ml-2 text-gray-700">
-                                                        Infinite
-                                                    </label>
-                                                </div>
                                             </div>
                                         </div>
                                     </div>

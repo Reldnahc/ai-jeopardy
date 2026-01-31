@@ -185,7 +185,7 @@ export async function ensureBoardTtsAssets({ ctx, game, boardData, trace }) {
 
     trace?.mark?.("tts_ensure_board_start", { count: texts.length });
 
-    const CONCURRENCY = 3;
+    const CONCURRENCY = 6;
     const out = [];
     let i = 0;
 

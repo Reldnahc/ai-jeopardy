@@ -213,25 +213,9 @@ export const gameHandlers = {
         if (!game) return;
         if (!ctx.requireHost(game, ws)) return;
 
-        game.buzzerLocked = false;
-        ctx.broadcast(gameId, { type: "buzzer-unlocked" });
+        ctx.cancelAutoUnlock(game);
 
-        if (game.timeToBuzz !== -1) {
-            ctx.startGameTimer(
-                gameId,
-                game,
-                ctx.broadcast,
-                game.timeToBuzz,
-                "buzz",
-                ({ gameId, game }) => {
-                    if (!game.buzzerLocked && !game.buzzed) {
-                        game.buzzerLocked = true;
-                        ctx.broadcast(gameId, { type: "buzzer-locked" });
-                        ctx.broadcast(gameId, { type: "answer-revealed" });
-                    }
-                }
-            );
-        }
+        ctx.doUnlockBuzzerAuthoritative({ gameId, game });
     },
 
     "lock-buzzer": async ({ ws, data, ctx }) => {
@@ -305,52 +289,69 @@ export const gameHandlers = {
         });
     },
     "clue-selected": async ({ ws, data, ctx }) => {
-        const {gameId, clue} = data;
-        if (!ctx.requireHost(ctx.games[gameId], ws)) return;
+        const { gameId, clue } = data;
+        const game = ctx.games[gameId];
+        if (!game) return;
+        if (!ctx.requireHost(game, ws)) return;
 
-        if (ctx.games[gameId]) {
-            ctx.games[gameId].selectedClue = {
-                ...clue,
-                isAnswerRevealed: false, // Add if the answer is revealed or not
-            };
+        // Any previous clue’s scheduled unlock should be canceled
+        ctx.cancelAutoUnlock(game);
 
-            // Reset buzzer state
-            ctx.games[gameId].buzzed = null;
-            ctx.games[gameId].buzzerLocked = true;
-            ctx.games[gameId].buzzLockouts = {};
-            // Broadcast the selected clue to all players in the game
-            ctx.broadcast(gameId, {
-                type: "clue-selected",
-                clue: ctx.games[gameId].selectedClue, // Send the clue and answer reveal status
-                clearedClues: Array.from(ctx.games[gameId].clearedClues),
-            });
+        game.selectedClue = {
+            ...clue,
+            isAnswerRevealed: false,
+        };
 
-            ctx.broadcast(gameId, {type: "reset-buzzer"});
-            ctx.broadcast(gameId, {type: "buzzer-locked"});
-        } else {
-            console.error(`[Server] Game ID ${gameId} not found when selecting clue.`);
-        }
+        // Reset buzzer state
+        game.buzzed = null;
+        game.buzzerLocked = true;
+        game.buzzLockouts = {};
+
+        ctx.broadcast(gameId, {
+            type: "clue-selected",
+            clue: game.selectedClue,
+            clearedClues: Array.from(game.clearedClues),
+        });
+
+        ctx.broadcast(gameId, { type: "reset-buzzer" });
+        ctx.broadcast(gameId, { type: "buzzer-locked" });
+
+        // --- AUTO UNLOCK AFTER TTS DURATION ---
+        const narrationEnabled = Boolean(game?.lobbySettings?.narrationEnabled);
+        if (!narrationEnabled) return;
+
+        const boardKey = game.activeBoard || "firstBoard";
+        const v = String(clue?.value ?? "");
+        const q = String(clue?.question ?? "").trim();
+        const clueKey = `${boardKey}:${v}:${q}`;
+
+        const ttsAssetId = game.boardData?.ttsByClueKey?.[clueKey] || null;
+
+        await ctx.scheduleAutoUnlockForClue({
+            gameId,
+            game,
+            clueKey,
+            ttsAssetId,
+        });
     },
     "reveal-answer": async ({ ws, data, ctx }) => {
-        const {gameId} = data;
+        const { gameId } = data;
+        const game = ctx.games[gameId];
+        if (!game) return;
 
-        if (ctx.games[gameId] && ctx.games[gameId].selectedClue) {
-            // Update the clue's state to mark the answer as revealed
-            ctx.games[gameId].selectedClue.isAnswerRevealed = true;
+        ctx.cancelAutoUnlock(game);
 
-            // Notify all players to display the answer
-            ctx.broadcast(gameId, {
-                type: "answer-revealed",
-                clue: ctx.games[gameId].selectedClue,
-            });
-        } else {
-            console.error(`[Server] Game ID ${gameId} not found or no clue selected when revealing answer.`);
+        if (game.selectedClue) {
+            game.selectedClue.isAnswerRevealed = true;
+            ctx.broadcast(gameId, { type: "answer-revealed", clue: game.selectedClue });
         }
     },
     "return-to-board": async ({ data, ctx }) => {
         const { gameId } = data;
         const game = ctx.games[gameId];
         if (!game) return;
+
+        ctx.cancelAutoUnlock(game);
 
         game.selectedClue = null;
 

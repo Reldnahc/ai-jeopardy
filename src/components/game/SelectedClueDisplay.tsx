@@ -205,7 +205,7 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                     </div>
                 )}
 
-                {!isHost && !isFinalJeopardy && !showAnswer && (
+                {/*!isHost &&*/ !isFinalJeopardy && !showAnswer && (
                     <button
                         onClick={handleBuzz}
                         disabled={!!buzzResult || buzzLockedOut}
@@ -222,7 +222,7 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                         {buzzLockedOut ? "Locked Out" : buzzerLocked ? "Buzz Early" : "Buzz!"}
                     </button>
                 )}
-                {isHost && !(players.length === 1 && isHost) && !showAnswer && !isFinalJeopardy && (
+                {false &&  !showAnswer && !isFinalJeopardy && (
                     <button
                         onClick={() => {
                             if (buzzerLocked) {
@@ -245,7 +245,7 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                     </button>
                 )}
                 {/* Button to reveal answer or return to board */}
-                {isHost && (
+                {false && (
                     <button
                         disabled={isFinalJeopardy && !drawings}
                         onClick={() => {
