@@ -139,7 +139,7 @@ const Profile: React.FC = () => {
 
     if (loading) {
         return (
-            <LoadingScreen message = "Loading profile" />
+            <LoadingScreen message = "Loading profile" progress={-1} />
         );
     }
 

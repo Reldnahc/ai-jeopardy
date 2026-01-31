@@ -33,12 +33,14 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({
             </h1>
 
             {/* Progress Bar (NEW) */}
-            <div className="mt-6 w-[18rem] sm:w-[24rem] md:w-[28rem] h-3 rounded-full bg-white/25 overflow-hidden">
-                <div
-                    className="h-full bg-white/90 rounded-full transition-all duration-300 ease-out"
-                    style={{ width: `${pct}%` }}
-                />
-            </div>
+            { progress != -1 &&
+                <div className="mt-6 w-[18rem] sm:w-[24rem] md:w-[28rem] h-3 rounded-full bg-white/25 overflow-hidden">
+                    <div
+                        className="h-full bg-white/90 rounded-full transition-all duration-300 ease-out"
+                        style={{ width: `${pct}%` }}
+                    />
+                </div>
+            }
         </div>
     );
 };

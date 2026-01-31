@@ -1,4 +1,4 @@
-//TODO MOVE THESE SOMEWHERE ELSE AND INJST VIA CTX
+//TODO MOVE THESE SOMEWHERE ELSE AND INGEST VIA CTX
 
 function collectImageAssetIdsFromBoard(boardData) {
     const ids = new Set();
@@ -55,7 +55,7 @@ export const lobbyHandlers = {
             ctx.games[gameId].lobbySettings = {
                 timeToBuzz: 10,
                 timeToAnswer: 10,
-                selectedModel: "gpt-5.2",
+                selectedModel: "gpt-5-mini",
                 reasoningEffort: "off",
                 visualMode: "off", // "off" | "commons" | "brave"
                 boardJson: "",
@@ -227,7 +227,6 @@ export const lobbyHandlers = {
         });
         trace.mark("broadcast_preload_images_end", { imageCount: assetIds.length });
 
-
         if (assetIds.length === 0) {
             ctx.broadcast(gameId, { type: "start-game" });
         }
@@ -316,7 +315,7 @@ export const lobbyHandlers = {
             lobbySettings: {
                 timeToBuzz: 10,
                 timeToAnswer: 10,
-                selectedModel: "gpt-5.2",
+                selectedModel: "gpt-5-mini",
                 reasoningEffort: "off",
                 visualMode: "off", // "off" | "commons" | "brave"
                 boardJson: "",
@@ -497,7 +496,7 @@ export const lobbyHandlers = {
                 game.lobbySettings = {
                     timeToBuzz: 10,
                     timeToAnswer: 10,
-                    selectedModel: "gpt-5.2",
+                    selectedModel: "gpt-5-mini",
                     reasoningEffort: "off",
                     visualMode: "off",
                     boardJson: "",

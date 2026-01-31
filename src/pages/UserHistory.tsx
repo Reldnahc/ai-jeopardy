@@ -140,7 +140,7 @@ export default function UserHistory() {
     }, [boards.length, hasMoreBoards, loadingBoards, profile?.displayname]);
 
     if (loadingProfile) {
-        return <LoadingScreen message="Loading history" />;
+        return <LoadingScreen message="Loading history" progress={-1}/>;
     }
 
     if (error || !profile) {
