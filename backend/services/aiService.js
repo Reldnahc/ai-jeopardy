@@ -146,7 +146,29 @@ function stripVisualWording(question) {
         .trim();
 }
 
-async function populateBoardVisuals(board, settings, progressTick) {
+function makeLimiter(maxConcurrent) {
+    let active = 0;
+    const queue = [];
+
+    const runNext = () => {
+        if (active >= maxConcurrent) return;
+        const next = queue.shift();
+        if (!next) return;
+        active += 1;
+        next().finally(() => {
+            active -= 1;
+            runNext();
+        });
+    };
+
+    return (fn) =>
+        new Promise((resolve, reject) => {
+            queue.push(() => fn().then(resolve, reject));
+            runNext();
+        });
+}
+
+async function populateCategoryVisuals(cat, settings, progressTick) {
     if (!settings.includeVisuals) return;
 
     // Image provider is intentionally swappable: use either Commons OR Brave.
@@ -157,8 +179,74 @@ async function populateBoardVisuals(board, settings, progressTick) {
         : pickCommonsImageForQueries;
 
     const maxPerCategory = Number(settings.maxVisualCluesPerCategory ?? 0);
+    const values = Array.isArray(cat?.values) ? cat.values : [];
 
-    // Only first + second boards (NO final jeopardy visuals)
+    // We only attempt image finding for clues that have a visual spec.
+    const visualClues = values
+        .filter((c) => c?.visual?.commonsSearchQueries?.length)
+        .slice(0, maxPerCategory);
+
+    let attemptedSlots = 0;
+
+    for (const clue of visualClues) {
+        attemptedSlots += 1;
+        try {
+            const found = await pickImageForQueries(
+                clue.visual.commonsSearchQueries,
+                {
+                    maxQueries: settings.maxImageSearchTries,
+                    searchLimit: 5,
+                    preferPhotos: settings.preferPhotos,
+                    trace: settings.trace,
+                }
+            );
+
+            if (!found) {
+                clue.question = stripVisualWording(clue.question);
+                delete clue.visual;
+                continue;
+            }
+
+            // "Caching" here is ingesting to R2 (dedupe + upload + DB)
+            const assetId = await ingestImageToR2FromUrl(
+                found.downloadUrl,
+                {
+                    sourceUrl: found.sourceUrl,
+                    license: found.license,
+                    licenseUrl: found.licenseUrl,
+                    attribution: found.attribution,
+                    trace: settings.trace,
+                },
+                supabase
+            );
+
+            clue.media = { type: "image", assetId };
+            delete clue.visual;
+        } catch (e) {
+            // Fail-soft: keep clue as text
+            clue.question = stripVisualWording(clue.question);
+            delete clue.visual;
+        } finally {
+            if (typeof progressTick === "function") progressTick(1);
+        }
+    }
+
+    // Count the remainder as "skipped slots" so the bar doesn't stall.
+    const remainingSlots = Math.max(0, maxPerCategory - attemptedSlots);
+    if (remainingSlots > 0 && typeof progressTick === "function") {
+        progressTick(remainingSlots);
+    }
+
+    // Cleanup any remaining visual specs if they exceed maxVisualCluesPerCategory
+    for (const clue of values) {
+        if (clue?.visual) delete clue.visual;
+    }
+}
+
+// Kept for compatibility / tests: enriches an entire board (sequentially).
+async function populateBoardVisuals(board, settings, progressTick) {
+    if (!settings.includeVisuals) return;
+
     const rounds = [
         board?.firstBoard?.categories,
         board?.secondBoard?.categories,
@@ -166,74 +254,15 @@ async function populateBoardVisuals(board, settings, progressTick) {
 
     for (const categories of rounds) {
         for (const cat of categories) {
-            const values = Array.isArray(cat?.values) ? cat.values : [];
-
-            // We only attempt image finding for clues that have a visual spec.
-            const visualClues = values
-                .filter((c) => c?.visual?.commonsSearchQueries?.length)
-                .slice(0, maxPerCategory);
-
-            let attemptedSlots = 0;
-
-            for (const clue of visualClues) {
-                attemptedSlots += 1;
-                try {
-                    const found = await pickImageForQueries(
-                        clue.visual.commonsSearchQueries,
-                        {
-                            maxQueries: settings.maxImageSearchTries,
-                            searchLimit: 5,
-                            preferPhotos: settings.preferPhotos,
-                            trace: settings.trace,
-                        }
-                    );
-
-                    if (!found) {
-                        clue.question = stripVisualWording(clue.question);
-                        delete clue.visual;
-                        continue;
-                    }
-
-                    // "Caching" here is ingesting to R2 (dedupe + upload + DB)
-                    const assetId = await ingestImageToR2FromUrl(
-                        found.downloadUrl,
-                        {
-                            sourceUrl: found.sourceUrl,
-                            license: found.license,
-                            licenseUrl: found.licenseUrl,
-                            attribution: found.attribution,
-                            trace: settings.trace,
-                        },
-                        supabase
-                    );
-
-                    clue.media = { type: "image", assetId };
-                    delete clue.visual;
-                } catch (e) {
-                    // Fail-soft: keep clue as text
-                    clue.question = stripVisualWording(clue.question);
-                    delete clue.visual;
-                } finally {
-                    if (typeof progressTick === "function") progressTick(1);
-                }
-            }
-
-            // count the remainder as "skipped slots" so the bar doesn't stall.
-            const remainingSlots = Math.max(0, maxPerCategory - attemptedSlots);
-            if (remainingSlots > 0 && typeof progressTick === "function") {
-                progressTick(remainingSlots);
-            }
-
-            // Cleanup any remaining visual specs if they exceed maxVisualCluesPerCategory
-            for (const clue of values) {
-                if (clue?.visual) delete clue.visual;
-            }
+            await populateCategoryVisuals(cat, settings, progressTick);
         }
     }
 
     // At this point, all ingestion to R2 is complete for this run.
     if (typeof progressTick === "function") progressTick(1);
 }
+
+
 
 async function createBoardData(categories, model, host, options = {}) {
     const settings = {
@@ -272,7 +301,7 @@ async function createBoardData(categories, model, host, options = {}) {
     if (!apiCall) throw new Error(`No API handler for provider: ${modelDef.provider}`);
 
     const total =
-        11 + (settings.includeVisuals ? (plannedVisualSlots(settings) + 2) : 0); // +1 for cache tick
+        11 + (settings.includeVisuals ? (plannedVisualSlots(settings) + 1) : 0); // +1 for cache tick
     let done = 0;
 
     const report = () => {
@@ -292,6 +321,8 @@ async function createBoardData(categories, model, host, options = {}) {
         if (done > total) done = total;
         report();
     };
+
+    const limitVisuals = settings.includeVisuals ? makeLimiter(2) : null;
 
     const valuesFor = (double) => (double ? [400, 800, 1200, 1600, 2000] : [200, 400, 600, 800, 1000]);
 
@@ -365,7 +396,7 @@ async function createBoardData(categories, model, host, options = {}) {
         
         ${reasoningRules}
         `.trim();
-        };
+    };
 
     const finalPrompt = (category) => `
         You are a professional Jeopardy clue writer.
@@ -429,9 +460,14 @@ async function createBoardData(categories, model, host, options = {}) {
                 }
 
                 return json;
-            }).then((json) => {
+            }).then(async (json) => {
                 tick(1);
-                return json
+
+                if (settings.includeVisuals && limitVisuals) {
+                    await limitVisuals(() => populateCategoryVisuals(json, settings, (n) => tick(n)));
+                }
+
+                return json;
             })
         );
 
@@ -450,9 +486,14 @@ async function createBoardData(categories, model, host, options = {}) {
                 }
 
                 return json;
-            }).then((json) => {
+            }).then(async (json) => {
                 tick(1);
-                return json
+
+                if (settings.includeVisuals && limitVisuals) {
+                    await limitVisuals(() => populateCategoryVisuals(json, settings, (n) => tick(n)));
+                }
+
+                return json;
             })
         );
 
@@ -469,9 +510,14 @@ async function createBoardData(categories, model, host, options = {}) {
             }
 
             return json;
-        }).then((json) => {
+        }).then(async (json) => {
             tick(1);
-            return json
+
+            if (settings.includeVisuals && limitVisuals) {
+                await limitVisuals(() => populateCategoryVisuals(json, settings, (n) => tick(n)));
+            }
+
+            return json;
         });
 
         trace?.mark("ALL REQUESTS FIRED");
@@ -494,8 +540,9 @@ async function createBoardData(categories, model, host, options = {}) {
         const finalJeopardy = { categories: [finalBuilt] };
 
         const board = { host, model, firstBoard, secondBoard, finalJeopardy };
-
-        await populateBoardVisuals(board, settings,  (n) => tick(n));
+        // Visuals are populated per-category as each category returns.
+        // Finalize the visual pipeline with one last tick (keeps progress accounting consistent).
+        if (settings.includeVisuals) tick(1);
 
         void saveBoardAsync({ supabase, host, board });
 
