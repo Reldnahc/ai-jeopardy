@@ -60,6 +60,7 @@ export default function Game() {
         selectorKey,
         selectorName,
         welcomeTtsAssetId,
+        aiHostText,
         //welcomeEndsAt,
     } = useGameSocketSync({ gameId, playerName: effectivePlayerName });
 
@@ -158,6 +159,31 @@ export default function Game() {
             console.debug("TTS play blocked:", e);
         }
     }, [audioMuted]);
+
+    const lastAiHostSpokenRef = useRef<string | null>(null);
+
+    useEffect(() => {
+        if (!aiHostText) return;
+
+        // aiHostText is "seq::text"
+        if (lastAiHostSpokenRef.current === aiHostText) return;
+        lastAiHostSpokenRef.current = aiHostText;
+
+        const idx = aiHostText.indexOf("::");
+        const text = (idx >= 0 ? aiHostText.slice(idx + 2) : aiHostText).trim();
+        if (!text) return;
+
+        // Page owns audio policy:
+        if (!narrationEnabled) return;
+        if (audioMuted) return;
+
+        activeTtsRequestIdRef.current = requestTts({
+            text,
+            textType: "text",
+            voiceId: "Matthew",
+        });
+    }, [aiHostText, narrationEnabled, audioMuted, requestTts]);
+
 
     useEffect(() => {
         audioRef.current = new Audio();

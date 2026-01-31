@@ -134,6 +134,8 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
     const [welcomeTtsAssetId, setWelcomeTtsAssetId] = useState<string | null>(null);
     const [welcomeEndsAt, setWelcomeEndsAt] = useState<number | null>(null);
 
+    const [aiHostText, setAiHostText] = useState<string | null>(null);
+    const aiHostSeqRef = useRef<number>(0);
 
     const makeRequestId = () =>
         (globalThis.crypto && "randomUUID" in globalThis.crypto)
@@ -361,6 +363,18 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
                 return;
             }
 
+            if (message.type === "ai-host-say") {
+                const m = message as unknown as { text?: string };
+                const text = String(m.text || "").trim();
+                if (!text) return;
+
+                // Store latest AI host line for the page to play (page handles mute)
+                aiHostSeqRef.current += 1;
+                setAiHostText(`${aiHostSeqRef.current}::${text}`);
+                return;
+            }
+
+
             if (message.type === "buzzer-locked") {
                 setBuzzerLocked(true);
                 return;
@@ -441,6 +455,7 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
                 setAnswerTranscript(null);
                 setAnswerResult(null);
                 setAnswerError(null);
+                setAiHostText(null);
                 resetLocalTimerState();
                 return;
             }
@@ -567,5 +582,6 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
         selectorName,
         welcomeTtsAssetId,
         welcomeEndsAt,
+        aiHostText,
     };
 }

@@ -1,3 +1,43 @@
+function parseClueValue(val) {
+    const n = Number(String(val || "").replace(/[^0-9]/g, ""));
+    return Number.isFinite(n) ? n : 0;
+}
+
+function applyScore(game, playerName, delta) {
+    if (!game.scores) game.scores = {};
+    game.scores[playerName] = (game.scores[playerName] || 0) + Number(delta || 0);
+}
+
+function finishClueAndReturnToBoard(ctx, gameId, game, { keepSelector }) {
+    if (!game) return;
+
+    // Mark cleared if we have a clue
+    if (game.selectedClue) {
+        if (!game.clearedClues) game.clearedClues = new Set();
+        const clueId = `${game.selectedClue.value}-${game.selectedClue.question}`;
+        game.clearedClues.add(clueId);
+        ctx.broadcast(gameId, { type: "clue-cleared", clueId });
+    }
+
+    // Reset clue state
+    game.selectedClue = null;
+    game.buzzed = null;
+    game.buzzerLocked = true;
+    game.phase = "board";
+    game.clueState = null;
+
+    // Selector remains if keepSelector=true (no-buzz or nobody-eligible)
+    ctx.broadcast(gameId, {
+        type: "phase-changed",
+        phase: "board",
+        selectorKey: game.selectorKey ?? null,
+        selectorName: game.selectorName ?? null,
+    });
+
+    ctx.broadcast(gameId, { type: "returned-to-board", selectedClue: null });
+}
+
+
 export const gameHandlers = {
     "join-game": async ({ ws, data, ctx }) => {
         const { gameId, playerName } = data;
@@ -167,6 +207,17 @@ export const gameHandlers = {
 
         const player = game.players.find((p) => p.id === ws.id);
         if (!player?.name) return;
+
+        const stable = ctx.playerStableId(player);
+        const lockedOut = game.clueState?.lockedOut || {};
+        if (game.clueState?.clueKey && lockedOut[stable]) {
+            ws.send(JSON.stringify({
+                type: "buzz-denied",
+                reason: "already-attempted",
+                lockoutUntil: 0,
+            }));
+            return;
+        }
 
         if (!game.buzzLockouts) game.buzzLockouts = {};
 
@@ -491,6 +542,104 @@ export const gameHandlers = {
             confidence,
             suggestedDelta,
         });
+
+// ----- AUTO-RESOLVE AFTER JUDGEMENT (AI-hosted gameplay) -----
+        if (verdict === "correct" || verdict === "incorrect") {
+            const clueValue = parseClueValue(game.selectedClue?.value);
+            const delta = verdict === "correct" ? clueValue : -clueValue;
+
+            // Apply score immediately (authoritative)
+            applyScore(game, player.name, delta);
+            ctx.broadcast(gameId, { type: "update-scores", scores: game.scores });
+
+            if (verdict === "correct") {
+                // Reveal as the host starts speaking
+                if (game.selectedClue) {
+                    game.selectedClue.isAnswerRevealed = true;
+                }
+
+                // "That's correct." (start speaking) + reveal at same time
+                const { ms } = ctx.aiHostSay(gameId, "That's correct.");
+
+                if (game.selectedClue) {
+                    ctx.broadcast(gameId, { type: "answer-revealed", clue: game.selectedClue });
+                }
+
+                // Correct player becomes selector
+                game.selectorKey = ctx.playerStableId(player);
+                game.selectorName = player.name;
+
+                // Return to board after he finishes + short delay
+                ctx.aiAfter(gameId, ms + 700, () => {
+                    const g = ctx.games?.[gameId];
+                    if (!g) return;
+                    finishClueAndReturnToBoard(ctx, gameId, g, { keepSelector: false });
+                });
+
+                return;
+            }
+
+            // verdict === "incorrect"
+            // Lock them out from re-buzzing on this clue
+            const stable = ctx.playerStableId(player);
+            if (game.clueState?.lockedOut) game.clueState.lockedOut[stable] = true;
+
+            // Clear current answering state so the clue can continue
+            game.buzzed = null;
+            game.answeringPlayerKey = null;
+            game.answerSessionId = null;
+            game.answerClueKey = null;
+
+            // Check if anyone remains eligible to buzz
+            const players = game.players || [];
+            const anyoneLeft = players.some((p) => !game.clueState?.lockedOut?.[ctx.playerStableId(p)]);
+
+            if (!anyoneLeft) {
+                // No eligible players left => treat as "nobody got it"
+                if (game.selectedClue) {
+                    game.selectedClue.isAnswerRevealed = true;
+                }
+
+                const { ms } = ctx.aiHostSay(gameId, "Looks like nobody got it.");
+
+                if (game.selectedClue) {
+                    ctx.broadcast(gameId, { type: "answer-revealed", clue: game.selectedClue });
+                }
+
+                ctx.aiAfter(gameId, ms + 700, () => {
+                    const g = ctx.games?.[gameId];
+                    if (!g) return;
+                    finishClueAndReturnToBoard(ctx, gameId, g, { keepSelector: true });
+                });
+
+                return;
+            }
+
+            // Otherwise: prompt and then unlock buzzers automatically
+            game.buzzerLocked = true;
+            ctx.broadcast(gameId, { type: "buzzer-locked" });
+
+            const { ms } = ctx.aiHostSay(gameId, "Would anyone else like to answer?");
+
+            ctx.aiAfter(gameId, ms + 250, () => {
+                const g = ctx.games?.[gameId];
+                if (!g) return;
+
+                // Reset buzzer state and unlock for remaining eligible players
+                g.buzzed = null;
+                g.buzzerLocked = false;
+
+                ctx.broadcast(gameId, { type: "reset-buzzer" });
+                ctx.broadcast(gameId, { type: "buzzer-unlocked" });
+
+                // Restart your normal buzz timer window
+                ctx.doUnlockBuzzerAuthoritative({ gameId, game: g });
+            });
+
+            return;
+        }
+// ----- END AUTO-RESOLVE -----
+
     },
 
     "reset-buzzer": async ({ ws, data, ctx }) => {
@@ -593,6 +742,19 @@ export const gameHandlers = {
             isAnswerRevealed: false,
         };
 
+        // ---- CLUE STATE START ----
+        const boardKey = game.activeBoard || "firstBoard";
+        const v = String(clue?.value ?? "");
+        const q = String(clue?.question ?? "").trim();
+        const clueKey = `${boardKey}:${v}:${q}`;
+
+        game.phase = "clue";
+        game.clueState = {
+            clueKey,
+            lockedOut: {},
+        };
+
+
         // Reset buzzer state
         game.buzzed = null;
         game.buzzerLocked = true;
@@ -610,11 +772,6 @@ export const gameHandlers = {
         // --- AUTO UNLOCK AFTER TTS DURATION ---
         const narrationEnabled = Boolean(game?.lobbySettings?.narrationEnabled);
         if (!narrationEnabled) return;
-
-        const boardKey = game.activeBoard || "firstBoard";
-        const v = String(clue?.value ?? "");
-        const q = String(clue?.question ?? "").trim();
-        const clueKey = `${boardKey}:${v}:${q}`;
 
         const ttsAssetId = game.boardData?.ttsByClueKey?.[clueKey] || null;
 

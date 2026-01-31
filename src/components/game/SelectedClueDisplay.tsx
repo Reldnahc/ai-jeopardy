@@ -349,7 +349,7 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                     {/* Reserve space for the answer */}
                 {(isFinalJeopardy ? (
                         <div className="flex justify-center items-center">
-                            {(showAnswer || hostCanSeeAnswer) && (
+                            {(showAnswer) && (
                                 <p style={{ fontSize: "clamp(1.5rem, 4vw, 3rem)" }} className="mt-5 text-yellow-300">
                                     {localSelectedClue.answer}
                                 </p>
@@ -357,7 +357,7 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                         </div>
                     ):(
                         <div className="sm:min-h-[70px] md:min-h-[100px] flex justify-center items-center">
-                            {(showAnswer || hostCanSeeAnswer) && (
+                            {(showAnswer) && (
                                 <p style={{ fontSize: "clamp(1.5rem, 4vw, 3rem)" }} className="mt-5 text-yellow-300">
                                     {localSelectedClue.answer}
                                 </p>
@@ -486,68 +486,6 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                     >
                         {buzzLockedOut ? "Locked Out" : buzzerLocked ? "Buzz Early" : "Buzz!"}
                     </button>
-                )}
-                {false && isHost &&  !showAnswer && !isFinalJeopardy && (
-                    <button
-                        onClick={() => {
-                            if (buzzerLocked) {
-                                sendJson({ type: "unlock-buzzer", gameId });
-                                unlockBuzzer?.();
-
-                            } else {
-                                sendJson({ type: "reset-buzzer", gameId });
-                                resetBuzzer();
-                            }
-
-                        }}
-                        style={{ fontSize: "clamp(1rem, 2.5vw, 2rem)" }}
-                        className={`mt-4 mr-3 px-12 min-w-[22rem] py-5 rounded-xl font-bold shadow-2xl text-white transition duration-300 ease-in-out ${
-                            buzzerLocked ? "bg-green-500 hover:bg-green-600" : buzzResult ? "bg-orange-500 hover:bg-orange-600" : "bg-gray-500"
-                        } ${!buzzResult && !buzzerLocked ? "opacity-50 cursor-not-allowed" : ""}`}
-                        disabled={!buzzResult && !buzzerLocked}
-                    >
-                        {buzzerLocked ? "Unlock Buzzer" : "Reset Buzzer"}
-                    </button>
-                )}
-                {false && isHost && (
-                    <button
-                        disabled={isFinalJeopardy && !drawings}
-                        onClick={() => {
-                            if (!showAnswer) {
-                                // Server is authoritative: ask server to reveal.
-                                sendJson({ type: "reveal-answer", gameId });
-                            } else {
-                                setShowClue(false);
-
-                                if (localSelectedClue) {
-                                    const clueId = `${localSelectedClue.value}-${localSelectedClue.question}`;
-
-                                    sendJson({ type: "clue-cleared", gameId, clueId });
-                                    sendJson({ type: "return-to-board", gameId });
-
-                                    if (isFinalJeopardy) {
-                                        sendJson({ type: "trigger-game-over", gameId });
-                                    }
-                                }
-                            }
-
-                        }}
-                        style={{ fontSize: "clamp(1rem, 2.5vw, 2rem)" }}
-                        className={`mt-4 px-12 py-5 rounded-xl min-w-[22rem] font-bold shadow-2xl text-white transition duration-300 ease-in-out ${
-                            isFinalJeopardy && !drawings
-                                ? "bg-gray-400 cursor-not-allowed"
-                                : showAnswer
-                                    ? "bg-violet-500 hover:bg-violet-700"
-                                    : "bg-indigo-700 hover:bg-indigo-900"
-                        }`}
-                    >
-                        {isFinalJeopardy && !drawings
-                            ? "Waiting for answers"
-                            : showAnswer
-                                ? "Return to Board"
-                                : "Reveal Answer"}
-                    </button>
-
                 )}
 
                 <div className="flex flex-wrap gap-4">
