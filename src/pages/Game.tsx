@@ -8,7 +8,7 @@ import {useWebSocket} from "../contexts/WebSocketContext.tsx";
 import {useDeviceContext} from "../contexts/DeviceContext.tsx";
 import MobileSidebar from "../components/game/MobileSidebar.tsx";
 import {useGameSession} from "../hooks/useGameSession.ts";
-import {useGameSocketSync} from "../hooks/game/useGameSocketSync.ts";
+import {BoardData, useGameSocketSync} from "../hooks/game/useGameSocketSync.ts";
 import {usePlayerIdentity} from "../hooks/usePlayerIdentity.ts";
 import {usePreloadBoardImages} from "../hooks/game/usePreloadBoardImages.ts";
 
@@ -197,7 +197,7 @@ export default function Game() {
         }
 
         // ✅ FAST PATH: if server provided mapping, play immediately (no WS noise)
-        const mappedAssetId = (boardData as any)?.ttsByClueKey?.[clueOpenKey];
+        const mappedAssetId = (boardData as BoardData)?.ttsByClueKey?.[clueOpenKey];
         if (typeof mappedAssetId === "string" && mappedAssetId.trim()) {
             playAudioUrl(`/api/tts/${mappedAssetId.trim()}`);
             narratedKeysRef.current.add(clueOpenKey);

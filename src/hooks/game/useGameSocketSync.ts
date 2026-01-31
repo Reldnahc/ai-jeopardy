@@ -5,7 +5,7 @@ import type { Category, Clue } from "../../types";
 import type { DrawingPath } from "../../utils/drawingUtils";
 import {LobbySettings} from "../lobby/useLobbySocketSync.tsx";
 
-type BoardData = {
+export type BoardData = {
     firstBoard: { categories: Category[] };
     secondBoard: { categories: Category[] };
     finalJeopardy: { categories: Category[] };
