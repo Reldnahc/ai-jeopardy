@@ -71,3 +71,7 @@ export async function verifySupabaseAccessToken(accessToken) {
         return null;
     }
 }
+
+export function playerStableId(p) {
+    return (typeof p.playerKey === "string" && p.playerKey.trim()) ? p.playerKey.trim() : p.name;
+}

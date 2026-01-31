@@ -6,13 +6,14 @@ import { sendLobbySnapshot, buildLobbyState, getPlayerForSocket } from "../lobby
 import { startGameTimer, clearGameTimer } from "../game/timer.js";
 import { validateImportedBoardData, parseBoardJson, normalizeCategories11 } from "../validation/boardImport.js";
 import { requireHost, isHostSocket } from "../auth/hostGuard.js";
-import {getColorFromPlayerName} from "../services/userService.js";
+import {getColorFromPlayerName, playerStableId} from "../services/userService.js";
 import {createTrace} from "../services/trace.js";
 import {createBoardData} from "../services/aiService.js";
 import { getRoleForUserId, verifySupabaseAccessToken } from "../services/userService.js";
 import {checkAllFinalDrawingsSubmitted, checkAllWagersSubmitted} from "../game/finalJeopardy.js";
 import {isBoardFullyCleared, startFinalJeopardy} from "../game/stageTransition.js";
 import {getCOTD} from "../state/cotdStore.js";
+import {collectImageAssetIdsFromBoard} from "../services/imageAssetService.js";
 
 export const createWsContext = (wss) => {
     const { broadcast, broadcastAll } = makeBroadcaster(wss);
@@ -58,5 +59,7 @@ export const createWsContext = (wss) => {
         isBoardFullyCleared,
         startFinalJeopardy,
         getCOTD,
+        collectImageAssetIdsFromBoard,
+        playerStableId,
     };
 };

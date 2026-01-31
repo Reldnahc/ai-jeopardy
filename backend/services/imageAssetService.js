@@ -84,3 +84,24 @@ export async function ingestImageToR2FromUrl(imageUrl, meta, supabase, trace) {
 
     return again.data.id;
 }
+
+export function collectImageAssetIdsFromBoard(boardData) {
+    const ids = new Set();
+
+    const collect = (categories) => {
+        (categories ?? []).forEach((cat) => {
+            (cat.values ?? []).forEach((clue) => {
+                const media = clue?.media;
+                if (media?.type === "image" && typeof media.assetId === "string" && media.assetId.trim()) {
+                    ids.add(media.assetId.trim());
+                }
+            });
+        });
+    };
+
+    collect(boardData?.firstBoard?.categories);
+    collect(boardData?.secondBoard?.categories);
+    collect(boardData?.finalJeopardy?.categories);
+
+    return Array.from(ids);
+}

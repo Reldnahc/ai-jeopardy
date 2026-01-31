@@ -1,30 +1,3 @@
-//TODO MOVE THESE SOMEWHERE ELSE AND INGEST VIA CTX
-
-function collectImageAssetIdsFromBoard(boardData) {
-    const ids = new Set();
-
-    const collect = (categories) => {
-        (categories ?? []).forEach((cat) => {
-            (cat.values ?? []).forEach((clue) => {
-                const media = clue?.media;
-                if (media?.type === "image" && typeof media.assetId === "string" && media.assetId.trim()) {
-                    ids.add(media.assetId.trim());
-                }
-            });
-        });
-    };
-
-    collect(boardData?.firstBoard?.categories);
-    collect(boardData?.secondBoard?.categories);
-    collect(boardData?.finalJeopardy?.categories);
-
-    return Array.from(ids);
-}
-
-function playerStableId(p) {
-    return (typeof p.playerKey === "string" && p.playerKey.trim()) ? p.playerKey.trim() : p.name;
-}
-
 export const lobbyHandlers = {
     "create-game": async ({ ws, data, ctx }) => { //Fired from lobby logic all done in lobby. it belongs here.
         const { gameId } = data ?? {};
@@ -245,13 +218,13 @@ export const lobbyHandlers = {
         ctx.games[gameId].finalJeopardyStage = null;
 
         trace.mark("broadcast_game_state_start");
-        const assetIds = collectImageAssetIdsFromBoard(boardData);
+        const assetIds = ctx.collectImageAssetIdsFromBoard(boardData);
 
         // Track preload status server-side (online players only)
         const onlinePlayers = (ctx.games[gameId].players ?? []).filter((p) => p.online);
         ctx.games[gameId].preload = {
             active: true,
-            required: onlinePlayers.map(playerStableId),
+            required: onlinePlayers.map(ctx.playerStableId),
             done: [],
             createdAt: Date.now(),
         };
@@ -290,7 +263,7 @@ export const lobbyHandlers = {
         if (!stable) return;
 
         // Only accept from players currently in the game list
-        const isKnown = (game.players ?? []).some((p) => playerStableId(p) === stable);
+        const isKnown = (game.players ?? []).some((p) => ctx.playerStableId(p) === stable);
         if (!isKnown) return;
 
         // Mark done
@@ -299,7 +272,7 @@ export const lobbyHandlers = {
         }
 
         // Recompute who is required (online only)
-        const requiredNow = (game.players ?? []).filter((p) => p.online).map(playerStableId);
+        const requiredNow = (game.players ?? []).filter((p) => p.online).map(ctx.playerStableId);
 
         const doneSet = new Set(game.preload.done);
         const allDone = requiredNow.every((id) => doneSet.has(id));
