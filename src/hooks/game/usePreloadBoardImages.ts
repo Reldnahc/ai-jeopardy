@@ -10,9 +10,6 @@ type BoardData = {
 function collectImageAssetIds(boardData: BoardData): string[] {
     if (!boardData) return [];
 
-    // DEBUG: Log the incoming data structure to verify it matches expectations
-    console.log("[Preloader] Extracting IDs from boardData:", boardData);
-
     // Defensive check: handle if boardData is the whole object or just an array
     const allCats: Category[] = [
         ...(boardData.firstBoard?.categories ?? []),
