@@ -38,7 +38,6 @@ function finishClueAndReturnToBoard(ctx, gameId, game, { keepSelector }) {
     game.phase = "board";
     game.clueState = null;
 
-    // Selector remains if keepSelector=true
     ctx.broadcast(gameId, {
         type: "phase-changed",
         phase: "board",
