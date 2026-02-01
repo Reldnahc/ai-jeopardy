@@ -57,10 +57,8 @@ export default function Game() {
         phase,
         selectorKey,
         selectorName,
-        welcomeTtsAssetId,
         aiHostText,
         aiHostAsset,
-        //welcomeEndsAt,
     } = useGameSocketSync({ gameId, playerName: effectivePlayerName });
 
     // Persistent WebSocket connection
@@ -298,22 +296,6 @@ export default function Game() {
             console.debug("TTS play blocked:", e);
         }
     }, [ttsReady, audioMuted]);
-
-    const playedWelcomeRef = useRef<string | null>(null);
-
-    useEffect(() => {
-        if (phase !== "welcome") return;
-        if (!welcomeTtsAssetId) return;
-
-        // don't replay
-        if (playedWelcomeRef.current === welcomeTtsAssetId) return;
-        playedWelcomeRef.current = welcomeTtsAssetId;
-
-        // if muted, do nothing (server still gates unlock via phase)
-        if (audioMuted) return;
-
-        playAudioUrl(`/api/tts/${welcomeTtsAssetId}`);
-    }, [phase, welcomeTtsAssetId, audioMuted, playAudioUrl]);
 
     useEffect(() => {
         if (!gameId || !effectivePlayerName) return;

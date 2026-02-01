@@ -77,8 +77,6 @@ type GameStateMessage = {
     phase?: string | null;
     selectorKey?: string | null;
     selectorName?: string | null;
-    welcomeTtsAssetId?: string | null;
-    welcomeEndsAt?: number | null;
 };
 
 type UseGameSocketSyncArgs = {
@@ -131,8 +129,6 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
     const [phase, setPhase] = useState<string | null>(null);
     const [selectorKey, setSelectorKey] = useState<string | null>(null);
     const [selectorName, setSelectorName] = useState<string | null>(null);
-    const [welcomeTtsAssetId, setWelcomeTtsAssetId] = useState<string | null>(null);
-    const [welcomeEndsAt, setWelcomeEndsAt] = useState<number | null>(null);
 
     const [aiHostText, setAiHostText] = useState<string | null>(null);
     const [aiHostAsset, setAiHostAsset] = useState<string | null>(null);
@@ -250,8 +246,6 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
                 setPhase(m.phase ?? null);
                 setSelectorKey(m.selectorKey ?? null);
                 setSelectorName(m.selectorName ?? null);
-                setWelcomeTtsAssetId(m.welcomeTtsAssetId ?? null);
-                setWelcomeEndsAt(m.welcomeEndsAt ?? null);
 
                 if (Array.isArray(m.clearedClues)) {
                     setClearedClues(new Set(m.clearedClues));
@@ -607,8 +601,6 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
         phase,
         selectorKey,
         selectorName,
-        welcomeTtsAssetId,
-        welcomeEndsAt,
         aiHostText,
         aiHostAsset,
     };

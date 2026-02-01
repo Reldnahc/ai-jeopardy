@@ -102,25 +102,6 @@ export const lobbyHandlers = {
             game.selectorName = null;
         }
 
-        // Prepare welcome TTS so it can be preloaded in the same handshake
-        // (If narration is disabled, we still create the asset for now; you can gate later.)
-        if (game.selectorName) {
-            const welcomeText = `Welcome to AI Jeopardy. ${game.selectorName} will be starting us off today.`;
-            try {
-                const ensured = await ctx.ensureTtsAsset(
-                    { text: welcomeText },
-                    ctx.supabase,
-                    trace
-                );
-                game.welcomeTtsAssetId = ensured?.id ?? null;
-            } catch (e) {
-                console.error("[create-game] welcome TTS failed:", e);
-                game.welcomeTtsAssetId = null;
-            }
-
-        } else {
-            game.welcomeTtsAssetId = null;
-        }
         // Build AI-host phrase bank + player name callouts so they're preloaded with welcome + board
         try {
             await ctx.ensureAiHostTtsBank({ ctx, game, trace });
@@ -187,51 +168,73 @@ export const lobbyHandlers = {
         if (!game.lobbyHost) game.lobbyHost = game.host;
         game.host = "AI Jeopardy";
 
-        // Start in welcome phase if we have welcome audio; otherwise go straight to board
-        const hasWelcome = typeof game.welcomeTtsAssetId === "string" && game.welcomeTtsAssetId.trim();
-        if (game.welcomeTimer) {
-            clearTimeout(game.welcomeTimer);
-            game.welcomeTimer = null;
-        }
 
-        if (hasWelcome) {
+        const narrationEnabled = Boolean(game?.lobbySettings?.narrationEnabled);
+        const selectorName = (game.selectorName ?? "").trim();
+
+        if (narrationEnabled && selectorName) {
             game.phase = "welcome";
+            game.welcomeEndsAt = null;
 
-            let durationMs = null;
-            try {
-                durationMs = await ctx.getTtsDurationMs(game.welcomeTtsAssetId);
-            } catch (e) {
-                console.error("[preload-done] welcome duration lookup failed:", e);
-            }
+            ctx.broadcast(gameId, {
+                type: "phase-changed",
+                phase: "welcome",
+                selectorKey: game.selectorKey ?? null,
+                selectorName: game.selectorName ?? null,
+            });
 
-            const waitMs = Math.max(0, (durationMs ?? 0) + 250);
-            game.welcomeEndsAt = Date.now() + waitMs;
+            // Fire welcome sequence via the same ai-host-say pipeline:
+            void (async () => {
+                const a = await ctx.aiHostSayRandomFromSlot(gameId, game, "welcome_intro");
+                const aMs = a?.ms ?? 0;
 
-            game.welcomeTimer = setTimeout(() => {
-                const g = ctx.games?.[gameId];
-                if (!g) return;
-                if (g.phase !== "welcome") return;
+                const b = await ctx.aiHostSayPlayerName(gameId, game, selectorName);
+                const bMs = b?.ms ?? 0;
 
-                g.phase = "board";
-                g.welcomeTimer = null;
+                const c = await ctx.aiHostSayRandomFromSlot(gameId, game, "welcome_outro");
+                const cMs = c?.ms ?? 0;
 
-                ctx.broadcast(gameId, {
-                    type: "phase-changed",
-                    phase: "board",
-                    selectorKey: g.selectorKey ?? null,
-                    selectorName: g.selectorName ?? null,
-                });
-            }, waitMs);
+                // Conservative timing if duration lookups return 0 due to timeout
+                const pad = 250;
+                const fallback = 900; // per segment fallback if ms=0
+                const total =
+                    (aMs || fallback) + pad +
+                    (bMs || fallback) + pad +
+                    (cMs || fallback) + 600;
+
+                game.welcomeEndsAt = Date.now() + total;
+
+                if (game.welcomeTimer) {
+                    clearTimeout(game.welcomeTimer);
+                    game.welcomeTimer = null;
+                }
+
+                game.welcomeTimer = setTimeout(() => {
+                    const g = ctx.games?.[gameId];
+                    if (!g) return;
+                    if (g.phase !== "welcome") return;
+
+                    g.phase = "board";
+                    g.welcomeTimer = null;
+
+                    ctx.broadcast(gameId, {
+                        type: "phase-changed",
+                        phase: "board",
+                        selectorKey: g.selectorKey ?? null,
+                        selectorName: g.selectorName ?? null,
+                    });
+                }, total);
+            })();
         } else {
             game.phase = "board";
             game.welcomeEndsAt = null;
         }
 
+
         ctx.broadcast(gameId, {
             type: "start-game",
             host: game.host,
         });
-
     },
 
 

@@ -47,6 +47,23 @@ function finishClueAndReturnToBoard(ctx, gameId, game, { keepSelector }) {
     });
 
     ctx.broadcast(gameId, { type: "returned-to-board", selectedClue: null });
+
+    if (Boolean(game?.lobbySettings?.narrationEnabled) && game.selectorName) {
+        (async () => {
+            const name = String(game.selectorName || "").trim();
+            if (!name) return;
+
+            const a = await ctx.aiHostSayPlayerName(gameId, game, name);
+            const aMs = a?.ms ?? 0;
+
+            // small gap so it feels like “Name… you’re up.”
+            ctx.aiAfter(gameId, (aMs || 650) + 150, async () => {
+                const g = ctx.games?.[gameId];
+                if (!g) return;
+                await ctx.aiHostSayRandomFromSlot(gameId, g, "your_up");
+            });
+        })();
+    }
 }
 
 async function autoResolveAfterJudgement(ctx, gameId, game, playerName, verdict) {

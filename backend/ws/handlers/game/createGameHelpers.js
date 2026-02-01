@@ -51,6 +51,19 @@ const AI_HOST_VARIANTS = {
         "Time's up—no one got it.",
         "We didn't get an answer on that one.",
     ],
+    welcome_intro: [
+        "Welcome to AI Jeopardy.",
+        "Welcome to AI Jeopardy!",
+    ],
+    welcome_outro: [
+        "will be starting us off today.",
+        "you're up first.",
+    ],
+    your_up: [
+        "you're up.",
+        "go ahead.",
+        "pick the next clue.",
+    ],
 };
 
 // “Name callout” should feel like Jeopardy: short + punchy.
@@ -60,36 +73,32 @@ function nameCalloutText(name) {
 }
 
 export async function ensureAiHostTtsBank({ ctx, game, trace }) {
-    // This creates:
-    // game.aiHostTts = {
-    //   slotAssets: { correct: [id...], rebuzz: [id...], nobody: [id...] },
-    //   nameAssetsByPlayer: { [playerName]: assetId },
-    //   allAssetIds: [ ...everything... ],
-    // }
     if (!game) return;
     if (game.aiHostTts && Array.isArray(game.aiHostTts.allAssetIds)) return;
 
     const narrationEnabled = Boolean(game?.lobbySettings?.narrationEnabled);
-    // If narration is off, we can skip generating to save cost.
-    // But you said “every play downloads every game” — that implies narration is on.
-    // We'll respect narrationEnabled to avoid wasting money when it’s off.
     if (!narrationEnabled) {
         game.aiHostTts = { slotAssets: {}, nameAssetsByPlayer: {}, allAssetIds: [] };
         return;
     }
 
+    const slotKeys = Object.keys(AI_HOST_VARIANTS);
+
     const out = {
-        slotAssets: { correct: [], incorrect: [], rebuzz: [], nobody: [] },
+        slotAssets: {},
         nameAssetsByPlayer: {},
         allAssetIds: [],
     };
 
+    // init arrays for every slot
+    for (const k of slotKeys) out.slotAssets[k] = [];
+
     trace?.mark?.("tts_ensure_aihost_start");
 
-    // 1) Ensure slot variants (concurrent)
     const slotJobs = [];
 
-    for (const slot of ["correct", "incorrect", "rebuzz", "nobody"]) {
+    // 1) Ensure slot variants
+    for (const slot of slotKeys) {
         const variants = AI_HOST_VARIANTS[slot] || [];
         for (const text of variants) {
             slotJobs.push((async () => {
@@ -110,7 +119,7 @@ export async function ensureAiHostTtsBank({ ctx, game, trace }) {
         }
     }
 
-    // 2) Ensure player name callouts (concurrent)
+    // 2) Ensure player name callouts
     const players = Array.isArray(game.players) ? game.players : [];
     for (const p of players) {
         const name = String(p?.name || "").trim();
@@ -135,19 +144,19 @@ export async function ensureAiHostTtsBank({ ctx, game, trace }) {
 
     await Promise.all(slotJobs);
 
-    // de-dupe
     out.allAssetIds = Array.from(new Set(out.allAssetIds));
-
     game.aiHostTts = out;
 
     trace?.mark?.("tts_ensure_aihost_end", {
         total: out.allAssetIds.length,
-        correct: out.slotAssets.correct.length,
-        rebuzz: out.slotAssets.rebuzz.length,
-        nobody: out.slotAssets.nobody.length,
+        slots: slotKeys.reduce((acc, k) => {
+            acc[k] = out.slotAssets[k]?.length ?? 0;
+            return acc;
+        }, {}),
         names: Object.keys(out.nameAssetsByPlayer).length,
     });
 }
+
 
 export function getGameOrFail({ ws, ctx, gameId }) {
     if (!gameId) {
@@ -355,17 +364,13 @@ export async function setupPreloadHandshake({ ctx, gameId, game, boardData, trac
     });
 
     const baseTts = Array.isArray(boardData?.ttsAssetIds) ? boardData.ttsAssetIds : [];
-    const extra = (game?.welcomeTtsAssetId && typeof game.welcomeTtsAssetId === "string")
-        ? [game.welcomeTtsAssetId]
-        : [];
 
     const aiHostExtra = Array.isArray(game?.aiHostTts?.allAssetIds)
         ? game.aiHostTts.allAssetIds
         : [];
 
 // de-dupe
-    const ttsAssetIds = Array.from(new Set([...baseTts, ...extra, ...aiHostExtra]));
-
+    const ttsAssetIds = Array.from(new Set([...baseTts, ...aiHostExtra]));
 
 
     trace?.mark("preload_tts_collected", {
