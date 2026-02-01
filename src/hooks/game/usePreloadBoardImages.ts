@@ -78,7 +78,7 @@ export function usePreloadBoardImages(boardData: BoardData | null | undefined, e
 
         const controller = new AbortController();
         const { signal } = controller;
-        const CONCURRENCY = 8;
+        const CONCURRENCY = 2;
 
         const queue = ids
             .map((id) => `/api/images/${id}`)
@@ -226,7 +226,7 @@ export function usePreloadImageAssetIds(
 
         const controller = new AbortController();
         const { signal } = controller;
-        const CONCURRENCY = 8;
+        const CONCURRENCY = 2;
 
         const queue = assetIds
             .map((id) => `/api/images/${id}`)
