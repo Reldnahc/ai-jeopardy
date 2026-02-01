@@ -155,7 +155,7 @@ export function usePreloadAudioAssetIds(
         const controller = new AbortController();
         const { signal } = controller;
 
-        const CONCURRENCY = 6;
+        const CONCURRENCY = 2;
 
         // Build urls, but DO NOT mark requested yet.
         const queue = assetIds
@@ -174,12 +174,15 @@ export function usePreloadAudioAssetIds(
         let index = 0;
         let completed = 0;
 
-        const pump = () => {
+        const pump = async () => {
             if (signal.aborted) return;
 
             while (inFlight < CONCURRENCY && index < queue.length) {
                 const url = queue[index++];
                 inFlight++;
+
+                // Small stagger to avoid thundering herd against /api/tts in prod
+                await new Promise((r) => setTimeout(r, 80));
 
                 preloadAudioOne(url, signal)
                     .then(() => {
@@ -198,12 +201,12 @@ export function usePreloadAudioAssetIds(
                             onDone?.();
                         }
 
-                        pump();
+                        void pump();
                     });
             }
         };
 
-        pump();
+        void pump();
 
         return () => controller.abort();
     }, [assetIds, enabled, onDone]);

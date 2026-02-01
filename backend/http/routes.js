@@ -4,6 +4,41 @@ import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { supabase } from "../config/database.js";
 import { r2 } from "../services/r2Client.js";
 
+
+// --- TTS asset lookup protection (prevents Supabase stampede) ---
+const TTS_CACHE_TTL_MS = 5 * 60 * 1000;
+
+const ttsMetaCache = new Map(); // assetId -> { storageKey, contentType, expiresAt }
+const ttsInFlight = new Map();  // assetId -> Promise<{ storageKey, contentType }>
+
+function getCachedTtsMeta(assetId) {
+    const hit = ttsMetaCache.get(assetId);
+    if (!hit) return null;
+    if (Date.now() > hit.expiresAt) {
+        ttsMetaCache.delete(assetId);
+        return null;
+    }
+    return hit;
+}
+
+function setCachedTtsMeta(assetId, storageKey, contentType) {
+    ttsMetaCache.set(assetId, {
+        storageKey,
+        contentType,
+        expiresAt: Date.now() + TTS_CACHE_TTL_MS,
+    });
+}
+
+function isConnectTimeoutError(err) {
+    const msg = String(err?.message || "");
+    const details = String(err?.details || "");
+    return (
+        msg.includes("fetch failed") ||
+        msg.includes("UND_ERR_CONNECT_TIMEOUT") ||
+        details.includes("UND_ERR_CONNECT_TIMEOUT")
+    );
+}
+
 /**
  * Registers all Express HTTP routes (GET endpoints + SPA fallback).
  * @param {import("express").Express} app
@@ -139,15 +174,85 @@ export function registerHttpRoutes(app, { distPath }) {
 
     app.get("/api/tts-assets/:assetId", async (req, res) => {
         const { assetId } = req.params;
+        // 1) Cache hit
+        const cached = getCachedTtsMeta(assetId);
+        let storageKey;
+        let contentType;
 
-        const { data, error } = await supabase
-            .from("tts_assets")
-            .select("*")
-            .eq("id", assetId)
-            .single();
+        if (cached) {
+            storageKey = cached.storageKey;
+            contentType = cached.contentType || "audio/mpeg";
+        } else {
+            // 2) In-flight dedupe (if 20 clients ask for same id, only 1 Supabase call)
+            let p = ttsInFlight.get(assetId);
 
-        if (error || !data) return res.status(404).json({ error: "Not found" });
-        res.json(data);
+            if (!p) {
+                p = (async () => {
+                    const { data, error } = await supabase
+                        .from("tts_assets")
+                        .select("storage_key, content_type")
+                        .eq("id", assetId)
+                        .single();
+
+                    if (error) {
+                        // If this is a connectivity failure, surface 503 (don’t cache)
+                        if (isConnectTimeoutError(error)) throw error;
+
+                        const code = error.code || "";
+                        const status = error.status || 0;
+                        const isNotFound =
+                            code === "PGRST116" || status === 406 || /0 rows/i.test(error.message || "");
+
+                        if (isNotFound) {
+                            const e = new Error("TTS_NOT_FOUND");
+                            e.code = "TTS_NOT_FOUND";
+                            throw e;
+                        }
+
+                        throw error;
+                    }
+
+                    if (!data) {
+                        const e = new Error("TTS_NOT_FOUND");
+                        e.code = "TTS_NOT_FOUND";
+                        throw e;
+                    }
+
+                    return {
+                        storageKey: data.storage_key,
+                        contentType: data.content_type || "audio/mpeg",
+                    };
+                })();
+
+                ttsInFlight.set(assetId, p);
+            }
+
+            try {
+                const meta = await p;
+                storageKey = meta.storageKey;
+                contentType = meta.contentType || "audio/mpeg";
+                setCachedTtsMeta(assetId, storageKey, contentType);
+            } catch (e) {
+                // IMPORTANT: clear in-flight on failure so future calls can retry
+                ttsInFlight.delete(assetId);
+
+                if (e?.code === "TTS_NOT_FOUND") {
+                    return res.status(404).json({ error: "TTS asset not found" });
+                }
+
+                if (isConnectTimeoutError(e)) {
+                    // Don’t let clients cache this failure
+                    res.setHeader("Cache-Control", "no-store");
+                    return res.status(503).json({ error: "TTS lookup temporarily unavailable" });
+                }
+
+                console.error("Supabase error in /api/tts:", e);
+                return res.status(500).json({ error: "TTS lookup failed" });
+            } finally {
+                // On success, remove in-flight (cache now holds it)
+                ttsInFlight.delete(assetId);
+            }
+        }
     });
 
     app.get("/test/tts/:assetId", async (req, res) => {
