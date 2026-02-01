@@ -36,6 +36,101 @@ function finishClueAndReturnToBoard(ctx, gameId, game, { keepSelector }) {
 
     ctx.broadcast(gameId, { type: "returned-to-board", selectedClue: null });
 }
+async function autoResolveAfterJudgement(ctx, gameId, game, playerName, verdict) {
+    if (!game || !game.selectedClue) return;
+
+    const clueValue = parseClueValue(game.selectedClue?.value);
+    const delta = verdict === "correct" ? clueValue : verdict === "incorrect" ? -clueValue : 0;
+
+    // Apply score immediately (authoritative)
+    if (verdict === "correct" || verdict === "incorrect") {
+        applyScore(game, playerName, delta);
+        ctx.broadcast(gameId, { type: "update-scores", scores: game.scores });
+    }
+
+    if (verdict === "correct") {
+        game.selectedClue.isAnswerRevealed = true;
+
+        const said = await ctx.aiHostSayRandomFromSlot(gameId, game, "correct");
+        const ms = said?.ms ?? 0;
+
+        ctx.broadcast(gameId, { type: "answer-revealed", clue: game.selectedClue });
+
+        // Correct player becomes selector
+        const p = (game.players || []).find(x => x?.name === playerName);
+        game.selectorKey = ctx.playerStableId(p || { name: playerName });
+        game.selectorName = playerName;
+
+        ctx.aiAfter(gameId, ms + 700, () => {
+            const g = ctx.games?.[gameId];
+            if (!g) return;
+            finishClueAndReturnToBoard(ctx, gameId, g, { keepSelector: false });
+        });
+
+        return;
+    }
+
+    // verdict === "incorrect"
+
+    // Lock them out from re-buzzing on this clue
+    const p = (game.players || []).find(x => x?.name === playerName);
+    const stable = ctx.playerStableId(p || { name: playerName });
+    if (game.clueState?.lockedOut) game.clueState.lockedOut[stable] = true;
+
+    // Clear any answer state so clue can continue
+    game.buzzed = null;
+    game.answeringPlayerKey = null;
+    game.answerSessionId = null;
+    game.answerClueKey = null;
+    game.answerTranscript = game.answerTranscript ?? "";
+    game.answerVerdict = "incorrect";
+
+    // Cancel timers tied to the answering window / old buzz window
+    ctx.clearAnswerWindow(game);
+    ctx.clearGameTimer(game);
+
+    // Check if anyone remains eligible to buzz
+    const players = game.players || [];
+    const anyoneLeft = players.some(pp => !game.clueState?.lockedOut?.[ctx.playerStableId(pp)]);
+
+    if (!anyoneLeft) {
+        game.selectedClue.isAnswerRevealed = true;
+
+        const said = await ctx.aiHostSayRandomFromSlot(gameId, game, "nobody");
+        const ms = said?.ms ?? 0;
+
+        ctx.broadcast(gameId, { type: "answer-revealed", clue: game.selectedClue });
+
+        ctx.aiAfter(gameId, ms + 700, () => {
+            const g = ctx.games?.[gameId];
+            if (!g) return;
+            finishClueAndReturnToBoard(ctx, gameId, g, { keepSelector: true });
+        });
+
+        return;
+    }
+
+    // Prompt and then reopen buzzers for remaining eligible players
+    game.buzzerLocked = true;
+    ctx.broadcast(gameId, { type: "buzzer-locked" });
+
+    const said = await ctx.aiHostSayRandomFromSlot(gameId, game, "incorrect");
+    const ms = said?.ms ?? 0;
+
+    ctx.aiAfter(gameId, ms + 250, () => {
+        const g = ctx.games?.[gameId];
+        if (!g) return;
+
+        // Clear "someone already buzzed"
+        g.buzzed = null;
+
+        // IMPORTANT: unlock first (server authority), starts a fresh buzz timer too
+        ctx.doUnlockBuzzerAuthoritative({ gameId, game: g });
+
+        // Then tell clients to visually reset their local buzzer UI
+        ctx.broadcast(gameId, { type: "buzzer-ui-reset" });
+    });
+}
 
 
 export const gameHandlers = {
@@ -262,91 +357,92 @@ export const gameHandlers = {
         game.buzzed = player.name;
         ctx.broadcast(gameId, { type: "buzz-result", playerName: player.name });
 
-// Start server-authoritative answer capture session
-        const boardKey = game.activeBoard || "firstBoard";
-        const v = String(game.selectedClue?.value ?? "");
-        const q = String(game.selectedClue?.question ?? "").trim();
-        const clueKey = `${boardKey}:${v}:${q}`;
+// Lock buzzer immediately (prevents weird edge cases)
+        game.buzzerLocked = true;
+        ctx.broadcast(gameId, { type: "buzzer-locked" });
 
-        game.phase = "ANSWER_CAPTURE";
-        game.answeringPlayerKey = player.name;
-        game.answerClueKey = clueKey;
-        game.answerSessionId = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
-        game.answerTranscript = null;
-        game.answerVerdict = null;
-        game.answerConfidence = null;
+// Say the player's name (Jeopardy-style), then start answer capture
+        let nameMs = 0;
+        try {
+            const said = await ctx.aiHostSayPlayerName(gameId, game, player.name);
+            nameMs = said?.ms ?? 0;
+        } catch (e) {
+            console.error("[buzz] aiHostSayPlayerName failed:", e);
+        }
 
-// Clear any prior capture window
-        ctx.clearAnswerWindow(game);
-
-// Choose a fixed recording window (keep it short for latency/cost)
+    // Delay answer capture until name finishes (+ buffer)
+        const startCaptureAfterMs = Math.max(0, nameMs + 150);
         const RECORD_MS = 9000;
-        const deadlineAt = Date.now() + RECORD_MS;
-
-        ctx.broadcast(gameId, {
-            type: "answer-capture-start",
-            gameId,
-            playerName: player.name,
-            answerSessionId: game.answerSessionId,
-            clueKey,
-            durationMs: RECORD_MS,
-            deadlineAt,
-        });
-
-        // Start window timer (if it expires, we publish needs_host so the game never deadlocks)
-        ctx.startAnswerWindow(gameId, game, ctx.broadcast, RECORD_MS, () => {
-            const g = ctx.games[gameId];
+        setTimeout(() => {
+            const g = ctx.games?.[gameId];
             if (!g) return;
 
-            // stale protection
-            // Allow if session matches and we haven't already processed a final result from audio.
-            if (game.phase !== "ANSWER_CAPTURE" && game.phase !== "RESULT") {
-                ws.send(JSON.stringify({
-                    type: "answer-error",
-                    gameId,
-                    answerSessionId: g.answerSessionId,
-                    message: `Not accepting answers right now (phase=${String(game.phase)})`
-                }));
-                return;
-            }
+            // Ensure we're still on same buzz & clue
+            if (g.buzzed !== player.name) return;
 
-            // If we already produced a transcript from audio (not timeout), don’t accept again
-            if (game.answerTranscript && game.answerTranscript.trim()) {
-                ws.send(JSON.stringify({
-                    type: "answer-error",
-                    gameId,
-                    answerSessionId: g.answerSessionId,
-                    message: "Answer already received."
-                }));
-                return;
-            }
+            // Start server-authoritative answer capture session
+            const boardKey = g.activeBoard || "firstBoard";
+            const v = String(g.selectedClue?.value ?? "");
+            const q = String(g.selectedClue?.question ?? "").trim();
+            const clueKey = `${boardKey}:${v}:${q}`;
 
+            g.phase = "ANSWER_CAPTURE";
+            g.answeringPlayerKey = player.name;
+            g.answerClueKey = clueKey;
+            g.answerSessionId = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+            g.answerTranscript = null;
+            g.answerVerdict = null;
+            g.answerConfidence = null;
 
-            g.phase = "RESULT";
-            g.answerTranscript = "";
-            g.answerVerdict = "incorrect";
-            g.answerConfidence = 0.0;
+            ctx.clearAnswerWindow(g);
 
-            const parseValue = (val) => {
-                const n = Number(String(val || "").replace(/[^0-9]/g, ""));
-                return Number.isFinite(n) ? n : 0;
-            };
-            const clueValue = parseValue(g.selectedClue?.value);
+            const deadlineAt = Date.now() + RECORD_MS;
 
             ctx.broadcast(gameId, {
-                type: "answer-result",
+                type: "answer-capture-start",
                 gameId,
+                playerName: player.name,
                 answerSessionId: g.answerSessionId,
-                playerName: g.answeringPlayerKey,
-                transcript: "",
-                verdict: "incorrect",
-                confidence: 0.0,
-                suggestedDelta: -clueValue,
+                clueKey,
+                durationMs: RECORD_MS,
+                deadlineAt,
             });
 
-        });
+            ctx.startAnswerWindow(gameId, g, ctx.broadcast, RECORD_MS, () => {
+                const gg = ctx.games?.[gameId];
+                if (!gg) return;
 
-        // Keep your existing visual timer if you want (UI countdown). It won’t control logic now.
+                // Only expire the CURRENT answer session (prevents stale timeouts)
+                if (!gg.answerSessionId) return;
+                if (gg.answerSessionId !== g.answerSessionId) return;
+                if (gg.answeringPlayerKey !== player.name) return;
+                if (!gg.selectedClue) return;
+
+                // Force resolve as incorrect (no-answer)
+                gg.phase = "RESULT";
+                gg.answerTranscript = "";
+                gg.answerVerdict = "incorrect";
+                gg.answerConfidence = 0.0;
+
+                const clueValue = parseClueValue(gg.selectedClue?.value);
+
+                ctx.broadcast(gameId, {
+                    type: "answer-result",
+                    gameId,
+                    answerSessionId: gg.answerSessionId,
+                    playerName: player.name,
+                    transcript: "",
+                    verdict: "incorrect",
+                    confidence: 0.0,
+                    suggestedDelta: -clueValue,
+                });
+
+                autoResolveAfterJudgement(ctx, gameId, gg, player.name, "incorrect")
+                    .catch((e) => console.error("[answer-timeout] autoResolve failed:", e));
+            });
+
+        }, startCaptureAfterMs);
+
         //TODO REIMPLEMENT UI TIMER
         // if (game.timeToAnswer !== -1) {
         //     ctx.startGameTimer(gameId, game, ctx.broadcast, game.timeToAnswer, "answer");
@@ -545,100 +641,9 @@ export const gameHandlers = {
 
 // ----- AUTO-RESOLVE AFTER JUDGEMENT (AI-hosted gameplay) -----
         if (verdict === "correct" || verdict === "incorrect") {
-            const clueValue = parseClueValue(game.selectedClue?.value);
-            const delta = verdict === "correct" ? clueValue : -clueValue;
-
-            // Apply score immediately (authoritative)
-            applyScore(game, player.name, delta);
-            ctx.broadcast(gameId, { type: "update-scores", scores: game.scores });
-
-            if (verdict === "correct") {
-                // Reveal as the host starts speaking
-                if (game.selectedClue) {
-                    game.selectedClue.isAnswerRevealed = true;
-                }
-
-                // "That's correct." (start speaking) + reveal at same time
-                const { ms } = ctx.aiHostSay(gameId, "That's correct.");
-
-                if (game.selectedClue) {
-                    ctx.broadcast(gameId, { type: "answer-revealed", clue: game.selectedClue });
-                }
-
-                // Correct player becomes selector
-                game.selectorKey = ctx.playerStableId(player);
-                game.selectorName = player.name;
-
-                // Return to board after he finishes + short delay
-                ctx.aiAfter(gameId, ms + 700, () => {
-                    const g = ctx.games?.[gameId];
-                    if (!g) return;
-                    finishClueAndReturnToBoard(ctx, gameId, g, { keepSelector: false });
-                });
-
-                return;
-            }
-
-            // verdict === "incorrect"
-            // Lock them out from re-buzzing on this clue
-            const stable = ctx.playerStableId(player);
-            if (game.clueState?.lockedOut) game.clueState.lockedOut[stable] = true;
-
-            // Clear current answering state so the clue can continue
-            game.buzzed = null;
-            game.answeringPlayerKey = null;
-            game.answerSessionId = null;
-            game.answerClueKey = null;
-
-            // Check if anyone remains eligible to buzz
-            const players = game.players || [];
-            const anyoneLeft = players.some((p) => !game.clueState?.lockedOut?.[ctx.playerStableId(p)]);
-
-            if (!anyoneLeft) {
-                // No eligible players left => treat as "nobody got it"
-                if (game.selectedClue) {
-                    game.selectedClue.isAnswerRevealed = true;
-                }
-
-                const { ms } = ctx.aiHostSay(gameId, "Looks like nobody got it.");
-
-                if (game.selectedClue) {
-                    ctx.broadcast(gameId, { type: "answer-revealed", clue: game.selectedClue });
-                }
-
-                ctx.aiAfter(gameId, ms + 700, () => {
-                    const g = ctx.games?.[gameId];
-                    if (!g) return;
-                    finishClueAndReturnToBoard(ctx, gameId, g, { keepSelector: true });
-                });
-
-                return;
-            }
-
-            // Otherwise: prompt and then unlock buzzers automatically
-            game.buzzerLocked = true;
-            ctx.broadcast(gameId, { type: "buzzer-locked" });
-
-            const { ms } = ctx.aiHostSay(gameId, "Would anyone else like to answer?");
-
-            ctx.aiAfter(gameId, ms + 250, () => {
-                const g = ctx.games?.[gameId];
-                if (!g) return;
-
-                // Reset buzzer state and unlock for remaining eligible players
-                g.buzzed = null;
-                g.buzzerLocked = false;
-
-                ctx.broadcast(gameId, { type: "reset-buzzer" });
-                ctx.broadcast(gameId, { type: "buzzer-unlocked" });
-
-                // Restart your normal buzz timer window
-                ctx.doUnlockBuzzerAuthoritative({ gameId, game: g });
-            });
-
+            await autoResolveAfterJudgement(ctx, gameId, game, player.name, verdict);
             return;
         }
-// ----- END AUTO-RESOLVE -----
 
     },
 
@@ -656,7 +661,7 @@ export const gameHandlers = {
 
         game.timerVersion = (game.timerVersion || 0) + 1;
 
-        ctx.broadcast(gameId, { type: "reset-buzzer" });
+        ctx.broadcast(gameId, { type: "buzzer-ui-reset" });
         ctx.broadcast(gameId, { type: "buzzer-locked" });
         ctx.broadcast(gameId, { type: "timer-end", timerVersion: (ctx.games[gameId]?.timerVersion || 0) }); // client now clears on reset-buzzer anyway
     },
@@ -766,7 +771,7 @@ export const gameHandlers = {
             clearedClues: Array.from(game.clearedClues),
         });
 
-        ctx.broadcast(gameId, { type: "reset-buzzer" });
+        ctx.broadcast(gameId, { type: "buzzer-ui-reset" });
         ctx.broadcast(gameId, { type: "buzzer-locked" });
 
         // --- AUTO UNLOCK AFTER TTS DURATION ---

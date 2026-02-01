@@ -24,6 +24,141 @@ function collectNarrationTextsFromBoard(boardData) {
     return Array.from(new Set(texts));
 }
 
+function pickRandom(arr) {
+    if (!Array.isArray(arr) || arr.length === 0) return null;
+    return arr[Math.floor(Math.random() * arr.length)];
+}
+
+// Variety banks (add as many as you want)
+const AI_HOST_VARIANTS = {
+    welcome: [
+        "Welcome to AI Jeopardy!",
+        "Welcome back to AI Jeopardy.",
+        "Alright, let's play AI Jeopardy!",
+    ],
+    correct: [
+        "That's correct.",
+        "Yes, that's right.",
+        "Correct.",
+        "You got it.",
+    ],
+    incorrect: [
+        "No, that's not it.",
+        "Sorry, that's incorrect.",
+        "Incorrect.",
+        "Nope. That's not the one.",
+        "That’s not correct—anyone else?",
+    ],
+    rebuzz: [
+        "Would anyone else like to answer?",
+        "Anyone else?",
+        "Other players, buzz in if you know it.",
+        "Still open—anyone else want to try?",
+    ],
+    nobody: [
+        "Looks like nobody got it.",
+        "No one buzzed in.",
+        "Time's up—no one got it.",
+        "We didn't get an answer on that one.",
+    ],
+};
+
+// “Name callout” should feel like Jeopardy: short + punchy.
+// You can also do `${name}.` but exclamation usually feels better.
+function nameCalloutText(name) {
+    return `${name}!`;
+}
+
+export async function ensureAiHostTtsBank({ ctx, game, trace }) {
+    // This creates:
+    // game.aiHostTts = {
+    //   slotAssets: { correct: [id...], rebuzz: [id...], nobody: [id...] },
+    //   nameAssetsByPlayer: { [playerName]: assetId },
+    //   allAssetIds: [ ...everything... ],
+    // }
+    if (!game) return;
+    if (game.aiHostTts && Array.isArray(game.aiHostTts.allAssetIds)) return;
+
+    const narrationEnabled = Boolean(game?.lobbySettings?.narrationEnabled);
+    // If narration is off, we can skip generating to save cost.
+    // But you said “every play downloads every game” — that implies narration is on.
+    // We'll respect narrationEnabled to avoid wasting money when it’s off.
+    if (!narrationEnabled) {
+        game.aiHostTts = { slotAssets: {}, nameAssetsByPlayer: {}, allAssetIds: [] };
+        return;
+    }
+
+    const out = {
+        slotAssets: { correct: [], incorrect: [], rebuzz: [], nobody: [] },
+        nameAssetsByPlayer: {},
+        allAssetIds: [],
+    };
+
+    trace?.mark?.("tts_ensure_aihost_start");
+
+    // 1) Ensure slot variants (concurrent)
+    const slotJobs = [];
+
+    for (const slot of ["correct", "rebuzz", "nobody"]) {
+        const variants = AI_HOST_VARIANTS[slot] || [];
+        for (const text of variants) {
+            slotJobs.push((async () => {
+                const asset = await ctx.ensureTtsAsset(
+                    {
+                        text,
+                        textType: "text",
+                        voiceId: "Matthew",
+                        engine: "standard",
+                        outputFormat: "mp3",
+                    },
+                    ctx.supabase,
+                    trace
+                );
+                out.slotAssets[slot].push(asset.id);
+                out.allAssetIds.push(asset.id);
+            })());
+        }
+    }
+
+    // 2) Ensure player name callouts (concurrent)
+    const players = Array.isArray(game.players) ? game.players : [];
+    for (const p of players) {
+        const name = String(p?.name || "").trim();
+        if (!name) continue;
+
+        slotJobs.push((async () => {
+            const asset = await ctx.ensureTtsAsset(
+                {
+                    text: nameCalloutText(name),
+                    textType: "text",
+                    voiceId: "Matthew",
+                    engine: "standard",
+                    outputFormat: "mp3",
+                },
+                ctx.supabase,
+                trace
+            );
+            out.nameAssetsByPlayer[name] = asset.id;
+            out.allAssetIds.push(asset.id);
+        })());
+    }
+
+    await Promise.all(slotJobs);
+
+    // de-dupe
+    out.allAssetIds = Array.from(new Set(out.allAssetIds));
+
+    game.aiHostTts = out;
+
+    trace?.mark?.("tts_ensure_aihost_end", {
+        total: out.allAssetIds.length,
+        correct: out.slotAssets.correct.length,
+        rebuzz: out.slotAssets.rebuzz.length,
+        nobody: out.slotAssets.nobody.length,
+        names: Object.keys(out.nameAssetsByPlayer).length,
+    });
+}
+
 export function getGameOrFail({ ws, ctx, gameId }) {
     if (!gameId) {
         ws.send(JSON.stringify({ type: "error", message: "create-game missing gameId" }));
@@ -234,8 +369,13 @@ export async function setupPreloadHandshake({ ctx, gameId, game, boardData, trac
         ? [game.welcomeTtsAssetId]
         : [];
 
-    // de-dupe
-    const ttsAssetIds = Array.from(new Set([...baseTts, ...extra]));
+    const aiHostExtra = Array.isArray(game?.aiHostTts?.allAssetIds)
+        ? game.aiHostTts.allAssetIds
+        : [];
+
+// de-dupe
+    const ttsAssetIds = Array.from(new Set([...baseTts, ...extra, ...aiHostExtra]));
+
 
 
     trace?.mark("preload_tts_collected", {

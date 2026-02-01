@@ -165,12 +165,12 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
 
     const lockBuzzer = useCallback(() => {
         if (!gameId) return;
-        sendJson({ type: "buzzer-locked", gameId });
+        sendJson({ type: "lock-buzzer", gameId });
     }, [gameId, sendJson]);
 
     const unlockBuzzer = useCallback(() => {
         if (!gameId) return;
-        sendJson({ type: "buzzer-unlocked", gameId });
+        sendJson({ type: "unlock-buzzer", gameId });
     }, [gameId, sendJson]);
 
     const boardDataRef = useRef(boardData);
@@ -182,6 +182,15 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
         setTimerEndTime(null);
         setTimerDuration(0);
     }, []);
+
+    const clearAnswerUi = () => {
+        setAnswerCapture(null);
+        setAnswerTranscript(null);
+        setAnswerResult(null);
+        setAnswerError(null);
+        // also allow re-buzz
+        setBuzzResult(null);
+    };
 
     const applyLockoutUntil = useCallback((until: number) => {
         if (lockoutTimeoutRef.current) {
@@ -374,7 +383,6 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
                 return;
             }
 
-
             if (message.type === "buzzer-locked") {
                 setBuzzerLocked(true);
                 return;
@@ -384,9 +392,16 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
                 return;
             }
 
+            if (message.type === "buzzer-ui-reset") {
+                clearAnswerUi();
+                resetLocalTimerState();
+                return;
+            }
+
             if (message.type === "reset-buzzer") {
-                setBuzzResult(null);
-                setBuzzerLocked(true);
+                // This is the HOST reset flow (server will also send buzzer-locked).
+                // Do UI cleanup but do NOT force buzzerLocked here.
+                clearAnswerUi();
                 resetLocalTimerState();
                 return;
             }

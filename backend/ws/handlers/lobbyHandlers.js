@@ -117,8 +117,16 @@ export const lobbyHandlers = {
                 console.error("[create-game] welcome TTS failed:", e);
                 game.welcomeTtsAssetId = null;
             }
+
         } else {
             game.welcomeTtsAssetId = null;
+        }
+        // Build AI-host phrase bank + player name callouts so they're preloaded with welcome + board
+        try {
+            await ctx.ensureAiHostTtsBank({ ctx, game, trace });
+        } catch (e) {
+            console.error("[create-game] ai host tts bank failed:", e);
+            game.aiHostTts = { slotAssets: {}, nameAssetsByPlayer: {}, allAssetIds: [] };
         }
 
         // Phase will be set when preload finishes (in preload-done)

@@ -19,7 +19,7 @@ import { transcribeAnswerAudio } from "../services/sttService.js";
 
 import {
     applyNewGameState,
-    clearGenerationProgress, ensureBoardTtsAssets,
+    clearGenerationProgress, ensureAiHostTtsBank, ensureBoardTtsAssets,
     ensureHostOrFail,
     ensureLobbySettings, getBoardDataOrFail,
     getGameOrFail,
@@ -39,6 +39,42 @@ export const createWsContext = (wss) => {
     const { broadcast, broadcastAll } = makeBroadcaster(wss);
 
     const ttsDuration = createTtsDurationService({ supabase, r2 });
+
+    function aiHostSayAsset(gameId, assetId) {
+        if (!assetId) return null;
+        broadcast(gameId, { type: "ai-host-say", assetId });
+        return assetId;
+    }
+
+    async function aiHostSayRandomFromSlot(gameId, game, slot) {
+        const ids = game?.aiHostTts?.slotAssets?.[slot];
+        const assetId = Array.isArray(ids) ? ids[Math.floor(Math.random() * ids.length)] : null;
+        if (!assetId) return null;
+
+        aiHostSayAsset(gameId, assetId);
+
+        // Return duration for scheduling
+        try {
+            const ms = await ttsDuration.getDurationMs(assetId);
+            return { assetId, ms: ms ?? 0 };
+        } catch {
+            return { assetId, ms: 0 };
+        }
+    }
+
+    async function aiHostSayPlayerName(gameId, game, playerName) {
+        const id = game?.aiHostTts?.nameAssetsByPlayer?.[playerName] || null;
+        if (!id) return null;
+
+        aiHostSayAsset(gameId, id);
+
+        try {
+            const ms = await ttsDuration.getDurationMs(id);
+            return { assetId: id, ms: ms ?? 0 };
+        } catch {
+            return { assetId: id, ms: 0 };
+        }
+    }
 
     function estimateSpeechMs(text) {
         const t = String(text || "").trim();
@@ -94,8 +130,9 @@ export const createWsContext = (wss) => {
     function doUnlockBuzzerAuthoritative({ gameId, game }) {
         if (!game) return;
 
-        // If already unlocked or clue changed, ignore
-        if (!game.buzzerLocked) return;
+        // Always restart the buzz timer window when we "unlock"
+        // (prevents stale timers from instantly expiring after a rebuzz)
+        clearGameTimer(game);
 
         game.buzzerLocked = false;
         broadcast(gameId, { type: "buzzer-unlocked" });
@@ -116,31 +153,26 @@ export const createWsContext = (wss) => {
                         game.buzzerLocked = true;
                         broadcast(gameId, { type: "buzzer-locked" });
 
-                        // AI host line + reveal immediately
                         const { ms } = aiHostSay(gameId, "Looks like nobody got it.");
 
                         game.selectedClue.isAnswerRevealed = true;
                         broadcast(gameId, { type: "answer-revealed", clue: game.selectedClue });
 
-                        // After speech + small pause => return to board
                         aiAfter(gameId, ms + 700, () => {
                             const g = games?.[gameId];
                             if (!g) return;
                             if (!g.selectedClue) return;
 
-                            // clear the clue (authoritative)
                             if (!g.clearedClues) g.clearedClues = new Set();
                             const clueId = `${g.selectedClue.value}-${g.selectedClue.question}`;
                             g.clearedClues.add(clueId);
                             broadcast(gameId, { type: "clue-cleared", clueId });
 
-                            // reset state
                             g.selectedClue = null;
                             g.buzzed = null;
                             g.phase = "board";
                             g.buzzerLocked = true;
 
-                            // IMPORTANT: selector stays the same (requirement)
                             broadcast(gameId, {
                                 type: "phase-changed",
                                 phase: "board",
@@ -263,5 +295,10 @@ export const createWsContext = (wss) => {
         aiHostSay,
         aiAfter,
         estimateSpeechMs,
+        ensureAiHostTtsBank,
+
+        aiHostSayAsset,
+        aiHostSayRandomFromSlot,
+        aiHostSayPlayerName,
     };
 };
