@@ -54,23 +54,23 @@ export async function getRoleForUserId(userId) {
 }
 
 export async function verifySupabaseAccessToken(accessToken) {
-    if (!accessToken || typeof accessToken !== "string") return null;
-
     try {
-        // With service-role key on server, this validates the JWT and returns the user
         const { data, error } = await supabase.auth.getUser(accessToken);
 
         if (error) {
-            console.error("[verifySupabaseAccessToken] Invalid token:", error.message);
+            // This is *actually* token-related most of the time
+            console.warn("[verifySupabaseAccessToken] auth error:", error.message);
             return null;
         }
 
         return data?.user ?? null;
     } catch (e) {
-        console.error("[verifySupabaseAccessToken] Exception:", e);
-        return null;
+        // This is network/infra, not “invalid token”
+        console.error("[verifySupabaseAccessToken] network failure:", e);
+        return null; // or throw, depending on your flow
     }
 }
+
 
 export function playerStableId(p) {
     return (typeof p.playerKey === "string" && p.playerKey.trim()) ? p.playerKey.trim() : p.name;

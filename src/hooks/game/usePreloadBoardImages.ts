@@ -123,13 +123,21 @@ export function usePreloadBoardImages(boardData: BoardData | null | undefined, e
 }
 
 async function preloadAudioOne(url: string, signal: AbortSignal): Promise<void> {
-    try {
-        const r = await fetch(url, { signal, cache: "force-cache" });
-        // ensure full download
-        await r.arrayBuffer();
-    } catch {
-        // ignore failures; don't block the game
+    const r = await fetch(url, { signal, cache: "force-cache" });
+
+    // If it isn't a 2xx, treat as failure so we can retry later.
+    if (!r.ok) {
+        throw new Error(`preload failed ${r.status} ${url}`);
     }
+
+    // Optional safety: make sure we didn't download JSON error text
+    const ct = r.headers.get("content-type") || "";
+    if (!ct.startsWith("audio/")) {
+        throw new Error(`preload got non-audio (${ct}) ${url}`);
+    }
+
+    // Ensure full download so it actually lands in cache
+    await r.arrayBuffer();
 }
 
 export function usePreloadAudioAssetIds(
@@ -146,22 +154,20 @@ export function usePreloadAudioAssetIds(
 
         const controller = new AbortController();
         const { signal } = controller;
+
         const CONCURRENCY = 6;
 
+        // Build urls, but DO NOT mark requested yet.
         const queue = assetIds
-            .map((id) => `/api/tts/${id}`)
-            .filter((url) => {
-                if (requestedRef.current.has(url)) return false;
-                requestedRef.current.add(url);
-                return true;
-            });
+            .map((id) => `/api/tts/${String(id).trim()}`)
+            .filter((url) => !requestedRef.current.has(url));
 
         if (!queue.length) {
             if (!doneCalledRef.current) {
                 doneCalledRef.current = true;
                 onDone?.();
             }
-            return;
+            return () => controller.abort();
         }
 
         let inFlight = 0;
@@ -175,25 +181,32 @@ export function usePreloadAudioAssetIds(
                 const url = queue[index++];
                 inFlight++;
 
-                preloadAudioOne(url, signal).finally(() => {
-                    inFlight--;
-                    completed++;
+                preloadAudioOne(url, signal)
+                    .then(() => {
+                        // Only mark requested if it truly preloaded.
+                        requestedRef.current.add(url);
+                    })
+                    .catch(() => {
+                        // swallow — we WANT retries on next render/handshake/etc
+                    })
+                    .finally(() => {
+                        inFlight--;
+                        completed++;
 
-                    if (completed >= queue.length && !doneCalledRef.current) {
-                        doneCalledRef.current = true;
-                        onDone?.();
-                        return;
-                    }
+                        if (completed >= queue.length && !doneCalledRef.current) {
+                            doneCalledRef.current = true;
+                            onDone?.();
+                        }
 
-                    pump();
-                });
+                        pump();
+                    });
             }
         };
 
         pump();
 
         return () => controller.abort();
-    }, [enabled, onDone, assetIds]);
+    }, [assetIds, enabled, onDone]);
 }
 
 export function usePreloadImageAssetIds(

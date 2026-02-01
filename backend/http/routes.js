@@ -97,7 +97,23 @@ export function registerHttpRoutes(app, { distPath }) {
                 .eq("id", assetId)
                 .single();
 
-            if (error || !data) {
+            if (error) {
+                // PostgREST "no rows" is commonly PGRST116 (and/or status 406 depending on client)
+                const code = error.code || "";
+                const status = error.status || 0;
+
+                const isNotFound =
+                    code === "PGRST116" || status === 406 || /0 rows/i.test(error.message || "");
+
+                if (isNotFound) {
+                    return res.status(404).json({ error: "TTS asset not found" });
+                }
+
+                console.error("Supabase error in /api/tts:", error);
+                return res.status(500).json({ error: "TTS lookup failed" });
+            }
+
+            if (!data) {
                 return res.status(404).json({ error: "TTS asset not found" });
             }
 
