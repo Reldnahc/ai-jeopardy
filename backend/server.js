@@ -11,6 +11,7 @@ import { attachWebSocketServer } from "./ws/index.js";
 import { getCOTD, setCOTD } from "./state/cotdStore.js";
 import { registerHttpRoutes } from "./http/routes.js";
 import { monitorEventLoopDelay } from "node:perf_hooks";
+import { Agent, setGlobalDispatcher } from "undici";
 const app = express(); // Initialize Express app
 app.use(cors());
 app.use(bodyParser.json());
@@ -25,20 +26,13 @@ const distPath = path.join(__dirname, "..", "dist");
 app.use(express.static(distPath));
 registerHttpRoutes(app, { distPath });
 
-
-
-const h = monitorEventLoopDelay({ resolution: 20 });
-h.enable();
-
-setInterval(() => {
-    const p99 = Math.round(h.percentile(99) / 1e6);
-    const mean = Math.round(h.mean / 1e6);
-
-    if (p99 > 200) {
-        console.warn("[PERF] event loop lag", { p99ms: p99, meanms: mean });
-    }
-    h.reset();
-}, 2000).unref();
+setGlobalDispatcher(new Agent({
+    keepAliveTimeout: 60_000,
+    keepAliveMaxTimeout: 60_000,
+    connectTimeout: 10_000,
+    headersTimeout: 30_000,
+    bodyTimeout: 30_000,
+}));
 
 // --- Startup safety --------------------------------------------------------
 // Make sure critical async state (COTD) is ready BEFORE accepting connections.
