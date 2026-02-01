@@ -359,19 +359,11 @@ export async function setupPreloadHandshake({ ctx, gameId, game, boardData, trac
     });
 
     const assetIds = ctx.collectImageAssetIdsFromBoard(boardData);
-    trace?.mark("preload_images_collected", {
-        imageAssetCount: assetIds.length,
-    });
+    trace?.mark("preload_images_collected", { imageAssetCount: assetIds.length });
 
     const baseTts = Array.isArray(boardData?.ttsAssetIds) ? boardData.ttsAssetIds : [];
-
-    const aiHostExtra = Array.isArray(game?.aiHostTts?.allAssetIds)
-        ? game.aiHostTts.allAssetIds
-        : [];
-
-// de-dupe
+    const aiHostExtra = Array.isArray(game?.aiHostTts?.allAssetIds) ? game.aiHostTts.allAssetIds : [];
     const ttsAssetIds = Array.from(new Set([...baseTts, ...aiHostExtra]));
-
 
     trace?.mark("preload_tts_collected", {
         ttsAssetCount: ttsAssetIds.length,
@@ -392,6 +384,15 @@ export async function setupPreloadHandshake({ ctx, gameId, game, boardData, trac
         requiredPlayerIds: game.preload.required,
     });
 
+    // Safety: if nobody is required, skip handshake (otherwise you deadlock)
+    if (game.preload.required.length === 0) {
+        trace?.mark("preload_no_required_players_start_game");
+        ctx.broadcast(gameId, { type: "start-game" });
+        return { assetIds, ttsAssetIds };
+    }
+
+    // ✅ Always broadcast preload instruction (even if arrays are empty).
+    // Clients will ack immediately once they detect there's nothing to do.
     trace?.mark("preload_broadcast_start", {
         imageAssetCount: assetIds.length,
         ttsAssetCount: ttsAssetIds.length,
@@ -404,17 +405,11 @@ export async function setupPreloadHandshake({ ctx, gameId, game, boardData, trac
     });
 
     trace?.mark("preload_broadcast_end");
-
-    if (assetIds.length === 0 && ttsAssetIds.length === 0) {
-        trace?.mark("preload_empty_fast_start");
-        ctx.broadcast(gameId, { type: "start-game" });
-        trace?.mark("preload_empty_fast_end");
-    }
-
     trace?.mark("preload_handshake_end");
 
     return { assetIds, ttsAssetIds };
 }
+
 
 
 

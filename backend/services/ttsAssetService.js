@@ -1,7 +1,40 @@
 import crypto from "crypto";
-import { PutObjectCommand } from "@aws-sdk/client-s3";
+import {HeadObjectCommand, PutObjectCommand} from "@aws-sdk/client-s3";
 import { PollyClient, SynthesizeSpeechCommand } from "@aws-sdk/client-polly";
 import { r2 } from "./r2Client.js";
+
+
+async function sleep(ms) {
+    await new Promise((r) => setTimeout(r, ms));
+}
+
+async function waitForR2Readable({ bucket, key, trace, attempts = 7 }) {
+    // very short backoff; we only need to bridge immediate consistency gaps
+    for (let i = 0; i < attempts; i++) {
+        try {
+            await r2.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
+            trace?.mark?.("tts_r2_head_ok", { attempt: i });
+            return true;
+        } catch (e) {
+            const msg = String(e?.name || "") + " " + String(e?.message || "");
+            const isNotFound =
+                msg.includes("NotFound") ||
+                msg.includes("NoSuchKey") ||
+                msg.includes("404");
+
+            trace?.mark?.("tts_r2_head_wait", { attempt: i, isNotFound });
+
+            // If it’s a real error (permissions, outage), don’t spin forever
+            if (!isNotFound) throw e;
+
+            // backoff: 60, 100, 160, 250, 400, 650, 1000...
+            const delay = Math.min(1200, Math.round(60 * Math.pow(1.6, i)));
+            await sleep(delay);
+        }
+    }
+
+    return false;
+}
 
 function normalizeText(s) {
     return String(s ?? "")
@@ -82,9 +115,9 @@ function makePollyClient() {
 export async function ensureTtsAsset(
     {
         text,
-        textType = "text", // "text" | "ssml"
+        textType = "text",
         voiceId = "Matthew",
-        engine = "standard", // keep standard for cost
+        engine = "standard",
         outputFormat = "mp3",
         languageCode = null,
     },
@@ -127,12 +160,10 @@ export async function ensureTtsAsset(
     const synthInput = {
         OutputFormat: outputFormat,
         Text: normalizedText,
-        TextType: textType, // "text" | "ssml"
+        TextType: textType,
         VoiceId: voiceId,
-        Engine: engine, // "standard" | "neural"
+        Engine: engine,
     };
-
-    // Only include LanguageCode if explicitly provided
     if (languageCode) synthInput.LanguageCode = languageCode;
 
     const resp = await polly.send(new SynthesizeSpeechCommand(synthInput));
@@ -153,6 +184,18 @@ export async function ensureTtsAsset(
         })
     );
     trace?.mark("tts_r2_put_end");
+
+    trace?.mark("tts_r2_head_start");
+    const ok = await waitForR2Readable({
+        bucket: process.env.R2_BUCKET,
+        key: storageKey,
+        trace,
+    });
+    trace?.mark("tts_r2_head_end", { ok });
+
+    if (!ok) {
+        throw new Error(`R2 object not readable after upload: ${storageKey}`);
+    }
 
     const row = {
         storage_key: storageKey,
@@ -178,7 +221,7 @@ export async function ensureTtsAsset(
         return { id: inserted.data.id, sha256, storageKey };
     }
 
-    // Race fallback: someone else inserted same sha256
+    // Race fallback
     const again = await supabase
         .from("tts_assets")
         .select("id")

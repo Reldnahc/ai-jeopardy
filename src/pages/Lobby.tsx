@@ -151,6 +151,12 @@ const Lobby: React.FC = () => {
             playerKey: playerKey,
         });
     };
+    
+    useEffect(() => {
+        // If preload-images arrived but there is nothing to fetch,
+        // we still must ack so the server can start the game.
+        trySendPreloadAck();
+    }, [isPreloadingImages, isPreloadingAudio, preloadAssetIds, preloadTtsAssetIds, trySendPreloadAck]);
 
     usePreloadImageAssetIds(preloadAssetIds, isPreloadingImages, () => {
         imagesDoneRef.current = true;
