@@ -99,7 +99,7 @@ export async function ensureAiHostTtsBank({ ctx, game, trace }) {
     // 1) Ensure slot variants (concurrent)
     const slotJobs = [];
 
-    for (const slot of ["correct", "rebuzz", "nobody"]) {
+    for (const slot of ["correct", "incorrect", "rebuzz", "nobody"]) {
         const variants = AI_HOST_VARIANTS[slot] || [];
         for (const text of variants) {
             slotJobs.push((async () => {

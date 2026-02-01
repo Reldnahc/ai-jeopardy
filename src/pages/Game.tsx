@@ -61,6 +61,7 @@ export default function Game() {
         selectorName,
         welcomeTtsAssetId,
         aiHostText,
+        aiHostAsset,
         //welcomeEndsAt,
     } = useGameSocketSync({ gameId, playerName: effectivePlayerName });
 
@@ -161,6 +162,27 @@ export default function Game() {
     }, [audioMuted]);
 
     const lastAiHostSpokenRef = useRef<string | null>(null);
+
+    const lastAiHostAssetPlayedRef = useRef<string | null>(null);
+
+    useEffect(() => {
+        if (!aiHostAsset) return;
+
+        if (lastAiHostAssetPlayedRef.current === aiHostAsset) return;
+        lastAiHostAssetPlayedRef.current = aiHostAsset;
+
+        const idx = aiHostAsset.indexOf("::");
+        const assetId = (idx >= 0 ? aiHostAsset.slice(idx + 2) : aiHostAsset).trim();
+        if (!assetId) return;
+
+        // Page owns audio policy
+        if (!narrationEnabled) return;
+        if (audioMuted) return;
+
+        // Direct stream from your backend (already implemented)
+        playAudioUrl(`/api/tts/${assetId}`);
+    }, [aiHostAsset, narrationEnabled, audioMuted, playAudioUrl]);
+
 
     useEffect(() => {
         if (!aiHostText) return;

@@ -135,6 +135,8 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
     const [welcomeEndsAt, setWelcomeEndsAt] = useState<number | null>(null);
 
     const [aiHostText, setAiHostText] = useState<string | null>(null);
+    const [aiHostAsset, setAiHostAsset] = useState<string | null>(null);
+
     const aiHostSeqRef = useRef<number>(0);
 
     const makeRequestId = () =>
@@ -373,15 +375,25 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
             }
 
             if (message.type === "ai-host-say") {
-                const m = message as unknown as { text?: string };
+                const m = message as unknown as { text?: string; assetId?: string };
+
+                // Prefer pre-generated asset playback when available
+                const assetId = typeof m.assetId === "string" ? m.assetId.trim() : "";
+                if (assetId) {
+                    aiHostSeqRef.current += 1;
+                    setAiHostAsset(`${aiHostSeqRef.current}::${assetId}`);
+                    return;
+                }
+
+                // Fallback to text-based TTS flow
                 const text = String(m.text || "").trim();
                 if (!text) return;
 
-                // Store latest AI host line for the page to play (page handles mute)
                 aiHostSeqRef.current += 1;
                 setAiHostText(`${aiHostSeqRef.current}::${text}`);
                 return;
             }
+
 
             if (message.type === "buzzer-locked") {
                 setBuzzerLocked(true);
@@ -598,5 +610,6 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
         welcomeTtsAssetId,
         welcomeEndsAt,
         aiHostText,
+        aiHostAsset,
     };
 }

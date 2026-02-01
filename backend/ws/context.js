@@ -46,20 +46,32 @@ export const createWsContext = (wss) => {
         return assetId;
     }
 
+    const withTimeout = (p, ms, fallback) => {
+        let t = null;
+        const timeout = new Promise((resolve) => {
+            t = setTimeout(() => resolve(fallback), ms);
+        });
+        return Promise.race([p, timeout]).finally(() => {
+            if (t) clearTimeout(t);
+        });
+    };
+
     async function aiHostSayRandomFromSlot(gameId, game, slot) {
         const ids = game?.aiHostTts?.slotAssets?.[slot];
         const assetId = Array.isArray(ids) ? ids[Math.floor(Math.random() * ids.length)] : null;
         if (!assetId) return null;
 
+        // Fire-and-forget: client can start playing immediately
         aiHostSayAsset(gameId, assetId);
 
-        // Return duration for scheduling
-        try {
-            const ms = await ttsDuration.getDurationMs(assetId);
-            return { assetId, ms: ms ?? 0 };
-        } catch {
-            return { assetId, ms: 0 };
-        }
+        // Duration is best-effort; NEVER block game flow on Supabase/R2
+        const ms = await withTimeout(
+            ttsDuration.getDurationMs(assetId),
+            250,     // <= key change: cap how long we wait
+            0
+        );
+
+        return { assetId, ms: Number(ms) || 0 };
     }
 
     async function aiHostSayPlayerName(gameId, game, playerName) {
@@ -68,12 +80,13 @@ export const createWsContext = (wss) => {
 
         aiHostSayAsset(gameId, id);
 
-        try {
-            const ms = await ttsDuration.getDurationMs(id);
-            return { assetId: id, ms: ms ?? 0 };
-        } catch {
-            return { assetId: id, ms: 0 };
-        }
+        const ms = await withTimeout(
+            ttsDuration.getDurationMs(id),
+            250,
+            0
+        );
+
+        return { assetId: id, ms: Number(ms) || 0 };
     }
 
     function estimateSpeechMs(text) {
@@ -153,7 +166,15 @@ export const createWsContext = (wss) => {
                         game.buzzerLocked = true;
                         broadcast(gameId, { type: "buzzer-locked" });
 
-                        const { ms } = aiHostSay(gameId, "Looks like nobody got it.");
+                        (async () => {
+                            const said = await aiHostSayRandomFromSlot(gameId, game, "nobody");
+                            const ms = said?.ms ?? aiHostSay(gameId, "Looks like nobody got it.").ms;
+
+                            game.selectedClue.isAnswerRevealed = true;
+                            broadcast(gameId, { type: "answer-revealed", clue: game.selectedClue });
+
+                            aiAfter(gameId, ms + 700, () => { /* existing return-to-board logic */ });
+                        })();
 
                         game.selectedClue.isAnswerRevealed = true;
                         broadcast(gameId, { type: "answer-revealed", clue: game.selectedClue });

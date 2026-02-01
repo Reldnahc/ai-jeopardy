@@ -114,22 +114,21 @@ async function autoResolveAfterJudgement(ctx, gameId, game, playerName, verdict)
     game.buzzerLocked = true;
     ctx.broadcast(gameId, { type: "buzzer-locked" });
 
-    const said = await ctx.aiHostSayRandomFromSlot(gameId, game, "incorrect");
-    const ms = said?.ms ?? 0;
+    let ms = 0;
+    try {
+        const said = await ctx.aiHostSayRandomFromSlot(gameId, game, "incorrect");
+        ms = said?.ms ?? 0;
+    } catch (e) {
+        console.error("[autoResolveAfterJudgement] aiHostSayRandomFromSlot failed:", e);
+    }
 
     ctx.aiAfter(gameId, ms + 250, () => {
         const g = ctx.games?.[gameId];
         if (!g) return;
-
-        // Clear "someone already buzzed"
-        g.buzzed = null;
-
-        // IMPORTANT: unlock first (server authority), starts a fresh buzz timer too
         ctx.doUnlockBuzzerAuthoritative({ gameId, game: g });
-
-        // Then tell clients to visually reset their local buzzer UI
         ctx.broadcast(gameId, { type: "buzzer-ui-reset" });
     });
+
 }
 
 
@@ -557,7 +556,8 @@ export const gameHandlers = {
                     confidence: 0.0,
                     suggestedDelta: -clueValue,
                 });
-                return;
+                return autoResolveAfterJudgement(ctx, gameId, game, player.name, "incorrect")
+                    .catch((e) => console.error("[answer-audio-blob] autoResolve failed:", e));
             }
         } catch (e) {
             console.error("[answer-audio-blob] STT failed:", e?.message || e);
@@ -582,7 +582,8 @@ export const gameHandlers = {
                 confidence: 0.0,
                 suggestedDelta: -clueValue,
             });
-            return;
+            return autoResolveAfterJudgement(ctx, gameId, game, player.name, "incorrect")
+                .catch((err) => console.error("[answer-audio-blob-error] autoResolve failed:", err));
 
         }
 
