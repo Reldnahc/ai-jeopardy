@@ -264,12 +264,12 @@ export default function Game() {
             lastRequestedKeyRef.current = clueOpenKey;
             return;
         }
+        console.error("WE ARE FALLING BACK ERROR");
 
         // Fallback: old on-demand behavior
         const valuePart = `For ${selectedClue.value} dollars. `;
         const text = `${valuePart}${selectedClue.question ?? ""}`.trim();
         if (!text) return;
-
         activeTtsRequestIdRef.current = requestTts({ text, textType: "text", voiceId: "Matthew" });
         narratedKeysRef.current.add(clueOpenKey);
         lastRequestedKeyRef.current = clueOpenKey;
