@@ -200,7 +200,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
             {/* Fixed Bottom Section */}
             <div className="fixed bottom-0 left-0 w-full md:w-72 flex flex-col items-center gap-5 z-[100]">
-                {profile && profile.role === 'admin' && isHost && activeBoard !== "finalJeopardy" && (
+                {profile && profile.role === 'admin' && activeBoard !== "finalJeopardy" && (
                     <button
                         onClick={markAllCluesComplete}
                         className="px-10 py-5 bg-red-700 text-white text-xl font-bold border-none rounded-lg cursor-pointer min-w-72 hover:bg-red-800"
