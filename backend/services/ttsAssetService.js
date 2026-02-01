@@ -195,21 +195,19 @@ export async function ensureTtsAsset(
 
     const storageKey = `tts/sha256/${sha256}.mp3`;
 
-    // ---- FAST PATH: DB dedupe before scheduling heavy work ----
-    trace?.mark?.("tts_db_lookup_start");
-    const existing = await supabase
-        .from("tts_assets")
-        .select("id")
-        .eq("sha256", sha256)
-        .maybeSingle();
-    trace?.mark?.("tts_db_lookup_end", { hit: Boolean(existing?.data?.id) });
-
-    if (existing?.data?.id) {
-        return { id: existing.data.id, sha256, storageKey };
-    }
-
-    // ---- HEAVY PATH: globally scheduled (concurrency + spacing) ----
     return scheduleTtsWork(async () => {
+        trace?.mark?.("tts_db_lookup_start");
+        const existing = await supabase
+            .from("tts_assets")
+            .select("id")
+            .eq("sha256", sha256)
+            .maybeSingle();
+        trace?.mark?.("tts_db_lookup_end", { hit: Boolean(existing?.data?.id) });
+
+        if (existing?.data?.id) {
+            return { id: existing.data.id, sha256, storageKey };
+        }
+
         // Re-check inside scheduler to avoid thundering herd duplication
         trace?.mark?.("tts_db_lookup_2_start");
         const againExisting = await supabase
