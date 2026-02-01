@@ -11,6 +11,7 @@ import {useGameSession} from "../hooks/useGameSession.ts";
 import {BoardData, useGameSocketSync} from "../hooks/game/useGameSocketSync.ts";
 import {usePlayerIdentity} from "../hooks/usePlayerIdentity.ts";
 import {usePreloadBoardImages} from "../hooks/game/usePreloadBoardImages.ts";
+import {useEarlyMicPermission} from "../hooks/earlyMicPermission.ts";
 
 export default function Game() {
     const {gameId} = useParams<{ gameId: string }>();
@@ -178,6 +179,7 @@ export default function Game() {
         // Direct stream from your backend (already implemented)
         playAudioUrl(`/api/tts/${assetId}`);
     }, [aiHostAsset, narrationEnabled, audioMuted, playAudioUrl]);
+
 
 
     useEffect(() => {
@@ -359,6 +361,8 @@ export default function Game() {
             }
         }
     },[canSelectClue, gameId, sendJson]);
+
+    useEarlyMicPermission();
 
     return (
         <div
