@@ -239,31 +239,89 @@ export const lobbyHandlers = {
 
 
     "create-lobby": async ({ ws, data, ctx }) => {
-        const { host, categories, playerKey  } = data;
+        const startedAt = Date.now();
+        const reqId = `${startedAt}-${Math.random().toString(16).slice(2, 6)}`;
 
+        const mark = (label, extra) => {
+            const ms = Date.now() - startedAt;
+            if (extra) {
+                console.log(`[create-lobby][${reqId}] +${ms}ms ${label}`, extra);
+            } else {
+                console.log(`[create-lobby][${reqId}] +${ms}ms ${label}`);
+            }
+        };
+
+        const sendTimed = (type, payloadObj) => {
+            const t0 = Date.now();
+            try {
+                ws.send(JSON.stringify(payloadObj));
+            } catch (e) {
+                console.error(`[create-lobby][${reqId}] ws.send failed (${type})`, e);
+                return;
+            }
+            const dt = Date.now() - t0;
+            if (dt > 50) {
+                console.warn(`[create-lobby][${reqId}] ws.send slow (${type})`, { ms: dt });
+            }
+        };
+
+        mark("start");
+
+        const { host, categories, playerKey } = data ?? {};
+        mark("parsed payload", {
+            hostType: typeof host,
+            categoriesType: typeof categories,
+            categoriesLen: Array.isArray(categories) ? categories.length : null,
+            hasPlayerKey: typeof playerKey === "string" && playerKey.trim().length > 0,
+        });
+
+        // game id generation
         let newGameId;
+        mark("gameId generation begin");
         do {
             newGameId = Math.random().toString(36).substr(2, 5).toUpperCase();
         } while (ctx.games[newGameId]);
+        mark("gameId generated", { gameId: newGameId });
 
         ws.gameId = newGameId;
+        mark("ws.gameId set");
 
         let color = "bg-blue-500";
         let text_color = "text-white";
 
+        // suspect call: supabase lookup inside getColorFromPlayerName
+        mark("color lookup begin", { host });
         try {
+            const t0 = Date.now();
             const c = await ctx.getColorFromPlayerName(host);
+            const dt = Date.now() - t0;
+
+            mark("color lookup end", {
+                ms: dt,
+                gotColor: Boolean(c?.color),
+                gotTextColor: Boolean(c?.text_color),
+            });
+
             if (c?.color) color = c.color;
             if (c?.text_color) text_color = c.text_color;
+
+            if (dt > 500) {
+                console.warn(`[create-lobby][${reqId}] getColorFromPlayerName SLOW`, { ms: dt, host });
+            }
         } catch (e) {
-            console.error("Color lookup failed:", e);
+            console.error(`[create-lobby][${reqId}] color lookup failed`, e);
         }
 
-        const stableKey = typeof playerKey === "string" && playerKey.trim() ? playerKey.trim() : null;
+        const stableKey =
+            typeof playerKey === "string" && playerKey.trim() ? playerKey.trim() : null;
+        mark("stableKey computed", { hasStableKey: Boolean(stableKey) });
 
+        mark("ctx.games[gameId] set begin");
         ctx.games[newGameId] = {
             host,
-            players: [{ id: ws.id, name: host, color, text_color, playerKey: stableKey, online: true }],
+            players: [
+                { id: ws.id, name: host, color, text_color, playerKey: stableKey, online: true },
+            ],
             inLobby: true,
             createdAt: Date.now(),
             categories: ctx.normalizeCategories11(categories),
@@ -287,15 +345,28 @@ export const lobbyHandlers = {
             emptySince: null,
             cleanupTimer: null,
         };
+        mark("ctx.games[gameId] set end");
 
-        ws.send(JSON.stringify({
+        // send responses
+        mark("ws.send lobby-created begin");
+        sendTimed("lobby-created", {
             type: "lobby-created",
             gameId: newGameId,
             categories: ctx.normalizeCategories11(categories),
             players: [{ id: ws.id, name: host, color, text_color }],
-        }));
+        });
+        mark("ws.send lobby-created end");
 
-        ws.send(JSON.stringify(ctx.buildLobbyState(newGameId, ws)));
+        mark("ws.send lobby state begin");
+        sendTimed("lobby-state", ctx.buildLobbyState(newGameId, ws));
+        mark("ws.send lobby state end");
+
+        const total = Date.now() - startedAt;
+        mark("done", { totalMs: total });
+
+        if (total > 1000) {
+            console.warn(`[create-lobby][${reqId}] TOTAL SLOW`, { totalMs: total, gameId: newGameId });
+        }
     },
 
     "join-lobby": async ({ ws, data, ctx }) => {
