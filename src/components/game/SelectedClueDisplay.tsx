@@ -11,7 +11,6 @@ import Timer from "./Timer.tsx";
 interface SelectedClueDisplayProps {
     localSelectedClue: Clue;
     showAnswer: boolean;
-    setShowClue: (value: boolean) => void;
     isHost: boolean;
     isFinalJeopardy: boolean;
     gameId: string;
@@ -21,10 +20,7 @@ interface SelectedClueDisplayProps {
     drawings: Record<string, DrawingPath[]> | null;
     drawingSubmitted: Record<string, boolean>;
     setDrawingSubmitted: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
-    hostCanSeeAnswer: boolean;
     players: Player[];
-    resetBuzzer: () => void;
-    unlockBuzzer?: () => void;
     handleBuzz: () => void;
     buzzerLocked: boolean;
     buzzResult: string | null;
@@ -64,7 +60,6 @@ interface SelectedClueDisplayProps {
 const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                                                                      localSelectedClue,
                                                                      showAnswer,
-                                                                     setShowClue,
                                                                      isHost,
                                                                      isFinalJeopardy,
                                                                      gameId,
@@ -73,10 +68,7 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                                                                      drawings,
                                                                      drawingSubmitted,
                                                                      setDrawingSubmitted,
-                                                                     hostCanSeeAnswer,
                                                                      players,
-                                                                     resetBuzzer,
-                                                                     unlockBuzzer,
                                                                      handleBuzz,
                                                                      buzzerLocked,
                                                                      buzzResult,
@@ -458,9 +450,7 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
 
                             {answerResult && answerResult.answerSessionId === answerCapture.answerSessionId && (
                                 <div className="mt-3 text-xl font-bold">
-                                    {answerResult.verdict === "correct" ? "✅ Correct" :
-                                        answerResult.verdict === "incorrect" ? "❌ Incorrect" :
-                                            "⚠️ Host decision"}
+                                    {answerResult.verdict === "correct" ? "✅ Correct" : "❌ Incorrect" }
                                 </div>
                             )}
 

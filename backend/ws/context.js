@@ -150,64 +150,62 @@ export const createWsContext = (wss) => {
         game.buzzerLocked = false;
         broadcast(gameId, { type: "buzzer-unlocked" });
 
-        if (game.timeToBuzz !== -1) {
-            startGameTimer(
-                gameId,
-                game,
-                broadcast,
-                game.timeToBuzz,
-                "buzz",
-                ({ gameId, game }) => {
-                    if (!game) return;
-                    if (!game.selectedClue) return;
+        if (game.timeToBuzz === -1) return;
 
-                    // If still open and nobody buzzed => AI host resolves it
-                    if (!game.buzzerLocked && !game.buzzed) {
-                        game.buzzerLocked = true;
-                        broadcast(gameId, { type: "buzzer-locked" });
+        startGameTimer(
+            gameId,
+            game,
+            broadcast,
+            game.timeToBuzz,
+            "buzz",
+            ({ gameId, game }) => {
+                if (!game) return;
+                if (!game.selectedClue) return;
 
-                        (async () => {
-                            const said = await aiHostSayRandomFromSlot(gameId, game, "nobody");
-                            const ms = said?.ms ?? aiHostSay(gameId, "Looks like nobody got it.").ms;
+                // If still open and nobody buzzed => AI host resolves it
+                if (game.buzzerLocked || game.buzzed) return;
 
-                            game.selectedClue.isAnswerRevealed = true;
-                            broadcast(gameId, { type: "answer-revealed", clue: game.selectedClue });
+                game.buzzerLocked = true;
+                broadcast(gameId, { type: "buzzer-locked" });
 
-                            aiAfter(gameId, ms + 700, () => { /* existing return-to-board logic */ });
-                        })();
+                (async () => {
+                    const said = await aiHostSayRandomFromSlot(gameId, game, "nobody");
+                    const ms = said?.ms ?? aiHostSay(gameId, "Looks like nobody got it.").ms;
 
-                        game.selectedClue.isAnswerRevealed = true;
-                        broadcast(gameId, { type: "answer-revealed", clue: game.selectedClue });
+                    // Reveal once
+                    game.selectedClue.isAnswerRevealed = true;
+                    broadcast(gameId, { type: "answer-revealed", clue: game.selectedClue });
 
-                        aiAfter(gameId, ms + 700, () => {
-                            const g = games?.[gameId];
-                            if (!g) return;
-                            if (!g.selectedClue) return;
+                    // After the line finishes, return to board + clear clue
+                    aiAfter(gameId, ms + 700, () => {
+                        const g = games?.[gameId];
+                        if (!g) return;
+                        if (!g.selectedClue) return;
 
-                            if (!g.clearedClues) g.clearedClues = new Set();
-                            const clueId = `${g.selectedClue.value}-${g.selectedClue.question}`;
-                            g.clearedClues.add(clueId);
-                            broadcast(gameId, { type: "clue-cleared", clueId });
+                        if (!g.clearedClues) g.clearedClues = new Set();
+                        const clueId = `${g.selectedClue.value}-${g.selectedClue.question}`;
+                        g.clearedClues.add(clueId);
+                        broadcast(gameId, { type: "clue-cleared", clueId });
 
-                            g.selectedClue = null;
-                            g.buzzed = null;
-                            g.phase = "board";
-                            g.buzzerLocked = true;
+                        g.selectedClue = null;
+                        g.buzzed = null;
+                        g.phase = "board";
+                        g.buzzerLocked = true;
 
-                            broadcast(gameId, {
-                                type: "phase-changed",
-                                phase: "board",
-                                selectorKey: g.selectorKey ?? null,
-                                selectorName: g.selectorName ?? null,
-                            });
-
-                            broadcast(gameId, { type: "returned-to-board", selectedClue: null });
+                        broadcast(gameId, {
+                            type: "phase-changed",
+                            phase: "board",
+                            selectorKey: g.selectorKey ?? null,
+                            selectorName: g.selectorName ?? null,
                         });
-                    }
-                }
-            );
-        }
+
+                        broadcast(gameId, { type: "returned-to-board", selectedClue: null });
+                    });
+                })();
+            }
+        );
     }
+
 
     async function scheduleAutoUnlockForClue({ gameId, game, clueKey, ttsAssetId }) {
         if (!game) return;

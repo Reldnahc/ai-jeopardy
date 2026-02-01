@@ -47,8 +47,6 @@ export default function Game() {
         drawings,
         isGameOver,
         markAllCluesComplete,
-        resetBuzzer,
-        unlockBuzzer,
         narrationEnabled,
         requestTts,
         ttsReady,
@@ -438,8 +436,6 @@ export default function Game() {
                             allWagersSubmitted={allWagersSubmitted}
                             isFinalJeopardy={isFinalJeopardy}
                             drawings={drawings}
-                            resetBuzzer={resetBuzzer}
-                            unlockBuzzer={unlockBuzzer}
                             handleBuzz={handleBuzz}
                             buzzerLocked={buzzerLocked}
                             buzzResult={buzzResult}
