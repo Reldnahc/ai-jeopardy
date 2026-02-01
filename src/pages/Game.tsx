@@ -412,6 +412,7 @@ export default function Game() {
                     handleScoreUpdate={handleScoreUpdate}
                     markAllCluesComplete={markAllCluesComplete}
                     onLeaveGame={leaveGame}
+                    selectorName={selectorName}
                 />
             )}
             {/* Jeopardy Board Section */}

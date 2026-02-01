@@ -17,6 +17,7 @@ interface SidebarProps {
     audioMuted: boolean;
     onToggleAudioMuted: () => void;
     onLeaveGame: () => void;
+    selectorName: string | null;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -33,6 +34,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                                              audioMuted,
                                              onToggleAudioMuted,
                                              onLeaveGame,
+                                             selectorName,
                                          }) => {
 
     const { profile } = useProfile();
@@ -143,16 +145,20 @@ const Sidebar: React.FC<SidebarProps> = ({
                         {players.map((player) => (
                             <li
                                 key={player.name}
-                                className={`flex items-center p-2.5 rounded-lg mb-2 text-base shadow-sm text-blue-500 
-                                ${player.online === false ? "opacity-50" : ""}
-                                ${host === player.name
-                                    ? "bg-yellow-200 border-yellow-500 border-2"
+                                className={`flex items-center p-2.5 rounded-lg mb-2 text-base shadow-sm text-blue-500
+                                    border-2 border-transparent
+                                    ${player.online === false ? "opacity-50" : ""}
+                                    ${host === player.name
+                                    ? "bg-yellow-200 border-yellow-500"
                                     : buzzResult === player.name
-                                        ? "bg-red-300 border-red-500 border-2"
-                                        : `bg-gray-100`}
-                                            `}
+                                        ? "bg-red-300 border-red-500"
+                                        : selectorName === player.name
+                                            ? "bg-blue-300 border-blue-500"
+                                            : "bg-gray-100"}
+                                    `}
                             >
-                                <Avatar name={player.name} size="8" color={player.color} textColor={player.text_color} />
+
+                            <Avatar name={player.name} size="8" color={player.color} textColor={player.text_color} />
                                 <div className="flex flex-col flex-1 ml-3">
                                       <span className="font-bold">
                                         {player.name}
