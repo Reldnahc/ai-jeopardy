@@ -87,12 +87,26 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         };
 
         ws.onmessage = (event) => {
-            let parsed: unknown;
+            let parsed: any;
             try {
                 parsed = JSON.parse(event.data);
             } catch {
                 console.warn("[WS] non-JSON message:", event.data);
                 return;
+            }
+
+            if (parsed?.type === "rtt-ping" && typeof parsed.t === "number") {
+                try {
+                    ws.send(
+                        JSON.stringify({
+                            type: "rtt-pong",
+                            t: parsed.t,
+                        })
+                    );
+                } catch {
+                    // socket may be closing; ignore
+                }
+                return; // IMPORTANT: do not pass to app logic
             }
 
             if (
