@@ -139,7 +139,7 @@ async function preloadAudioOne(url: string, signal: AbortSignal): Promise<void> 
         const delayMs = Math.min(2000, Math.round(150 * Math.pow(1.6, attempt)));
         const jitter = Math.round(Math.random() * 80);
 
-        const r = await fetch(url, { signal, cache: "no-store" });
+        const r = await fetch(url, { signal, cache: "force-cache" });
 
         // ✅ Not ready yet
         if (r.status === 202) {
@@ -185,7 +185,7 @@ export function usePreloadAudioAssetIds(
         const controller = new AbortController();
         const { signal } = controller;
 
-        const CONCURRENCY = 2;
+        const CONCURRENCY = 10;
 
         // Build urls, but DO NOT mark requested yet.
         const queue = assetIds

@@ -103,10 +103,13 @@ export default function Game() {
     const clueOpenKey = useMemo(() => {
         if (!selectedClue) return null;
 
-        const v = String(selectedClue.value);
-        const q = (selectedClue.question ?? "").trim();
+        const q = String(selectedClue.question ?? "").trim();
+        if (!q) return null;
+
+        const v = typeof selectedClue.value === "number" ? selectedClue.value : "?";
         return `${activeBoard}:${v}:${q}`;
     }, [activeBoard, selectedClue]);
+
 
 
     const activeTtsRequestIdRef = useRef<string | null>(null);
@@ -264,7 +267,6 @@ export default function Game() {
             lastRequestedKeyRef.current = clueOpenKey;
             return;
         }
-        console.error("WE ARE FALLING BACK ERROR");
 
         // Fallback: old on-demand behavior
         const valuePart = `For ${selectedClue.value} dollars. `;
@@ -291,7 +293,6 @@ export default function Game() {
         try {
             a.pause();
             a.currentTime = 0;
-            a.src = ttsReady.url;
             playAudioUrl(ttsReady.url);
         } catch (e) {
             // autoplay policies can block play(); ignore safely
