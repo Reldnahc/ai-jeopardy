@@ -83,10 +83,10 @@ export const supabase = createClient(
     process.env.SUPABASE_SERVICE_ROLE_KEY,
     {
         global: { fetch: verboseFetch },
-        auth: {
-            persistSession: false,
-            autoRefreshToken: false,
-            detectSessionInUrl: false,
-        },
+        // auth: {
+        //     persistSession: false,
+        //     autoRefreshToken: false,
+        //     detectSessionInUrl: false,
+        // },
     }
 );

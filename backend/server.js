@@ -10,8 +10,8 @@ import { fileURLToPath } from "url";
 import { attachWebSocketServer } from "./ws/index.js";
 import { getCOTD, setCOTD } from "./state/cotdStore.js";
 import { registerHttpRoutes } from "./http/routes.js";
-import { monitorEventLoopDelay } from "node:perf_hooks";
 import { Agent, setGlobalDispatcher } from "undici";
+
 const app = express(); // Initialize Express app
 app.use(cors());
 app.use(bodyParser.json());
