@@ -185,7 +185,7 @@ export function usePreloadAudioAssetIds(
         const controller = new AbortController();
         const { signal } = controller;
 
-        const CONCURRENCY = 10;
+        const CONCURRENCY = 2;
 
         // Build urls, but DO NOT mark requested yet.
         const queue = assetIds
