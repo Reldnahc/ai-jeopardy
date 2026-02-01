@@ -115,29 +115,119 @@ function parseProviderJson(response) {
 }
 
 const saveBoardAsync = async ({ supabase, host, board }) => {
+    console.log("[Server][saveBoardAsync] Starting board save");
+    console.log("[Server][saveBoardAsync] Host:", host);
+    console.log(
+        "[Server][saveBoardAsync] Board summary:",
+        board
+            ? {
+                categories: board.categories?.length ?? "unknown",
+                clues:
+                    Array.isArray(board.categories)
+                        ? board.categories.reduce(
+                            (sum, c) => sum + (c.clues?.length ?? 0),
+                            0
+                        )
+                        : "unknown",
+            }
+            : "NO BOARD PROVIDED"
+    );
+
+    if (!supabase) {
+        console.error("[Server][saveBoardAsync] ❌ Supabase client is missing");
+        return;
+    }
+
+    if (!host || typeof host !== "string") {
+        console.error("[Server][saveBoardAsync] ❌ Invalid host value:", host);
+        return;
+    }
+
+    if (!board) {
+        console.error("[Server][saveBoardAsync] ❌ No board data provided");
+        return;
+    }
+
     try {
+        const normalizedHost = host.toLowerCase().trim();
+        console.log(
+            "[Server][saveBoardAsync] Looking up profile for username:",
+            normalizedHost
+        );
+
         const profileRes = await supabase
             .from("profiles")
             .select("id")
-            .eq("username", host.toLowerCase())
+            .eq("username", normalizedHost)
             .single();
 
-        const ownerId = profileRes.data?.id;
-        if (!ownerId) {
-            console.log("[Server] Board not saved: profile missing id");
+        if (profileRes.error) {
+            console.error(
+                "[Server][saveBoardAsync] ❌ Error fetching profile:",
+                profileRes.error
+            );
             return;
         }
 
-        const { error } = await supabase
-            .from("jeopardy_boards")
-            .insert([{ board, owner: ownerId }]);
+        if (!profileRes.data) {
+            console.warn(
+                "[Server][saveBoardAsync] ⚠️ Profile query returned no data for user:",
+                normalizedHost
+            );
+            return;
+        }
 
-        if (error) console.log("[Server] Error saving board:", error);
-        else console.log("[Server] Board saved successfully");
+        const ownerId = profileRes.data.id;
+
+        if (!ownerId) {
+            console.warn(
+                "[Server][saveBoardAsync] ⚠️ Profile found but id is missing:",
+                profileRes.data
+            );
+            return;
+        }
+
+        console.log(
+            "[Server][saveBoardAsync] Profile resolved. Owner ID:",
+            ownerId
+        );
+
+        console.log("[Server][saveBoardAsync] Inserting board into database…");
+
+        const insertRes = await supabase
+            .from("jeopardy_boards")
+            .insert([
+                {
+                    board,
+                    owner: ownerId,
+                },
+            ]);
+
+        if (insertRes.error) {
+            console.error(
+                "[Server][saveBoardAsync] ❌ Failed to insert board:",
+                insertRes.error
+            );
+            return;
+        }
+
+        console.log(
+            "[Server][saveBoardAsync] ✅ Board saved successfully for owner:",
+            ownerId
+        );
     } catch (e) {
-        console.log("[Server] Error saving board (async):", e?.message ?? e);
+        console.error(
+            "[Server][saveBoardAsync] ❌ Unhandled exception while saving board",
+            {
+                message: e?.message ?? e,
+                stack: e?.stack,
+            }
+        );
+    } finally {
+        console.log("[Server][saveBoardAsync] Finished board save attempt");
     }
 };
+
 
 function stripVisualWording(question) {
     return String(question ?? "")
