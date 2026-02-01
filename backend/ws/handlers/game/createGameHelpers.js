@@ -24,18 +24,8 @@ function collectNarrationTextsFromBoard(boardData) {
     return Array.from(new Set(texts));
 }
 
-function pickRandom(arr) {
-    if (!Array.isArray(arr) || arr.length === 0) return null;
-    return arr[Math.floor(Math.random() * arr.length)];
-}
-
 // Variety banks (add as many as you want)
 const AI_HOST_VARIANTS = {
-    welcome: [
-        "Welcome to AI Jeopardy!",
-        "Welcome back to AI Jeopardy.",
-        "Alright, let's play AI Jeopardy!",
-    ],
     correct: [
         "That's correct.",
         "Yes, that's right.",
@@ -47,7 +37,7 @@ const AI_HOST_VARIANTS = {
         "Sorry, that's incorrect.",
         "Incorrect.",
         "Nope. That's not the one.",
-        "That’s not correct—anyone else?",
+        "That’s not correct",
     ],
     rebuzz: [
         "Would anyone else like to answer?",

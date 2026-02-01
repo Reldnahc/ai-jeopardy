@@ -187,6 +187,15 @@ export const createWsContext = (wss) => {
                         g.clearedClues.add(clueId);
                         broadcast(gameId, { type: "clue-cleared", clueId });
 
+                        if (g.activeBoard === "firstBoard" && isBoardFullyCleared(g, "firstBoard")) {
+                            g.activeBoard = "secondBoard";
+                            g.isFinalJeopardy = false;
+                            g.finalJeopardyStage = null;
+                            broadcast(gameId, { type: "transition-to-second-board" });
+                        } else if (g.activeBoard === "secondBoard" && isBoardFullyCleared(g, "secondBoard")) {
+                            startFinalJeopardy(gameId, g, broadcast);
+                        }
+
                         g.selectedClue = null;
                         g.buzzed = null;
                         g.phase = "board";

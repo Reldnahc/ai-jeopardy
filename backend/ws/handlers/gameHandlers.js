@@ -16,7 +16,19 @@ function finishClueAndReturnToBoard(ctx, gameId, game, { keepSelector }) {
         if (!game.clearedClues) game.clearedClues = new Set();
         const clueId = `${game.selectedClue.value}-${game.selectedClue.question}`;
         game.clearedClues.add(clueId);
+
+        // Inform clients
         ctx.broadcast(gameId, { type: "clue-cleared", clueId });
+
+        if (game.activeBoard === "firstBoard" && ctx.isBoardFullyCleared(game, "firstBoard")) {
+            game.activeBoard = "secondBoard";
+            game.isFinalJeopardy = false;
+            game.finalJeopardyStage = null;
+
+            ctx.broadcast(gameId, { type: "transition-to-second-board" });
+        } else if (game.activeBoard === "secondBoard" && ctx.isBoardFullyCleared(game, "secondBoard")) {
+            ctx.startFinalJeopardy(gameId, game, ctx.broadcast);
+        }
     }
 
     // Reset clue state
@@ -26,7 +38,7 @@ function finishClueAndReturnToBoard(ctx, gameId, game, { keepSelector }) {
     game.phase = "board";
     game.clueState = null;
 
-    // Selector remains if keepSelector=true (no-buzz or nobody-eligible)
+    // Selector remains if keepSelector=true
     ctx.broadcast(gameId, {
         type: "phase-changed",
         phase: "board",
@@ -36,6 +48,7 @@ function finishClueAndReturnToBoard(ctx, gameId, game, { keepSelector }) {
 
     ctx.broadcast(gameId, { type: "returned-to-board", selectedClue: null });
 }
+
 async function autoResolveAfterJudgement(ctx, gameId, game, playerName, verdict) {
     if (!game || !game.selectedClue) return;
 
@@ -677,12 +690,12 @@ export const gameHandlers = {
             suggestedDelta,
         });
 
-// ----- AUTO-RESOLVE AFTER JUDGEMENT (AI-hosted gameplay) -----
         if (verdict === "correct" || verdict === "incorrect") {
-            await autoResolveAfterJudgement(ctx, gameId, game, player.name, verdict);
-            return;
+            return await autoResolveAfterJudgement(ctx, gameId, game, player.name, verdict);
         }
 
+        return autoResolveAfterJudgement(ctx, gameId, game, player.name, "incorrect")
+                .catch((e) => console.error("[answer-audio-blob] autoResolve failed:", e));
     },
 
     "reset-buzzer": async ({ ws, data, ctx }) => {
@@ -732,9 +745,6 @@ export const gameHandlers = {
             // however you start final jeopardy now
             ctx.startFinalJeopardy(gameId, game, ctx.broadcast);
         }
-
-        console.error(`[Server] Game ID ${gameId} not found when marking all clues complete.`);
-
     },
 
     "trigger-game-over": async ({ ws, data, ctx }) => {
