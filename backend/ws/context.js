@@ -177,7 +177,7 @@ export const createWsContext = (wss) => {
                     broadcast(gameId, { type: "answer-revealed", clue: game.selectedClue });
 
                     // After the line finishes, return to board + clear clue
-                    aiAfter(gameId, ms + 700, () => {
+                    aiAfter(gameId, ms + 3500, () => {
                         const g = games?.[gameId];
                         if (!g) return;
                         if (!g.selectedClue) return;

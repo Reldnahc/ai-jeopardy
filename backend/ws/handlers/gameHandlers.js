@@ -61,7 +61,7 @@ async function autoResolveAfterJudgement(ctx, gameId, game, playerName, verdict)
         game.selectorKey = ctx.playerStableId(p || { name: playerName });
         game.selectorName = playerName;
 
-        ctx.aiAfter(gameId, ms + 700, () => {
+        ctx.aiAfter(gameId, ms + 3500, () => {
             const g = ctx.games?.[gameId];
             if (!g) return;
             finishClueAndReturnToBoard(ctx, gameId, g, { keepSelector: false });
@@ -110,7 +110,7 @@ async function autoResolveAfterJudgement(ctx, gameId, game, playerName, verdict)
         game.selectedClue.isAnswerRevealed = true;
         ctx.broadcast(gameId, { type: "answer-revealed", clue: game.selectedClue });
 
-        ctx.aiAfter(gameId, ms + 700, () => {
+        ctx.aiAfter(gameId, ms + 3500, () => {
             const g = ctx.games?.[gameId];
             if (!g) return;
             finishClueAndReturnToBoard(ctx, gameId, g, { keepSelector: true });
@@ -123,20 +123,36 @@ async function autoResolveAfterJudgement(ctx, gameId, game, playerName, verdict)
     game.buzzerLocked = true;
     ctx.broadcast(gameId, { type: "buzzer-locked" });
 
-    let ms = 0;
+    let msIncorrect = 0;
     try {
         const said = await ctx.aiHostSayRandomFromSlot(gameId, game, "incorrect");
-        ms = said?.ms ?? 0;
+        msIncorrect = said?.ms ?? 0;
     } catch (e) {
-        console.error("[autoResolveAfterJudgement] aiHostSayRandomFromSlot failed:", e);
+        console.error("[autoResolveAfterJudgement] aiHostSayRandomFromSlot incorrect failed:", e);
     }
 
-    ctx.aiAfter(gameId, ms + 250, () => {
+// After "incorrect", play "rebuzz" (ONLY when someone is still eligible)
+    let msRebuzz = 0;
+    ctx.aiAfter(gameId, msIncorrect + 700, async () => {
         const g = ctx.games?.[gameId];
         if (!g) return;
-        ctx.doUnlockBuzzerAuthoritative({ gameId, game: g });
-        ctx.broadcast(gameId, { type: "buzzer-ui-reset" });
+
+        try {
+            const said2 = await ctx.aiHostSayRandomFromSlot(gameId, g, "rebuzz");
+            msRebuzz = said2?.ms ?? 0;
+        } catch (e) {
+            console.error("[autoResolveAfterJudgement] aiHostSayRandomFromSlot rebuzz failed:", e);
+        }
+
+        // Unlock after both lines finish
+        ctx.aiAfter(gameId, msRebuzz + 700, () => {
+            const gg = ctx.games?.[gameId];
+            if (!gg) return;
+            ctx.doUnlockBuzzerAuthoritative({ gameId, game: gg });
+            ctx.broadcast(gameId, { type: "buzzer-ui-reset" });
+        });
     });
+
 
 }
 
