@@ -32,7 +32,11 @@ function collectImageAssetIds(boardData: BoardData): string[] {
     return Array.from(ids);
 }
 
-async function preloadOne(url: string, signal: AbortSignal): Promise<void> {
+async function preloadOne(
+    url: string,
+    signal: AbortSignal,
+    onSuccess?: (url: string) => void
+): Promise<void> {
     return new Promise<void>((resolve) => {
         if (signal.aborted) return resolve();
 
@@ -54,8 +58,11 @@ async function preloadOne(url: string, signal: AbortSignal): Promise<void> {
             } catch (e) {
                 console.warn(`[Preloader] Decode failed for ${url}, but image is cached.` + e);
             }
+
+            onSuccess?.(url);
             resolve();
         };
+
 
         img.onerror = () => {
             cleanup();
@@ -82,11 +89,7 @@ export function usePreloadBoardImages(boardData: BoardData | null | undefined, e
 
         const queue = ids
             .map((id) => `/api/images/${id}`)
-            .filter((url) => {
-                if (requestedRef.current.has(url)) return false;
-                requestedRef.current.add(url);
-                return true;
-            });
+            .filter((url) => !requestedRef.current.has(url));
 
         if (!queue.length) {
             console.log("[Preloader] All found images already requested/cached.");
@@ -105,11 +108,14 @@ export function usePreloadBoardImages(boardData: BoardData | null | undefined, e
                 const url = queue[index++];
                 inFlight++;
 
-                // Remove ric/setTimeout to start requests immediately
-                preloadOne(url, signal).finally(() => {
-                    inFlight--;
-                    pump();
-                });
+                // micro-stagger to avoid bursty connects
+                setTimeout(() => {
+                    preloadOne(url, signal, (u) => requestedRef.current.add(u)).finally(() => {
+                        inFlight--;
+                        pump();
+                    });
+                }, 75);
+
             }
         };
 
@@ -230,11 +236,8 @@ export function usePreloadImageAssetIds(
 
         const queue = assetIds
             .map((id) => `/api/images/${id}`)
-            .filter((url) => {
-                if (requestedRef.current.has(url)) return false;
-                requestedRef.current.add(url);
-                return true;
-            });
+            .filter((url) => !requestedRef.current.has(url));
+
 
         if (!queue.length) {
             if (!doneCalledRef.current) {
@@ -255,7 +258,7 @@ export function usePreloadImageAssetIds(
                 const url = queue[index++];
                 inFlight++;
 
-                preloadOne(url, signal).finally(() => {
+                preloadOne(url, signal, (u) => requestedRef.current.add(u)).finally(() => {
                     inFlight--;
                     completed++;
 
