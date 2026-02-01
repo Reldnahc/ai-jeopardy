@@ -133,7 +133,7 @@ async function autoResolveAfterJudgement(ctx, gameId, game, playerName, verdict)
 
 // After "incorrect", play "rebuzz" (ONLY when someone is still eligible)
     let msRebuzz = 0;
-    ctx.aiAfter(gameId, msIncorrect + 700, async () => {
+    ctx.aiAfter(gameId, msIncorrect + 1000, async () => {
         const g = ctx.games?.[gameId];
         if (!g) return;
 
