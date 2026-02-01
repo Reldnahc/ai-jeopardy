@@ -270,7 +270,7 @@ export const lobbyHandlers = {
                 selectedModel: "gpt-5-mini",
                 reasoningEffort: "off",
                 visualMode: "off", // "off" | "commons" | "brave"
-                narrationEnabled: false,
+                narrationEnabled: true,
                 boardJson: "",
             },
             lockedCategories: {
@@ -452,7 +452,7 @@ export const lobbyHandlers = {
                     selectedModel: "gpt-5-mini",
                     reasoningEffort: "off",
                     visualMode: "off",
-                    narrationEnabled: false,
+                    narrationEnabled: true,
                     boardJson: "",
                 };
             }

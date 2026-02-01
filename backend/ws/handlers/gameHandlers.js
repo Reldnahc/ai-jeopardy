@@ -380,10 +380,17 @@ export const gameHandlers = {
 
     // Delay answer capture until name finishes (+ buffer)
         const startCaptureAfterMs = Math.max(0, nameMs + 150);
-        const RECORD_MS = 9000;
+
         setTimeout(() => {
             const g = ctx.games?.[gameId];
             if (!g) return;
+
+            const ANSWER_SECONDS =
+                typeof g.timeToAnswer === "number" && g.timeToAnswer > 0
+                    ? g.timeToAnswer
+                    : 9;
+
+            const RECORD_MS = ANSWER_SECONDS * 1000;
 
             // Ensure we're still on same buzz & clue
             if (g.buzzed !== player.name) return;
@@ -415,6 +422,11 @@ export const gameHandlers = {
                 durationMs: RECORD_MS,
                 deadlineAt,
             });
+            // Start "answer" timer (also clears the prior "buzz" timer)
+            if (ANSWER_SECONDS > 0) {
+                ctx.startGameTimer(gameId, g, ctx.broadcast, ANSWER_SECONDS, "answer");
+            }
+
 
             ctx.startAnswerWindow(gameId, g, ctx.broadcast, RECORD_MS, () => {
                 const gg = ctx.games?.[gameId];
