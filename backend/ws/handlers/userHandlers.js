@@ -5,6 +5,17 @@ export const userHandlers = {
     "auth": async ({ ws, data, ctx }) => {
         const accessToken = data?.accessToken;
 
+
+        if (ws.auth?.isAuthed && ws.auth?.userId) {
+            ws.send(JSON.stringify({
+                type: "auth-result",
+                ok: true,
+                role: ws.auth.role,
+                userId: ws.auth.userId,
+            }));
+            return;
+        }
+
         const user = await ctx.verifySupabaseAccessToken(accessToken);
         if (!user) {
             ws.auth = { isAuthed: false, userId: null, role: "default" };
