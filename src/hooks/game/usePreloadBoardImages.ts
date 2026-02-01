@@ -129,22 +129,46 @@ export function usePreloadBoardImages(boardData: BoardData | null | undefined, e
 }
 
 async function preloadAudioOne(url: string, signal: AbortSignal): Promise<void> {
-    const r = await fetch(url, { signal, cache: "force-cache" });
+    const MAX_ATTEMPTS = 7;
 
-    // If it isn't a 2xx, treat as failure so we can retry later.
-    if (!r.ok) {
-        throw new Error(`preload failed ${r.status} ${url}`);
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+        if (signal.aborted) return;
+
+        // Exponential-ish backoff with jitter:
+        // 0: 150ms, 1: 250ms, 2: 400ms, 3: 650ms, 4: 1000ms, ...
+        const delayMs = Math.min(2000, Math.round(150 * Math.pow(1.6, attempt)));
+        const jitter = Math.round(Math.random() * 80);
+
+        const r = await fetch(url, { signal, cache: "no-store" });
+
+        // ✅ Not ready yet
+        if (r.status === 202) {
+            await new Promise((res) => setTimeout(res, delayMs + jitter));
+            continue;
+        }
+
+        // Optional: treat 404 as "maybe not ready yet" for a couple retries
+        if (r.status === 404 && attempt < 2) {
+            await new Promise((res) => setTimeout(res, delayMs + jitter));
+            continue;
+        }
+
+        if (!r.ok) {
+            throw new Error(`preload failed ${r.status} ${url}`);
+        }
+
+        const ct = r.headers.get("content-type") || "";
+        if (!ct.startsWith("audio/")) {
+            throw new Error(`preload got non-audio (${ct}) ${url}`);
+        }
+
+        await r.arrayBuffer();
+        return;
     }
 
-    // Optional safety: make sure we didn't download JSON error text
-    const ct = r.headers.get("content-type") || "";
-    if (!ct.startsWith("audio/")) {
-        throw new Error(`preload got non-audio (${ct}) ${url}`);
-    }
-
-    // Ensure full download so it actually lands in cache
-    await r.arrayBuffer();
+    throw new Error(`preload timed out waiting for ready: ${url}`);
 }
+
 
 export function usePreloadAudioAssetIds(
     assetIds: string[] | null | undefined,

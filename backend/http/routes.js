@@ -123,52 +123,71 @@ export function registerHttpRoutes(app, { distPath }) {
     // --- TTS -----------------------------------------------------------------
 
     app.get("/api/tts/:assetId", async (req, res) => {
-        try {
-            const { assetId } = req.params;
+        const { assetId } = req.params;
 
+        try {
             const { data, error } = await supabase
                 .from("tts_assets")
                 .select("storage_key, content_type")
                 .eq("id", assetId)
                 .single();
 
+            // If Supabase query itself failed (network issues etc.)
             if (error) {
-                // PostgREST "no rows" is commonly PGRST116 (and/or status 406 depending on client)
-                const code = error.code || "";
-                const status = error.status || 0;
-
-                const isNotFound =
-                    code === "PGRST116" || status === 406 || /0 rows/i.test(error.message || "");
-
-                if (isNotFound) {
-                    return res.status(404).json({ error: "TTS asset not found" });
-                }
-
                 console.error("Supabase error in /api/tts:", error);
-                return res.status(500).json({ error: "TTS lookup failed" });
+                res.setHeader("Cache-Control", "no-store");
+                return res.status(503).json({ error: "TTS lookup unavailable" });
             }
 
+            // If row not found, keep 404 (optional: treat as 202 for a short window if you want)
             if (!data) {
                 return res.status(404).json({ error: "TTS asset not found" });
+            }
+
+            // ✅ Pending: row exists but storage key not yet set
+            if (!data.storage_key || !String(data.storage_key).trim()) {
+                res.setHeader("Cache-Control", "no-store");
+                res.setHeader("Retry-After", "0.25");
+                return res.status(202).json({ status: "pending" });
             }
 
             const storageKey = data.storage_key;
             const contentType = data.content_type || "audio/mpeg";
 
-            const cmd = new GetObjectCommand({
-                Bucket: process.env.R2_BUCKET,
-                Key: storageKey,
-            });
+            try {
+                const cmd = new GetObjectCommand({
+                    Bucket: process.env.R2_BUCKET,
+                    Key: storageKey,
+                });
 
-            const obj = await r2.send(cmd);
+                const obj = await r2.send(cmd);
 
-            res.setHeader("Content-Type", contentType);
-            res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+                res.setHeader("Content-Type", contentType);
+                res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+                return obj.Body.pipe(res);
+            } catch (e) {
+                // ✅ Pending: storage_key exists, but object not available yet
+                // This is the race you described.
+                const msg = String(e?.name || "") + " " + String(e?.message || "");
+                const isNotYetThere =
+                    msg.includes("NoSuchKey") ||
+                    msg.includes("NotFound") ||
+                    msg.includes("404");
 
-            obj.Body.pipe(res);
+                if (isNotYetThere) {
+                    res.setHeader("Cache-Control", "no-store");
+                    res.setHeader("Retry-After", "0.25");
+                    return res.status(202).json({ status: "pending" });
+                }
+
+                console.error("R2 error in /api/tts:", e);
+                res.setHeader("Cache-Control", "no-store");
+                return res.status(500).json({ error: "TTS fetch failed" });
+            }
         } catch (e) {
             console.error("GET /api/tts/:assetId failed:", e);
-            res.status(500).json({ error: "Failed to load tts audio" });
+            res.setHeader("Cache-Control", "no-store");
+            return res.status(500).json({ error: "TTS endpoint failed" });
         }
     });
 
