@@ -94,11 +94,20 @@ async function autoResolveAfterJudgement(ctx, gameId, game, playerName, verdict)
     const anyoneLeft = players.some(pp => !game.clueState?.lockedOut?.[ctx.playerStableId(pp)]);
 
     if (!anyoneLeft) {
+        // Everyone buzzed and missed. Do NOT play the "nobody" line and do NOT reopen buzzers.
+        // Keep things locked, optionally play the normal incorrect line, then reveal and return.
+        game.buzzerLocked = true;
+        ctx.broadcast(gameId, { type: "buzzer-locked" });
+
+        let ms = 0;
+        try {
+            const said = await ctx.aiHostSayRandomFromSlot(gameId, game, "incorrect");
+            ms = said?.ms ?? 0;
+        } catch (e) {
+            console.error("[autoResolveAfterJudgement] aiHostSayRandomFromSlot failed:", e);
+        }
+
         game.selectedClue.isAnswerRevealed = true;
-
-        const said = await ctx.aiHostSayRandomFromSlot(gameId, game, "nobody");
-        const ms = said?.ms ?? 0;
-
         ctx.broadcast(gameId, { type: "answer-revealed", clue: game.selectedClue });
 
         ctx.aiAfter(gameId, ms + 700, () => {
