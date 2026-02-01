@@ -54,6 +54,14 @@ export const lobbyHandlers = {
 
         ctx. resetGenerationProgressAndNotify({ ctx, gameId, game });
 
+        // Build AI-host phrase bank + player name callouts so they're preloaded with welcome + board
+        try {
+            void ctx.ensureAiHostTtsBank({ ctx, game, trace });
+        } catch (e) {
+            console.error("[create-game] ai host tts bank failed:", e);
+            game.aiHostTts = { slotAssets: {}, nameAssetsByPlayer: {}, allAssetIds: [] };
+        }
+
         const boardData = await ctx.getBoardDataOrFail({
             ctx,
             game,
@@ -102,13 +110,6 @@ export const lobbyHandlers = {
             game.selectorName = null;
         }
 
-        // Build AI-host phrase bank + player name callouts so they're preloaded with welcome + board
-        try {
-            await ctx.ensureAiHostTtsBank({ ctx, game, trace });
-        } catch (e) {
-            console.error("[create-game] ai host tts bank failed:", e);
-            game.aiHostTts = { slotAssets: {}, nameAssetsByPlayer: {}, allAssetIds: [] };
-        }
 
         // Phase will be set when preload finishes (in preload-done)
         game.phase = null;

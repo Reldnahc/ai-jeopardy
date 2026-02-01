@@ -1,15 +1,70 @@
+// backend/services/ttsAssetService.js
 import crypto from "crypto";
-import {HeadObjectCommand, PutObjectCommand} from "@aws-sdk/client-s3";
+import { HeadObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { PollyClient, SynthesizeSpeechCommand } from "@aws-sdk/client-polly";
 import { r2 } from "./r2Client.js";
 
+/**
+ * GLOBAL TTS SCHEDULER
+ * - Limits concurrent "heavy" TTS work (Polly + R2 + DB insert)
+ * - Adds slight spacing between job starts to avoid bursty rate limits
+ *
+ * Tune with:
+ *   TTS_CONCURRENCY (default 2)
+ *   TTS_MIN_DELAY_MS (default 120)
+ */
+const TTS_CONCURRENCY = Number( 2);
+const TTS_MIN_DELAY_MS = Number(120);
+
+let _ttsActive = 0;
+let _ttsLastStart = 0;
+const _ttsQueue = [];
+
+/** Schedule a unit of work through the global TTS limiter. */
+function scheduleTtsWork(fn) {
+    return new Promise((resolve, reject) => {
+        _ttsQueue.push({ fn, resolve, reject });
+        drainTtsQueue();
+    });
+}
+
+function drainTtsQueue() {
+    if (_ttsActive >= TTS_CONCURRENCY) return;
+    if (_ttsQueue.length === 0) return;
+
+    const now = Date.now();
+    const waitMs = Math.max(0, TTS_MIN_DELAY_MS - (now - _ttsLastStart));
+
+    if (waitMs > 0) {
+        setTimeout(drainTtsQueue, waitMs);
+        return;
+    }
+
+    const job = _ttsQueue.shift();
+    _ttsActive++;
+    _ttsLastStart = Date.now();
+
+    (async () => {
+        try {
+            const res = await job.fn();
+            job.resolve(res);
+        } catch (err) {
+            job.reject(err);
+        } finally {
+            _ttsActive--;
+            drainTtsQueue();
+        }
+    })();
+}
+
+// ------------------ helpers ------------------
 
 async function sleep(ms) {
     await new Promise((r) => setTimeout(r, ms));
 }
 
 async function waitForR2Readable({ bucket, key, trace, attempts = 7 }) {
-    // very short backoff; we only need to bridge immediate consistency gaps
+    // Very short backoff; we only need to bridge immediate consistency gaps
     for (let i = 0; i < attempts; i++) {
         try {
             await r2.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
@@ -99,7 +154,7 @@ async function streamToBuffer(stream) {
 }
 
 function makePollyClient() {
-    // Prefer POLLY_REGION if provided, otherwise AWS_REGION, otherwise a safe default.
+    // Prefer AWS_REGION if provided, otherwise a safe default.
     const region = process.env.AWS_REGION || "us-east-1";
     return new PollyClient({ region });
 }
@@ -140,93 +195,109 @@ export async function ensureTtsAsset(
 
     const storageKey = `tts/sha256/${sha256}.mp3`;
 
-    // Hard dedupe (DB) BEFORE calling Polly
-    trace?.mark("tts_db_lookup_start");
+    // ---- FAST PATH: DB dedupe before scheduling heavy work ----
+    trace?.mark?.("tts_db_lookup_start");
     const existing = await supabase
         .from("tts_assets")
         .select("id")
         .eq("sha256", sha256)
         .maybeSingle();
-    trace?.mark("tts_db_lookup_end", { hit: Boolean(existing?.data?.id) });
+    trace?.mark?.("tts_db_lookup_end", { hit: Boolean(existing?.data?.id) });
 
     if (existing?.data?.id) {
         return { id: existing.data.id, sha256, storageKey };
     }
 
-    // Synthesize
-    trace?.mark("tts_polly_start");
-    const polly = makePollyClient();
+    // ---- HEAVY PATH: globally scheduled (concurrency + spacing) ----
+    return scheduleTtsWork(async () => {
+        // Re-check inside scheduler to avoid thundering herd duplication
+        trace?.mark?.("tts_db_lookup_2_start");
+        const againExisting = await supabase
+            .from("tts_assets")
+            .select("id")
+            .eq("sha256", sha256)
+            .maybeSingle();
+        trace?.mark?.("tts_db_lookup_2_end", { hit: Boolean(againExisting?.data?.id) });
 
-    const synthInput = {
-        OutputFormat: outputFormat,
-        Text: normalizedText,
-        TextType: textType,
-        VoiceId: voiceId,
-        Engine: engine,
-    };
-    if (languageCode) synthInput.LanguageCode = languageCode;
+        if (againExisting?.data?.id) {
+            return { id: againExisting.data.id, sha256, storageKey };
+        }
 
-    const resp = await polly.send(new SynthesizeSpeechCommand(synthInput));
-    const mp3Buffer = await streamToBuffer(resp.AudioStream);
-    trace?.mark("tts_polly_end", { bytes: mp3Buffer.length });
+        // Synthesize
+        trace?.mark?.("tts_polly_start");
+        const polly = makePollyClient();
 
-    if (!mp3Buffer.length) throw new Error("Polly returned empty audio");
+        const synthInput = {
+            OutputFormat: outputFormat,
+            Text: normalizedText,
+            TextType: textType,
+            VoiceId: voiceId,
+            Engine: engine,
+        };
+        if (languageCode) synthInput.LanguageCode = languageCode;
 
-    // Upload to R2 (idempotent by key)
-    trace?.mark("tts_r2_put_start");
-    await r2.send(
-        new PutObjectCommand({
-            Bucket: process.env.R2_BUCKET,
-            Key: storageKey,
-            Body: mp3Buffer,
-            ContentType: "audio/mpeg",
-            CacheControl: "public, max-age=31536000, immutable",
-        })
-    );
-    trace?.mark("tts_r2_put_end");
+        const resp = await polly.send(new SynthesizeSpeechCommand(synthInput));
+        const mp3Buffer = await streamToBuffer(resp.AudioStream);
+        trace?.mark?.("tts_polly_end", { bytes: mp3Buffer.length });
 
-    trace?.mark("tts_r2_head_start");
-    const ok = await waitForR2Readable({
-        bucket: process.env.R2_BUCKET,
-        key: storageKey,
-        trace,
+        if (!mp3Buffer.length) throw new Error("Polly returned empty audio");
+
+        // Upload to R2 (idempotent by key)
+        trace?.mark?.("tts_r2_put_start");
+        await r2.send(
+            new PutObjectCommand({
+                Bucket: process.env.R2_BUCKET,
+                Key: storageKey,
+                Body: mp3Buffer,
+                ContentType: "audio/mpeg",
+                CacheControl: "public, max-age=31536000, immutable",
+            })
+        );
+        trace?.mark?.("tts_r2_put_end");
+
+        trace?.mark?.("tts_r2_head_start");
+        const ok = await waitForR2Readable({
+            bucket: process.env.R2_BUCKET,
+            key: storageKey,
+            trace,
+        });
+        trace?.mark?.("tts_r2_head_end", { ok });
+
+        if (!ok) {
+            throw new Error(`R2 object not readable after upload: ${storageKey}`);
+        }
+
+        const row = {
+            storage_key: storageKey,
+            sha256,
+            content_type: "audio/mpeg",
+            bytes: mp3Buffer.length,
+            text: normalizedText,
+            text_type: textType,
+            voice_id: voiceId,
+            engine,
+            language_code: languageCode,
+        };
+
+        trace?.mark?.("tts_db_insert_start");
+        const inserted = await supabase
+            .from("tts_assets")
+            .insert(row)
+            .select("id")
+            .maybeSingle();
+        trace?.mark?.("tts_db_insert_end");
+
+        if (inserted?.data?.id) {
+            return { id: inserted.data.id, sha256, storageKey };
+        }
+
+        // Race fallback
+        const race = await supabase
+            .from("tts_assets")
+            .select("id")
+            .eq("sha256", sha256)
+            .single();
+
+        return { id: race.data.id, sha256, storageKey };
     });
-    trace?.mark("tts_r2_head_end", { ok });
-
-    if (!ok) {
-        throw new Error(`R2 object not readable after upload: ${storageKey}`);
-    }
-
-    const row = {
-        storage_key: storageKey,
-        sha256,
-        content_type: "audio/mpeg",
-        bytes: mp3Buffer.length,
-        text: normalizedText,
-        text_type: textType,
-        voice_id: voiceId,
-        engine,
-        language_code: languageCode,
-    };
-
-    trace?.mark("tts_db_insert_start");
-    const inserted = await supabase
-        .from("tts_assets")
-        .insert(row)
-        .select("id")
-        .maybeSingle();
-    trace?.mark("tts_db_insert_end");
-
-    if (inserted?.data?.id) {
-        return { id: inserted.data.id, sha256, storageKey };
-    }
-
-    // Race fallback
-    const again = await supabase
-        .from("tts_assets")
-        .select("id")
-        .eq("sha256", sha256)
-        .single();
-
-    return { id: again.data.id, sha256, storageKey };
 }
