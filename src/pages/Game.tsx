@@ -10,7 +10,7 @@ import MobileSidebar from "../components/game/MobileSidebar.tsx";
 import {useGameSession} from "../hooks/useGameSession.ts";
 import {BoardData, useGameSocketSync} from "../hooks/game/useGameSocketSync.ts";
 import {usePlayerIdentity} from "../hooks/usePlayerIdentity.ts";
-import {usePreloadBoardImages} from "../hooks/game/usePreloadBoardImages.ts";
+import {usePreload} from "../hooks/game/usePreload.ts";
 import {useEarlyMicPermission} from "../hooks/earlyMicPermission.ts";
 
 export default function Game() {
@@ -342,7 +342,7 @@ export default function Game() {
         boardData?.finalJeopardy?.categories?.length
     ]);
 
-    usePreloadBoardImages(memoizedBoardData, Boolean(memoizedBoardData));
+    usePreload(memoizedBoardData, Boolean(memoizedBoardData));
 
     const handleBuzz = () => {
         if (!gameId) return;

@@ -12,7 +12,7 @@ import {getUniqueCategories} from "../categories/getUniqueCategories.ts";
 import {useGameSession} from "../hooks/useGameSession.ts";
 import { useLobbySocketSync } from "../hooks/lobby/useLobbySocketSync";
 import {usePlayerIdentity} from "../hooks/usePlayerIdentity.ts";
-import { usePreloadAudioAssetIds, usePreloadImageAssetIds } from "../hooks/game/usePreloadBoardImages.ts";
+import { usePreloadAudioAssetIds, usePreloadImageAssetIds } from "../hooks/game/usePreload.ts";
 
 const Lobby: React.FC = () => {
     const location = useLocation();
@@ -52,7 +52,8 @@ const Lobby: React.FC = () => {
         preloadAssetIds,
         isPreloadingImages,
         preloadTtsAssetIds,
-        isPreloadingAudio
+        isPreloadingAudio,
+        preloadFinalToken
     } = useLobbySocketSync({
         gameId,
         playerKey,
@@ -66,16 +67,6 @@ const Lobby: React.FC = () => {
         if (!lobbyInvalid) return;
         navigate("/");
     }, [lobbyInvalid, navigate]);
-
-    useEffect(() => {
-        preloadAckSentRef.current = false;
-        imagesDoneRef.current = false;
-    }, [preloadAssetIds]);
-
-    useEffect(() => {
-        preloadAckSentRef.current = false;
-        audioDoneRef.current = false;
-    }, [preloadTtsAssetIds]);
 
     useEffect(() => {
         if (!gameId || !effectivePlayerName) return;
@@ -131,16 +122,35 @@ const Lobby: React.FC = () => {
 
 
     const preloadAckSentRef = useRef(false);
-    const imagesDoneRef = useRef(false);
-    const audioDoneRef = useRef(false);
 
-    const trySendPreloadAck = () => {
+    const [imagesDone, setImagesDone] = useState(false);
+    const [audioDone, setAudioDone] = useState(false);
+
+    const canAck = preloadFinalToken != null;
+
+    useEffect(() => {
+        console.log("[PRELOAD] ack gate", {
+            canAck,
+            preloadFinalToken,
+            isPreloadingImages,
+            isPreloadingAudio,
+            preloadAssetIdsLen: preloadAssetIds?.length ?? null,
+            preloadTtsLen: preloadTtsAssetIds?.length ?? null,
+            imagesDone,
+            audioDone,
+            ackSent: preloadAckSentRef.current,
+        });
+
         if (preloadAckSentRef.current) return;
+        if (!canAck) return;
 
-        const imagesDone = !isPreloadingImages || imagesDoneRef.current || !preloadAssetIds || preloadAssetIds.length === 0;
-        const audioDone = !isPreloadingAudio || audioDoneRef.current || !preloadTtsAssetIds || preloadTtsAssetIds.length === 0;
+        const imagesOk =
+            !isPreloadingImages || !preloadAssetIds?.length || imagesDone;
 
-        if (!imagesDone || !audioDone) return;
+        const audioOk =
+            !isPreloadingAudio || !preloadTtsAssetIds?.length || audioDone;
+
+        if (!imagesOk || !audioOk) return;
 
         preloadAckSentRef.current = true;
 
@@ -148,24 +158,38 @@ const Lobby: React.FC = () => {
             type: "preload-done",
             gameId,
             playerName: effectivePlayerName,
-            playerKey: playerKey,
+            playerKey,
+            token: preloadFinalToken, // IMPORTANT: send token
         });
-    };
-    
+    }, [
+        canAck,
+        preloadFinalToken,
+        isPreloadingImages,
+        isPreloadingAudio,
+        preloadAssetIds,
+        preloadTtsAssetIds,
+        imagesDone,
+        audioDone,
+        sendJson,
+        gameId,
+        effectivePlayerName,
+        playerKey,
+    ]);
+
     useEffect(() => {
-        // If preload-images arrived but there is nothing to fetch,
-        // we still must ack so the server can start the game.
-        trySendPreloadAck();
-    }, [isPreloadingImages, isPreloadingAudio, preloadAssetIds, preloadTtsAssetIds, trySendPreloadAck]);
+        setImagesDone(false);
+    }, [preloadAssetIds]);
+
+    useEffect(() => {
+        setAudioDone(false);
+    }, [preloadTtsAssetIds]);
 
     usePreloadImageAssetIds(preloadAssetIds, isPreloadingImages, () => {
-        imagesDoneRef.current = true;
-        trySendPreloadAck();
+        setImagesDone(true);
     });
 
     usePreloadAudioAssetIds(preloadTtsAssetIds, isPreloadingAudio, () => {
-        audioDoneRef.current = true;
-        trySendPreloadAck();
+        setAudioDone(true);
     });
 
 

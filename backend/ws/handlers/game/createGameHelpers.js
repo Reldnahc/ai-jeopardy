@@ -1,3 +1,39 @@
+function makePreloadTtsBatcher({ ctx, gameId, flushMs = 250, maxBatch = 12 }) {
+    let buf = [];
+    let timer = null;
+
+    const flush = () => {
+        timer = null;
+        if (buf.length === 0) return;
+
+        const batch = buf;
+        buf = [];
+
+        ctx.broadcast(gameId, {
+            type: "preload-images",
+            assetIds: [],        // no images here
+            ttsAssetIds: batch,  // ✅ partial TTS
+            partial: true,
+        });
+    };
+
+    return {
+        push(id) {
+            if (!id) return;
+            buf.push(id);
+
+            if (buf.length >= maxBatch) {
+                flush();
+                return;
+            }
+
+            if (!timer) timer = setTimeout(flush, flushMs);
+        },
+        flush,
+    };
+}
+
+
 function collectNarrationTextsFromBoard(boardData) {
     const texts = [];
 
@@ -158,6 +194,134 @@ export async function ensureAiHostTtsBank({ ctx, game, trace }) {
 }
 
 
+// --- NEW ---
+// Call once at start of create-game so clients can begin preloading ASAP.
+export function initPreloadState({ ctx, gameId, game, trace }) {
+    if (!game) return null;
+
+    const onlinePlayers = (game.players ?? []).filter((p) => p.online);
+
+    game.preload = {
+        active: true,
+        required: onlinePlayers.map(ctx.playerStableId),
+
+        // Token increments per batch. Clients ack token.
+        token: 0,
+        finalToken: null,
+
+        // playerStableId -> last acked token
+        acksByPlayer: {},
+
+        createdAt: Date.now(),
+    };
+
+    trace?.mark?.("preload_state_initialized", {
+        requiredPlayers: game.preload.required.length,
+        requiredPlayerIds: game.preload.required,
+    });
+
+    // If nobody is required, skip handshake (avoid deadlock)
+    if (game.preload.required.length === 0) {
+        trace?.mark?.("preload_no_required_players");
+        return game.preload;
+    }
+
+    // Optional: tell clients a preload session started (useful to clear old state)
+    ctx.broadcast(gameId, { type: "preload-start", token: game.preload.token });
+
+    return game.preload;
+}
+
+// --- NEW ---
+// Broadcast a batch immediately when it becomes available.
+export function broadcastPreloadBatch({
+                                          ctx,
+                                          gameId,
+                                          game,
+                                          imageAssetIds = [],
+                                          ttsAssetIds = [],
+                                          final = false,
+                                          trace,
+                                          reason,
+                                      }) {
+    if (!game?.preload?.active) return null;
+
+    const images = Array.isArray(imageAssetIds) ? imageAssetIds.filter(Boolean) : [];
+    const tts = Array.isArray(ttsAssetIds) ? ttsAssetIds.filter(Boolean) : [];
+
+    // Advance token for this batch
+    game.preload.token = (Number(game.preload.token) || 0) + 1;
+    const token = game.preload.token;
+
+    if (final) game.preload.finalToken = token;
+
+    trace?.mark?.("preload_broadcast_batch", {
+        token,
+        final,
+        reason: reason || null,
+        batchImages: images.length,
+        batchTts: tts.length,
+    });
+
+    // New protocol
+    ctx.broadcast(gameId, {
+        type: "preload-assets",
+        token,
+        final,
+        imageAssetIds: images,
+        ttsAssetIds: tts,
+    });
+
+    // Back-compat for older clients that still listen for preload-images
+    ctx.broadcast(gameId, {
+        type: "preload-images",
+        assetIds: images,
+        ttsAssetIds: tts,
+        token,
+        final,
+    });
+
+    return token;
+}
+
+// --- UPDATED ---
+// This now just sends the FINAL batch (board images + board tts + ai-host tts union)
+export async function setupPreloadHandshake({ ctx, gameId, game, boardData, trace }) {
+    trace?.mark?.("preload_handshake_start", {
+        gameId,
+        narrationEnabled: Boolean(game?.lobbySettings?.narrationEnabled),
+    });
+
+    if (!game?.preload?.active) {
+        initPreloadState({ ctx, gameId, game, trace });
+    }
+
+    const imageAssetIds = ctx.collectImageAssetIdsFromBoard(boardData);
+
+    const baseTts = Array.isArray(boardData?.ttsAssetIds) ? boardData.ttsAssetIds : [];
+    const aiHostExtra = Array.isArray(game?.aiHostTts?.allAssetIds) ? game.aiHostTts.allAssetIds : [];
+    const ttsAssetIds = Array.from(new Set([...baseTts, ...aiHostExtra]));
+
+    broadcastPreloadBatch({
+        ctx,
+        gameId,
+        game,
+        imageAssetIds,
+        ttsAssetIds,
+        final: true,
+        trace,
+        reason: "board+aihost-final",
+    });
+
+    trace?.mark?.("preload_handshake_end", {
+        finalToken: game?.preload?.finalToken ?? null,
+        imageAssetCount: imageAssetIds.length,
+        ttsAssetCount: ttsAssetIds.length,
+    });
+
+    return { imageAssetIds, ttsAssetIds };
+}
+
 export function getGameOrFail({ ws, ctx, gameId }) {
     if (!gameId) {
         ws.send(JSON.stringify({ type: "error", message: "create-game missing gameId" }));
@@ -301,7 +465,7 @@ export function applyNewGameState({ game, boardData, timeToBuzz, timeToAnswer })
     game.clearedClues = new Set();
     game.boardData = boardData;
     game.scores = {};
-    game.inLobby = false;
+    //game.inLobby = false;
     game.timeToBuzz = timeToBuzz;
     game.timeToAnswer = timeToAnswer;
     game.isGenerating = false;
@@ -352,68 +516,6 @@ export async function ensureBoardTtsAssets({ ctx, game, boardData, trace }) {
     return out;
 }
 
-export async function setupPreloadHandshake({ ctx, gameId, game, boardData, trace }) {
-    trace?.mark("preload_handshake_start", {
-        gameId,
-        narrationEnabled: Boolean(game?.lobbySettings?.narrationEnabled),
-    });
-
-    const assetIds = ctx.collectImageAssetIdsFromBoard(boardData);
-    trace?.mark("preload_images_collected", { imageAssetCount: assetIds.length });
-
-    const baseTts = Array.isArray(boardData?.ttsAssetIds) ? boardData.ttsAssetIds : [];
-    const aiHostExtra = Array.isArray(game?.aiHostTts?.allAssetIds) ? game.aiHostTts.allAssetIds : [];
-    const ttsAssetIds = Array.from(new Set([...baseTts, ...aiHostExtra]));
-
-    trace?.mark("preload_tts_collected", {
-        ttsAssetCount: ttsAssetIds.length,
-        hasTtsField: Array.isArray(boardData?.ttsAssetIds),
-    });
-
-    const onlinePlayers = (game.players ?? []).filter((p) => p.online);
-
-    game.preload = {
-        active: true,
-        required: onlinePlayers.map(ctx.playerStableId),
-        done: [],
-        createdAt: Date.now(),
-    };
-
-    trace?.mark("preload_state_initialized", {
-        requiredPlayers: game.preload.required.length,
-        requiredPlayerIds: game.preload.required,
-    });
-
-    // Safety: if nobody is required, skip handshake (otherwise you deadlock)
-    if (game.preload.required.length === 0) {
-        trace?.mark("preload_no_required_players_start_game");
-        ctx.broadcast(gameId, { type: "start-game" });
-        return { assetIds, ttsAssetIds };
-    }
-
-    // ✅ Always broadcast preload instruction (even if arrays are empty).
-    // Clients will ack immediately once they detect there's nothing to do.
-    trace?.mark("preload_broadcast_start", {
-        imageAssetCount: assetIds.length,
-        ttsAssetCount: ttsAssetIds.length,
-    });
-
-    ctx.broadcast(gameId, {
-        type: "preload-images",
-        assetIds,
-        ttsAssetIds,
-    });
-
-    trace?.mark("preload_broadcast_end");
-    trace?.mark("preload_handshake_end");
-
-    return { assetIds, ttsAssetIds };
-}
-
-
-
-
-
 export async function getBoardDataOrFail({
                                              ctx,
                                              game,
@@ -444,6 +546,8 @@ export async function getBoardDataOrFail({
         game.isGenerating = true;
         trace?.mark?.("createBoardData_start");
 
+        const ttsBatcher = makePreloadTtsBatcher({ ctx, gameId });
+
         const boardData = await ctx.createBoardData(categories, selectedModel, host, {
             includeVisuals: effectiveIncludeVisuals,
             imageProvider: effectiveImageProvider,
@@ -451,6 +555,7 @@ export async function getBoardDataOrFail({
             narrationEnabled: Boolean(game?.lobbySettings?.narrationEnabled),
             reasoningEffort,
             trace,
+            onTtsReady: (id) => ttsBatcher.push(id),
             onProgress: ({ done, total, progress }) => {
                 const g = ctx.games?.[gameId];
                 if (!g) return;
@@ -462,6 +567,8 @@ export async function getBoardDataOrFail({
                 ctx.broadcast(gameId, { type: "generation-progress", progress, done, total });
             },
         });
+
+        ttsBatcher.flush();
 
         trace?.mark?.("createBoardData_end");
         return boardData;

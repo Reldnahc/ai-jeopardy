@@ -368,6 +368,7 @@ async function createBoardData(categories, model, host, options = {}) {
         // Hint for image pickers to prefer photo-style results.
         preferPhotos: true,
         onProgress: undefined,
+        onTtsReady: undefined,
         ...options,
     };
     const trace = settings.trace;
@@ -458,6 +459,13 @@ async function createBoardData(categories, model, host, options = {}) {
                     );
 
                     ttsIds.add(asset.id);
+
+                    //notify as soon as it's ready
+                    try {
+                        settings.onTtsReady?.(asset.id);
+                    } catch {
+                        // ignore callback errors
+                    }
 
                     const k = clueKeyFor(boardType, clue);
                     if (k) ttsByClueKey[k] = asset.id;

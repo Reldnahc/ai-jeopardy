@@ -18,11 +18,11 @@ import { supabase } from "../config/database.js";
 import { transcribeAnswerAudio } from "../services/sttService.js";
 
 import {
-    applyNewGameState,
+    applyNewGameState, broadcastPreloadBatch,
     clearGenerationProgress, ensureAiHostTtsBank, ensureBoardTtsAssets,
     ensureHostOrFail,
     ensureLobbySettings, getBoardDataOrFail,
-    getGameOrFail,
+    getGameOrFail, initPreloadState,
     normalizeRole,
     resetGenerationProgressAndNotify,
     resolveModelOrFail,
@@ -300,7 +300,6 @@ export const createWsContext = (wss) => {
         clearGenerationProgress,
         safeAbortGeneration,
         applyNewGameState,
-        setupPreloadHandshake,
         ensureBoardTtsAssets,
         getBoardDataOrFail,
         ensureTtsAsset,
@@ -328,5 +327,9 @@ export const createWsContext = (wss) => {
         aiHostSayAsset,
         aiHostSayRandomFromSlot,
         aiHostSayPlayerName,
+
+        setupPreloadHandshake,
+        initPreloadState,
+        broadcastPreloadBatch,
     };
 };

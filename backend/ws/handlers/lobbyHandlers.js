@@ -54,13 +54,30 @@ export const lobbyHandlers = {
 
         ctx. resetGenerationProgressAndNotify({ ctx, gameId, game });
 
-        // Build AI-host phrase bank + player name callouts so they're preloaded with welcome + board
-        try {
-            void ctx.ensureAiHostTtsBank({ ctx, game, trace });
-        } catch (e) {
-            console.error("[create-game] ai host tts bank failed:", e);
-            game.aiHostTts = { slotAssets: {}, nameAssetsByPlayer: {}, allAssetIds: [] };
-        }
+        ctx.initPreloadState({ ctx, gameId, game, trace });
+
+        // Build AI-host phrase bank + player name callouts and PRELOAD them as soon as they're ready.
+        // IMPORTANT: this runs in parallel with board generation so clients can start downloading immediately.
+        void (async () => {
+            try {
+                await ctx.ensureAiHostTtsBank({ ctx, game, trace });
+                const ids = Array.isArray(game?.aiHostTts?.allAssetIds) ? game.aiHostTts.allAssetIds : [];
+
+                ctx.broadcastPreloadBatch({
+                    ctx,
+                    gameId,
+                    game,
+                    imageAssetIds: [],
+                    ttsAssetIds: ids,
+                    final: false,
+                    trace,
+                    reason: "ai-host-bank",
+                });
+            } catch (e) {
+                console.error("[create-game] ai host tts bank failed:", e);
+                game.aiHostTts = { slotAssets: {}, nameAssetsByPlayer: {}, allAssetIds: [] };
+            }
+        })();
 
         const boardData = await ctx.getBoardDataOrFail({
             ctx,
@@ -131,34 +148,25 @@ export const lobbyHandlers = {
     },
 
     "preload-done": async ({ ws, data, ctx }) => {
-        const { gameId, playerKey, playerName } = data ?? {};
+        const { gameId, playerKey, playerName, token  } = data ?? {};
         if (!gameId || !ctx.games?.[gameId]) return;
 
         const game = ctx.games[gameId];
-        if (!game.preload?.active) return;
+        const stable = playerKey?.trim() || String(playerName ?? "").trim();
+        // ...
+        const tok = Number(token);
+        const finalTok = Number(game?.preload?.finalToken) || 0;
 
-        // Identify who is asking
-        const stable = (typeof playerKey === "string" && playerKey.trim())
-            ? playerKey.trim()
-            : String(playerName ?? "").trim();
+        // Back-compat: if older clients don't send token, treat it as ack for latest final token
+        game.preload.acksByPlayer[stable] = Number.isFinite(tok) ? tok : finalTok;
 
-        if (!stable) return;
-
-        // Only accept from players currently in the game list
-        const isKnown = (game.players ?? []).some((p) => ctx.playerStableId(p) === stable);
-        if (!isKnown) return;
-
-        // Mark done
-        if (!game.preload.done.includes(stable)) {
-            game.preload.done.push(stable);
-        }
-
-        // Recompute who is required (online only)
         const requiredNow = (game.players ?? []).filter((p) => p.online).map(ctx.playerStableId);
+        const finalToken = game.preload.finalToken;
 
-        const doneSet = new Set(game.preload.done);
-        const allDone = requiredNow.every((id) => doneSet.has(id));
+        // Can't finish until final batch has been broadcast
+        if (!finalToken) return;
 
+        const allDone = requiredNow.every((id) => game.preload.acksByPlayer?.[id] === finalToken);
         if (!allDone) return;
 
         // Phase 2: everyone is ready → start game

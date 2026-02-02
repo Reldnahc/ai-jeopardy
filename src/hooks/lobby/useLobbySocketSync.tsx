@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
-import { useWebSocket } from "../../contexts/WebSocketContext";
-import type { Player } from "../../types/Lobby";
-import type { LobbyBoardType } from "../../components/lobby/CategoryBoard";
-import { unflattenBySections, type BoardType, CATEGORY_SECTIONS } from "../../utils/lobbySections";
+import {useCallback, useEffect, useState} from "react";
+import {useWebSocket} from "../../contexts/WebSocketContext";
+import type {Player} from "../../types/Lobby";
+import type {LobbyBoardType} from "../../components/lobby/CategoryBoard";
+import {type BoardType, CATEGORY_SECTIONS, unflattenBySections} from "../../utils/lobbySections";
 import {AlertButton} from "../../contexts/AlertContext.tsx";
 
 type LockedCategories = {
@@ -54,6 +54,10 @@ export function useLobbySocketSync({
 
     const [preloadTtsAssetIds, setPreloadTtsAssetIds] = useState<string[] | null>(null);
     const [isPreloadingAudio, setIsPreloadingAudio] = useState(false);
+
+    const [preloadToken, setPreloadToken] = useState<number | null>(null);
+    const [preloadFinalToken, setPreloadFinalToken] = useState<number | null>(null);
+
 
     const [categories, setCategories] = useState<Record<BoardType, string[]>>(() => ({
         firstBoard: Array(CATEGORY_SECTIONS[0].count).fill(""),
@@ -316,16 +320,43 @@ export function useLobbySocketSync({
                 }
 
                 case "preload-images": {
-                    const m = message as unknown as { assetIds?: string[]; ttsAssetIds?: string[] };
+                    const m = message as { assetIds?: string[]; ttsAssetIds?: string[]; token?: number; final?: boolean };
+
+                    const tok = Number(m.token);
+                    if (Number.isFinite(tok)) setPreloadToken(tok);
+                    if (m.final && Number.isFinite(tok)) setPreloadFinalToken(tok);
+
+                    const nextImages = Array.isArray(m.assetIds) ? m.assetIds.filter(Boolean) : [];
+                    const nextTts = Array.isArray(m.ttsAssetIds) ? m.ttsAssetIds.filter(Boolean) : [];
 
                     setAllowLeave(false);
 
-                    setPreloadAssetIds(Array.isArray(m.assetIds) ? m.assetIds : []);
+                    setPreloadAssetIds((prev) => {
+                        const prevArr = Array.isArray(prev) ? prev : [];
+                        return Array.from(new Set([...prevArr, ...nextImages]));
+                    });
                     setIsPreloadingImages(true);
 
-                    setPreloadTtsAssetIds(Array.isArray(m.ttsAssetIds) ? m.ttsAssetIds : []);
+                    setPreloadTtsAssetIds((prev) => {
+                        const prevArr = Array.isArray(prev) ? prev : [];
+                        return Array.from(new Set([...prevArr, ...nextTts]));
+                    });
                     setIsPreloadingAudio(true);
 
+                    return;
+                }
+
+                case "preload-start": {
+                    const m = message as { token?: number };
+                    const tok = Number(m.token);
+                    setPreloadToken(Number.isFinite(tok) ? tok : 0);
+                    setPreloadFinalToken(null);
+
+                    // reset asset lists / flags so you don’t carry old state
+                    setPreloadAssetIds(null);
+                    setPreloadTtsAssetIds(null);
+                    setIsPreloadingImages(false);
+                    setIsPreloadingAudio(false);
                     return;
                 }
 
@@ -409,6 +440,8 @@ export function useLobbySocketSync({
         preloadAssetIds,
         isPreloadingImages,
         preloadTtsAssetIds,
-        isPreloadingAudio
+        isPreloadingAudio,
+        preloadToken,
+        preloadFinalToken,
     };
 }
