@@ -129,18 +129,6 @@ const Lobby: React.FC = () => {
     const canAck = preloadFinalToken != null;
 
     useEffect(() => {
-        console.log("[PRELOAD] ack gate", {
-            canAck,
-            preloadFinalToken,
-            isPreloadingImages,
-            isPreloadingAudio,
-            preloadAssetIdsLen: preloadAssetIds?.length ?? null,
-            preloadTtsLen: preloadTtsAssetIds?.length ?? null,
-            imagesDone,
-            audioDone,
-            ackSent: preloadAckSentRef.current,
-        });
-
         if (preloadAckSentRef.current) return;
         if (!canAck) return;
 
