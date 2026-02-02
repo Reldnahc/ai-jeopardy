@@ -149,9 +149,6 @@ export function useLobbySocketSync({
         if (!isSocketReady) return;
         if (!gameId) return;
 
-        setIsLoading(true);
-        setLoadingMessage("Joining lobby...");
-
         const unsubscribe = subscribe((message) => {
             // console.log(message);
 
@@ -181,6 +178,7 @@ export function useLobbySocketSync({
                         categories?: string[];
                         inLobby?: boolean;
                         isGenerating?: boolean;
+                        isLoading?: boolean;
                         generationProgress?: number | null;
                         lockedCategories?: LockedCategories;
                         you?: { isHost?: boolean; playerName?: string; playerKey?: string };
@@ -214,6 +212,10 @@ export function useLobbySocketSync({
                         setIsLoading(true);
                         setLoadingMessage("Generating your questions...");
                         setLoadingProgress(typeof m.generationProgress === "number" ? m.generationProgress : 0);
+                        return;
+                    }
+
+                    if (m.isLoading === false) {
                         return;
                     }
 

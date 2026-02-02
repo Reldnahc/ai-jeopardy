@@ -465,7 +465,7 @@ export function applyNewGameState({ game, boardData, timeToBuzz, timeToAnswer })
     game.clearedClues = new Set();
     game.boardData = boardData;
     game.scores = {};
-    //game.inLobby = false;
+    game.isLoading = true;
     game.timeToBuzz = timeToBuzz;
     game.timeToAnswer = timeToAnswer;
     game.isGenerating = false;

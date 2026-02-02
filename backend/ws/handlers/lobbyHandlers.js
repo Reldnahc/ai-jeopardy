@@ -174,12 +174,18 @@ export const lobbyHandlers = {
 
         // Flip lobby state now
         game.inLobby = false;
+        game.isLoading = false;
         if (!game.lobbyHost) game.lobbyHost = game.host;
         game.host = "AI Jeopardy";
 
 
         const narrationEnabled = Boolean(game?.lobbySettings?.narrationEnabled);
         const selectorName = (game.selectorName ?? "").trim();
+
+        ctx.broadcast(gameId, {
+            type: "start-game",
+            host: game.host,
+        });
 
         if (narrationEnabled && selectorName) {
             game.phase = "welcome";
@@ -238,12 +244,6 @@ export const lobbyHandlers = {
             game.phase = "board";
             game.welcomeEndsAt = null;
         }
-
-
-        ctx.broadcast(gameId, {
-            type: "start-game",
-            host: game.host,
-        });
     },
 
 
