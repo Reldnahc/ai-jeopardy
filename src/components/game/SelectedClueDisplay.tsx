@@ -1,6 +1,5 @@
 import React, {useEffect} from "react";
 import { ReactSketchCanvas } from "react-sketch-canvas";
-import { convertToSVG, DrawingPath } from "../../utils/drawingUtils.tsx";
 import { Clue } from "../../types.ts";
 import { useWebSocket } from "../../contexts/WebSocketContext.tsx";
 import { Player } from "../../types/Lobby.ts";
@@ -11,13 +10,12 @@ import Timer from "./Timer.tsx";
 interface SelectedClueDisplayProps {
     localSelectedClue: Clue;
     showAnswer: boolean;
-    isHost: boolean;
     isFinalJeopardy: boolean;
     gameId: string;
     currentPlayer: string;
     // @ts-expect-error sketch type of issue
     canvasRef: React.RefObject<ReactSketchCanvas>;
-    drawings: Record<string, DrawingPath[]> | null;
+    drawings: Record<string, string> | null;
     drawingSubmitted: Record<string, boolean>;
     setDrawingSubmitted: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
     players: Player[];
@@ -43,7 +41,6 @@ interface SelectedClueDisplayProps {
 const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                                                                      localSelectedClue,
                                                                      showAnswer,
-                                                                     isHost,
                                                                      isFinalJeopardy,
                                                                      gameId,
                                                                      currentPlayer,
@@ -345,13 +342,13 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                         </div>
                 ))}
 
-                {!isHost && isFinalJeopardy && drawingSubmitted[currentPlayer] && !drawings && (
+                {isFinalJeopardy && drawingSubmitted[currentPlayer] && !drawings && (
                     <p style={{ fontSize: "clamp(1rem, 2vw, 1.5rem)" }}>
                         Answer Submitted, waiting for others...
                     </p>
                 )}
 
-                {(!isHost || players.length === 1) && isFinalJeopardy && !drawingSubmitted[currentPlayer] && (
+                {isFinalJeopardy && !drawingSubmitted[currentPlayer] && (
                     <div className="flex flex-col items-center justify-center w-full text-white p-5">
                         <h2 style={{ fontSize: "clamp(1.5rem, 3vw, 2.5rem)" }} className="mb-5">
                             Write Your Answer
@@ -392,23 +389,18 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                                 {/* Submit Drawing */}
                                 <button
                                     onClick={() => {
-                                        canvasRef.current?.exportPaths().then((paths: string) => {
-                                            const drawingData = JSON.stringify(paths);
-
+                                        canvasRef.current?.exportImage("png").then((pngDataUrl: string) => {
                                             sendJson({
-                                                type: "final-jeopardy-drawing",
+                                                type: "submit-drawing",
                                                 gameId,
                                                 player: currentPlayer,
-                                                drawing: drawingData,
+                                                drawing: pngDataUrl,
                                             });
 
-
-                                            if (!drawingSubmitted[currentPlayer]) {
-                                                setDrawingSubmitted((prev) => ({
-                                                    ...prev,
-                                                    [currentPlayer]: true,
-                                                }));
-                                            }
+                                            setDrawingSubmitted((prev) => ({
+                                                ...prev,
+                                                [currentPlayer]: true,
+                                            }));
                                         });
                                     }}
                                     className="px-5 py-2 rounded-lg bg-blue-500 text-white cursor-pointer
@@ -434,7 +426,7 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                         </div>
                     )}
 
-                {/*!isHost &&*/ !isFinalJeopardy && !showAnswer && (
+                {!isFinalJeopardy && !showAnswer && (
                     <button
                         onClick={handleBuzz}
                         disabled={!!buzzResult || buzzLockedOut || !!answerCapture}
@@ -455,7 +447,7 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                 <div className="flex flex-wrap gap-4">
                     {drawings &&
                         !Array.isArray(drawings) &&
-                        Object.entries(drawings).map(([player, drawingString]) => (
+                        Object.entries(drawings).map(([player, pngDataUrl]) => (
                             <div key={player} className="mb-5 z-0 w-auto">
                                 <div className="flex flex-col items-center">
                                     {/* Customize avatar display */}
@@ -465,7 +457,17 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                                     >
                                         {player}'s answer:
                                     </h2>
-                                    {convertToSVG(drawingString)}
+                                    <img
+                                        src={pngDataUrl}
+                                        alt={`${player} final jeopardy answer`}
+                                        className="max-h-[35vh] max-w-[45vw] object-contain rounded-lg shadow-2xl border border-white/20 bg-white"
+                                        loading="lazy"
+                                        decoding="async"
+                                        draggable={false}
+                                        onError={(e) => {
+                                            (e.currentTarget as HTMLImageElement).style.display = "none";
+                                        }}
+                                    />
                                 </div>
                             </div>
                         ))}

@@ -942,46 +942,6 @@ export const gameHandlers = {
         }
     },
 
-    "clue-cleared": async ({ ws, data, ctx }) => {
-        const { gameId, clueId } = data;
-
-        if (ctx.games[gameId]) {
-            const game = ctx.games[gameId];
-
-            if (!game.clearedClues) game.clearedClues = new Set();
-            game.clearedClues.add(clueId);
-
-            ctx.broadcast(gameId, { type: "clue-cleared", clueId });
-
-            if (game.activeBoard === "firstBoard" && ctx.isBoardFullyCleared(game, "firstBoard")) {
-                game.activeBoard = "secondBoard";
-                game.isFinalJeopardy = false;
-                game.finalJeopardyStage = null;
-                ctx.broadcast(gameId, { type: "transition-to-second-board" });
-            }
-
-            if (game.activeBoard === "secondBoard" && ctx.isBoardFullyCleared(game, "secondBoard")) {
-                ctx.startFinalJeopardy(gameId, game, ctx.broadcast);
-            }
-        } else {
-            console.error(`[Server] Game ID ${gameId} not found when clearing clue.`);
-        }
-    },
-    "transition-to-second-board": async ({ ws, data, ctx }) => {
-        const { gameId } = data;
-        if (!ctx.requireHost(ctx.games[gameId], ws)) return;
-
-        if (ctx.games[gameId]) {
-            const game = ctx.games[gameId];
-            game.activeBoard = "secondBoard";
-            game.isFinalJeopardy = false;
-            game.finalJeopardyStage = null;
-
-            ctx.broadcast(gameId, { type: "transition-to-second-board" });
-        } else {
-            console.error(`[Server] Game ID ${gameId} not found for board transition.`);
-        }
-    },
     "update-score": async ({ ws, data, ctx }) => {
         const { gameId, player, delta } = data;
         const game = ctx.games[gameId];
@@ -1013,28 +973,48 @@ export const gameHandlers = {
                 wager,
             });
 
-            const evt = ctx.checkAllWagersSubmitted(ctx.games[gameId]);
-            if (evt) ctx.broadcast(gameId, evt);
-        }
-    },
-    "transition-to-final-jeopardy": async ({ ws, data, ctx }) => {
-        const { gameId } = data;
-
-        if (ctx.games[gameId]) {
             const game = ctx.games[gameId];
 
-            game.isFinalJeopardy = true;
-            game.finalJeopardyStage = "wager"; // "wager" -> "drawing" -> "done"
+            const evt = ctx.checkAllWagersSubmitted(game);
+            if (evt) {
+                ctx.broadcast(gameId, evt);
 
-            game.wagers = {};
-            game.drawings = {};
+                // Reveal the final clue immediately after wagers are locked in
+                const fjCat = game.boardData?.finalJeopardy?.categories?.[0] || null;
+                const fjClueRaw = fjCat?.values?.[0] || null;
 
-            ctx.broadcast(gameId, { type: "final-jeopardy" });
-        } else {
-            console.error(`[Server] Game ID ${gameId} not found for board transition.`);
+                if (!fjClueRaw) {
+                    console.error("[FinalJeopardy] Missing final clue in boardData");
+                    return;
+                }
+
+                // Ensure it matches your client Clue shape (needs `value`)
+                game.selectedClue = {
+                    value: typeof fjClueRaw.value === "number" ? fjClueRaw.value : 0,
+                    question: String(fjClueRaw.question || ""),
+                    answer: String(fjClueRaw.answer || ""),
+                    isAnswerRevealed: false,
+                    media: fjClueRaw.media || undefined,
+                };
+                game.phase = "clue";
+
+                // Final Jeopardy shouldn't use the buzzer
+                game.buzzerLocked = true;
+                game.buzzed = null;
+                game.buzzLockouts = {};
+                ctx.broadcast(gameId, { type: "buzzer-locked" });
+                ctx.broadcast(gameId, { type: "buzzer-ui-reset" });
+
+                ctx.broadcast(gameId, {
+                    type: "clue-selected",
+                    clue: game.selectedClue,
+                    clearedClues: Array.from(game.clearedClues || []),
+                });
+            }
+
         }
     },
-    "final-jeopardy-drawing": async ({ ws, data, ctx }) => {
+    "submit-drawing": async ({ ws, data, ctx }) => {
         const {gameId, player, drawing} = data;
 
         if (ctx.games[gameId]) {
@@ -1043,27 +1023,21 @@ export const gameHandlers = {
                 ctx.games[gameId].drawings = {};
             }
 
-            // Parse the drawing if it’s a string
-            let parsedDrawing;
-            try {
-                parsedDrawing = typeof drawing === 'string' ? JSON.parse(drawing) : drawing;
-            } catch (error) {
-                console.error(`[Server] Failed to parse drawing for player ${player}:`, error.message);
-                return; // Exit early if the drawing can't be parsed
-            }
+
 
             // Store the player's drawing as an object
-            ctx.games[gameId].drawings[player] = parsedDrawing;
+            ctx.games[gameId].drawings[player] = drawing;
 
-            // Broadcast that the player's drawing is submitted
-            ctx.broadcast(gameId, {
-                type: "final-jeopardy-drawing-submitted",
-                player,
-            });
+
+
 
 
             const evt = ctx.checkAllFinalDrawingsSubmitted(ctx.games[gameId]);
-            if (evt) ctx.broadcast(gameId, evt);
+            if (evt) {
+                ctx.broadcast(gameId, evt);
+
+
+            }
         } else {
             console.error(`[Server] Game ID ${gameId} not found when submitting final jeopardy drawing.`);
         }
@@ -1076,7 +1050,6 @@ export const gameHandlers = {
         const game = ctx.games?.[gameId];
         if (!game) return;
 
-        // 🔒 server-authoritative toggle
         if (!game.lobbySettings?.narrationEnabled) {
             ws.send(JSON.stringify({
                 type: "tts-error",
@@ -1085,16 +1058,6 @@ export const gameHandlers = {
             }));
             return;
         }
-
-        // Optional: per-socket rate limit
-        // if (!ctx.rateLimit(ws, "tts", 5, 60_000)) {
-        //     ws.send(JSON.stringify({
-        //         type: "tts-error",
-        //         requestId,
-        //         message: "TTS rate limit exceeded"
-        //     }));
-        //     return;
-        // }
 
         const trace = ctx.createTrace("tts-ensure", { gameId });
 

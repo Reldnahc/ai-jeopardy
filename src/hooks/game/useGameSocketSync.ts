@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useWebSocket } from "../../contexts/WebSocketContext";
 import type { Player } from "../../types/Lobby";
 import type {BoardData, Clue} from "../../types";
-import type { DrawingPath } from "../../utils/drawingUtils";
 import {LobbySettings} from "../lobby/useLobbySocketSync.tsx";
 
 type ActiveBoard = "firstBoard" | "secondBoard" | "finalJeopardy";
@@ -107,7 +106,7 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
     const [isFinalJeopardy, setIsFinalJeopardy] = useState(false);
     const [allWagersSubmitted, setAllWagersSubmitted] = useState(false);
     const [wagers, setWagers] = useState<Record<string, number>>({});
-    const [drawings, setDrawings] = useState<Record<string, DrawingPath[]> | null>(null);
+    const [drawings, setDrawings] = useState<Record<string, string> | null>(null);
     const [isGameOver, setIsGameOver] = useState(false);
 
     const [narrationEnabled, setNarrationEnabled] = useState(false);
@@ -334,15 +333,11 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
                 setSelectorName(m.selectorName ?? null);
                 return;
             }
+
             if (message.type === "all-wagers-submitted") {
                 const m = message as unknown as { wagers: Record<string, number> };
                 setAllWagersSubmitted(true);
                 setWagers(m.wagers);
-
-                const finalClue = boardDataRef.current.finalJeopardy?.categories?.[0]?.values?.[0];
-                if (finalClue && isHost && gameId) {
-                    sendJson({ type: "clue-selected", gameId, clue: finalClue });
-                }
                 return;
             }
 
@@ -496,7 +491,7 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
             }
 
             if (message.type === "all-final-jeopardy-drawings-submitted") {
-                const m = message as unknown as { drawings: Record<string, DrawingPath[]> };
+                const m = message as unknown as { drawings: Record<string, string> };
                 setDrawings(m.drawings);
                 return;
             }

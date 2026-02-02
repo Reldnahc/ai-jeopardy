@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState} from 'react';
 import {Category, Clue} from "../../types.ts";
 import JeopardyGrid from "./JeopardyGrid.tsx"; // Import the grid component
 import WagerInput from "./WagerInput.tsx"; // Import the wager input component
-import { DrawingPath} from "../../utils/drawingUtils.tsx";
 import SelectedClueDisplay from "./SelectedClueDisplay.tsx";
 import {useWebSocket} from "../../contexts/WebSocketContext.tsx";
 import {Player} from "../../types/Lobby.ts";
@@ -20,7 +19,7 @@ interface JeopardyBoardProps {
     currentPlayer: string; // New prop for the current player
     allWagersSubmitted: boolean;
     isFinalJeopardy: boolean;
-    drawings: Record<string, DrawingPath[]> | null;
+    drawings: Record<string, string> | null;
     handleBuzz: () => void;
     buzzerLocked: boolean;
     buzzResult: string | null;
@@ -187,7 +186,6 @@ const JeopardyBoard: React.FC<JeopardyBoardProps> =
                     <SelectedClueDisplay
                         localSelectedClue={localSelectedClue}
                         showAnswer={showAnswer}
-                        isHost={canSelectClue}
                         isFinalJeopardy={isFinalJeopardy}
                         gameId={gameId}
                         currentPlayer={currentPlayer}
