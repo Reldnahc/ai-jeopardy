@@ -758,10 +758,13 @@ async function judgeClueAnswerFast({ clueQuestion, expectedAnswer, transcript })
         You are judging a Jeopardy-style answer.
         
         Rules:
-        - Be lenient on articles ("a", "an", "the"), punctuation, minor paraphrases, pluralization, and common synonyms.
+        - Be lenient on articles ("a", "an", "the"), punctuation, minor paraphrases, pluralization, and exact synonyms.
+        - They still need to be Specific.
+        - Do not accept close answers.
         - Do not require it to be phrased as a question. 
         - If the answer is a name, allow the first name to be omitted.
         - If the Answer is a name, allow last name only responses.
+        - Example if the answer is "Jane Doe" allow "Doe" as a correct input.
         - For numbers/dates/names, allow common spoken variants.
         
         Return STRICT JSON ONLY:

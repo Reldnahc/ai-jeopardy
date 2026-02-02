@@ -67,6 +67,7 @@ type GameStateMessage = {
     phase?: string | null;
     selectorKey?: string | null;
     selectorName?: string | null;
+    boardSelectionLocked?: boolean | null;
 };
 
 type UseGameSocketSyncArgs = {
@@ -91,6 +92,7 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
     const [activeBoard, setActiveBoard] = useState<ActiveBoard>("firstBoard");
     const [selectedClue, setSelectedClue] = useState<Clue | null>(null);
     const [clearedClues, setClearedClues] = useState<Set<string>>(new Set());
+    const [boardSelectionLocked, setBoardSelectionLocked] = useState<boolean | null>(null);
 
     const [buzzerLocked, setBuzzerLocked] = useState(true);
     const [buzzResult, setBuzzResult] = useState<string | null>(null);
@@ -236,6 +238,7 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
                 setPhase(m.phase ?? null);
                 setSelectorKey(m.selectorKey ?? null);
                 setSelectorName(m.selectorName ?? null);
+                setBoardSelectionLocked(m.boardSelectionLocked ?? null);
 
                 if (Array.isArray(m.clearedClues)) {
                     setClearedClues(new Set(m.clearedClues));
@@ -459,7 +462,13 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
                 return;
             }
 
+            if (message.type === "board-selection-unlocked") {
+                setBoardSelectionLocked(false);
+                return;
+            }
+
             if (message.type === "returned-to-board") {
+                const m = message as unknown as { boardSelectionLocked?: boolean };
                 setSelectedClue(null);
                 setBuzzResult(null);
                 setAnswerCapture(null);
@@ -467,6 +476,7 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
                 setAnswerResult(null);
                 setAnswerError(null);
                 setAiHostText(null);
+                setBoardSelectionLocked(m.boardSelectionLocked ?? null);
                 resetLocalTimerState();
                 return;
             }
@@ -593,5 +603,6 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
         selectorName,
         aiHostText,
         aiHostAsset,
+        boardSelectionLocked,
     };
 }

@@ -58,6 +58,7 @@ export default function Game() {
         selectorName,
         aiHostText,
         aiHostAsset,
+        boardSelectionLocked,
     } = useGameSocketSync({ gameId, playerName: effectivePlayerName });
 
     // Persistent WebSocket connection
@@ -87,12 +88,15 @@ export default function Game() {
         });
     }, []);
 
-    const canSelectClue = Boolean(
+    const isSelectorOnBoard = Boolean(
         phase === "board" &&
-        selectorName  &&
-        playerKey  &&
+        selectorName &&
+        playerKey &&
         selectorKey === playerKey
     );
+
+    const canSelectClue = Boolean(isSelectorOnBoard && !boardSelectionLocked);
+
 
     const narratedKeysRef = useRef<Set<string>>(new Set());
     const lastRequestedKeyRef = useRef<string | null>(null);

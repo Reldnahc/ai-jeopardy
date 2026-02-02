@@ -7,6 +7,42 @@ function applyScore(game, playerName, delta) {
     if (!game.scores) game.scores = {};
     game.scores[playerName] = (game.scores[playerName] || 0) + Number(delta || 0);
 }
+function lockBoardSelection(ctx, gameId, game, { reason = "host_speaking" } = {}) {
+    if (!game) return 0;
+
+    game.boardSelectionLocked = true;
+    game.boardSelectionLockReason = reason;
+
+    // version token so old scheduled unlocks can’t unlock a newer lock
+    game.boardSelectionLockVersion = (game.boardSelectionLockVersion || 0) + 1;
+
+    ctx.broadcast(gameId, {
+        type: "board-selection-locked",
+        reason,
+        lockVersion: game.boardSelectionLockVersion,
+    });
+
+    return game.boardSelectionLockVersion;
+}
+
+function unlockBoardSelection(ctx, gameId, game, lockVersion) {
+    if (!game) return;
+
+    // Only unlock if this scheduled unlock is still current
+    if (typeof lockVersion === "number" && lockVersion > 0) {
+        if ((game.boardSelectionLockVersion || 0) !== lockVersion) return;
+    }
+
+    if (!game.boardSelectionLocked) return;
+
+    game.boardSelectionLocked = false;
+    game.boardSelectionLockReason = null;
+
+    ctx.broadcast(gameId, {
+        type: "board-selection-unlocked",
+        lockVersion: game.boardSelectionLockVersion || 0,
+    });
+}
 
 function finishClueAndReturnToBoard(ctx, gameId, game, { keepSelector }) {
     if (!game) return;
@@ -17,14 +53,12 @@ function finishClueAndReturnToBoard(ctx, gameId, game, { keepSelector }) {
         const clueId = `${game.selectedClue.value}-${game.selectedClue.question}`;
         game.clearedClues.add(clueId);
 
-        // Inform clients
         ctx.broadcast(gameId, { type: "clue-cleared", clueId });
 
         if (game.activeBoard === "firstBoard" && ctx.isBoardFullyCleared(game, "firstBoard")) {
             game.activeBoard = "secondBoard";
             game.isFinalJeopardy = false;
             game.finalJeopardyStage = null;
-
             ctx.broadcast(gameId, { type: "transition-to-second-board" });
         } else if (game.activeBoard === "secondBoard" && ctx.isBoardFullyCleared(game, "secondBoard")) {
             ctx.startFinalJeopardy(gameId, game, ctx.broadcast);
@@ -38,6 +72,20 @@ function finishClueAndReturnToBoard(ctx, gameId, game, { keepSelector }) {
     game.phase = "board";
     game.clueState = null;
 
+    // IMPORTANT: lock selection immediately when we return to board
+    // (we will unlock after host finishes speaking)
+    const narrationEnabled = Boolean(game?.lobbySettings?.narrationEnabled);
+    const selectorName = String(game.selectorName || "").trim();
+
+    let lockVersion = 0;
+    if (narrationEnabled && selectorName) {
+        lockVersion = lockBoardSelection(ctx, gameId, game, { reason: "return_to_board_prompt" });
+    } else {
+        // If no narration, ensure unlocked
+        game.boardSelectionLocked = false;
+        game.boardSelectionLockReason = null;
+    }
+
     ctx.broadcast(gameId, {
         type: "phase-changed",
         phase: "board",
@@ -45,23 +93,42 @@ function finishClueAndReturnToBoard(ctx, gameId, game, { keepSelector }) {
         selectorName: game.selectorName ?? null,
     });
 
-    ctx.broadcast(gameId, { type: "returned-to-board", selectedClue: null });
+    ctx.broadcast(gameId, { type: "returned-to-board", selectedClue: null, boardSelectionLocked: game.boardSelectionLocked });
 
-    if (Boolean(game?.lobbySettings?.narrationEnabled) && game.selectorName) {
+    // Speak “Name…” then “you’re up”, then unlock selection authoritatively
+    if (narrationEnabled && selectorName) {
         (async () => {
-            const name = String(game.selectorName || "").trim();
-            if (!name) return;
+            const g0 = ctx.games?.[gameId];
+            if (!g0) return;
 
-            const a = await ctx.aiHostSayPlayerName(gameId, game, name);
+            // If something else re-locked the board since we started, don’t proceed
+            if ((g0.boardSelectionLockVersion || 0) !== lockVersion) return;
+
+            const a = await ctx.aiHostSayPlayerName(gameId, g0, selectorName);
             const aMs = a?.ms ?? 0;
 
-            // small gap so it feels like “Name… you’re up.”
+            // schedule “your_up” after name finishes
             ctx.aiAfter(gameId, (aMs || 650) + 150, async () => {
-                const g = ctx.games?.[gameId];
-                if (!g) return;
-                await ctx.aiHostSayRandomFromSlot(gameId, g, "your_up");
+                const g1 = ctx.games?.[gameId];
+                if (!g1) return;
+
+                if ((g1.boardSelectionLockVersion || 0) !== lockVersion) return;
+
+                const b = await ctx.aiHostSayRandomFromSlot(gameId, g1, "your_up");
+                const bMs = b?.ms ?? 0;
+
+                // unlock shortly after “your_up” finishes
+                ctx.aiAfter(gameId, (bMs || 650) + 150, () => {
+                    const g2 = ctx.games?.[gameId];
+                    if (!g2) return;
+                    unlockBoardSelection(ctx, gameId, g2, lockVersion);
+                });
             });
         })();
+    } else {
+        // no narration => unlock immediately (or just leave it unlocked)
+        const g = ctx.games?.[gameId];
+        if (g) unlockBoardSelection(ctx, gameId, g, 0);
     }
 }
 
@@ -279,6 +346,9 @@ export const gameHandlers = {
             answerSessionId: game.answerSessionId || null,
             answerDeadlineAt: game.answerDeadlineAt || null,
             answerClueKey: game.answerClueKey || null,
+            boardSelectionLocked: Boolean(game.boardSelectionLocked),
+            boardSelectionLockReason: game.boardSelectionLockReason || null,
+            boardSelectionLockVersion: game.boardSelectionLockVersion || 0,
         }));
 
         // Notify others
@@ -787,6 +857,14 @@ export const gameHandlers = {
             return;
         }
 
+        if (game.boardSelectionLocked) {
+            console.warn("[CLUE SELECT BLOCKED] board selection locked", {
+                reason: game.boardSelectionLockReason,
+                lockVersion: game.boardSelectionLockVersion,
+            });
+            return;
+        }
+
         if (!callerStable) {
             console.warn("[CLUE SELECT BLOCKED] no callerStable");
             return;
@@ -863,23 +941,7 @@ export const gameHandlers = {
             ctx.broadcast(gameId, { type: "answer-revealed", clue: game.selectedClue });
         }
     },
-    "return-to-board": async ({ data, ctx }) => {
-        const { gameId } = data;
-        const game = ctx.games[gameId];
-        if (!game) return;
 
-        ctx.clearAnswerWindow(game);
-        game.phase = null;
-        game.answeringPlayerKey = null;
-        game.answerSessionId = null;
-        game.answerClueKey = null;
-        game.selectedClue = null;
-
-        ctx.broadcast(gameId, {
-            type: "returned-to-board",
-            selectedClue: null,
-        });
-    },
     "clue-cleared": async ({ ws, data, ctx }) => {
         const { gameId, clueId } = data;
 

@@ -208,7 +208,7 @@ export const createWsContext = (wss) => {
                             selectorName: g.selectorName ?? null,
                         });
 
-                        broadcast(gameId, { type: "returned-to-board", selectedClue: null });
+                        broadcast(gameId, { type: "returned-to-board", selectedClue: null, boardSelectionLocked: g.boardSelectionLocked });
                     });
                 })();
             }
