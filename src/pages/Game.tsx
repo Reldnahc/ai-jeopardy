@@ -165,6 +165,29 @@ export default function Game() {
 
     const lastAiHostAssetPlayedRef = useRef<string | null>(null);
 
+    const gameReadySentRef = useRef(false);
+
+    useEffect(() => {
+        if (gameReadySentRef.current) return;
+        if (!isSocketReady) return;
+        if (!gameId) return;
+        if (!playerKey) return;
+        if (!effectivePlayerName) return;
+
+        // Important: wait until we've received at least one game-state
+        // so we know the game page hook is hydrated + subscribed.
+        if (!host) return;
+
+        gameReadySentRef.current = true;
+
+        sendJson({
+            type: "game-ready",
+            gameId,
+            playerKey,
+            playerName: effectivePlayerName,
+        });
+    }, [isSocketReady, gameId, playerKey, effectivePlayerName, host, sendJson]);
+
     useEffect(() => {
         if (!aiHostAsset) return;
 

@@ -1,3 +1,5 @@
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 export const lobbyHandlers = {
     "create-game": async ({ ws, data, ctx }) => {
         const { gameId } = data ?? {};
@@ -160,7 +162,7 @@ export const lobbyHandlers = {
         // Back-compat: if older clients don't send token, treat it as ack for latest final token
         game.preload.acksByPlayer[stable] = Number.isFinite(tok) ? tok : finalTok;
 
-        const requiredNow = (game.players ?? []).filter((p) => p.online).map(ctx.playerStableId);
+        let requiredNow = (game.players ?? []).filter((p) => p.online).map(ctx.playerStableId);
         const finalToken = game.preload.finalToken;
 
         // Can't finish until final batch has been broadcast
@@ -187,6 +189,56 @@ export const lobbyHandlers = {
             host: game.host,
         });
 
+        requiredNow = (game.players ?? [])
+            .filter((p) => p.online)
+            .map(ctx.playerStableId);
+
+        game.gameReady = {
+            expected: Object.fromEntries(requiredNow.map((id) => [id, true])),
+            acks: {},
+            done: false,
+        };
+
+        game.phase = null;
+
+        ctx.broadcast(gameId, {
+            type: "phase-changed",
+            phase: game.phase,
+            selectorKey: game.selectorKey ?? null,
+            selectorName: game.selectorName ?? null,
+        });
+    },
+
+    "game-ready": async ({ ws, data, ctx }) => {
+        const { gameId, playerKey, playerName } = data ?? {};
+        if (!gameId || !ctx.games?.[gameId]) return;
+
+        const game = ctx.games[gameId];
+
+        // If we never set up the barrier (or already done), ignore
+        if (!game.gameReady || game.gameReady.done) return;
+
+        // Identify stable id exactly like the rest of your code
+        // Prefer playerKey; fallback to playerName
+        const stable = (playerKey?.trim()) || String(playerName ?? "").trim();
+        if (!stable) return;
+
+        // Only count players we were expecting (don’t let random clients unblock)
+        if (!game.gameReady.expected?.[stable]) return;
+
+        game.gameReady.acks[stable] = true;
+
+        const expectedIds = Object.keys(game.gameReady.expected);
+        const allReady = expectedIds.every((id) => game.gameReady.acks[id]);
+
+        if (!allReady) return;
+
+        game.gameReady.done = true;
+
+        // NOW fire welcome logic (moved from preload-done)
+        const narrationEnabled = Boolean(game?.lobbySettings?.narrationEnabled);
+        const selectorName = String(game.selectorName ?? "").trim();
+
         if (narrationEnabled && selectorName) {
             game.phase = "welcome";
             game.welcomeEndsAt = null;
@@ -198,26 +250,28 @@ export const lobbyHandlers = {
                 selectorName: game.selectorName ?? null,
             });
 
-            // Fire welcome sequence via the same ai-host-say pipeline:
             void (async () => {
+                const pad = 250;
+                const fallback = 900;
+
                 const a = await ctx.aiHostSayRandomFromSlot(gameId, game, "welcome_intro");
                 const aMs = a?.ms ?? 0;
+                await sleep((aMs || fallback) + pad);
 
                 const b = await ctx.aiHostSayPlayerName(gameId, game, selectorName);
                 const bMs = b?.ms ?? 0;
+                await sleep((bMs || fallback) + pad);
 
                 const c = await ctx.aiHostSayRandomFromSlot(gameId, game, "welcome_outro");
                 const cMs = c?.ms ?? 0;
 
-                // Conservative timing if duration lookups return 0 due to timeout
-                const pad = 250;
-                const fallback = 900; // per segment fallback if ms=0
+                // Now compute end timing for the welcome phase (optional)
                 const total =
                     (aMs || fallback) + pad +
                     (bMs || fallback) + pad +
                     (cMs || fallback) + 600;
 
-                game.welcomeEndsAt = Date.now() + total;
+                game.welcomeEndsAt = Date.now() + (cMs || fallback) + 600;
 
                 if (game.welcomeTimer) {
                     clearTimeout(game.welcomeTimer);
@@ -238,14 +292,22 @@ export const lobbyHandlers = {
                         selectorKey: g.selectorKey ?? null,
                         selectorName: g.selectorName ?? null,
                     });
-                }, total);
+                }, (cMs || fallback) + 600);
             })();
+
+
         } else {
             game.phase = "board";
             game.welcomeEndsAt = null;
+
+            ctx.broadcast(gameId, {
+                type: "phase-changed",
+                phase: "board",
+                selectorKey: game.selectorKey ?? null,
+                selectorName: game.selectorName ?? null,
+            });
         }
     },
-
 
     "create-lobby": async ({ ws, data, ctx }) => {
         const startedAt = Date.now();

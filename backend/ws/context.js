@@ -67,7 +67,7 @@ export const createWsContext = (wss) => {
         // Duration is best-effort; NEVER block game flow on Supabase/R2
         const ms = await withTimeout(
             ttsDuration.getDurationMs(assetId),
-            250,     // <= key change: cap how long we wait
+            500,     // <= key change: cap how long we wait
             0
         );
 
