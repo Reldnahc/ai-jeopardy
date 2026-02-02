@@ -13,7 +13,7 @@ import { r2 } from "./r2Client.js";
  *   TTS_CONCURRENCY (default 2)
  *   TTS_MIN_DELAY_MS (default 120)
  */
-const TTS_CONCURRENCY = Number( 2);
+const TTS_CONCURRENCY = Number( 4);
 const TTS_MIN_DELAY_MS = Number(120);
 
 let _ttsActive = 0;

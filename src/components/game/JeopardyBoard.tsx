@@ -36,22 +36,6 @@ interface JeopardyBoardProps {
         deadlineAt: number;
     } | null;
 
-    answerTranscript: {
-        playerName: string;
-        transcript: string;
-        isFinal: boolean;
-        answerSessionId: string;
-    } | null;
-
-    answerResult: {
-        playerName: string;
-        transcript: string;
-        verdict: "correct" | "incorrect";
-        confidence: number;
-        suggestedDelta: number;
-        answerSessionId: string;
-    } | null;
-
     answerError: string | null;
     effectivePlayerName: string | null;
 
@@ -61,7 +45,7 @@ const JeopardyBoard: React.FC<JeopardyBoardProps> =
     ({ boardData, canSelectClue, onClueSelected, selectedClue, gameId, clearedClues, players, scores,
          currentPlayer, allWagersSubmitted, isFinalJeopardy, drawings,
            handleBuzz, buzzerLocked, buzzResult, buzzLockedOut, timerEndTime, timerDuration,
-          answerCapture, answerTranscript, answerResult, answerError, effectivePlayerName}) => {
+          answerCapture, answerError, effectivePlayerName}) => {
     const [localSelectedClue, setLocalSelectedClue] = useState<Clue | null>(null);
     const [showClue, setShowClue] = useState(false);
     const [wagers, setWagers] = useState<Record<string, number>>({});
@@ -219,8 +203,6 @@ const JeopardyBoard: React.FC<JeopardyBoardProps> =
                         timerEndTime={timerEndTime}
                         timerDuration={timerDuration}
                         answerCapture={answerCapture}
-                        answerTranscript={answerTranscript}
-                        answerResult={answerResult}
                         answerError={answerError}
                         effectivePlayerName={effectivePlayerName}
                     />

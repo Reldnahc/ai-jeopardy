@@ -1,19 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useWebSocket } from "../../contexts/WebSocketContext";
 import type { Player } from "../../types/Lobby";
-import type { Category, Clue } from "../../types";
+import type {BoardData, Clue} from "../../types";
 import type { DrawingPath } from "../../utils/drawingUtils";
 import {LobbySettings} from "../lobby/useLobbySocketSync.tsx";
-
-export type BoardData = {
-    firstBoard: { categories: Category[] };
-    secondBoard: { categories: Category[] };
-    finalJeopardy: { categories: Category[] };
-    // Optional narration precompute output. When present, the client can play audio instantly
-    // without sending a WS "tts-ensure" for each clue.
-    ttsAssetIds?: string[];
-    ttsByClueKey?: Record<string, string>;
-};
 
 type ActiveBoard = "firstBoard" | "secondBoard" | "finalJeopardy";
 

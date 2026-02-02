@@ -1,11 +1,5 @@
 import { useEffect, useRef } from "react";
-import type { Category, Clue } from "../../types";
-
-type BoardData = {
-    firstBoard: { categories: Category[] };
-    secondBoard: { categories: Category[] };
-    finalJeopardy: { categories: Category[] };
-};
+import type {BoardData, Category, Clue} from "../../types";
 
 function collectImageAssetIds(boardData: BoardData): string[] {
     if (!boardData) return [];

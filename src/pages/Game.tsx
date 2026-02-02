@@ -1,14 +1,14 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useLocation, useNavigate, useParams} from 'react-router-dom';
 import JeopardyBoard from '../components/game/JeopardyBoard.tsx';
-import {Clue} from "../types.ts";
+import {Clue, BoardData} from "../types.ts";
 import Sidebar from "../components/game/Sidebar.tsx";
 import FinalScoreScreen from "../components/game/FinalScoreScreen.tsx";
 import {useWebSocket} from "../contexts/WebSocketContext.tsx";
 import {useDeviceContext} from "../contexts/DeviceContext.tsx";
 import MobileSidebar from "../components/game/MobileSidebar.tsx";
 import {useGameSession} from "../hooks/useGameSession.ts";
-import {BoardData, useGameSocketSync} from "../hooks/game/useGameSocketSync.ts";
+import {useGameSocketSync} from "../hooks/game/useGameSocketSync.ts";
 import {usePlayerIdentity} from "../hooks/usePlayerIdentity.ts";
 import {usePreload} from "../hooks/game/usePreload.ts";
 import {useEarlyMicPermission} from "../hooks/earlyMicPermission.ts";
@@ -52,8 +52,6 @@ export default function Game() {
         requestTts,
         ttsReady,
         answerCapture,
-        answerTranscript,
-        answerResult,
         answerError,
         phase,
         selectorKey,
@@ -454,8 +452,6 @@ export default function Game() {
                             timerEndTime={timerEndTime}
                             timerDuration={timerDuration}
                             answerCapture={answerCapture}
-                            answerTranscript={answerTranscript}
-                            answerResult={answerResult}
                             answerError={answerError}
                             effectivePlayerName={effectivePlayerName}
                         />

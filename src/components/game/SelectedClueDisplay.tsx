@@ -35,23 +35,6 @@ interface SelectedClueDisplayProps {
         deadlineAt: number;
     } | null;
 
-    answerTranscript: {
-        playerName: string;
-        transcript: string;
-        isFinal: boolean;
-        answerSessionId: string;
-
-    } | null;
-
-    answerResult: {
-        playerName: string;
-        transcript: string;
-        verdict: "correct" | "incorrect";
-        confidence: number;
-        suggestedDelta: number;
-        answerSessionId: string;
-    } | null;
-
     answerError: string | null;
     effectivePlayerName: string | null;
 
@@ -76,8 +59,6 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                                                                      timerEndTime,
                                                                      timerDuration,
                                                                      answerCapture,
-                                                                     answerTranscript,
-                                                                     answerResult,
                                                                      answerError,
                                                                      effectivePlayerName
                                                                  }) => {
@@ -444,23 +425,9 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                             <div className="text-lg font-bold">
                                 {answerCapture.playerName} is answering…
                             </div>
-
                             {isAnsweringPlayer && (
                                 <div className="text-sm opacity-80 mt-1">Recording your mic now…</div>
                             )}
-
-                            {answerTranscript && answerTranscript.answerSessionId === answerCapture.answerSessionId && (
-                                <div className="mt-2 text-base italic opacity-90">
-                                    “{answerTranscript.transcript}”
-                                </div>
-                            )}
-
-                            {answerResult && answerResult.answerSessionId === answerCapture.answerSessionId && (
-                                <div className="mt-3 text-xl font-bold">
-                                    {answerResult.verdict === "correct" ? "✅ Correct" : "❌ Incorrect" }
-                                </div>
-                            )}
-
                             {answerError && (
                                 <div className="mt-2 text-sm text-red-200">{answerError}</div>
                             )}

@@ -1,6 +1,6 @@
 import OpenAI, { toFile } from "openai";
 
-const openai = new OpenAI(); // uses process.env.OPENAI_API_KEY by default
+const openai = new OpenAI();
 
 function safeJson(obj) {
     try {
@@ -11,7 +11,6 @@ function safeJson(obj) {
 }
 
 function describeOpenAiError(err) {
-    // openai sdk errors usually have: status, error, headers, request_id, etc.
     return {
         name: err?.name,
         message: err?.message,
@@ -26,11 +25,33 @@ function describeOpenAiError(err) {
     };
 }
 
+function buildExpectedAnswerPrompt(context) {
+    // You said you'll send ONLY the answer. We'll accept:
+    // - context: "Mount Rushmore"
+    // - context: ["Mount Rushmore"] (legacy)
+    let expected = "";
+
+    if (Array.isArray(context)) expected = String(context[0] ?? "").trim();
+    else expected = String(context ?? "").trim();
+
+    if (!expected) return undefined;
+
+    // Keep the prompt short and explicit.
+    // This is an STT *bias* hint, not a chat instruction.
+    // Also avoid quotes that sometimes get transcribed literally.
+    return (
+        "English transcription. The spoken response is expected to match this answer closely.\n" +
+        "Prefer this exact spelling if heard:\n" +
+        expected +
+        "\nReturn only the transcript."
+    );
+}
+
 /**
  * Transcribe short answer audio into text.
  * Expected from browser: audio/webm;codecs=opus or audio/webm.
  */
-export async function transcribeAnswerAudio({ buffer, mimeType }) {
+export async function transcribeAnswerAudio({ buffer, mimeType, context }) {
     const model = "gpt-4o-mini-transcribe";
     const ct = String(mimeType || "audio/webm");
 
@@ -38,23 +59,31 @@ export async function transcribeAnswerAudio({ buffer, mimeType }) {
         throw new Error("transcribeAnswerAudio: missing/empty buffer");
     }
 
-    // Helpful debug logs (you asked for verbose)
+    const prompt = buildExpectedAnswerPrompt(context);
+
     console.log("[stt] start", {
         model,
         mimeType: ct,
         bytes: buffer.length,
-        hasKey: Boolean(process.env.OPENAI_API_KEY),
-        keyPrefix: process.env.OPENAI_API_KEY ? process.env.OPENAI_API_KEY.slice(0, 7) : null, // safe-ish
+        hasPrompt: Boolean(prompt),
+        promptChars: prompt ? prompt.length : 0,
+        expectedPreview: Array.isArray(context)
+            ? String(context[0] ?? "").slice(0, 80)
+            : String(context ?? "").slice(0, 80),
     });
 
-    // IMPORTANT: wrap Buffer as a proper File for multipart
     const file = await toFile(buffer, "answer.webm", { type: ct });
 
     try {
         const resp = await openai.audio.transcriptions.create({
             model,
             file,
-            // optional: language: "en",
+            language: "en",
+            prompt, // <-- the whole point
+            // Optional debugging:
+            // response_format: "json",
+            // logprobs: true,
+            // temperature: 0,
         });
 
         const text = String(resp?.text || "").trim();
@@ -62,10 +91,7 @@ export async function transcribeAnswerAudio({ buffer, mimeType }) {
         return { text };
     } catch (err) {
         const info = describeOpenAiError(err);
-
         console.error("[stt] failed", safeJson(info));
-
-        // Re-throw with more context so your handler prints something useful too
         throw new Error(
             `STT failed: status=${info.status ?? "?"} message=${info.message ?? "?"} request_id=${info.request_id ?? "?"}`
         );

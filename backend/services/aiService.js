@@ -741,7 +741,7 @@ function normalizeJeopardyText(s) {
 
 /**
  * Judge whether a spoken transcript matches the expected answer for a clue.
- * Returns: { verdict: "correct"|"incorrect"|"needs_host", confidence: number, normalizedTranscript: string }
+ * Returns: { verdict: "correct"|"incorrect", confidence: number, normalizedTranscript: string }
  */
 async function judgeClueAnswerFast({ clueQuestion, expectedAnswer, transcript }) {
     const normT = normalizeJeopardyText(transcript);
@@ -749,34 +749,29 @@ async function judgeClueAnswerFast({ clueQuestion, expectedAnswer, transcript })
 
     // Cheap fast-path: exact normalized match
     if (normT && normA && normT === normA) {
-        return { verdict: "correct", confidence: 0.98, normalizedTranscript: normT };
+        return { verdict: "correct", normalizedTranscript: normT };
     }
 
-    const model = "gpt-4o-mini";
+    const model = "gpt-4.1-nano";
 
     const prompt = `
         You are judging a Jeopardy-style answer.
         
-        Inputs:
-        - clue_question: the clue prompt shown to players
-        - expected_answer: canonical answer for scoring
-        - transcript: player's spoken answer (speech-to-text)
-        
         Rules:
         - Be lenient on articles ("a", "an", "the"), punctuation, minor paraphrases, pluralization, and common synonyms.
+        - Do not require it to be phrased as a question. 
+        - If the answer is a name, allow the first name to be omitted.
+        - If the Answer is a name, allow last name only responses.
         - For numbers/dates/names, allow common spoken variants.
-        - If clearly correct -> "correct"
-        - If clearly wrong -> "incorrect"
-        - If ambiguous / incomplete / uncertain -> "needs_host"
         
         Return STRICT JSON ONLY:
-        { "verdict": "correct"|"incorrect"|"needs_host", "confidence": 0 to 1, "normalizedTranscript": string }
+        { "verdict": "correct"|"incorrect"}
         
-        clue_question: ${JSON.stringify(String(clueQuestion || ""))}
-        expected_answer: ${JSON.stringify(String(expectedAnswer || ""))}
-        transcript: ${JSON.stringify(String(transcript || ""))}
-        normalized_transcript_hint: ${JSON.stringify(normT)}
-        normalized_answer_hint: ${JSON.stringify(normA)}
+        Player Input: ${JSON.stringify(String(transcript || ""))}
+        Expected Answer: ${JSON.stringify(String(expectedAnswer || ""))}
+
+        Normalized Player Input: ${JSON.stringify(normT)}
+        Normalized Answer: ${JSON.stringify(normA)}
         `;
 
     const r = await callOpenAi(model, prompt, { reasoningEffort: "off" });
@@ -786,19 +781,13 @@ async function judgeClueAnswerFast({ clueQuestion, expectedAnswer, transcript })
     try { parsed = JSON.parse(content); } catch { parsed = {}; }
 
     const verdict = parsed?.verdict;
-    const confidence = Number(parsed?.confidence);
-    const normalizedTranscript = typeof parsed?.normalizedTranscript === "string"
-        ? parsed.normalizedTranscript
-        : normT;
 
-    if (verdict !== "correct" && verdict !== "incorrect" && verdict !== "needs_host") {
-        return { verdict: "incorrect", confidence: 0.2, normalizedTranscript };
+    if (verdict !== "correct" && verdict !== "incorrect") {
+        return { verdict: "incorrect" };
     }
 
     return {
         verdict,
-        confidence: Number.isFinite(confidence) ? Math.max(0, Math.min(1, confidence)) : 0.5,
-        normalizedTranscript,
     };
 }
 

@@ -598,7 +598,7 @@ export const gameHandlers = {
         // --- STT ---
         let transcript = "";
         try {
-            const stt = await ctx.transcribeAnswerAudio({ buffer: buf, mimeType });
+            const stt = await ctx.transcribeAnswerAudio({ buffer: buf, mimeType, context: game.selectedClue?.answer });
             transcript = String(stt?.text || "").trim();
             if (!transcript) {
                 const parseValue = (val) => {
@@ -664,7 +664,6 @@ export const gameHandlers = {
 
         // --- JUDGE ---
         let verdict = "incorrect";
-        let confidence = 0.0;
 
         try {
             const expectedAnswer = String(game.selectedClue?.answer || "");
@@ -672,11 +671,9 @@ export const gameHandlers = {
             const judged = await ctx.judgeClueAnswerFast({ clueQuestion, expectedAnswer, transcript });
 
             verdict = judged?.verdict || "needs_host";
-            confidence = Number(judged?.confidence || 0);
         } catch (e) {
             console.error("[answer-audio-blob] judge failed:", e?.message || e);
             verdict = "needs_host";
-            confidence = 0.0;
         }
 
         // Suggest delta but do NOT mutate scores yet (keeps this ripple-free)
@@ -693,7 +690,6 @@ export const gameHandlers = {
         game.phase = "RESULT";
         game.answerTranscript = transcript;
         game.answerVerdict = verdict;
-        game.answerConfidence = confidence;
 
         ctx.broadcast(gameId, {
             type: "answer-result",
@@ -702,7 +698,6 @@ export const gameHandlers = {
             playerName: player.name,
             transcript,
             verdict,
-            confidence,
             suggestedDelta,
         });
 
