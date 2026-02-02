@@ -142,7 +142,14 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                 const mime = pickMimeType();
 
                 chunksRef.current = [];
-                const rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+                const rec = new MediaRecorder(stream, mime ? {
+                    mimeType: mime,
+                    audioBitsPerSecond: 8000,   // try 16000–32000
+                    bitsPerSecond: 8000,
+                } : {
+                    audioBitsPerSecond: 8000,
+                    bitsPerSecond: 8000,
+                });
                 recorderRef.current = rec;
 
                 // --- VAD setup (detect when they've spoken, then stop after silence) ---
@@ -243,7 +250,7 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                 };
 
                 // Start recording; collect chunks every 250ms
-                rec.start(250);
+                rec.start(1000);
 
                 // Start VAD loop
                 vadTimer = window.setTimeout(scheduleVadTick, VAD_INTERVAL_MS);
