@@ -8,9 +8,14 @@ import { validateImportedBoardData, parseBoardJson, normalizeCategories11 } from
 import { requireHost, isHostSocket } from "../auth/hostGuard.js";
 import {getColorFromPlayerName, playerStableId} from "../services/userService.js";
 import {createTrace} from "../services/trace.js";
-import {createBoardData, judgeClueAnswerFast} from "../services/aiService.js";
+import {createBoardData, judgeClueAnswerFast, judgeImage} from "../services/aiService.js";
 import { getRoleForUserId, verifySupabaseAccessToken } from "../services/userService.js";
-import {checkAllFinalDrawingsSubmitted, checkAllWagersSubmitted} from "../game/finalJeopardy.js";
+import {
+    checkAllDrawingsSubmitted,
+    checkAllWagersSubmitted,
+    submitDrawing,
+    submitWager
+} from "../game/finalJeopardy.js";
 import {isBoardFullyCleared, startFinalJeopardy} from "../game/stageTransition.js";
 import {getCOTD} from "../state/cotdStore.js";
 import {collectImageAssetIdsFromBoard} from "../services/imageAssetService.js";
@@ -288,6 +293,7 @@ export const createWsContext = (wss) => {
         // inference
         transcribeAnswerAudio,
         judgeClueAnswerFast,
+        judgeImage,
 
         //create-game
         getGameOrFail,
@@ -307,8 +313,10 @@ export const createWsContext = (wss) => {
         getColorFromPlayerName,
         createTrace,
         createBoardData,
+        submitWager,
+        submitDrawing,
         checkAllWagersSubmitted,
-        checkAllFinalDrawingsSubmitted,
+        checkAllFinalDrawingsSubmitted: checkAllDrawingsSubmitted,
         isBoardFullyCleared,
         startFinalJeopardy,
         getCOTD,

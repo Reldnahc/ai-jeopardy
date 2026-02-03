@@ -490,13 +490,13 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
                 return;
             }
 
-            if (message.type === "all-final-jeopardy-drawings-submitted") {
+            if (message.type === "all-drawings-submitted") {
                 const m = message as unknown as { drawings: Record<string, string> };
                 setDrawings(m.drawings);
                 return;
             }
 
-            if (message.type === "game-over") {
+            if (message.type === "final-score-screen") {
                 setIsGameOver(true);
                 return;
             }

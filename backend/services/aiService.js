@@ -36,14 +36,30 @@ function plannedVisualSlots(settings) {
 function callOpenAi(model, prompt, options = {}) {
     const modelDef = modelsByValue[model];
     const effort = options?.reasoningEffort;
+    const image = options?.image;
 
     const includeReasoningEffort =
         modelDef?.supportsReasoningEffort === true &&
         (effort === "low" || effort === "medium" || effort === "high");
 
+    const content = image
+        ? [
+            { type: "text", text: prompt },
+            {
+                type: "image_url",
+                image_url: { url: image },
+            },
+        ]
+        : prompt;
+
     const payload = {
         model,
-        messages: [{ role: "user", content: prompt }],
+        messages: [
+            {
+                role: "user",
+                content,
+            },
+        ],
         response_format: { type: "json_object" },
     };
 
@@ -53,6 +69,7 @@ function callOpenAi(model, prompt, options = {}) {
 
     return openai.chat.completions.create(payload);
 }
+
 
 function callDeepseek(model, prompt, options = {}) {
     return deepseek.chat.completions.create({
@@ -743,13 +760,13 @@ function normalizeJeopardyText(s) {
  * Judge whether a spoken transcript matches the expected answer for a clue.
  * Returns: { verdict: "correct"|"incorrect", confidence: number, normalizedTranscript: string }
  */
-async function judgeClueAnswerFast({ clueQuestion, expectedAnswer, transcript }) {
+async function judgeClueAnswerFast(expectedAnswer, transcript ) {
     const normT = normalizeJeopardyText(transcript);
     const normA = normalizeJeopardyText(expectedAnswer);
 
     // Cheap fast-path: exact normalized match
     if (normT && normA && normT === normA) {
-        return { verdict: "correct", normalizedTranscript: normT };
+        return "correct";
     }
 
     const model = "gpt-4.1-nano";
@@ -789,13 +806,50 @@ async function judgeClueAnswerFast({ clueQuestion, expectedAnswer, transcript })
         return { verdict: "incorrect" };
     }
 
-    return {
-        verdict,
-    };
+    return verdict;
+}
+
+async function judgeImage(expectedAnswer, imageUrl) {
+    const model = "gpt-4.1-mini";
+
+    const prompt = `
+        You are judging a final jeopardy clue. Look at the image to see what the player wrote. 
+        
+        Rules:
+        - Be lenient on articles ("a", "an", "the"), punctuation, minor paraphrases, pluralization, and exact synonyms.
+        - They still need to be Specific.
+        - Do not accept close answers.
+        - Do not require it to be phrased as a question. 
+        - If the answer is a name, allow the first name to be omitted.
+        - If the Answer is a name, allow last name only responses.
+        - Example if the answer is "Jane Doe" allow "Doe" as a correct input.
+        - For numbers/dates/names, allow common spoken variants.
+        
+        Return STRICT JSON ONLY:
+        { "verdict": "correct"|"incorrect"}
+        
+        Player Input: See Image
+        Expected Answer: ${JSON.stringify(String(expectedAnswer || ""))}
+        `;
+
+    const r = await callOpenAi(model, prompt, { image: imageUrl });
+    const content = r?.choices?.[0]?.message?.content || "{}";
+
+    let parsed;
+    try { parsed = JSON.parse(content); } catch { parsed = {}; }
+
+    const verdict = parsed?.verdict;
+
+    if (verdict !== "correct" && verdict !== "incorrect") {
+        return "incorrect";
+    }
+
+    return verdict;
 }
 
 export {
     createBoardData,
     createCategoryOfTheDay,
-    judgeClueAnswerFast
+    judgeClueAnswerFast,
+    judgeImage
 };

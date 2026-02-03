@@ -32,7 +32,7 @@ const FinalScoreScreen: React.FC<FinalScoreScreenProps> = ({ scores }) => {
                             {player}
                         </span>
                         <span className={`text-2xl ${index === 0 ? 'font-bold' : ''}`}>
-                            ${score.toLocaleString()}
+                            ${score}
                         </span>
                     </div>
                 ))}

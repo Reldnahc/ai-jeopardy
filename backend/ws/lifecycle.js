@@ -1,6 +1,6 @@
 // backend/ws/lifecycle.js
 import {
-    checkAllFinalDrawingsSubmitted,
+    checkAllDrawingsSubmitted,
     checkAllWagersSubmitted,
 } from "../game/finalJeopardy.js";
 
@@ -46,11 +46,10 @@ export function handleSocketClose(ws, ctx) {
         console.log(`[Server] Player ${player.name} disconnected (soft).`);
 
         // Unblock Final Jeopardy if they were required (domain returns events)
-        const evt1 = checkAllWagersSubmitted(game);
-        if (evt1) ctx.broadcast(gameId, evt1);
+        checkAllWagersSubmitted(game, gameId, ctx);
 
-        const evt2 = checkAllFinalDrawingsSubmitted(game);
-        if (evt2) ctx.broadcast(gameId, evt2);
+        checkAllDrawingsSubmitted(game);
+
     } catch (e) {
         console.error("[WS] close handler error:", e);
     }

@@ -411,8 +411,7 @@ export const gameHandlers = {
             host: game.host,
         });
         // After removal, re-check whether we can unblock Final Jeopardy
-        const evt1 = ctx.checkAllWagersSubmitted(game);
-        if (evt1) ctx.broadcast(gameId, evt1);
+        ctx.checkAllWagersSubmitted(game, gameId, ctx);
 
         const evt2 = ctx.checkAllFinalDrawingsSubmitted(game);
         if (evt2) ctx.broadcast(gameId, evt2);
@@ -737,13 +736,11 @@ export const gameHandlers = {
 
         try {
             const expectedAnswer = String(game.selectedClue?.answer || "");
-            const clueQuestion = String(game.selectedClue?.question || "");
-            const judged = await ctx.judgeClueAnswerFast({ clueQuestion, expectedAnswer, transcript });
+            verdict = await ctx.judgeClueAnswerFast(expectedAnswer, transcript );
 
-            verdict = judged?.verdict || "needs_host";
         } catch (e) {
             console.error("[answer-audio-blob] judge failed:", e?.message || e);
-            verdict = "needs_host";
+            verdict = "incorrect";
         }
 
         // Suggest delta but do NOT mutate scores yet (keeps this ripple-free)
@@ -828,14 +825,6 @@ export const gameHandlers = {
         }
     },
 
-    "trigger-game-over": async ({ ws, data, ctx }) => {
-        const {gameId} = data;
-        if (!ctx.requireHost(ctx.games[gameId], ws)) return;
-
-        ctx.broadcast(gameId, {
-            type: "game-over",
-        });
-    },
     "clue-selected": async ({ ws, data, ctx }) => {
         const { gameId, clue } = data;
         const game = ctx.games[gameId];
@@ -960,86 +949,18 @@ export const gameHandlers = {
     },
     "submit-wager": async ({ ws, data, ctx }) => {
         const {gameId, player, wager} = data;
+        const game = ctx.games[gameId];
 
-        if (ctx.games[gameId]) {
-            if (!ctx.games[gameId].wagers) {
-                ctx.games[gameId].wagers = {};
-            }
-            ctx.games[gameId].wagers[player] = wager;
-
-            ctx.broadcast(gameId, {
-                type: "wager-update",
-                player,
-                wager,
-            });
-
-            const game = ctx.games[gameId];
-
-            const evt = ctx.checkAllWagersSubmitted(game);
-            if (evt) {
-                ctx.broadcast(gameId, evt);
-
-                // Reveal the final clue immediately after wagers are locked in
-                const fjCat = game.boardData?.finalJeopardy?.categories?.[0] || null;
-                const fjClueRaw = fjCat?.values?.[0] || null;
-
-                if (!fjClueRaw) {
-                    console.error("[FinalJeopardy] Missing final clue in boardData");
-                    return;
-                }
-
-                // Ensure it matches your client Clue shape (needs `value`)
-                game.selectedClue = {
-                    value: typeof fjClueRaw.value === "number" ? fjClueRaw.value : 0,
-                    question: String(fjClueRaw.question || ""),
-                    answer: String(fjClueRaw.answer || ""),
-                    isAnswerRevealed: false,
-                    media: fjClueRaw.media || undefined,
-                };
-                game.phase = "clue";
-
-                // Final Jeopardy shouldn't use the buzzer
-                game.buzzerLocked = true;
-                game.buzzed = null;
-                game.buzzLockouts = {};
-                ctx.broadcast(gameId, { type: "buzzer-locked" });
-                ctx.broadcast(gameId, { type: "buzzer-ui-reset" });
-
-                ctx.broadcast(gameId, {
-                    type: "clue-selected",
-                    clue: game.selectedClue,
-                    clearedClues: Array.from(game.clearedClues || []),
-                });
-            }
-
+        if (game) {
+            ctx.submitWager(game, gameId, player, wager, ctx);
         }
     },
     "submit-drawing": async ({ ws, data, ctx }) => {
         const {gameId, player, drawing} = data;
+        const game = ctx.games[gameId];
 
-        if (ctx.games[gameId]) {
-            // Initialize the drawings object if not present
-            if (!ctx.games[gameId].drawings) {
-                ctx.games[gameId].drawings = {};
-            }
-
-
-
-            // Store the player's drawing as an object
-            ctx.games[gameId].drawings[player] = drawing;
-
-
-
-
-
-            const evt = ctx.checkAllFinalDrawingsSubmitted(ctx.games[gameId]);
-            if (evt) {
-                ctx.broadcast(gameId, evt);
-
-
-            }
-        } else {
-            console.error(`[Server] Game ID ${gameId} not found when submitting final jeopardy drawing.`);
+        if (game) {
+            await ctx.submitDrawing(game, gameId, player, drawing, ctx);
         }
     },
     "tts-ensure": async ({ ws, data, ctx }) => {
