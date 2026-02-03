@@ -193,7 +193,6 @@ const JeopardyBoard: React.FC<JeopardyBoardProps> =
                         drawings={drawings}
                         drawingSubmitted={drawingSubmitted}
                         setDrawingSubmitted={setDrawingSubmitted}
-                        players={players}
                         handleBuzz={handleBuzz}
                         buzzerLocked={buzzerLocked}
                         buzzResult={buzzResult}

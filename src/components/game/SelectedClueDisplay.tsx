@@ -18,7 +18,6 @@ interface SelectedClueDisplayProps {
     drawings: Record<string, string> | null;
     drawingSubmitted: Record<string, boolean>;
     setDrawingSubmitted: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
-    players: Player[];
     handleBuzz: () => void;
     buzzerLocked: boolean;
     buzzResult: string | null;
@@ -48,7 +47,6 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                                                                      drawings,
                                                                      drawingSubmitted,
                                                                      setDrawingSubmitted,
-                                                                     players,
                                                                      handleBuzz,
                                                                      buzzerLocked,
                                                                      buzzResult,
