@@ -769,15 +769,14 @@ async function judgeClueAnswerFast(expectedAnswer, transcript ) {
         return "correct";
     }
 
-    const model = "gpt-4.1-nano";
+    const model = "gpt-4o-mini";
 
     const prompt = `
         You are judging a Jeopardy-style answer.
         
         Rules:
         - Be lenient on articles ("a", "an", "the"), punctuation, minor paraphrases, pluralization, and exact synonyms.
-        - They still need to be Specific.
-        - Do not accept close answers.
+        - Dont require information that can be inferred. eg. Mario accepted for Super Mario, West Nile accepted for West Nile Virus
         - Do not require it to be phrased as a question. 
         - If the answer is a name, allow the first name to be omitted.
         - If the Answer is a name, allow last name only responses.

@@ -72,8 +72,8 @@ export const ProfileProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     // Fetch the profile on component mount
     useEffect(() => {
-        if (loading === false){
-            fetchProfile();
+        if (!loading){
+           void fetchProfile();
         }
     }, [user, loading]);
 

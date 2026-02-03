@@ -1,8 +1,9 @@
 function getExpectedFinalists(game) {
+
     const players = Array.isArray(game?.players) ? game.players : [];
 
     return players.filter((p) => {
-        const score = Number(p?.score ?? 0);
+        const score = Number(game.scores[p.name] ?? 0);
         const online = p?.online !== false; // default true if missing
         return score > 0 && online;
     });
@@ -93,12 +94,6 @@ export function submitWager(game, gameId, player, wager, ctx) {
     }
     game.wagers[player] = wager;
 
-    ctx.broadcast(gameId, {
-        type: "wager-update",
-        player,
-        wager,
-    });
-
     checkAllWagersSubmitted(game, gameId, ctx);
 }
 
@@ -108,6 +103,9 @@ export function checkAllWagersSubmitted(game, gameId, ctx) {
 
     const expected = getExpectedFinalists(game).map((p) => p.name);
     const wagers = game.wagers || {};
+
+    console.log(wagers);
+    console.log(expected);
 
     const allSubmitted =
         expected.length === 0 ||

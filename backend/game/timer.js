@@ -9,7 +9,7 @@ export const clearGameTimer = (game) => {
     game.timerKind = null; // "buzz" | "answer" | null
 };
 
-export const startGameTimer = (gameId, game, broadcast, durationSeconds, kind, onExpire) => {
+export const startGameTimer = (gameId, game, ctx, durationSeconds, kind, onExpire) => {
     if (!game) return;
 
     // Cancel any previous timer and bump version so stale timeouts can't win
@@ -23,7 +23,7 @@ export const startGameTimer = (gameId, game, broadcast, durationSeconds, kind, o
 
     const currentVersion = game.timerVersion;
 
-    broadcast(gameId, {
+    ctx.broadcast(gameId, {
         type: "timer-start",
         endTime,
         duration: durationSeconds,
@@ -37,9 +37,9 @@ export const startGameTimer = (gameId, game, broadcast, durationSeconds, kind, o
         clearGameTimer(game);
 
         if (typeof onExpire === "function") {
-            onExpire({ gameId, game, broadcast, timerVersion: currentVersion, timerKind: kind || null });
+            onExpire({ gameId, game, broadcast: ctx.broadcast, timerVersion: currentVersion, timerKind: kind || null });
         }
 
-        broadcast(gameId, { type: "timer-end", timerVersion: currentVersion, timerKind: kind || null });
+        ctx.broadcast(gameId, { type: "timer-end", timerVersion: currentVersion, timerKind: kind || null });
     }, durationSeconds * 1000);
 };

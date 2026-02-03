@@ -24,9 +24,7 @@ const WagerInput: React.FC<WagerInputProps> = ({
                                                }) => {
     return (
         <div>
-            {isHost && players.length > 1 ? (
-                <p>Waiting for players to place their wagers...</p>
-            ) : (
+            {  (
                 players
                     .filter((player) => player.name === currentPlayer) // Only show box for the current player
                     .map((player) => {

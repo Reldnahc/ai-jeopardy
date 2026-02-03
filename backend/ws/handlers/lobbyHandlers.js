@@ -1,5 +1,3 @@
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
 export const lobbyHandlers = {
     "create-game": async ({ ws, data, ctx }) => {
         const { gameId } = data ?? {};
@@ -251,25 +249,19 @@ export const lobbyHandlers = {
             });
 
             void (async () => {
-                const pad = 250;
                 const fallback = 900;
 
-                const a = await ctx.aiHostSayRandomFromSlot(gameId, game, "welcome_intro");
+                const a = await ctx.aiHostSayRandomFromSlot(gameId, game, "welcome_intro", ctx);
                 const aMs = a?.ms ?? 0;
-                await sleep((aMs || fallback) + pad);
+                await ctx.sleep((aMs || fallback) + 200);
 
-                const b = await ctx.aiHostSayPlayerName(gameId, game, selectorName);
+                const b = await ctx.aiHostSayPlayerName(gameId, game, selectorName, ctx);
                 const bMs = b?.ms ?? 0;
-                await sleep((bMs || fallback) + pad);
+                await ctx.sleep((bMs || fallback) + 100);
 
-                const c = await ctx.aiHostSayRandomFromSlot(gameId, game, "welcome_outro");
+                const c = await ctx.aiHostSayRandomFromSlot(gameId, game, "welcome_outro", ctx);
                 const cMs = c?.ms ?? 0;
 
-                // Now compute end timing for the welcome phase (optional)
-                const total =
-                    (aMs || fallback) + pad +
-                    (bMs || fallback) + pad +
-                    (cMs || fallback) + 600;
 
                 game.welcomeEndsAt = Date.now() + (cMs || fallback) + 600;
 

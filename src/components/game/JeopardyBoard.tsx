@@ -129,14 +129,14 @@ const JeopardyBoard: React.FC<JeopardyBoardProps> =
             // Prevent duplicate submits
             setWagerSubmitted((prev) => (prev.includes(player) ? prev : [...prev, player]));
 
-            // Send to server
-            sendJson({
-                type: "submit-wager",
-                gameId,
-                player,
-                wager: normalizedWager,
-            });
-
+            if (normalizedWager > 0) {
+                sendJson({
+                    type: "submit-wager",
+                    gameId,
+                    player,
+                    wager: normalizedWager,
+                });
+            }
         };
 
 
