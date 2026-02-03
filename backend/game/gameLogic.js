@@ -279,8 +279,8 @@ export function doUnlockBuzzerAuthoritative( gameId, game, ctx) {
             ctx.broadcast(gameId, { type: "buzzer-locked" });
 
             (async () => {
-                await ctx.aiHostSayRandomFromSlot(gameId, game, "nobody", ctx);
-
+                const said = await ctx.aiHostSayRandomFromSlot(gameId, game, "nobody", ctx);
+                const ms = said?.ms ?? 0;
                 // Reveal once
                 game.selectedClue.isAnswerRevealed = true;
                 ctx.broadcast(gameId, { type: "answer-revealed", clue: game.selectedClue });
