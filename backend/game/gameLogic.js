@@ -101,7 +101,7 @@ function finishClueAndReturnToBoard(ctx, gameId, game) {
     }
 
 
-    returnToBoard();
+    returnToBoard(game, gameId, ctx);
 }
 
 export function parseClueValue(val) {
@@ -221,8 +221,8 @@ export async function autoResolveAfterJudgement(ctx, gameId, game, playerName, v
         ctx.aiAfter(gameId, msRebuzz + 700, () => {
             const game = ctx.games?.[gameId];
             if (!game) return;
-            ctx.doUnlockBuzzerAuthoritative(gameId, game, ctx);
             ctx.broadcast(gameId, { type: "buzzer-ui-reset" });
+            ctx.doUnlockBuzzerAuthoritative(gameId, game, ctx);
         });
     });
 }

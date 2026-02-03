@@ -77,7 +77,7 @@ type UseGameSocketSyncArgs = {
 type TtsReady = { requestId?: string; assetId: string; url: string };
 
 export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs) {
-    const { isSocketReady, sendJson, subscribe } = useWebSocket();
+    const { isSocketReady, sendJson, subscribe, nowMs } = useWebSocket();
 
     const [host, setHost] = useState<string | null>(null);
     const [players, setPlayers] = useState<Player[]>([]);
@@ -263,7 +263,7 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
                     timerVersionRef.current = m.timerVersion;
                 }
 
-                if (typeof m.timerEndTime === "number" && m.timerEndTime > Date.now()) {
+                if (typeof m.timerEndTime === "number" && m.timerEndTime > nowMs()) {
                     setTimerEndTime(m.timerEndTime);
                     setTimerDuration(typeof m.timerDuration === "number" ? m.timerDuration : 0);
                 } else {
@@ -388,7 +388,7 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
 
             if (message.type === "buzzer-ui-reset") {
                 clearAnswerUi();
-                resetLocalTimerState();
+                //resetLocalTimerState();
                 return;
             }
 

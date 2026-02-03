@@ -11,6 +11,7 @@ interface WebSocketContextType {
     sendJson: (payload: object) => void;
     subscribe: (listener: Listener) => () => void;
     setLobbyPresence: (presence: { gameId: string; playerId: string } | null) => void;
+    nowMs: () => number;
 }
 
 const WebSocketContext = createContext<WebSocketContextType | null>(null);
@@ -25,6 +26,11 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     const [isSocketReady, setIsSocketReady] = useState(false);
     const lastLobbyRef = useRef<{ gameId: string; playerId: string } | null>(null);
+
+    const serverOffsetMsRef = useRef(0);
+
+    const nowMs = useCallback(() => Date.now() + serverOffsetMsRef.current, []);
+
 
     // const { profile, error } = useProfile();
     // const { loading } = useAuth();
@@ -63,6 +69,9 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                     ws.send(JSON.stringify({ type: "auth", accessToken: token }));
                 }
             })();
+
+            const clientSentAt = Date.now();
+            ws.send(JSON.stringify({ type: "request-time-sync", clientSentAt}));
 
             setIsSocketReady(true);
             flushQueue();
@@ -103,6 +112,16 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             ) return;
 
             const msg = parsed as WSMessage;
+            if (msg.type === "send-time-sync") {
+                const clientSentAt = Number((msg as any).clientSentAt || 0);
+                const serverNow = Number((msg as any).serverNow || 0);
+                const clientRecvAt = Date.now();
+
+                if (clientSentAt > 0 && serverNow > 0) {
+                    const midpoint = (clientSentAt + clientRecvAt) / 2;
+                    serverOffsetMsRef.current = serverNow - midpoint;
+                }
+            }
             for (const listener of listenersRef.current) listener(msg);
         };
     }, [flushQueue]);
@@ -197,8 +216,9 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         isSocketReady,
         sendJson,
         subscribe,
-        setLobbyPresence
-    }), [isSocketReady, sendJson, setLobbyPresence, subscribe]);
+        setLobbyPresence,
+        nowMs
+    }), [isSocketReady, nowMs, sendJson, setLobbyPresence, subscribe]);
 
     return <WebSocketContext.Provider value={value}>{children}</WebSocketContext.Provider>;
 };

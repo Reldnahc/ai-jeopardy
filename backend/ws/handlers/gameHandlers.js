@@ -412,8 +412,8 @@ export const gameHandlers = {
         // --- STT ---
         let transcript = "";
         try {
-            const stt = await ctx.transcribeAnswerAudio({ buffer: buf, mimeType, context: game.selectedClue?.answer });
-            transcript = String(stt?.text || "").trim();
+            const stt = await ctx.transcribeAnswerAudio( buf, mimeType, game.selectedClue?.answer );
+            transcript = String(stt || "").trim();
             if (!transcript) {
                 const parseValue = (val) => {
                     const n = Number(String(val || "").replace(/[^0-9]/g, ""));

@@ -2,6 +2,14 @@ export const userHandlers = {
     "ping": async ({ ws }) => {
         ws.send(JSON.stringify({ type: "pong", t: Date.now() }));
     },
+    "request-time-sync": async ({ ws, data }) => {
+        const clientSentAt = Number(data?.clientSentAt || 0);
+        ws.send(JSON.stringify({
+            type: "send-time-sync",
+            clientSentAt,
+            serverNow: Date.now(),
+        }));
+    },
     "auth": async ({ ws, data, ctx }) => {
         const accessToken = data?.accessToken;
 

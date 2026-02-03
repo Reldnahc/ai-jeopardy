@@ -142,6 +142,9 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
 
                 let hasSpoken = false;
                 let lastVoiceAt = 0;
+                let maxRms = 0;
+                let voiceTicks = 0;
+                const startedAt = Date.now();
 
                 const computeRms = () => {
                     if (!analyser) return 0;
@@ -156,6 +159,11 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                     if (!recorderRef.current) return;
 
                     const level = computeRms();
+                    if (level > maxRms) maxRms = level;
+
+                    if (level > RMS_THRESHOLD) {
+                        voiceTicks += 1;
+                    }
                     const now = Date.now();
 
                     if (level > RMS_THRESHOLD) {
@@ -201,6 +209,34 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
 
                     if (cancelled) return;
 
+                    const endedAt = Date.now();
+                    const durationMs = endedAt - startedAt;
+                    const voiceMs = voiceTicks * VAD_INTERVAL_MS;
+
+                    if (!hasSpoken) {
+                        // Mark sent now so we never duplicate
+                        sentSessionRef.current = answerCapture.answerSessionId;
+
+                        console.log("[mic] no speech detected, sending noSpeech", {
+                            session: answerCapture.answerSessionId,
+                            durationMs,
+                            maxRms,
+                        });
+
+                        sendJson({
+                            type: "answer-audio-blob",
+                            gameId,
+                            answerSessionId: answerCapture.answerSessionId,
+                            mimeType: rec.mimeType || "audio/webm",
+                            noSpeech: true,
+                            vad: { hasSpoken: false, maxRms, voiceMs, durationMs },
+                            dataBase64: "", // keep server happy if it expects a string
+                        });
+
+                        return;
+                    }
+
+
                     const blob = new Blob(chunksRef.current, { type: rec.mimeType || "audio/webm" });
                     chunksRef.current = [];
 
@@ -221,6 +257,7 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                         answerSessionId: answerCapture.answerSessionId,
                         mimeType: blob.type,
                         dataBase64,
+                        vad: { hasSpoken: true, maxRms, voiceMs, durationMs },
                     });
                 };
 

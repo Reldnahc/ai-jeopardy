@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import {useWebSocket} from "../../contexts/WebSocketContext.tsx";
 
 interface TimerProps {
     endTime: number | null;
@@ -8,6 +9,10 @@ interface TimerProps {
 
 const Timer: React.FC<TimerProps> = ({ endTime, duration }) => {
     const [timeLeft, setTimeLeft] = useState<number>(duration);
+    const { nowMs } = useWebSocket();
+    
+    const isLastSeconds = timeLeft <= 3;
+    const displayTime = Math.ceil(timeLeft);
 
     useEffect(() => {
         if (!endTime) {
@@ -16,7 +21,7 @@ const Timer: React.FC<TimerProps> = ({ endTime, duration }) => {
         }
 
         const intervalId = setInterval(() => {
-            const remaining = Math.max(0, (endTime - Date.now()) / 1000);
+            const remaining = Math.max(0, (endTime - nowMs()) / 1000);
             setTimeLeft(remaining);
 
             if (remaining <= 0) {
@@ -25,10 +30,7 @@ const Timer: React.FC<TimerProps> = ({ endTime, duration }) => {
         }, 16); // 60fps update rate
 
         return () => clearInterval(intervalId);
-    }, [endTime, duration]);
-
-    const isLastSeconds = timeLeft <= 3;
-    const displayTime = Math.ceil(timeLeft);
+    }, [endTime, duration, nowMs]);
 
     return (
         <div className="timer flex justify-center items-center min-h-[200px]">
