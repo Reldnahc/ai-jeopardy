@@ -4,7 +4,6 @@ import {Player} from "../../types/Lobby.ts";
 interface WagerInputProps {
     players: Player[];
     currentPlayer: string;
-    isHost: boolean;
     scores: Record<string, number>;
     wagers: Record<string, number>;
     wagerSubmitted: string[];
@@ -15,7 +14,6 @@ interface WagerInputProps {
 const WagerInput: React.FC<WagerInputProps> = ({
                                                    players,
                                                    currentPlayer,
-                                                   isHost,
                                                    scores,
                                                    wagers,
                                                    wagerSubmitted,

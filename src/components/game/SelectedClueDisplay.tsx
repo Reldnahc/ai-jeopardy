@@ -2,7 +2,6 @@ import React, {useEffect} from "react";
 import { ReactSketchCanvas } from "react-sketch-canvas";
 import { Clue } from "../../types.ts";
 import { useWebSocket } from "../../contexts/WebSocketContext.tsx";
-import { Player } from "../../types/Lobby.ts";
 import {useDeviceContext} from "../../contexts/DeviceContext.tsx";
 import BuzzAnimation from "./BuzzAnimation.tsx";
 import Timer from "./Timer.tsx";

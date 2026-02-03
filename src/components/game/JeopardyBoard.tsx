@@ -160,7 +160,6 @@ const JeopardyBoard: React.FC<JeopardyBoardProps> =
                         <WagerInput
                             players={players}
                             currentPlayer={currentPlayer}
-                            isHost={canSelectClue}
                             scores={scores}
                             wagers={wagers}
                             wagerSubmitted={wagerSubmitted}
