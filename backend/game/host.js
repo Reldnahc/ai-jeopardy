@@ -97,6 +97,7 @@ export async function ensureAiHostTtsBank({ ctx, game, trace }) {
         slotAssets: {},
         nameAssetsByPlayer: {},
         allAssetIds: [],
+        categoryAssetsByCategory: {},
     };
 
     // init arrays for every slot
@@ -151,6 +152,35 @@ export async function ensureAiHostTtsBank({ ctx, game, trace }) {
         })());
     }
 
+    // 3) Ensure category name callouts
+    const categories = Array.isArray(game.categories) ? game.categories : [];
+    for (const c of categories) {
+        const categoryName =
+            typeof c === "string"
+                ? c.trim()
+                : String(c?.name || c?.category || "").trim();
+
+        if (!categoryName) continue;
+
+        slotJobs.push((async () => {
+            const asset = await ctx.ensureTtsAsset(
+                {
+                    text: categoryName,
+                    textType: "text",
+                    voiceId: "Matthew",
+                    engine: "standard",
+                    outputFormat: "mp3",
+                },
+                ctx.supabase,
+                trace
+            );
+
+            out.categoryAssetsByCategory[categoryName] = asset.id;
+            out.allAssetIds.push(asset.id);
+        })());
+    }
+
+
     await Promise.all(slotJobs);
 
     out.allAssetIds = Array.from(new Set(out.allAssetIds));
@@ -193,7 +223,7 @@ export async function aiHostSayRandomFromSlot(gameId, game, slot, ctx) {
     // Duration is best-effort; NEVER block game flow on Supabase/R2
     const ms = await withTimeout(
         ctx.getTtsDurationMs(assetId),
-        500,     // <= key change: cap how long we wait
+        1000,     // <= key change: cap how long we wait
         0
     );
 
@@ -208,13 +238,27 @@ export async function aiHostSayPlayerName(gameId, game, playerName, ctx) {
 
     const ms = await withTimeout(
         ctx.getTtsDurationMs(id),
-        250,
+        1000,
         0
     );
 
     return { assetId: id, ms: Number(ms) || 0 };
 }
 
+export async function aiHostSayCategory(gameId, game, category, ctx) {
+    const id = game?.aiHostTts?.categoryAssetsByCategory?.[category] || null;
+    if (!id) return null;
+
+    aiHostSayAsset(gameId, id, ctx);
+
+    const ms = await withTimeout(
+        ctx.getTtsDurationMs(id),
+        1000,
+        0
+    );
+
+    return { assetId: id, ms: Number(ms) || 0 };
+}
 
 export function aiAfter(gameId, delayMs, fn) {
     // Use your existing timer system so it’s centralized.

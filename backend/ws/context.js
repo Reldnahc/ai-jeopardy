@@ -41,11 +41,17 @@ import {r2} from "../services/r2Client.js";
 import {clearAnswerWindow, startAnswerWindow} from "../game/answerWindow.js";
 import {
     autoResolveAfterJudgement,
-    cancelAutoUnlock, doUnlockBuzzerAuthoritative,
+    cancelAutoUnlock, doUnlockBuzzerAuthoritative, findCategoryForClue,
     parseClueValue,
     scheduleAutoUnlockForClue
 } from "../game/gameLogic.js";
-import {aiAfter, aiHostSayPlayerName, aiHostSayRandomFromSlot, ensureAiHostTtsBank} from "../game/host.js";
+import {
+    aiAfter,
+    aiHostSayCategory,
+    aiHostSayPlayerName,
+    aiHostSayRandomFromSlot,
+    ensureAiHostTtsBank
+} from "../game/host.js";
 
 export const createWsContext = (wss) => {
     const { broadcast, broadcastAll } = makeBroadcaster(wss);
@@ -101,7 +107,7 @@ export const createWsContext = (wss) => {
         judgeClueAnswerFast,
         judgeImage,
 
-
+        findCategoryForClue,
 
         //create-game
         getGameOrFail,
@@ -139,6 +145,7 @@ export const createWsContext = (wss) => {
 
         aiHostSayRandomFromSlot,
         aiHostSayPlayerName,
+        aiHostSayCategory,
 
         setupPreloadHandshake,
         initPreloadState,

@@ -28,6 +28,7 @@ function advanceToDrawingPhase(game, gameId, wagers, ctx) {
         answer: String(fjClueRaw.answer || ""),
         isAnswerRevealed: false,
         media: fjClueRaw.media || undefined,
+        category: String(fjCat?.category || "").trim() || undefined,
     };
 
     game.phase = "clue";

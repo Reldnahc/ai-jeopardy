@@ -6,6 +6,7 @@ export type Clue = {
     value: number;
     question: string;
     answer: string;
+    category?: string;
     showAnswer?: boolean;
     media?: ClueMedia;
 };

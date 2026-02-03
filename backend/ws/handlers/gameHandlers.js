@@ -1,5 +1,3 @@
-import {checkAllDrawingsSubmitted} from "../../game/finalJeopardy.js";
-
 export const gameHandlers = {
     "join-game": async ({ ws, data, ctx }) => {
         const { gameId, playerName } = data;
@@ -230,7 +228,7 @@ export const gameHandlers = {
         game.buzzerLocked = true;
         ctx.broadcast(gameId, { type: "buzzer-locked" });
 
-// Say the player's name (Jeopardy-style), then start answer capture
+        // Say the player's name (Jeopardy-style), then start answer capture
         let nameMs = 0;
         try {
             const said = await ctx.aiHostSayPlayerName(gameId, game, player.name, ctx);
@@ -570,7 +568,7 @@ export const gameHandlers = {
         const { gameId, clue } = data;
         const game = ctx.games[gameId];
         if (!game) return;
-        // Selector-only authority (AI-hosted game)
+
         const caller = ctx.getPlayerForSocket(game, ws);
         const callerStable = caller ? ctx.playerStableId(caller) : null;
 
@@ -605,14 +603,19 @@ export const gameHandlers = {
             return;
         }
 
-
         // Any previous clue’s scheduled unlock should be canceled
         ctx.cancelAutoUnlock(game);
 
+        const category =
+            String(clue?.category ?? "").trim() ||
+            ctx.findCategoryForClue(game, clue);
+
         game.selectedClue = {
             ...clue,
+            category: category || undefined,
             isAnswerRevealed: false,
         };
+
 
         // ---- CLUE STATE START ----
         const boardKey = game.activeBoard || "firstBoard";
@@ -626,11 +629,14 @@ export const gameHandlers = {
             lockedOut: {},
         };
 
-
         // Reset buzzer state
         game.buzzed = null;
         game.buzzerLocked = true;
         game.buzzLockouts = {};
+
+        const said = await ctx.aiHostSayCategory(gameId, game, game.selectedClue.category, ctx);
+        const ms = said?.ms ?? 0;
+        await ctx.sleep(ms + 200);
 
         ctx.broadcast(gameId, {
             type: "clue-selected",

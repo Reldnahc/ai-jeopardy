@@ -614,6 +614,18 @@ async function createBoardData(categories, model, host, options = {}) {
         }
     };
 
+    function stampCategoryOnClues(categoryJson) {
+        const cat = String(categoryJson?.category || "").trim();
+        if (!cat || !Array.isArray(categoryJson?.values)) return categoryJson;
+
+        categoryJson.values = categoryJson.values.map((clue) => ({
+            ...clue,
+            category: cat,
+        }));
+
+        return categoryJson;
+    }
+
     trace?.mark("createBoardData BEGIN");
 
     try {
@@ -631,7 +643,7 @@ async function createBoardData(categories, model, host, options = {}) {
                     throw new Error(`Single category ${i} missing {category, values}`);
                 }
 
-                return json;
+                return stampCategoryOnClues(json);;
             }).then(async (json) => {
                 tick(1);
 
@@ -660,7 +672,7 @@ async function createBoardData(categories, model, host, options = {}) {
                     throw new Error(`Double category ${i} missing {category, values}`);
                 }
 
-                return json;
+                return stampCategoryOnClues(json);;
             }).then(async (json) => {
                 tick(1);
 
@@ -686,7 +698,7 @@ async function createBoardData(categories, model, host, options = {}) {
                 throw new Error("Final jeopardy missing {category, values}");
             }
 
-            return json;
+            return stampCategoryOnClues(json);;
         }).then(async (json) => {
             tick(1);
 

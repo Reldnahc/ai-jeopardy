@@ -510,15 +510,6 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
         sendJson({ type: "buzz", gameId });
     }, [gameId, buzzResult, buzzLockedOut, sendJson]);
 
-    const clueSelected = useCallback(
-        (clue: Clue) => {
-            if (!isHost) return;
-            if (!gameId) return;
-            sendJson({ type: "clue-selected", gameId, clue });
-        },
-        [isHost, gameId, sendJson]
-    );
-
     const markAllCluesComplete = useCallback(() => {
         if (!gameId) return;
         sendJson({ type: "mark-all-complete", gameId });
@@ -580,7 +571,6 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
         isGameOver,
         // actions
         buzz,
-        clueSelected,
         markAllCluesComplete,
         updateScore,
         leaveGame,

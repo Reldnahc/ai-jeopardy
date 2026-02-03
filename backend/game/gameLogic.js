@@ -38,6 +38,54 @@ function unlockBoardSelection(ctx, gameId, game, lockVersion) {
     });
 }
 
+function returnToBoard(game, gameId, ctx){
+    // Reset clue state
+    game.selectedClue = null;
+    game.buzzed = null;
+    game.buzzerLocked = true;
+    game.phase = "board";
+    game.clueState = null;
+
+
+    const selectorName = String(game.selectorName || "").trim();
+
+    let lockVersion = 0;
+
+    lockVersion = lockBoardSelection(ctx, gameId, game);
+
+    ctx.broadcast(gameId, {
+        type: "phase-changed",
+        phase: "board",
+        selectorKey: game.selectorKey ?? null,
+        selectorName: game.selectorName ?? null,
+    });
+
+    ctx.broadcast(gameId, { type: "returned-to-board", selectedClue: null, boardSelectionLocked: game.boardSelectionLocked });
+
+    (async () => {
+        const g0 = ctx.games?.[gameId];
+        if (!g0) return;
+        // If something else re-locked the board since we started, don’t proceed
+        if ((g0.boardSelectionLockVersion || 0) !== lockVersion) return;
+        const a = await ctx.aiHostSayPlayerName(gameId, g0, selectorName, ctx);
+        const aMs = a?.ms ?? 0;
+        // schedule “your_up” after name finishes
+        ctx.aiAfter(gameId, (aMs || 650) + 150, async () => {
+            const g1 = ctx.games?.[gameId];
+            if (!g1) return;
+            if ((g1.boardSelectionLockVersion || 0) !== lockVersion) return;
+            const b = await ctx.aiHostSayRandomFromSlot(gameId, g1, "your_up", ctx);
+            const bMs = b?.ms ?? 0;
+            // unlock shortly after “your_up” finishes
+            ctx.aiAfter(gameId, (bMs || 650) + 150, () => {
+                const g2 = ctx.games?.[gameId];
+                if (!g2) return;
+                unlockBoardSelection(ctx, gameId, g2, lockVersion);
+            });
+        });
+    })();
+}
+
 function finishClueAndReturnToBoard(ctx, gameId, game) {
     if (!game) return;
 
@@ -52,71 +100,8 @@ function finishClueAndReturnToBoard(ctx, gameId, game) {
         ctx.checkBoardTransition(game, gameId, ctx);
     }
 
-    // Reset clue state
-    game.selectedClue = null;
-    game.buzzed = null;
-    game.buzzerLocked = true;
-    game.phase = "board";
-    game.clueState = null;
 
-    // IMPORTANT: lock selection immediately when we return to board
-    // (we will unlock after host finishes speaking)
-    const narrationEnabled = Boolean(game?.lobbySettings?.narrationEnabled);
-    const selectorName = String(game.selectorName || "").trim();
-
-    let lockVersion = 0;
-    if (narrationEnabled && selectorName) {
-        lockVersion = lockBoardSelection(ctx, gameId, game);
-    } else {
-        // If no narration, ensure unlocked
-        game.boardSelectionLocked = false;
-        game.boardSelectionLockReason = null;
-    }
-
-    ctx.broadcast(gameId, {
-        type: "phase-changed",
-        phase: "board",
-        selectorKey: game.selectorKey ?? null,
-        selectorName: game.selectorName ?? null,
-    });
-
-    ctx.broadcast(gameId, { type: "returned-to-board", selectedClue: null, boardSelectionLocked: game.boardSelectionLocked });
-
-    // Speak “Name…” then “you’re up”, then unlock selection authoritatively
-    if (narrationEnabled && selectorName) {
-        (async () => {
-            const g0 = ctx.games?.[gameId];
-            if (!g0) return;
-
-            // If something else re-locked the board since we started, don’t proceed
-            if ((g0.boardSelectionLockVersion || 0) !== lockVersion) return;
-
-            const a = await ctx.aiHostSayPlayerName(gameId, g0, selectorName, ctx);
-            const aMs = a?.ms ?? 0;
-
-            // schedule “your_up” after name finishes
-            ctx.aiAfter(gameId, (aMs || 650) + 150, async () => {
-                const g1 = ctx.games?.[gameId];
-                if (!g1) return;
-
-                if ((g1.boardSelectionLockVersion || 0) !== lockVersion) return;
-
-                const b = await ctx.aiHostSayRandomFromSlot(gameId, g1, "your_up", ctx);
-                const bMs = b?.ms ?? 0;
-
-                // unlock shortly after “your_up” finishes
-                ctx.aiAfter(gameId, (bMs || 650) + 150, () => {
-                    const g2 = ctx.games?.[gameId];
-                    if (!g2) return;
-                    unlockBoardSelection(ctx, gameId, g2, lockVersion);
-                });
-            });
-        })();
-    } else {
-        // no narration => unlock immediately (or just leave it unlocked)
-        const g = ctx.games?.[gameId];
-        if (g) unlockBoardSelection(ctx, gameId, g, 0);
-    }
+    returnToBoard();
 }
 
 export function parseClueValue(val) {
@@ -287,30 +272,18 @@ export function doUnlockBuzzerAuthoritative( gameId, game, ctx) {
 
                 // After the line finishes, return to board + clear clue
                 ctx.aiAfter(gameId, ms + 3500, () => {
-                    const g = ctx.games?.[gameId];
-                    if (!g) return;
-                    if (!g.selectedClue) return;
+                    const game = ctx.games?.[gameId];
+                    if (!game) return;
+                    if (!game.selectedClue) return;
 
-                    if (!g.clearedClues) g.clearedClues = new Set();
-                    const clueId = `${g.selectedClue.value}-${g.selectedClue.question}`;
-                    g.clearedClues.add(clueId);
+                    if (!game.clearedClues) game.clearedClues = new Set();
+                    const clueId = `${game.selectedClue.value}-${game.selectedClue.question}`;
+                    game.clearedClues.add(clueId);
                     ctx.broadcast(gameId, { type: "clue-cleared", clueId });
 
                     ctx.checkBoardTransition(game, gameId, ctx)
 
-                    g.selectedClue = null;
-                    g.buzzed = null;
-                    g.phase = "board";
-                    g.buzzerLocked = true;
-
-                    ctx.broadcast(gameId, {
-                        type: "phase-changed",
-                        phase: "board",
-                        selectorKey: g.selectorKey ?? null,
-                        selectorName: g.selectorName ?? null,
-                    });
-
-                    ctx.broadcast(gameId, { type: "returned-to-board", selectedClue: null, boardSelectionLocked: g.boardSelectionLocked });
+                    returnToBoard(game, gameId, ctx);
                 });
             })();
         }
@@ -335,13 +308,35 @@ export async function scheduleAutoUnlockForClue({ gameId, game, clueKey, ttsAsse
     game.autoUnlockClueKey = clueKey;
 
     game.autoUnlockTimer = setTimeout(() => {
-        const g = ctx.games?.[gameId];
-        if (!g) return;
+        const game = ctx.games?.[gameId];
+        if (!game) return;
 
         // Only unlock if we're still on the same clue
-        if (g.autoUnlockClueKey !== clueKey) return;
+        if (game.autoUnlockClueKey !== clueKey) return;
 
-        g.autoUnlockTimer = null;
-        doUnlockBuzzerAuthoritative( gameId, g, ctx );
+        game.autoUnlockTimer = null;
+        doUnlockBuzzerAuthoritative( gameId, game, ctx );
     }, waitMs);
+}
+
+export function findCategoryForClue(game, clue) {
+    const boardKey = game.activeBoard || "firstBoard";
+    const cats = game.boardData?.[boardKey]?.categories;
+    if (!Array.isArray(cats)) return null;
+
+    const v = clue?.value;
+    const q = String(clue?.question ?? "").trim();
+    if (!q) return null;
+
+    for (const cat of cats) {
+        const catName = String(cat?.category ?? "").trim();
+        const values = Array.isArray(cat?.values) ? cat.values : [];
+        for (const c of values) {
+            const sameValue = c?.value === v;
+            const sameQuestion = String(c?.question ?? "").trim() === q;
+            if (sameValue && sameQuestion) return catName || null;
+        }
+    }
+
+    return null;
 }

@@ -75,7 +75,7 @@ export const lobbyHandlers = {
                 });
             } catch (e) {
                 console.error("[create-game] ai host tts bank failed:", e);
-                game.aiHostTts = { slotAssets: {}, nameAssetsByPlayer: {}, allAssetIds: [] };
+                game.aiHostTts = { slotAssets: {}, nameAssetsByPlayer: {}, allAssetIds: [], categoryAssetsByCategory: {} };
             }
         })();
 
