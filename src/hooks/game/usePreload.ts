@@ -1,6 +1,13 @@
 import { useEffect, useRef } from "react";
 import type {BoardData, Category, Clue} from "../../types";
 
+function getApiBase() {
+    return import.meta.env.VITE_API_BASE || "http://localhost:3002";
+}
+function ttsUrl(id: string) {
+    return `${getApiBase()}/api/tts/${encodeURIComponent(id)}`;
+}
+
 function collectImageAssetIds(boardData: BoardData): string[] {
     if (!boardData) return [];
 
@@ -187,7 +194,7 @@ export function usePreloadAudioAssetIds(
 
         const next = Array.isArray(assetIds) ? assetIds : [];
         for (const id of next) {
-            const url = `/api/tts/${String(id).trim()}`;
+            const url = ttsUrl(String(id).trim());
             if (!url.trim()) continue;
             if (requestedRef.current.has(url)) continue;
             if (pendingRef.current.includes(url)) continue;

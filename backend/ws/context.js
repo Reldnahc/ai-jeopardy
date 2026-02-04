@@ -21,7 +21,7 @@ import { transcribeAnswerAudio } from "../services/sttService.js";
 
 import {
     applyNewGameState, broadcastPreloadBatch,
-    clearGenerationProgress, ensureBoardTtsAssets,
+    clearGenerationProgress,
     ensureHostOrFail,
     ensureLobbySettings, getBoardDataOrFail,
     getGameOrFail, initPreloadState,
@@ -51,6 +51,9 @@ import {
 } from "../game/host.js";
 import {verifyJwt} from "../auth/jwt.js";
 import {pool} from "../config/pg.js";
+import {getBearerToken, playerStableId, verifyAccessToken} from "../services/userService.js";
+
+
 
 export const createWsContext = (wss) => {
     const { broadcast, broadcastAll } = makeBroadcaster(wss);
@@ -117,7 +120,6 @@ export const createWsContext = (wss) => {
         clearGenerationProgress,
         safeAbortGeneration,
         applyNewGameState,
-        ensureBoardTtsAssets,
         getBoardDataOrFail,
         ensureTtsAsset,
 
@@ -137,6 +139,9 @@ export const createWsContext = (wss) => {
 
         aiAfter,
         ensureAiHostTtsBank,
+        playerStableId,
+        getBearerToken,
+        verifyAccessToken,
 
         aiHostSayRandomFromSlot,
         aiHostSayPlayerName,

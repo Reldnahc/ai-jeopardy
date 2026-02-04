@@ -340,48 +340,6 @@ export function applyNewGameState({ game, boardData, timeToBuzz, timeToAnswer })
     game.finalJeopardyStage = null;
 }
 
-export async function ensureBoardTtsAssets({ ctx, game, boardData, trace }) {
-    const narrationEnabled = Boolean(game?.lobbySettings?.narrationEnabled);
-    if (!narrationEnabled) return [];
-
-    const texts = collectNarrationTextsFromBoard(boardData);
-    if (texts.length === 0) return [];
-
-    trace?.mark?.("tts_ensure_board_start", { count: texts.length });
-
-    const CONCURRENCY = 6;
-    const out = [];
-    let i = 0;
-
-    const worker = async () => {
-        while (i < texts.length) {
-            const idx = i++;
-            const text = texts[idx];
-
-            const asset = await ctx.ensureTtsAsset(
-                {
-                    text,
-                    textType: "text",
-                    voiceId: "Matthew",
-                    engine: "standard",
-                    outputFormat: "mp3",
-                },
-                ctx.pool,
-                trace
-            );
-
-            out.push(asset.id);
-        }
-    };
-
-    const workers = Array.from({ length: Math.min(CONCURRENCY, texts.length) }, () => worker());
-    await Promise.all(workers);
-
-    trace?.mark?.("tts_ensure_board_end", { count: out.length });
-
-    return out;
-}
-
 export async function getBoardDataOrFail({
                                              ctx,
                                              game,

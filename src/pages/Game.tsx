@@ -13,6 +13,13 @@ import {usePlayerIdentity} from "../hooks/usePlayerIdentity.ts";
 import {usePreload} from "../hooks/game/usePreload.ts";
 import {useEarlyMicPermission} from "../hooks/earlyMicPermission.ts";
 
+function getApiBase() {
+    return import.meta.env.VITE_API_BASE || "http://localhost:3002";
+}
+function ttsUrl(id: string) {
+    return `${getApiBase()}/api/tts/${encodeURIComponent(id)}`;
+}
+
 export default function Game() {
     const {gameId} = useParams<{ gameId: string }>();
     const location = useLocation();
@@ -205,8 +212,8 @@ export default function Game() {
         if (audioMuted) return;
 
         // Direct stream from your backend (already implemented)
-        playAudioUrl(`/api/tts/${assetId}`);
-    }, [aiHostAsset, narrationEnabled, audioMuted, playAudioUrl]);
+        playAudioUrl(ttsUrl(assetId));
+        }, [aiHostAsset, narrationEnabled, audioMuted, playAudioUrl]);
 
 
 
@@ -287,7 +294,7 @@ export default function Game() {
         // ✅ FAST PATH: if server provided mapping, play immediately (no WS noise)
         const mappedAssetId = (boardData as BoardData)?.ttsByClueKey?.[clueOpenKey];
         if (typeof mappedAssetId === "string" && mappedAssetId.trim()) {
-            playAudioUrl(`/api/tts/${mappedAssetId.trim()}`);
+            playAudioUrl(ttsUrl(mappedAssetId.trim()));
             narratedKeysRef.current.add(clueOpenKey);
             lastRequestedKeyRef.current = clueOpenKey;
             return;
