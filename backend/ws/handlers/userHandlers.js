@@ -10,41 +10,27 @@ export const userHandlers = {
             serverNow: Date.now(),
         }));
     },
-    "auth": async ({ ws, data, ctx }) => {
-        const accessToken = data?.accessToken;
+    "auth": async ({ ws, data }) => {
+        const token = data?.token;
 
-
-        if (ws.auth?.isAuthed && ws.auth?.userId) {
-            ws.send(JSON.stringify({
-                type: "auth-result",
-                ok: true,
-                role: ws.auth.role,
-                userId: ws.auth.userId,
-            }));
-            return;
-        }
-
-        const user = await ctx.verifySupabaseAccessToken(accessToken);
-        if (!user) {
+        if (!token) {
             ws.auth = { isAuthed: false, userId: null, role: "default" };
             ws.send(JSON.stringify({ type: "auth-result", ok: false }));
             return;
         }
 
-        const role = await ctx.getRoleForUserId(user.id);
-
-        ws.auth = {
-            isAuthed: true,
-            userId: user.id,
-            role,
-        };
-
-        ws.send(JSON.stringify({
-            type: "auth-result",
-            ok: true,
-            role,
-            userId: user.id,
-        }));
+        try {
+            const payload = ctx.verifyJwt(token);
+            ws.auth = {
+                isAuthed: true,
+                userId: payload.sub,
+                role: payload.role || "default",
+            };
+            ws.send(JSON.stringify({ type: "auth-result", ok: true, role: ws.auth.role, userId: ws.auth.userId }));
+        } catch {
+            ws.auth = { isAuthed: false, userId: null, role: "default" };
+            ws.send(JSON.stringify({ type: "auth-result", ok: false }));
+        }
     },
     "check-cotd": async ({ ws, ctx }) => {
         ws.send(JSON.stringify({

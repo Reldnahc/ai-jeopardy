@@ -1,124 +1,73 @@
-import { useState } from "react";
-import { supabase } from "../../supabaseClient";
+import React, { useMemo, useState } from "react";
+import { useAuth } from "../../contexts/AuthContext";
 
-const Signup = () => {
+function normalizeUsername(input: string) {
+    return input.trim().toLowerCase();
+}
+
+function normalizeEmail(input: string) {
+    const v = input.trim().toLowerCase();
+    return v.length ? v : "";
+}
+
+function validateUsername(usernameLower: string): string | null {
+    if (!usernameLower) return "Username is required.";
+    if (usernameLower.length < 3 || usernameLower.length > 16) {
+        return "Username must be 3–16 characters.";
+    }
+    if (!/^[a-z][a-z0-9_ ]*$/.test(usernameLower)) {
+        return "Username must start with a letter and contain only letters, numbers, spaces, or underscores.";
+    }
+    if (/\s{2,}/.test(usernameLower)) {
+        return "Username cannot contain consecutive spaces.";
+    }
+    return null;
+}
+
+function validatePassword(password: string): string | null {
+    if (!password) return "Password is required.";
+    if (password.length < 8) return "Password must be at least 8 characters.";
+    return null;
+}
+
+const Signup: React.FC = () => {
+    const { signup } = useAuth();
+
     const [email, setEmail] = useState("");
-    const [username, setUsername] = useState(""); // New username field
+    const [usernameInput, setUsernameInput] = useState("");
     const [password, setPassword] = useState("");
-    const [confirmPassword, setConfirmPassword] = useState("");
-    const [error, setError] = useState(""); // General error message
-    const [usernameError, setUsernameError] = useState(""); // Specific real-time error for username
-    const [success, setSuccess] = useState(""); // Success message
-    const [loading, setLoading] = useState(false); // Loading state
 
-    // Function to check if the username is already taken
-    const isUsernameTaken = async (username: string): Promise<boolean> => {
-        try {
-            const { data, error } = await supabase
-                .from("profiles") // Replace "users" with the name of your table
-                .select("username")
-                .eq("username", username)
-                .single(); // Fetch the first match
-            if (error && error.code !== "PGRST116") {
-                console.error("Error checking username:", error);
-                return true;
-            }
-            return !!data; // If data exists, the username is taken
-        } catch (err) {
-            console.error("Unexpected error during username check:", err);
-            return true; // Assume username is taken in case of error
-        }
-    };
+    const [error, setError] = useState("");
+    const [success, setSuccess] = useState("");
+    const [loading, setLoading] = useState(false);
 
-    const validateUsernameRegex = (username: string): string | null => {
-        const normalizedUsername = username.toLowerCase(); // Normalize to lowercase
-        const usernameRegex = /^[a-zA-Z][a-zA-Z0-9_ ]{2,15}$/; // Allow letters, numbers, underscores, and spaces
+    const usernameLower = useMemo(() => normalizeUsername(usernameInput), [usernameInput]);
+    const usernameError = useMemo(() => validateUsername(usernameLower), [usernameLower]);
+    const passwordError = useMemo(() => validatePassword(password), [password]);
 
-        if (!usernameRegex.test(normalizedUsername)) {
-            return "Username must be 3-16 characters, start with a letter, and contain only letters, numbers, spaces, or underscores.";
-        }
+    const canSubmit = !loading && !usernameError && !passwordError;
 
-        if (/\s{2,}/.test(normalizedUsername)) {
-            return "Username cannot contain consecutive spaces.";
-        }
-
-        return null; // Username is valid
-    };
-
-
-    const handleUsernameChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const input = e.target.value;
-        setUsername(input);
-
-        const normalizedInput = input.toLowerCase(); // Normalize to lowercase before validation
-
-        // Validate username format
-        const errorMessage = validateUsernameRegex(normalizedInput);
-        if (errorMessage) {
-            setUsernameError(errorMessage);
-        } else {
-            // Check if username is taken
-            const taken = await isUsernameTaken(normalizedInput);
-            if (taken) {
-                setUsernameError("Username is already taken. Please choose another.");
-            } else {
-                setUsernameError(""); // No error
-            }
-        }
-    };
-
-
-    const handleSignup = async (e: { preventDefault: () => void }) => {
+    const handleSignup = async (e: React.FormEvent) => {
         e.preventDefault();
         setError("");
         setSuccess("");
         setLoading(true);
 
-        // General form validation
-        if (!email || !username || !password || !confirmPassword) {
-            setError("All fields are required.");
-            setLoading(false);
-            return;
-        }
-        if (password !== confirmPassword) {
-            setError("Passwords do not match.");
-            setLoading(false);
-            return;
-        }
-        if (usernameError) {
-            setError("Please resolve username issues before signing up.");
-            setLoading(false);
-            return;
-        }
-
         try {
-            // Check if the username is taken (final validation)
-            const taken = await isUsernameTaken(username);
-            if (taken) {
-                setError("Username is already taken. Please choose another.");
-                setLoading(false);
-                return;
-            }
+            const emailNorm = normalizeEmail(email);
 
-            const { error } = await supabase.auth.signUp({
-                email: email.trim(),
-                password: password.trim(),
-                options: {
-                    data: {
-                        username: username.trim().toLowerCase(),
-                        displayname: username.trim()
-                    },
-                },
+            // IMPORTANT:
+            // - username sent as lowercase (stored normalized)
+            // - displayname NOT sent; backend will set displayname from the original username
+            await signup({
+                email: emailNorm.length ? emailNorm : null,
+                username: usernameLower,
+                password,
             });
 
-            if (error) {
-                setError(error.message);
-            } else {
-                setSuccess("Please check your email for a confirmation link.");
-            }
+            setSuccess("Account created!");
         } catch (err) {
-            console.error("Unexpected error during signup:", err);
-            setError("An unexpected error occurred. Please try again.");
+            setError(String((err as any)?.message || err || "Signup failed"));
         } finally {
             setLoading(false);
         }
@@ -127,21 +76,24 @@ const Signup = () => {
     return (
         <div className="max-w-sm mx-auto rounded-lg p-6">
             <h2 className="text-2xl font-semibold mb-4 text-center text-blue-500">Sign Up</h2>
+
             <form onSubmit={handleSignup} className="space-y-4">
+                {/* Email (optional) */}
                 <div>
                     <label htmlFor="email" className="block text-blue-500 font-medium">
-                        Email
+                        Email <span className="text-gray-400 font-normal">(optional)</span>
                     </label>
                     <input
                         type="email"
                         id="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        placeholder="Enter your email"
-                        required
+                        placeholder="you@example.com"
                         className="w-full p-3 border border-gray-300 text-black rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                 </div>
+
+                {/* Username (always lowercase in DB) */}
                 <div>
                     <label htmlFor="username" className="block text-blue-500 font-medium">
                         Username
@@ -149,18 +101,28 @@ const Signup = () => {
                     <input
                         type="text"
                         id="username"
-                        value={username}
-                        onChange={handleUsernameChange}
-                        placeholder="Enter your username"
+                        value={usernameInput}
+                        onChange={(e) => setUsernameInput(e.target.value)}
+                        onBlur={() => {
+                            // Snap visible input to lowercase on blur so it's obvious what will be stored.
+                            if (usernameInput !== usernameLower) setUsernameInput(usernameLower);
+                        }}
+                        placeholder="username"
                         required
+                        autoComplete="username"
                         className={`w-full p-3 border rounded text-black focus:outline-none focus:ring-2 ${
-                            usernameError
-                                ? "border-red-500 focus:ring-red-500"
-                                : "border-gray-300 focus:ring-blue-500"
+                            usernameError ? "border-red-500 focus:ring-red-500" : "border-gray-300 focus:ring-blue-500"
                         }`}
                     />
+                    {!!usernameInput && usernameInput !== usernameLower && (
+                        <p className="text-gray-500 text-xs mt-1">
+                            Will be saved as: <span className="font-mono">{usernameLower}</span>
+                        </p>
+                    )}
                     {usernameError && <p className="text-red-500 text-sm mt-1">{usernameError}</p>}
                 </div>
+
+                {/* Password */}
                 <div>
                     <label htmlFor="password" className="block text-blue-500 font-medium">
                         Password
@@ -170,24 +132,14 @@ const Signup = () => {
                         id="password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        placeholder="Enter a strong password"
+                        placeholder="At least 8 characters"
+                        autoComplete="new-password"
                         required
-                        className="w-full p-3 border border-gray-300 text-black rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className={`w-full p-3 border rounded text-black focus:outline-none focus:ring-2 ${
+                            passwordError ? "border-red-500 focus:ring-red-500" : "border-gray-300 focus:ring-blue-500"
+                        }`}
                     />
-                </div>
-                <div>
-                    <label htmlFor="confirmPassword" className="block text-blue-500 font-medium">
-                        Confirm Password
-                    </label>
-                    <input
-                        type="password"
-                        id="confirmPassword"
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        placeholder="Confirm your password"
-                        required
-                        className="w-full p-3 border border-gray-300 text-black rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
+                    {passwordError && <p className="text-red-500 text-sm mt-1">{passwordError}</p>}
                 </div>
 
                 {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
@@ -195,9 +147,9 @@ const Signup = () => {
 
                 <button
                     type="submit"
-                    disabled={loading}
+                    disabled={!canSubmit}
                     className={`w-full py-3 bg-blue-500 text-white font-semibold rounded hover:bg-blue-600 focus:outline-none focus:ring-4 focus:ring-blue-300 ${
-                        loading ? "opacity-50 cursor-not-allowed" : ""
+                        !canSubmit ? "opacity-50 cursor-not-allowed" : ""
                     }`}
                 >
                     {loading ? "Signing up..." : "Sign Up"}

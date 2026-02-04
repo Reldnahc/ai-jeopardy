@@ -1,62 +1,35 @@
-import { useState } from "react";
-import { supabase } from "../../supabaseClient";
+import React, { useMemo, useState } from "react";
+import { useAuth } from "../../contexts/AuthContext";
 
-const Login = () => {
-    const [identifier, setIdentifier] = useState(""); // email OR username
+function normalizeUsername(input: string) {
+    return input.trim().toLowerCase();
+}
+
+const Login: React.FC = () => {
+    const { login } = useAuth();
+    const [usernameInput, setUsernameInput] = useState("");
     const [password, setPassword] = useState("");
+
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
 
-    const handleLogin = async (e: { preventDefault: () => void }) => {
+    const usernameLower = useMemo(() => normalizeUsername(usernameInput), [usernameInput]);
+
+    const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         setError("");
 
-        const id = identifier.trim();
-        const pw = password.trim();
-
-        if (!id || !pw) {
-            setError("Please enter your email/username and password.");
-            setLoading(false);
-            return;
-        }
-
         try {
-            // 1) Resolve email (if identifier is already email, function returns it)
-            const { data: email, error: rpcError } = await supabase.rpc(
-                "login_email_for",
-                { identifier: id }
-            );
-
-            if (rpcError) {
-                setError("Login lookup failed. Please try again.");
-                return;
-            }
-
-            if (!email) {
-                setError("No account found for that email/username.");
-                return;
-            }
-
-            // 2) Sign in with password using resolved email
-            const { data, error: signInError } = await supabase.auth.signInWithPassword({
-                email,
-                password: pw,
-            });
-
-            if (signInError) {
-                setError(signInError.message);
-                return;
-            }
-
-            console.log("User logged in:", data.user);
+            await login({ username: usernameLower, password });
         } catch (err) {
-            console.error("Unexpected error:", err);
-            setError("An unexpected error occurred. Please try again.");
+            setError(String((err as any)?.message || err || "Login failed"));
         } finally {
             setLoading(false);
         }
     };
+
+    const canSubmit = !loading && usernameLower.length > 0 && password.length > 0;
 
     return (
         <div className="max-w-sm mx-auto rounded-lg p-6">
@@ -64,19 +37,27 @@ const Login = () => {
 
             <form onSubmit={handleLogin} className="space-y-4">
                 <div>
-                    <label htmlFor="identifier" className="block text-blue-500 font-medium">
-                        Email or Username
+                    <label htmlFor="username" className="block text-blue-500 font-medium">
+                        Username
                     </label>
                     <input
                         type="text"
-                        id="identifier"
-                        value={identifier}
-                        onChange={(e) => setIdentifier(e.target.value)}
-                        placeholder="Enter your email or username"
+                        id="username"
+                        value={usernameInput}
+                        onChange={(e) => setUsernameInput(e.target.value)}
+                        onBlur={() => {
+                            if (usernameInput !== usernameLower) setUsernameInput(usernameLower);
+                        }}
+                        placeholder="chandler"
                         autoComplete="username"
                         required
                         className="w-full p-3 border border-gray-300 rounded text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
+                    {!!usernameInput && usernameInput !== usernameLower && (
+                        <p className="text-gray-500 text-xs mt-1">
+                            Using: <span className="font-mono">{usernameLower}</span>
+                        </p>
+                    )}
                 </div>
 
                 <div>
@@ -99,9 +80,9 @@ const Login = () => {
 
                 <button
                     type="submit"
-                    disabled={loading}
+                    disabled={!canSubmit}
                     className={`w-full py-3 bg-blue-500 text-white font-semibold rounded hover:bg-blue-600 focus:outline-none focus:ring-4 focus:ring-blue-300 ${
-                        loading ? "opacity-50 cursor-not-allowed" : ""
+                        !canSubmit ? "opacity-50 cursor-not-allowed" : ""
                     }`}
                 >
                     {loading ? "Logging in..." : "Login"}

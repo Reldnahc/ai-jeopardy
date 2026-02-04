@@ -24,7 +24,4 @@ repomix-output.xml
 *.sln
 *.sw?
 
-.env.backend
 .env
-
-

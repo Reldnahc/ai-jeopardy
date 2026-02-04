@@ -1,5 +1,5 @@
 import dotenv from "dotenv";
-dotenv.config({ path: ".env.backend" });
+dotenv.config({ path: ".env" });
 
 import { supabase } from "../config/database.js";
 import { createTrace } from "../services/trace.js";

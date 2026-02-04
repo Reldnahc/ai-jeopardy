@@ -11,6 +11,7 @@ import { attachWebSocketServer } from "./ws/index.js";
 import { getCOTD, setCOTD } from "./state/cotdStore.js";
 import { registerHttpRoutes } from "./http/routes.js";
 import { Agent, setGlobalDispatcher } from "undici";
+import {registerAuthRoutes} from "./http/authRoutes.js";
 
 const app = express(); // Initialize Express app
 app.use(cors());
@@ -25,6 +26,7 @@ const __dirname = path.dirname(__filename);
 const distPath = path.join(__dirname, "..", "dist");
 app.use(express.static(distPath));
 registerHttpRoutes(app, { distPath });
+registerAuthRoutes(app);
 
 setGlobalDispatcher(new Agent({
     keepAliveTimeout: 60_000,

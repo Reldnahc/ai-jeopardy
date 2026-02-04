@@ -1,0 +1,46 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ai_jeopardy
+      POSTGRES_USER: ai_jeopardy
+      POSTGRES_PASSWORD: ai_jeopardy_dev_password
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  backend:
+    image: node:20
+    working_dir: /app
+    volumes:
+      - ./:/app
+      - /app/node_modules
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: ${DATABASE_URL}
+      JWT_SECRET: ${JWT_SECRET}
+    command: ["bash","-lc","npm install && npm run dev:backend"]
+    ports:
+      - "3002:3002"
+    depends_on:
+      - db
+
+  web:
+    image: node:20
+    working_dir: /app
+    volumes:
+      - ./:/app
+      - /app/node_modules
+    environment:
+      NODE_ENV: development
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
+    command: ["bash","-lc","npm install && npm run dev:web"]
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:

@@ -1,68 +1,108 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { supabase } from "../supabaseClient"; // Import your Supabase client
-import { User } from "@supabase/supabase-js"; // Import Supabase types
 
-// Define the shape of the context's value
-interface AuthContextType {
-    user: User | null; // Supabase User object or null if not logged in
-    setUser: React.Dispatch<React.SetStateAction<User | null>>; // Function to update the user state
-    loading: boolean; // Loading state during session check
-}
+type AppUser = {
+    id: string;
+    email?: string | null;
+    username: string;
+    role: string;
+    displayname?: string | null;
+    color?: string | null;
+    text_color?: string | null;
+};
 
-// Create the context with a default value of `null`, which will later be overridden
+type AuthContextType = {
+    user: AppUser | null;
+    token: string | null;
+    loading: boolean;
+    login: (params: { username: string; password: string }) => Promise<void>;
+    signup: (params: { email?: string | null; username: string; displayname?: string; password: string }) => Promise<void>;
+    logout: () => void;
+};
+
 const AuthContext = createContext<AuthContextType | null>(null);
 
-// Define the props for the AuthProvider component
-interface AuthProviderProps {
-    children: ReactNode; // ReactNode allows any valid React children
+const TOKEN_KEY = "aiJeopardy.jwt";
+
+function getApiBase() {
+    return import.meta.env.VITE_API_BASE || "http://localhost:3002";
 }
 
-// AuthProvider component to wrap the application
-export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-    const [user, setUser] = useState<User | null>(null); // State to hold the authenticated user
-    const [loading, setLoading] = useState<boolean>(true); // To indicate loading state during session fetch
+export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+    const [user, setUser] = useState<AppUser | null>(null);
+    const [token, setToken] = useState<string | null>(localStorage.getItem(TOKEN_KEY));
+    const [loading, setLoading] = useState(true);
+
+    async function fetchMe(t: string) {
+        const res = await fetch(`${getApiBase()}/api/auth/me`, {
+            headers: { Authorization: `Bearer ${t}` },
+        });
+        if (!res.ok) throw new Error("me failed");
+        const data = await res.json();
+        return data.user as AppUser;
+    }
 
     useEffect(() => {
-        // Fetch the current session when the app starts
-        const getSession = async () => {
-            const { data: result, error } = await supabase.auth.getSession();
-
-            if (error) {
-                console.error("Error fetching session:", error.message);
+        (async () => {
+            try {
+                if (!token) return;
+                const me = await fetchMe(token);
+                setUser(me);
+            } catch {
+                localStorage.removeItem(TOKEN_KEY);
+                setToken(null);
+                setUser(null);
+            } finally {
+                setLoading(false);
             }
+        })();
+        if (!token) setLoading(false);
+    }, [token]);
 
-            setUser(result.session?.user || null); // Update user state from the session
-            setLoading(false); // Stop loading once session is checked
-        };
-
-        getSession();
-
-        // Listen to auth state changes (login/logout/token refresh)
-        const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-            setUser(session?.user || null); // Update user state on auth change
+    const login: AuthContextType["login"] = async ({ username, password }) => {
+        const res = await fetch(`${getApiBase()}/api/auth/login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, password }),
         });
 
-        // Cleanup listener on component unmount
-        return () => {
-            authListener?.subscription.unsubscribe();
-        };
-    }, []);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.error || "Login failed");
+
+        localStorage.setItem(TOKEN_KEY, data.token);
+        setToken(data.token);
+        setUser(data.user);
+    };
+
+    const signup: AuthContextType["signup"] = async ({ email = null, username, displayname, password }) => {
+        const res = await fetch(`${getApiBase()}/api/auth/signup`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, username, displayname, password }),
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.error || "Signup failed");
+
+        localStorage.setItem(TOKEN_KEY, data.token);
+        setToken(data.token);
+        setUser(data.user);
+    };
+
+    const logout = () => {
+        localStorage.removeItem(TOKEN_KEY);
+        setToken(null);
+        setUser(null);
+    };
 
     return (
-        <AuthContext.Provider value={{ user, setUser, loading }}>
+        <AuthContext.Provider value={{ user, token, loading, login, signup, logout }}>
             {children}
         </AuthContext.Provider>
     );
 };
 
-// Custom hook to use the AuthContext
-export const useAuth = (): AuthContextType => {
-    const context = useContext(AuthContext);
-
-    // If no AuthProvider is wrapping the component, throw an error
-    if (!context) {
-        throw new Error("useAuth must be used within an AuthProvider.");
-    }
-
-    return context;
-};
+export function useAuth() {
+    const ctx = useContext(AuthContext);
+    if (!ctx) throw new Error("useAuth must be used within AuthProvider");
+    return ctx;
+}

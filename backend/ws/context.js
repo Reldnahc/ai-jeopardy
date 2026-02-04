@@ -52,6 +52,7 @@ import {
     aiHostSayRandomFromSlot,
     ensureAiHostTtsBank
 } from "../game/host.js";
+import {verifyJwt} from "../auth/jwt.js";
 
 export const createWsContext = (wss) => {
     const { broadcast, broadcastAll } = makeBroadcaster(wss);
@@ -146,7 +147,7 @@ export const createWsContext = (wss) => {
         aiHostSayRandomFromSlot,
         aiHostSayPlayerName,
         aiHostSayCategory,
-
+        verifyJwt,
         setupPreloadHandshake,
         initPreloadState,
         broadcastPreloadBatch,

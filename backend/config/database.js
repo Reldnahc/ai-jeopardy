@@ -2,7 +2,7 @@
 import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
 
-dotenv.config({ path: ".env.backend" });
+dotenv.config({ path: ".env" });
 
 function redactUrl(u) {
     return String(u)
