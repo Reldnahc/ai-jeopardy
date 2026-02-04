@@ -1,90 +1,109 @@
-import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
-import {supabase} from "../supabaseClient";
-import {useAuth} from "./AuthContext.tsx";
+import React, { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { useAuth } from "./AuthContext";
 
-// Define the shape of the data you expect from the "profiles" table
 export interface Profile {
-    displayname: string;
     id: string;
     username: string;
-    role: string; // Admin, Privileged, or Default
-    tokens: number;
-    bio?: string;
-    boards_generated?: number;
-    games_finished?: number;
-    games_won?: number;
+    displayname: string;
+    bio?: string | null;
+    color?: string | null;
+    text_color?: string | null;
+
+    // public-ish stats
+    boards_generated?: number | null;
+    games_finished?: number | null;
+    games_won?: number | null;
+    money_won?: number | null;
+
+    // private-only fields may exist on /me, but public route won't include them
+    email?: string | null;
+    role?: string | null;
+    tokens?: number | null;
 }
 
-// Context value type definition
 interface ProfileContextType {
     profile: Profile | null;
     loading: boolean;
     error: string | null;
-    refetchProfile: () => Promise<void>; // Function to refetch profile
+    refetchProfile: () => Promise<void>;
 }
 
-// Default value for the context
 const ProfileContext = createContext<ProfileContextType>({
     profile: null,
     loading: true,
     error: null,
-    refetchProfile: async () => {}
+    refetchProfile: async () => {},
 });
 
-// Context Provider Component
-export const ProfileProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+function getApiBase() {
+    return import.meta.env.VITE_API_BASE || "http://localhost:3002";
+}
+
+function normalizeUsername(u: string) {
+    return u.trim().toLowerCase();
+}
+
+export const ProfileProvider: React.FC<{ children: ReactNode; username?: string | null }> = ({
+                                                                                                 children,
+                                                                                                 username,
+                                                                                             }) => {
+    const { token, user, loading: authLoading } = useAuth();
+
     const [profile, setProfile] = useState<Profile | null>(null);
     const [profileLoading, setProfileLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const { user, loading } = useAuth();
 
-    // Fetch the profile from Supabase
     const fetchProfile = async () => {
-        try {
-            setProfileLoading(true);
-            if (user) {
-                const { data, error } = await supabase
-                    .from('profiles') // Replace with your table name
-                    .select('*') // Select all columns or limit as needed (e.g., 'id, username, role')
-                    .eq('id', user.id)
-                    .single();
+        setError(null);
+        setProfileLoading(true);
 
-                if (error) {
-                    throw new Error(error.message);
-                }
-                setProfile(data); // Set the profile in state
-            } else {
-                setProfile({
-                    displayname: "", // Default display name
-                    id: "placeholder-id", // Generic placeholder ID
-                    username: "", // Default username
-                    role: "Default", // Default role
-                    tokens: 0, // Default tokens value
-                });
+        try {
+            const api = getApiBase();
+
+            // If a username was provided, load PUBLIC profile
+            if (username && username.trim().length) {
+                const u = normalizeUsername(username);
+                const res = await fetch(`${api}/api/profile/${encodeURIComponent(u)}`);
+                const data = await res.json();
+                if (!res.ok) throw new Error(data?.error || "Failed to load profile");
+                setProfile(data.profile);
+                return;
             }
-        } catch (err: any) {
-            console.error('Error fetching profile:', err.message);
-            setError(err.message);
+
+            // Otherwise, if logged in, load PRIVATE /me profile
+            if (token) {
+                const res = await fetch(`${api}/api/profile/me`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data?.error || "Failed to load profile");
+                setProfile(data.profile);
+                return;
+            }
+
+            // Not logged in + no username → nothing to load
+            setProfile(null);
+        } catch (e: any) {
+            setError(String(e?.message || e));
+            setProfile(null);
         } finally {
             setProfileLoading(false);
         }
     };
 
-    // Fetch the profile on component mount
     useEffect(() => {
-        if (!loading){
-           void fetchProfile();
-        }
-    }, [user, loading]);
+        if (authLoading) return;
+        void fetchProfile();
+        // Re-run when the route username changes or token changes
+    }, [authLoading, token, user?.id, username]);
 
-    // Provide the context value
     return (
         <ProfileContext.Provider
             value={{
                 profile,
                 loading: profileLoading,
                 error,
-                refetchProfile: fetchProfile // Allow re-fetching
+                refetchProfile: fetchProfile,
             }}
         >
             {children}
@@ -92,13 +111,4 @@ export const ProfileProvider: React.FC<{ children: ReactNode }> = ({ children })
     );
 };
 
-// Custom Hook to Use the Profile Context
-export const useProfile = () => {
-    const context = useContext(ProfileContext);
-
-    if (!context) {
-        throw new Error('useProfile must be used within a ProfileProvider');
-    }
-
-    return context;
-};
+export const useProfile = () => useContext(ProfileContext);

@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useWebSocket } from "../contexts/WebSocketContext.tsx";
+import {useEffect, useMemo, useState} from "react";
+import {useNavigate} from "react-router-dom";
+import {useWebSocket} from "../contexts/WebSocketContext.tsx";
 import {useAuth} from "../contexts/AuthContext.tsx";
-import {useProfile} from "../contexts/ProfileContext.tsx";
 import {useAlert} from "../contexts/AlertContext.tsx";
 import PlayerSearch from "../components/main/PlayerSearch.tsx";
 import {Player} from "../types/Lobby.ts";
@@ -10,40 +9,25 @@ import {getUniqueCategories} from "../categories/getUniqueCategories.ts";
 import {useGameSession} from "../hooks/useGameSession.ts";
 
 export default function MainPage() {
-    const [gameId, setGameId] = useState('');
+    const [gameId, setGameId] = useState("");
     const [isCreatingLobby, setIsCreatingLobby] = useState(false);
-    const [cotd, setCotd] = useState({
-        category: "Connecting to server...",
-        description: ""
-    });
+    const [cotd, setCotd] = useState({ category: "Connecting to server...", description: "" });
+
     const { saveSession } = useGameSession();
     const { showAlert } = useAlert();
-    const { user } = useAuth();
-    const { profile, loading: profileLoading, refetchProfile } = useProfile();
+    const { user, loading: authLoading } = useAuth();
     const { isSocketReady, sendJson, subscribe } = useWebSocket();
     const navigate = useNavigate();
 
+    const adjectives = ["Hallucinated", "Intelligent", "Dreamt", "Generated", "Conjured", "Created"];
+    const randomAdjective = useMemo(() => adjectives[Math.floor(Math.random() * adjectives.length)], []);
 
-    const adjectives = [
-        "Hallucinated",
-        "Intelligent",
-        "Dreamt",
-        "Generated",
-        "Conjured",
-        "Created",
-    ];
-
-    const randomAdjective = useMemo(
-        () => adjectives[Math.floor(Math.random() * adjectives.length)],
-        []
-    );
+    const myName = (user?.displayname || user?.username || "").trim();
 
     useEffect(() => {
         if (!isSocketReady) return;
 
-        const unsubscribe = subscribe((message) => {
-            console.log(message);
-
+        return subscribe((message) => {
             switch (message.type) {
                 case "category-of-the-day": {
                     const m = message as unknown as { cotd: { category: string; description: string } };
@@ -52,27 +36,24 @@ export default function MainPage() {
                 }
 
                 case "lobby-created": {
-                    const m = message as unknown as {
-                        gameId: string;
-                        players: Player[];
-                        categories: string[];
-                    };
+                    const m = message as unknown as { gameId: string; players: Player[]; categories: string[] };
 
                     setIsCreatingLobby(false);
 
-                    if (!profile) return;
-                    saveSession(m.gameId, profile.displayname, true);
+                    if (!myName) return;
+
+                    saveSession(m.gameId, myName, true);
 
                     navigate(`/lobby/${m.gameId}`, {
                         state: {
-                            playerName: profile.displayname,
+                            playerName: myName,
                             isHost: true,
                             players: m.players,
                             categories: m.categories,
                         },
                     });
 
-                    sendJson({ type: "request-lobby-state", gameId: m.gameId });
+                    sendJson({type: "request-lobby-state", gameId: m.gameId});
                     return;
                 }
 
@@ -80,28 +61,22 @@ export default function MainPage() {
                     const m = message as unknown as { isValid: boolean; gameId: string };
 
                     if (m.isValid) {
-                        const name = profile ? profile.displayname : "";
-
-                        saveSession(m.gameId, name.trim(), false);
-                        //TODO Remove
-                        // sendJson({
-                        //     type: "join-lobby",
-                        //     gameId: m.gameId,
-                        //     playerName: name.trim(),
-                        // });
+                        saveSession(m.gameId, myName, false);
 
                         navigate(`/lobby/${m.gameId}`, {
                             state: {
-                                playerName: name.trim(),
+                                playerName: myName,
                                 isHost: false,
                             },
                         });
                     } else {
                         showAlert(
                             <span>
-                              <span className="text-red-500 font-bold text-xl">Invalid lobby or game already in progress.</span>
-                              <br />
-                            </span>,
+                <span className="text-red-500 font-bold text-xl">
+                  Invalid lobby or game already in progress.
+                </span>
+                <br/>
+              </span>,
                             [
                                 {
                                     label: "Okay",
@@ -118,62 +93,63 @@ export default function MainPage() {
                     return;
             }
         });
-
-        return unsubscribe;
-    }, [isSocketReady, subscribe, navigate, showAlert, profile, sendJson]);
+    }, [isSocketReady, subscribe, navigate, showAlert, myName, sendJson, saveSession]);
 
     useEffect(() => {
         if (!isSocketReady) return;
-
         sendJson({ type: "check-cotd" });
     }, [isSocketReady, sendJson]);
 
     const handleGenerateRandomCategories = () => {
-
         return getUniqueCategories(11);
     };
 
     function sendErrorAlert() {
-        showAlert(
+        void showAlert(
             <span>
-                <span className="text-red-500 font-bold text-xl">Connection to Websockets failed.</span><br/>
-                <span className="text-gray-900 font-semibold">Please refresh the page and try again.</span>
-            </span>,
-            [
-                {
-                    label: "Okay",
-                    actionValue: "okay",
-                    styleClass: "bg-green-500 text-white hover:bg-green-600",
-                }
-            ]
+        <span className="text-red-500 font-bold text-xl">Connection to Websockets failed.</span>
+        <br />
+        <span className="text-gray-900 font-semibold">Please refresh the page and try again.</span>
+      </span>,
+            [{ label: "Okay", actionValue: "okay", styleClass: "bg-green-500 text-white hover:bg-green-600" }]
         );
     }
 
     const handleCreateGame = async () => {
         if (isCreatingLobby) return;
+
+        // wait for auth to finish initializing
+        if (authLoading) return;
+
         if (!user) {
-            showAlert(
+            void showAlert(
                 <span>
-                <span className="text-red-500 font-bold text-xl">Please log in to create a game.</span><br/>
-            </span>,
-                [
-                    {
-                        label: "Okay",
-                        actionValue: "okay",
-                        styleClass: "bg-green-500 text-white hover:bg-green-600",
-                    }
-                ]
+          <span className="text-red-500 font-bold text-xl">Please log in to create a game.</span>
+          <br />
+        </span>,
+                [{ label: "Okay", actionValue: "okay", styleClass: "bg-green-500 text-white hover:bg-green-600" }]
             );
             return;
         }
-        if (isSocketReady && profile) {
+
+        if (!myName) {
+            void showAlert(
+                <span>
+          <span className="text-red-500 font-bold text-xl">Your profile name is missing.</span>
+          <br />
+        </span>,
+                [{ label: "Okay", actionValue: "okay", styleClass: "bg-green-500 text-white hover:bg-green-600" }]
+            );
+            return;
+        }
+
+        if (isSocketReady) {
             setIsCreatingLobby(true);
             sendJson({
                 type: "create-lobby",
-                host: profile.displayname,
+                host: myName,
                 categories: handleGenerateRandomCategories(),
             });
-            console.log('sent create-lobby message');
         } else {
             sendErrorAlert();
         }
@@ -181,45 +157,30 @@ export default function MainPage() {
 
     const handleJoinGame = async () => {
         if (isCreatingLobby) return;
+
         if (!gameId.trim()) {
             await showAlert(
                 <span>
-                    <span className="text-red-500 font-bold text-xl">Please enter a valid Game ID.</span><br/>
-                </span>,
-                [
-                    {
-                        label: "Okay",
-                        actionValue: "okay",
-                        styleClass: "bg-green-500 text-white hover:bg-green-600",
-                    }]
+          <span className="text-red-500 font-bold text-xl">Please enter a valid Game ID.</span>
+          <br />
+        </span>,
+                [{ label: "Okay", actionValue: "okay", styleClass: "bg-green-500 text-white hover:bg-green-600" }]
             );
             return;
         }
 
+        // wait for auth init so we don't flash "not logged in"
+        if (authLoading) return;
+
         if (!user) {
             const action = await showAlert(
                 <span>
-                    <span className="text-red-500 font-bold text-xl">You are not logged in.</span><br/>
-                </span>,
-                [
-                    {
-                        label: "Go Back",
-                        actionValue: "return",
-                        styleClass: "bg-red-500 text-white hover:bg-red-600",
-                    }
-
-                ]
+          <span className="text-red-500 font-bold text-xl">You are not logged in.</span>
+          <br />
+        </span>,
+                [{ label: "Go Back", actionValue: "return", styleClass: "bg-red-500 text-white hover:bg-red-600" }]
             );
-
-            if (action === "return") {
-                return;
-            }
-        }
-
-        // Wait for the profile to fully load
-        if (profileLoading) {
-            console.log("Waiting for profile to finish loading...");
-            await refetchProfile(); // Optional - ensures profile is up-to-date
+            if (action === "return") return;
         }
 
         if (isSocketReady) {

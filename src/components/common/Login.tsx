@@ -45,9 +45,6 @@ const Login: React.FC = () => {
                         id="username"
                         value={usernameInput}
                         onChange={(e) => setUsernameInput(e.target.value)}
-                        onBlur={() => {
-                            if (usernameInput !== usernameLower) setUsernameInput(usernameLower);
-                        }}
                         placeholder="chandler"
                         autoComplete="username"
                         required

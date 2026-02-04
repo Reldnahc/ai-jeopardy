@@ -1,65 +1,95 @@
-import React, { useState } from "react";
-import {supabase} from "../../supabaseClient";
-import {useNavigate} from "react-router-dom";
-import Avatar from "../common/Avatar.tsx";
+import React, { useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import Avatar from "../common/Avatar";
 
-// Define the expected shape of the profiles table
-interface Profile {
-    username: string; // The username field from your Supabase table
+type ProfileSearchRow = {
+    username: string;
     displayname: string;
-    color: string;
-    text_color: string;
-    // Add additional fields if required
+    color: string | null;
+    text_color: string | null;
+};
+
+function getApiBase() {
+    return import.meta.env.VITE_API_BASE || "http://localhost:3002";
+}
+
+async function fetchJson<T>(url: string): Promise<T> {
+    const res = await fetch(url);
+    const text = await res.text();
+    let payload: any = null;
+    try {
+        payload = text ? JSON.parse(text) : null;
+    } catch {}
+
+    if (!res.ok) {
+        const msg = payload?.error || text || `HTTP ${res.status}`;
+        throw new Error(msg);
+    }
+
+    return payload as T;
 }
 
 const PlayerSearch: React.FC = () => {
-    const [searchQuery, setSearchQuery] = useState(""); // State for search query
-    const [matchingUsers, setMatchingUsers] = useState<Profile[]>([]); // Array of profiles
-    const [isDropdownVisible, setIsDropdownVisible] = useState(false); // Dropdown visibility
+    const [searchQuery, setSearchQuery] = useState("");
+    const [matchingUsers, setMatchingUsers] = useState<ProfileSearchRow[]>([]);
+    const [isDropdownVisible, setIsDropdownVisible] = useState(false);
+    const [loading, setLoading] = useState(false);
+
     const navigate = useNavigate();
+    const apiBase = useMemo(() => getApiBase(), []);
+
+    const requestSeq = useRef(0);
+
+    const trimmed = searchQuery.trim();
+    const tooShort = trimmed.length > 0 && trimmed.length < 2;
 
     const handleSearchChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const query = e.target.value;
-        setSearchQuery(query);
+        const next = e.target.value;
+        setSearchQuery(next);
 
-        if (query.trim() === "") {
+        const t = next.trim();
+
+        if (!t) {
             setMatchingUsers([]);
             setIsDropdownVisible(false);
+            setLoading(false);
             return;
         }
 
-        const { data, error } = await supabase
-            .from("profiles")
-            .select(`
-            username,
-            displayname,
-            user_profiles (color, text_color)
-            `) // Fetch rows from both `profiles` and related `user_profiles`
-            .ilike("username", `%${query}%`)// Case-insensitive username matching
-            .limit(5);
+        if (t.length < 2) {
+            setMatchingUsers([]);
+            setIsDropdownVisible(false);
+            setLoading(false);
+            return;
+        }
 
-        if (error) {
-            console.error("Error fetching matching users:", error.message);
-        } else if (data){
-            console.log(data);
-            const transformedData = data.map((user) => ({
-                username: user.username,
-                displayname: user.displayname,
-                // @ts-expect-error test
-                color: user.user_profiles?.color, // Take `color` from the first `user_profiles` entry, or default to an empty string
-                // @ts-expect-error test
-                text_color: user.user_profiles?.text_color, // Likewise for `text_color`
-            }));
+        const seq = ++requestSeq.current;
+        setLoading(true);
 
-            setMatchingUsers(transformedData); // Ensure we have a valid array (if data is null, default to [])
-            setIsDropdownVisible(true); // Show dropdown if there are results
+        try {
+            const data = await fetchJson<{ users: ProfileSearchRow[] }>(
+                `${apiBase}/api/profile/search?q=${encodeURIComponent(t)}&limit=5`
+            );
+
+            // ignore out-of-order responses
+            if (seq !== requestSeq.current) return;
+
+            const users = data.users ?? [];
+            setMatchingUsers(users);
+            setIsDropdownVisible(users.length > 0);
+        } catch (err) {
+            if (seq !== requestSeq.current) return;
+            console.error("Error searching users:", err);
+            setMatchingUsers([]);
+            setIsDropdownVisible(false);
+        } finally {
+            if (seq === requestSeq.current) setLoading(false);
         }
     };
 
     const handleUserSelect = (username: string) => {
-        //setSearchQuery(username); // Set the input value to the selected username
-        setIsDropdownVisible(false); // Hide the dropdown
-        navigate(`profile/${username}`);
+        setIsDropdownVisible(false);
+        navigate(`/profile/${username}`);
     };
 
     return (
@@ -67,6 +97,7 @@ const PlayerSearch: React.FC = () => {
             <label className="block text-2xl font-semibold text-gray-700 mb-2" htmlFor="player-search">
                 Search for a Player
             </label>
+
             <input
                 type="text"
                 id="player-search"
@@ -74,23 +105,49 @@ const PlayerSearch: React.FC = () => {
                 onChange={handleSearchChange}
                 placeholder="Start typing a username..."
                 className="w-full p-3 border border-gray-300 text-black rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                autoComplete="off"
+                onFocus={() => {
+                    if (matchingUsers.length > 0) setIsDropdownVisible(true);
+                }}
+                onBlur={() => {
+                    // small delay so click registers
+                    setTimeout(() => setIsDropdownVisible(false), 150);
+                }}
             />
+
+            {/* Reserve space so the page doesn't jump */}
+            <div className="mt-1 min-h-[1rem] text-xs text-gray-500">
+                {tooShort ? (
+                    <>
+                        Type <span className="font-semibold">2+</span> characters to search.
+                    </>
+                ) : loading ? (
+                    <>Searching…</>
+                ) : (
+                    // keep height, show nothing
+                    <span className="opacity-0">placeholder</span>
+                )}
+            </div>
+
+
             {isDropdownVisible && matchingUsers.length > 0 && (
                 <ul className="absolute w-full mt-2 bg-white border border-gray-300 rounded shadow-lg z-10">
-                    {matchingUsers.map((user, index) => (
+                    {matchingUsers.map((user) => (
                         <li
-                            key={index}
+                            key={user.username}
                             className="p-3 hover:bg-blue-100 cursor-pointer text-black flex items-center space-x-3"
-                            style={{ minHeight: "3rem" }} // Ensures enough height for the Avatar
+                            style={{ minHeight: "3rem" }}
+                            onMouseDown={(ev) => ev.preventDefault()} // prevents blur before click
                             onClick={() => handleUserSelect(user.username)}
                         >
                             <Avatar
                                 size={"8"}
                                 name={user.username}
-                                color={user.color}
-                                textColor={user.text_color}
+                                color={user.color ?? undefined}
+                                textColor={user.text_color ?? undefined}
                             />
                             <span className="whitespace-nowrap">{user.displayname}</span>
+                            <span className="ml-auto text-xs text-gray-500">@{user.username}</span>
                         </li>
                     ))}
                 </ul>

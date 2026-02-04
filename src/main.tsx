@@ -11,7 +11,6 @@ import { AuthProvider } from './contexts/AuthContext.tsx';
 import Profile from "./pages/Profile.tsx";
 import {ProfileProvider} from "./contexts/ProfileContext.tsx";
 import RecentBoards from "./pages/RecentBoards.tsx";
-import {UserProfileProvider} from "./contexts/UserProfileContext.tsx";
 import {AlertProvider} from "./contexts/AlertContext.tsx";
 import {DeviceProvider} from "./contexts/DeviceContext.tsx";
 import NotFoundPage from "./pages/NotFoundPage.tsx";
@@ -76,13 +75,11 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <DeviceProvider>
             <AuthProvider>
                 <ProfileProvider>
-                    <UserProfileProvider>
-                        <WebSocketProvider>
-                            <AlertProvider>
-                                <RouterProvider router={router} />
-                            </AlertProvider>
-                        </WebSocketProvider>
-                    </UserProfileProvider>
+                    <WebSocketProvider>
+                        <AlertProvider>
+                            <RouterProvider router={router} />
+                        </AlertProvider>
+                    </WebSocketProvider>
                 </ProfileProvider>
             </AuthProvider>
         </DeviceProvider>

@@ -11,10 +11,16 @@ import { attachWebSocketServer } from "./ws/index.js";
 import { getCOTD, setCOTD } from "./state/cotdStore.js";
 import { registerHttpRoutes } from "./http/routes.js";
 import { Agent, setGlobalDispatcher } from "undici";
-import {registerAuthRoutes} from "./http/authRoutes.js";
+import { registerAuthRoutes } from "./http/authRoutes.js";
+import { registerProfileRoutes } from "./http/profileRoutes.js";
 
-const app = express(); // Initialize Express app
-app.use(cors());
+const app = express();
+app.use(cors({
+    origin: "http://localhost:5173",
+    credentials: true,
+    methods: ["GET","POST","PUT","PATCH","DELETE","OPTIONS"],
+    allowedHeaders: ["Content-Type","Authorization"],
+}));
 app.use(bodyParser.json());
 
 const server = http.createServer(app);
@@ -22,12 +28,22 @@ const wss = new WebSocketServer({ server });
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
 const distPath = path.join(__dirname, "..", "dist");
-app.use(express.static(distPath));
-registerHttpRoutes(app, { distPath });
-registerAuthRoutes(app);
 
+// --- 1. REGISTER API ROUTES FIRST ---
+// We do this before static files so /api/... requests don't hit the static middle-ware
+registerAuthRoutes(app);
+registerProfileRoutes(app);
+
+// --- 2. SERVE STATIC ASSETS ---
+// This handles JS, CSS, and Images
+app.use(express.static(distPath));
+
+// --- 3. FRONTEND CATCH-ALL LAST ---
+// This handles React Router paths by serving index.html
+registerHttpRoutes(app, { distPath });
+
+// --- External Service Config ---
 setGlobalDispatcher(new Agent({
     keepAliveTimeout: 60_000,
     keepAliveMaxTimeout: 60_000,
@@ -36,9 +52,7 @@ setGlobalDispatcher(new Agent({
     bodyTimeout: 30_000,
 }));
 
-// --- Startup safety --------------------------------------------------------
-// Make sure critical async state (COTD) is ready BEFORE accepting connections.
-const PORT = Number( 3002);
+const PORT = Number(3002);
 
 async function refreshCOTD() {
     try {
@@ -47,22 +61,18 @@ async function refreshCOTD() {
         return next;
     } catch (err) {
         console.error("[COTD] Failed to refresh Category Of The Day:", err);
-        // Keep the previous COTD so the server can still run.
         return getCOTD();
     }
 }
 
 async function bootstrap() {
     await refreshCOTD();
-
-    // Wire up WS handlers before listening.
     attachWebSocketServer(wss);
 
     server.listen(PORT, () => {
         console.log(`HTTP + WS listening on :${PORT}`);
     });
 
-    // Refresh hourly (best-effort; errors are logged and previous COTD is kept).
     setInterval(() => {
         refreshCOTD().catch(() => {});
     }, 1000 * 60 * 60);

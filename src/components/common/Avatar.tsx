@@ -1,10 +1,14 @@
 import React from "react";
 
 interface AvatarProps {
-    name: string; // Player name
-    size?: string; // CSS size for the avatar (optional, default is "8")
-    color?: string | null; // Background color for the avatar (default: "bg-blue-500")
-    textColor?: string | null; // Text color for the avatar (default: "text-white")
+    name: string;
+    size?: string;
+    color?: string | null;     // can be tailwind class OR hex
+    textColor?: string | null; // can be tailwind class OR hex
+}
+
+function isHexColor(s: unknown): s is string {
+    return typeof s === "string" && /^#[0-9a-fA-F]{6}$/.test(s);
 }
 
 const Avatar: React.FC<AvatarProps> = ({
@@ -13,22 +17,25 @@ const Avatar: React.FC<AvatarProps> = ({
                                            color = "bg-blue-500",
                                            textColor = "text-white",
                                        }) => {
-    const avatarSize = `${parseInt(size) * 4}px`; // Convert size into pixel values (e.g., "8" -> "32px")
+    const avatarSize = `${parseInt(size) * 4}px`;
+
+    const bgClass = isHexColor(color) ? "" : (color ?? "");
+    const textClass = isHexColor(textColor) ? "" : (textColor ?? "");
+
+    const style: React.CSSProperties = {
+        width: avatarSize,
+        height: avatarSize,
+        fontSize: `${parseInt(size) * 2}px`,
+        ...(isHexColor(color) ? { backgroundColor: color } : null),
+        ...(isHexColor(textColor) ? { color: textColor } : null),
+    };
 
     return (
         <div
-            className={`rounded-full ${color} ${textColor} flex justify-center items-center font-bold border border-black border-opacity-10`}
-            style={{
-                width: avatarSize,
-                height: avatarSize,
-                fontSize: `${parseInt(size) * 2}px`, // Dynamically scale font size
-
-            }}
+            className={`rounded-full ${bgClass} ${textClass} flex justify-center items-center font-bold border border-black border-opacity-10`}
+            style={style}
         >
-            <span className="relative top-[-1px]">
-              {name?.charAt(0).toUpperCase()}
-            </span>
-
+            <span className="relative top-[-1px]">{name?.charAt(0).toUpperCase()}</span>
         </div>
     );
 };

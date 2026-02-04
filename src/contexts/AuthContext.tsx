@@ -17,6 +17,7 @@ type AuthContextType = {
     login: (params: { username: string; password: string }) => Promise<void>;
     signup: (params: { email?: string | null; username: string; displayname?: string; password: string }) => Promise<void>;
     logout: () => void;
+    updateUser: (patch: Partial<AppUser>) => void;
 };
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -30,33 +31,89 @@ function getApiBase() {
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<AppUser | null>(null);
     const [token, setToken] = useState<string | null>(localStorage.getItem(TOKEN_KEY));
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(() => Boolean(localStorage.getItem(TOKEN_KEY)));
+
+    const updateUser: AuthContextType["updateUser"] = (patch) => {
+        setUser((prev) => (prev ? { ...prev, ...patch } : prev));
+    };
 
     async function fetchMe(t: string) {
         const res = await fetch(`${getApiBase()}/api/auth/me`, {
             headers: { Authorization: `Bearer ${t}` },
         });
-        if (!res.ok) throw new Error("me failed");
-        const data = await res.json();
+
+        // Try to parse JSON error bodies (most APIs do)
+        const text = await res.text();
+        let payload: any = null;
+        try { payload = text ? JSON.parse(text) : null; } catch {}
+
+        if (!res.ok) {
+            const msg = payload?.error || text || `HTTP ${res.status}`;
+            const err: any = new Error(msg);
+            err.status = res.status;
+            err.payload = payload;
+            throw err;
+        }
+
+        const data = payload ?? (text ? JSON.parse(text) : null);
         return data.user as AppUser;
     }
 
+
+
     useEffect(() => {
-        (async () => {
-            try {
-                if (!token) return;
-                const me = await fetchMe(token);
-                setUser(me);
-            } catch {
-                localStorage.removeItem(TOKEN_KEY);
-                setToken(null);
-                setUser(null);
-            } finally {
-                setLoading(false);
+        let cancelled = false;
+
+        const boot = async () => {
+            const t = localStorage.getItem(TOKEN_KEY);
+
+            // If state says "token" but storage doesn't, keep them consistent.
+            if (!t) {
+                if (!cancelled) {
+                    setToken(null);
+                    setUser(null);
+                    setLoading(false);
+                }
+                return;
             }
-        })();
-        if (!token) setLoading(false);
-    }, [token]);
+
+            if (!cancelled) setLoading(true);
+
+            try {
+                const me = await fetchMe(t);
+                if (!cancelled) {
+                    setUser(me);
+                    // ensure state token matches storage token
+                    setToken(t);
+                }
+            } catch (e: any) {
+                console.error("AuthContext boot failed:", e);
+
+                const status = e?.status;
+                const apiErr = e?.payload?.error;
+
+                const isAuthFailure =
+                    status === 401 || status === 403 ||
+                    apiErr === "Invalid token" || apiErr === "Token expired";
+
+                if (!cancelled) {
+                    if (isAuthFailure) {
+                        localStorage.removeItem(TOKEN_KEY);
+                        setToken(null);
+                        setUser(null);
+                    }
+                    // If it was a network/server hiccup, keep token and just show logged-out UI until it recovers.
+                }
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
+        };
+
+        void boot();
+        return () => { cancelled = true; };
+    }, []);
+
+
 
     const login: AuthContextType["login"] = async ({ username, password }) => {
         const res = await fetch(`${getApiBase()}/api/auth/login`, {
@@ -95,7 +152,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
 
     return (
-        <AuthContext.Provider value={{ user, token, loading, login, signup, logout }}>
+        <AuthContext.Provider value={{ user, token, loading, login, signup, logout, updateUser }}>
             {children}
         </AuthContext.Provider>
     );

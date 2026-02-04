@@ -41,7 +41,7 @@ export function registerAuthRoutes(app) {
             );
 
             const user = rows[0];
-            const token = signJwt({ id: user.id, username: user.username, role: user.role });
+            const token = signJwt({ sub: user.id, username: user.username, role: user.role });
 
             res.json({ token, user });
         } catch (e) {
@@ -78,7 +78,7 @@ export function registerAuthRoutes(app) {
             const ok = await bcrypt.compare(password, user.password_hash);
             if (!ok) return res.status(401).json({ error: "Invalid credentials" });
 
-            const token = signJwt({ id: user.id, username: user.username, role: user.role });
+            const token = signJwt({ sub: user.id, username: user.username, role: user.role });
 
             delete user.password_hash;
             res.json({ token, user });
@@ -97,11 +97,14 @@ export function registerAuthRoutes(app) {
             const token = header.slice("Bearer ".length);
             const payload = verifyJwt(token);
 
+            const userId = payload.sub || payload.id;
+            if (!userId) return res.status(401).json({ error: "Invalid token payload" });
+
             const { rows } = await pool.query(
                 `select id, email, username, role, displayname, color, text_color
                  from profiles
                  where id = $1`,
-                [payload.sub]
+                [userId]
             );
 
             if (!rows.length) return res.status(401).json({ error: "User not found" });

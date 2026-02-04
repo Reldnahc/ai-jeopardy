@@ -4,9 +4,9 @@ import jwt from "jsonwebtoken";
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) throw new Error("JWT_SECRET is required");
 
-export function signJwt({ id, username, role }) {
+export function signJwt({ sub, username, role }) {
     return jwt.sign(
-        { sub: id, username, role },
+        { sub, username, role },
         JWT_SECRET,
         { expiresIn: "7d" }
     );
