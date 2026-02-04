@@ -1,11 +1,10 @@
 // backend/http/routes.js
 import path from "path";
 import { GetObjectCommand } from "@aws-sdk/client-s3";
-import { supabase } from "../config/database.js";
+import { pool } from "../config/pg.js";
 import { r2 } from "../services/r2Client.js";
 
 
-// --- TTS asset lookup protection (prevents Supabase stampede) ---
 const TTS_CACHE_TTL_MS = 5 * 60 * 1000;
 
 const ttsMetaCache = new Map(); // assetId -> { storageKey, contentType, expiresAt }
@@ -51,15 +50,12 @@ export function registerHttpRoutes(app, { distPath }) {
         try {
             const { assetId } = req.params;
 
-            const { data, error } = await supabase
-                .from("image_assets")
-                .select("storage_key, content_type")
-                .eq("id", assetId)
-                .single();
-
-            if (error || !data) {
-                return res.status(404).json({ error: "Image asset not found" });
-            }
+            const { rows } = await pool.query(
+                `select storage_key, content_type from public.image_assets where id = $1 limit 1`,
+                [assetId]
+            );
+            const data = rows?.[0];
+            if (!data) return res.status(404).json({ error: "Image asset not found" });
 
             const storageKey = data.storage_key;
             const contentType = data.content_type || "image/webp";
@@ -84,13 +80,12 @@ export function registerHttpRoutes(app, { distPath }) {
     app.get("/api/image-assets/:assetId", async (req, res) => {
         const { assetId } = req.params;
 
-        const { data, error } = await supabase
-            .from("image_assets")
-            .select("*")
-            .eq("id", assetId)
-            .single();
-
-        if (error || !data) return res.status(404).json({ error: "Not found" });
+        const { rows } = await pool.query(
+            `select storage_key, content_type from public.image_assets where id = $1 limit 1`,
+            [assetId]
+        );
+        const data = rows?.[0];
+        if (!data) return res.status(404).json({ error: "Image asset not found" });
         res.json(data);
     });
 
@@ -126,64 +121,26 @@ export function registerHttpRoutes(app, { distPath }) {
         const { assetId } = req.params;
 
         try {
-            const { data, error } = await supabase
-                .from("tts_assets")
-                .select("storage_key, content_type")
-                .eq("id", assetId)
-                .single();
+            const { rows } = await pool.query(
+                `select storage_key, content_type from public.tts_assets where id = $1 limit 1`,
+                [assetId]
+            );
 
-            // If Supabase query itself failed (network issues etc.)
-            if (error) {
-                console.error("Supabase error in /api/tts:", error);
-                res.setHeader("Cache-Control", "no-store");
-                return res.status(503).json({ error: "TTS lookup unavailable" });
-            }
-
-            // If row not found, keep 404 (optional: treat as 202 for a short window if you want)
-            if (!data) {
-                return res.status(404).json({ error: "TTS asset not found" });
-            }
-
-            // ✅ Pending: row exists but storage key not yet set
-            if (!data.storage_key || !String(data.storage_key).trim()) {
-                res.setHeader("Cache-Control", "no-store");
-                res.setHeader("Retry-After", "0.25");
-                return res.status(202).json({ status: "pending" });
-            }
+            const data = rows?.[0];
+            if (!data) return res.status(404).json({ error: "TTS asset not found" });
 
             const storageKey = data.storage_key;
             const contentType = data.content_type || "audio/mpeg";
 
-            try {
-                const cmd = new GetObjectCommand({
-                    Bucket: process.env.R2_BUCKET,
-                    Key: storageKey,
-                });
+            const cmd = new GetObjectCommand({
+                Bucket: process.env.R2_BUCKET,
+                Key: storageKey,
+            });
+            const obj = await r2.send(cmd);
+            res.setHeader("Content-Type", contentType);
+            res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+            return obj.Body.pipe(res);
 
-                const obj = await r2.send(cmd);
-
-                res.setHeader("Content-Type", contentType);
-                res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-                return obj.Body.pipe(res);
-            } catch (e) {
-                // ✅ Pending: storage_key exists, but object not available yet
-                // This is the race you described.
-                const msg = String(e?.name || "") + " " + String(e?.message || "");
-                const isNotYetThere =
-                    msg.includes("NoSuchKey") ||
-                    msg.includes("NotFound") ||
-                    msg.includes("404");
-
-                if (isNotYetThere) {
-                    res.setHeader("Cache-Control", "no-store");
-                    res.setHeader("Retry-After", "0.25");
-                    return res.status(202).json({ status: "pending" });
-                }
-
-                console.error("R2 error in /api/tts:", e);
-                res.setHeader("Cache-Control", "no-store");
-                return res.status(500).json({ error: "TTS fetch failed" });
-            }
         } catch (e) {
             console.error("GET /api/tts/:assetId failed:", e);
             res.setHeader("Cache-Control", "no-store");
@@ -193,6 +150,7 @@ export function registerHttpRoutes(app, { distPath }) {
 
     app.get("/api/tts-assets/:assetId", async (req, res) => {
         const { assetId } = req.params;
+
         // 1) Cache hit
         const cached = getCachedTtsMeta(assetId);
         let storageKey;
@@ -202,34 +160,18 @@ export function registerHttpRoutes(app, { distPath }) {
             storageKey = cached.storageKey;
             contentType = cached.contentType || "audio/mpeg";
         } else {
-            // 2) In-flight dedupe (if 20 clients ask for same id, only 1 Supabase call)
+            // 2) In-flight dedupe (if 20 clients ask for same id, only 1 DB call)
             let p = ttsInFlight.get(assetId);
 
             if (!p) {
                 p = (async () => {
-                    const { data, error } = await supabase
-                        .from("tts_assets")
-                        .select("storage_key, content_type")
-                        .eq("id", assetId)
-                        .single();
 
-                    if (error) {
-                        // If this is a connectivity failure, surface 503 (don’t cache)
-                        if (isConnectTimeoutError(error)) throw error;
+                    const { rows } = await pool.query(
+                        'SELECT storage_key, content_type FROM public.tts_assets WHERE id = $1 LIMIT 1',
+                        [assetId]
+                    );
 
-                        const code = error.code || "";
-                        const status = error.status || 0;
-                        const isNotFound =
-                            code === "PGRST116" || status === 406 || /0 rows/i.test(error.message || "");
-
-                        if (isNotFound) {
-                            const e = new Error("TTS_NOT_FOUND");
-                            e.code = "TTS_NOT_FOUND";
-                            throw e;
-                        }
-
-                        throw error;
-                    }
+                    const data = rows?.[0];
 
                     if (!data) {
                         const e = new Error("TTS_NOT_FOUND");
@@ -260,18 +202,20 @@ export function registerHttpRoutes(app, { distPath }) {
                 }
 
                 if (isConnectTimeoutError(e)) {
-                    // Don’t let clients cache this failure
                     res.setHeader("Cache-Control", "no-store");
                     return res.status(503).json({ error: "TTS lookup temporarily unavailable" });
                 }
 
-                console.error("Supabase error in /api/tts:", e);
+                console.error("Database error in /api/tts-assets:", e);
                 return res.status(500).json({ error: "TTS lookup failed" });
             } finally {
                 // On success, remove in-flight (cache now holds it)
                 ttsInFlight.delete(assetId);
             }
         }
+
+        // Return the metadata JSON
+        res.json({ storage_key: storageKey, content_type: contentType });
     });
 
     app.get("/test/tts/:assetId", async (req, res) => {

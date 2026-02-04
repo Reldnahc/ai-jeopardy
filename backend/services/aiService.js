@@ -1,12 +1,12 @@
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
 import 'dotenv/config';
-import {supabase} from "../config/database.js";
 import { modelsByValue } from "../../shared/models.js";
 import { pickCommonsImageForQueries } from "./commonsService.js";
 import { pickBraveImageForQueries } from "./braveImageService.js";
 import { ingestImageToR2FromUrl } from "./imageAssetService.js";
 import { ensureTtsAsset } from "./ttsAssetService.js";
+import {pool} from "../config/pg.js";
 
 // Initialize AI clients
 const openai = new OpenAI();
@@ -131,40 +131,7 @@ function parseProviderJson(response) {
     throw new Error("Unknown AI response shape (cannot parse JSON).");
 }
 
-const saveBoardAsync = async ({ supabase, host, board }) => {
-    console.log("[Server][saveBoardAsync] Starting board save");
-    console.log("[Server][saveBoardAsync] Host:", host);
-    console.log(
-        "[Server][saveBoardAsync] Board summary:",
-        board
-            ? {
-                categories: board.categories?.length ?? "unknown",
-                clues:
-                    Array.isArray(board.categories)
-                        ? board.categories.reduce(
-                            (sum, c) => sum + (c.clues?.length ?? 0),
-                            0
-                        )
-                        : "unknown",
-            }
-            : "NO BOARD PROVIDED"
-    );
-
-    if (!supabase) {
-        console.error("[Server][saveBoardAsync] ❌ Supabase client is missing");
-        return;
-    }
-
-    if (!host || typeof host !== "string") {
-        console.error("[Server][saveBoardAsync] ❌ Invalid host value:", host);
-        return;
-    }
-
-    if (!board) {
-        console.error("[Server][saveBoardAsync] ❌ No board data provided");
-        return;
-    }
-
+const saveBoardAsync = async ({ pool, host, board }) => {
     try {
         const normalizedHost = host.toLowerCase().trim();
         console.log(
@@ -172,66 +139,27 @@ const saveBoardAsync = async ({ supabase, host, board }) => {
             normalizedHost
         );
 
-        const profileRes = await supabase
-            .from("profiles")
-            .select("id")
-            .eq("username", normalizedHost)
-            .single();
+        const prof = await pool.query(
+            `select id from public.profiles where username = $1 limit 1`,
+            [normalizedHost]
+        );
 
-        if (profileRes.error) {
-            console.error(
-                "[Server][saveBoardAsync] ❌ Error fetching profile:",
-                profileRes.error
-            );
-            return;
-        }
-
-        if (!profileRes.data) {
-            console.warn(
-                "[Server][saveBoardAsync] ⚠️ Profile query returned no data for user:",
-                normalizedHost
-            );
-            return;
-        }
-
-        const ownerId = profileRes.data.id;
-
+        const ownerId = prof.rows?.[0]?.id;
         if (!ownerId) {
-            console.warn(
-                "[Server][saveBoardAsync] ⚠️ Profile found but id is missing:",
-                profileRes.data
-            );
+            console.warn("[Server][saveBoardAsync] ⚠️ No profile for:", normalizedHost);
             return;
         }
 
-        console.log(
-            "[Server][saveBoardAsync] Profile resolved. Owner ID:",
-            ownerId
+        await pool.query(
+            `insert into public.jeopardy_boards (owner, board) values ($1, $2::jsonb)`,
+            [ownerId, board]
         );
 
-        console.log("[Server][saveBoardAsync] Inserting board into database…");
-
-        const insertRes = await supabase
-            .from("jeopardy_boards")
-            .insert([
-                {
-                    board,
-                    owner: ownerId,
-                },
-            ]);
-
-        if (insertRes.error) {
-            console.error(
-                "[Server][saveBoardAsync] ❌ Failed to insert board:",
-                insertRes.error
-            );
-            return;
-        }
-
-        console.log(
-            "[Server][saveBoardAsync] ✅ Board saved successfully for owner:",
-            ownerId
+        await pool.query(
+            `update public.profiles set boards_generated = boards_generated + 1 where id = $1`,
+            [ownerId]
         );
+
     } catch (e) {
         console.error(
             "[Server][saveBoardAsync] ❌ Unhandled exception while saving board",
@@ -325,7 +253,7 @@ async function populateCategoryVisuals(cat, settings, progressTick) {
                     attribution: found.attribution,
                     trace: settings.trace,
                 },
-                supabase
+                pool
             );
 
             clue.media = { type: "image", assetId };
@@ -471,7 +399,7 @@ async function createBoardData(categories, model, host, options = {}) {
                             engine: "standard",
                             outputFormat: "mp3",
                         },
-                        supabase,
+                        pool,
                         trace
                     );
 
@@ -739,7 +667,7 @@ async function createBoardData(categories, model, host, options = {}) {
         // Finalize the visual pipeline with one last tick (keeps progress accounting consistent).
         if (settings.includeVisuals) tick(1);
 
-        void saveBoardAsync({ supabase, host, board });
+        void saveBoardAsync({ pool, host, board });
 
         trace?.mark("createBoardData DONE");
         return {

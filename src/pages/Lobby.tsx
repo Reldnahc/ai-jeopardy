@@ -58,6 +58,10 @@ const Lobby: React.FC = () => {
         gameId,
         playerKey,
         effectivePlayerName,
+        cosmetics: {
+            color: profile?.color ?? null,
+            text_color: profile?.text_color ?? null,
+        },
         showAlert,
     });
 

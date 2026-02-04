@@ -13,6 +13,7 @@ import { registerHttpRoutes } from "./http/routes.js";
 import { Agent, setGlobalDispatcher } from "undici";
 import { registerAuthRoutes } from "./http/authRoutes.js";
 import { registerProfileRoutes } from "./http/profileRoutes.js";
+import {registerBoardRoutes} from "./http/boardRoutes.js";
 
 const app = express();
 app.use(cors({
@@ -34,7 +35,7 @@ const distPath = path.join(__dirname, "..", "dist");
 // We do this before static files so /api/... requests don't hit the static middle-ware
 registerAuthRoutes(app);
 registerProfileRoutes(app);
-
+registerBoardRoutes(app);
 // --- 2. SERVE STATIC ASSETS ---
 // This handles JS, CSS, and Images
 app.use(express.static(distPath));

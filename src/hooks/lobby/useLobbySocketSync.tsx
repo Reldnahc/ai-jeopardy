@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useState} from "react";
+import React, {useCallback, useEffect, useRef, useState} from "react";
 import {useWebSocket} from "../../contexts/WebSocketContext";
 import type {Player} from "../../types/Lobby";
 import type {LobbyBoardType} from "../../components/lobby/CategoryBoard";
@@ -25,17 +25,13 @@ type UseLobbySocketSyncArgs = {
     gameId?: string;
     playerKey: string | null;
     effectivePlayerName: string | null;
+    cosmetics?: { color?: string | null; text_color?: string | null };
 
-    // UI integration
     showAlert: (node: React.ReactNode, actions: AlertButton[]) => Promise<string>;
 };
 
-export function useLobbySocketSync({
-                                       gameId,
-                                       playerKey,
-                                       effectivePlayerName,
-                                       showAlert,
-                                   }: UseLobbySocketSyncArgs) {
+export function useLobbySocketSync({ gameId, playerKey, effectivePlayerName, cosmetics, showAlert }: UseLobbySocketSyncArgs) {
+
     const { isSocketReady, sendJson, subscribe } = useWebSocket();
     const [lobbyInvalid, setLobbyInvalid] = useState(false);
     const [invalidReason, setInvalidReason] = useState<"missing_identity" | "not_found_or_started" | null>(null);
@@ -133,15 +129,41 @@ export function useLobbySocketSync({
 
     // --- join / request snapshot (moved from Lobby.tsx)
 
+    const lastJoinKeyRef = useRef<string>("");
+
     useEffect(() => {
         if (!isSocketReady) return;
         if (!gameId) return;
         if (!effectivePlayerName) return;
 
-        // Always attempt to (re)join when socket is ready; server dedupes via playerKey.
-        sendJson({ type: "join-lobby", gameId, playerName: effectivePlayerName, playerKey });
+        const joinIdentity = `${gameId}|${effectivePlayerName}|${playerKey}`;
+
+        if (lastJoinKeyRef.current === joinIdentity) {
+            return; // don't re-join just because cosmetics changed
+        }
+
+        lastJoinKeyRef.current = joinIdentity;
+
+        sendJson({
+            type: "join-lobby",
+            gameId,
+            playerName: effectivePlayerName,
+            playerKey,
+            color: cosmetics?.color ?? undefined,
+            text_color: cosmetics?.text_color ?? undefined,
+        });
         requestLobbyState();
-    }, [isSocketReady, gameId, effectivePlayerName, playerKey, sendJson, requestLobbyState]);
+    }, [
+        isSocketReady,
+        gameId,
+        effectivePlayerName,
+        playerKey,
+        cosmetics?.color,
+        cosmetics?.text_color,
+        sendJson,
+        requestLobbyState,
+    ]);
+
 
     // --- inbound message handling (moved from Lobby.tsx)
 
@@ -301,7 +323,7 @@ export function useLobbySocketSync({
                     );
 
 
-                    showAlert(alertContent, [
+                    void showAlert(alertContent, [
                         {
                             label: "Okay",
                             actionValue: "okay",

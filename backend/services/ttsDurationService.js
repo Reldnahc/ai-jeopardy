@@ -7,20 +7,21 @@ async function streamToBuffer(stream) {
     return Buffer.concat(chunks);
 }
 
-export function createTtsDurationService({ supabase, r2 }) {
+export function createTtsDurationService({ pool, r2 }) {
     const cache = new Map(); // assetId -> durationMs (number)
 
     async function getDurationMs(assetId) {
         if (!assetId) return null;
         if (cache.has(assetId)) return cache.get(assetId);
 
-        const { data, error } = await supabase
-            .from("tts_assets")
-            .select("storage_key, bytes, content_type")
-            .eq("id", assetId)
-            .single();
+        const { rows } = await pool.query(
+            `select storage_key, bytes, content_type from public.tts_assets where id = $1 limit 1`,
+            [assetId]
+        );
 
-        if (error || !data?.storage_key || !data?.bytes) return null;
+        const data = rows?.[0];
+        if (!data?.storage_key || !data?.bytes) return null;
+
 
         // Pull only the first few KB to parse the first MP3 frame header.
         const obj = await r2.send(new GetObjectCommand({

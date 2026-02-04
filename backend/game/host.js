@@ -120,7 +120,7 @@ export async function ensureAiHostTtsBank({ ctx, game, trace }) {
                         engine: "standard",
                         outputFormat: "mp3",
                     },
-                    ctx.supabase,
+                    ctx.pool,
                     trace
                 );
                 out.slotAssets[slot].push(asset.id);
@@ -144,7 +144,7 @@ export async function ensureAiHostTtsBank({ ctx, game, trace }) {
                     engine: "standard",
                     outputFormat: "mp3",
                 },
-                ctx.supabase,
+                ctx.pool,
                 trace
             );
             out.nameAssetsByPlayer[name] = asset.id;
@@ -171,7 +171,7 @@ export async function ensureAiHostTtsBank({ ctx, game, trace }) {
                     engine: "standard",
                     outputFormat: "mp3",
                 },
-                ctx.supabase,
+                ctx.pool,
                 trace
             );
 

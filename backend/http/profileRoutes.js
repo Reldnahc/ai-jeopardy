@@ -49,7 +49,6 @@ export function registerProfileRoutes(app) {
         }
     });
 
-    // Search profiles by username/displayname (public fields only)
     app.get("/api/profile/search", async (req, res) => {
         try {
             const q = String(req.query.q ?? "").trim();
@@ -127,19 +126,23 @@ export function registerProfileRoutes(app) {
             const username = normalizeUsername(req.params.username);
             if (!username) return res.status(400).json({ error: "Missing username" });
 
-            const limitRaw = Number(req.query.limit ?? 5);
-            const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 20) : 5;
+            const limitRaw = Number(req.query.limit ?? 10);
+            const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 50) : 10;
+
+            const offsetRaw = Number(req.query.offset ?? 0);
+            const offset = Number.isFinite(offsetRaw) ? Math.max(offsetRaw, 0) : 0;
 
             const { rows } = await pool.query(
                 `
-            select jb.board
-            from jeopardy_boards jb
-            join profiles p on p.id = jb.owner
-            where p.username = $1
-            order by jb.created_at desc
-            limit $2
-            `,
-                [username, limit]
+      select jb.board
+      from jeopardy_boards jb
+      join profiles p on p.id = jb.owner
+      where p.username = $1
+      order by jb.created_at desc
+      limit $2
+      offset $3
+      `,
+                [username, limit, offset]
             );
 
             res.json({ boards: rows.map((r) => r.board) });

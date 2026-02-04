@@ -1,48 +1,60 @@
 import { useState, useEffect, useRef } from "react";
 import GameCard from "../components/recentboards/GameCard";
 import { Board } from "../types/Board.ts";
-import { supabase } from "../supabaseClient";
-import {models} from "../../shared/models.js";
+import { models } from "../../shared/models.js";
+
+function getApiBase() {
+    return import.meta.env.VITE_API_BASE || "http://localhost:3002";
+}
+
+async function fetchJson<T>(url: string): Promise<T> {
+    const res = await fetch(url);
+    const text = await res.text();
+    let payload: any = null;
+    try {
+        payload = text ? JSON.parse(text) : null;
+    } catch {}
+
+    if (!res.ok) {
+        const msg = payload?.error || text || `HTTP ${res.status}`;
+        throw new Error(msg);
+    }
+
+    return payload as T;
+}
 
 const RecentBoards = () => {
-    const [boards, setBoards] = useState<Board[]>([]); // Holds the list of fetched boards
-    const [loading, setLoading] = useState(false); // Controls request throttling
-    const [hasMoreBoards, setHasMoreBoards] = useState(true); // Stops loading if no more data
-    const [filterModel, setFilterModel] = useState<string | null>(null); // Currently selected model filter
+    const [boards, setBoards] = useState<Board[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [hasMoreBoards, setHasMoreBoards] = useState(true);
+    const [filterModel, setFilterModel] = useState<string | null>(null);
     const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
-    // Fetch boards from Supabase with optional filter
     const fetchBoards = async (offset: number = 0, limit: number = 10) => {
         if (loading || !hasMoreBoards) return;
         setLoading(true);
 
-        let query = supabase
-            .from("jeopardy_boards") // Replace with your actual table name
-            .select("board") // Fetch only the 'board' column
-            .order("created_at", { ascending: false })
-            .range(offset, offset + limit - 1);
+        try {
+            const api = getApiBase();
+            const params = new URLSearchParams();
+            params.set("offset", String(offset));
+            params.set("limit", String(limit));
+            if (filterModel) params.set("model", filterModel);
 
-        // Apply filter if a specific model is selected
-        if (filterModel) {
-            query = query.eq("board->>model", filterModel); // Adjust according to your JSON structure
-        }
+            const data = await fetchJson<{ boards: Board[] }>(
+                `${api}/api/boards/recent?${params.toString()}`
+            );
 
-        const { data, error } = await query;
+            const newBoards = data.boards ?? [];
+            setBoards((prev) => [...prev, ...newBoards]);
 
-        if (error) {
-            console.error("Error fetching boards:", error.message);
-        } else if (data) {
-            const newBoards = data.map(({ board }) => board);
-            setBoards((prevBoards) => [...prevBoards, ...newBoards]);
-
-            // If the response contains fewer than the limit, we've reached the end
-            if (data.length < limit) {
-                setHasMoreBoards(false);
-            }
-        } else {
+            if (newBoards.length < limit) setHasMoreBoards(false);
+        } catch (e) {
+            console.error("Error fetching boards:", e);
             setHasMoreBoards(false);
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
 
     useEffect(() => {
@@ -50,40 +62,34 @@ const RecentBoards = () => {
         setHasMoreBoards(true);
     }, [filterModel]);
 
+    useEffect(() => {
+        // load first page when filter changes
+        fetchBoards(0, 10);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [filterModel]);
 
-    // Infinite scrolling logic
     useEffect(() => {
         const observer = new IntersectionObserver(
             (entries) => {
                 if (entries[0].isIntersecting && hasMoreBoards && !loading) {
-                    fetchBoards(boards.length);
+                    fetchBoards(boards.length, 10);
                 }
             },
             { threshold: 1.0 }
         );
 
-        if (loadMoreRef.current) {
-            observer.observe(loadMoreRef.current);
-        }
-
-        return () => {
-            if (loadMoreRef.current) {
-                observer.unobserve(loadMoreRef.current);
-            }
-        };
+        if (loadMoreRef.current) observer.observe(loadMoreRef.current);
+        return () => observer.disconnect();
     }, [boards.length, loading, hasMoreBoards]);
 
     return (
         <div className="min-h-screen bg-gradient-to-r from-indigo-400 to-blue-700 flex flex-col items-center p-6">
-
-
-            {/* Boards Display */}
             <div className="bg-white rounded-xl shadow-2xl overflow-hidden w-full max-w-6xl">
                 <div className="p-10">
                     <h1 className="text-4xl font-bold text-gray-900 mb-8 text-center">
                         Recent Boards
                     </h1>
-                    {/* Filter Buttons */}
+
                     <div className="flex flex-wrap gap-4 justify-center mb-6">
                         {models.map((model) => (
                             <button
@@ -98,7 +104,6 @@ const RecentBoards = () => {
                                 {model.label}
                             </button>
                         ))}
-                        {/* Clear Filter Button */}
                         <button
                             onClick={() => setFilterModel(null)}
                             className="px-4 py-2 rounded-md bg-red-500 hover:bg-red-600 text-white shadow-md hover:scale-105 transition-all duration-300 text-sm sm:text-base font-semibold"
@@ -107,23 +112,17 @@ const RecentBoards = () => {
                         </button>
                     </div>
 
-
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {boards.map((game, idx) => (
                             <GameCard key={idx} game={game} />
                         ))}
                     </div>
-                    {loading && (
-                        <div className="text-center text-gray-700 my-4 italic">
-                            Loading more boards...
-                        </div>
-                    )}
+
+                    {loading && <div className="text-center text-gray-700 my-4 italic">Loading more boards...</div>}
                     {!hasMoreBoards && !loading && (
-                        <div className="text-center text-gray-700 my-4 italic">
-                            No more boards to load.
-                        </div>
+                        <div className="text-center text-gray-700 my-4 italic">No more boards to load.</div>
                     )}
-                    {/* Dummy div to trigger infinite scroll */}
+
                     <div ref={loadMoreRef} className="h-12"></div>
                 </div>
             </div>

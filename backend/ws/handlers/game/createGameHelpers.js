@@ -366,7 +366,7 @@ export async function ensureBoardTtsAssets({ ctx, game, boardData, trace }) {
                     engine: "standard",
                     outputFormat: "mp3",
                 },
-                ctx.supabase,
+                ctx.pool,
                 trace
             );
 

@@ -7,6 +7,7 @@ import PlayerSearch from "../components/main/PlayerSearch.tsx";
 import {Player} from "../types/Lobby.ts";
 import {getUniqueCategories} from "../categories/getUniqueCategories.ts";
 import {useGameSession} from "../hooks/useGameSession.ts";
+import {useProfile} from "../contexts/ProfileContext.tsx";
 
 export default function MainPage() {
     const [gameId, setGameId] = useState("");
@@ -16,6 +17,7 @@ export default function MainPage() {
     const { saveSession } = useGameSession();
     const { showAlert } = useAlert();
     const { user, loading: authLoading } = useAuth();
+    const {profile} = useProfile();
     const { isSocketReady, sendJson, subscribe } = useWebSocket();
     const navigate = useNavigate();
 
@@ -149,6 +151,8 @@ export default function MainPage() {
                 type: "create-lobby",
                 host: myName,
                 categories: handleGenerateRandomCategories(),
+                color: profile?.color,
+                text_color: profile?.text_color,
             });
         } else {
             sendErrorAlert();

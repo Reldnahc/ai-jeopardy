@@ -1,6 +1,5 @@
 -- 001_init.sql
 -- Self-hostable schema with local auth built into public.profiles
--- No Supabase auth dependency. No public.users table. No public.user_profiles table.
 
 BEGIN;
 

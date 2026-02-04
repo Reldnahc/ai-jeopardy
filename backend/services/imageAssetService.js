@@ -10,14 +10,17 @@ const MAX_WIDTH = 1024;   // was 1280
 const QUALITY = 50;       // was 82
 const EFFORT = 3;         // 0-6 (6 is slowest/best compression)
 
-export async function ingestImageToR2FromUrl(imageUrl, meta, supabase, trace) {
+export async function ingestImageToR2FromUrl(imageUrl, meta, pool, trace) {
     if (!process.env.R2_BUCKET) throw new Error("Missing R2_BUCKET env var");
+
     trace?.mark("img_dl_start");
     const r = await fetch(imageUrl, { headers: { "User-Agent": UA } });
     trace?.mark("img_dl_end", { status: r.status });
+
     if (!r.ok) throw new Error(`Image download failed: ${r.status}`);
     const inputBytes = Buffer.from(await r.arrayBuffer());
     trace?.mark("img_encode_start");
+
     const webpBuffer = await sharp(inputBytes)
         .rotate()
         .resize({ width: MAX_WIDTH , withoutEnlargement: true })
@@ -32,13 +35,12 @@ export async function ingestImageToR2FromUrl(imageUrl, meta, supabase, trace) {
 
     // Hard dedupe (DB)
     trace?.mark("img_db_lookup_start");
-    const existing = await supabase
-        .from("image_assets")
-        .select("id")
-        .eq("sha256", sha256)
-        .maybeSingle();
+    const existing = await pool.query(
+        `select id from public.image_assets where sha256 = $1 limit 1`,
+        [sha256]
+    );
     trace?.mark("img_db_lookup_end", { hit: Boolean(existing?.data?.id) });
-    if (existing?.data?.id) return existing.data.id;
+    if (existing.rows?.[0]?.id) return existing.rows[0].id;
 
     // Upload to R2 (idempotent by key)
     trace?.mark("img_r2_put_start");
@@ -52,37 +54,36 @@ export async function ingestImageToR2FromUrl(imageUrl, meta, supabase, trace) {
         })
     );
     trace?.mark("img_r2_put_end");
-    const row = {
-        storage_key: storageKey,
-        sha256,
-        content_type: "image/webp",
-        bytes: webpBuffer.length,
-        width: info.width ?? null,
-        height: info.height ?? null,
-        source_url: meta?.sourceUrl ?? null,
-        license: meta?.licenseUrl
-            ? `${meta?.license ?? ""} ${meta?.licenseUrl}`.trim()
-            : (meta?.license ?? null),
-        attribution: meta?.attribution ?? null,
-    };
+
     trace?.mark("img_db_insert_start");
-    const inserted = await supabase
-        .from("image_assets")
-        .insert(row)
-        .select("id")
-        .maybeSingle();
-    trace?.mark("img_db_insert_end");
+    const inserted = await pool.query(
+        `
+          insert into public.image_assets
+            (storage_key, sha256, content_type, bytes, width, height, source_url, license, attribution)
+          values
+            ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+          on conflict (sha256)
+          do update set sha256 = excluded.sha256
+          returning id
+          `,
+        [
+            storageKey,
+            sha256,
+            "image/webp",
+            webpBuffer.length,
+            info.width ?? null,
+            info.height ?? null,
+            meta?.sourceUrl ?? null,
+            meta?.licenseUrl
+                ? `${meta?.license ?? ""} ${meta?.licenseUrl}`.trim()
+                : (meta?.license ?? null),
+            meta?.attribution ?? null,
+        ]
+    );
 
-    if (inserted?.data?.id) return inserted.data.id;
-
-    // Race fallback
-    const again = await supabase
-        .from("image_assets")
-        .select("id")
-        .eq("sha256", sha256)
-        .single();
-
-    return again.data.id;
+    const id = inserted.rows?.[0]?.id;
+    if (!id) throw new Error("Failed to upsert image_assets row");
+    return id;
 }
 
 export function collectImageAssetIdsFromBoard(boardData) {

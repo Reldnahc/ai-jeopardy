@@ -1,3 +1,17 @@
+function normalizeBgColor(input, fallback = "bg-blue-500") {
+    const s = String(input ?? "").trim();
+    if (/^bg-[a-z]+-\d{3}$/.test(s)) return s; // tailwind class
+    if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(s)) return s; // allow hex if you support it
+    return fallback;
+}
+
+function normalizeTextColor(input, fallback = "text-white") {
+    const s = String(input ?? "").trim();
+    if (/^text-[a-z]+-\d{3}$/.test(s)) return s;
+    if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(s)) return s;
+    return fallback;
+}
+
 export const lobbyHandlers = {
     "create-game": async ({ ws, data, ctx }) => {
         const { gameId } = data ?? {};
@@ -52,7 +66,7 @@ export const lobbyHandlers = {
             return;
         }
 
-        ctx. resetGenerationProgressAndNotify({ ctx, gameId, game });
+        ctx.resetGenerationProgressAndNotify({ ctx, gameId, game });
 
         ctx.initPreloadState({ ctx, gameId, game, trace });
 
@@ -115,9 +129,7 @@ export const lobbyHandlers = {
         // Pick a starting selector (random online player; fallback to first player)
         const online = (game.players ?? []).filter((p) => p?.online !== false);
         const pool = online.length > 0 ? online : (game.players ?? []);
-        const pick = pool.length > 0
-            ? pool[Math.floor(Math.random() * pool.length)]
-            : null;
+        const pick = pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : null;
 
         if (pick) {
             game.selectorKey = pick.playerKey;
@@ -126,7 +138,6 @@ export const lobbyHandlers = {
             game.selectorKey = null;
             game.selectorName = null;
         }
-
 
         // Phase will be set when preload finishes (in preload-done)
         game.phase = null;
@@ -148,12 +159,12 @@ export const lobbyHandlers = {
     },
 
     "preload-done": async ({ ws, data, ctx }) => {
-        const { gameId, playerKey, playerName, token  } = data ?? {};
+        const { gameId, playerKey, playerName, token } = data ?? {};
         if (!gameId || !ctx.games?.[gameId]) return;
 
         const game = ctx.games[gameId];
         const stable = playerKey?.trim() || String(playerName ?? "").trim();
-        // ...
+
         const tok = Number(token);
         const finalTok = Number(game?.preload?.finalToken) || 0;
 
@@ -178,18 +189,12 @@ export const lobbyHandlers = {
         if (!game.lobbyHost) game.lobbyHost = game.host;
         game.host = "AI Jeopardy";
 
-
-        const narrationEnabled = Boolean(game?.lobbySettings?.narrationEnabled);
-        const selectorName = (game.selectorName ?? "").trim();
-
         ctx.broadcast(gameId, {
             type: "start-game",
             host: game.host,
         });
 
-        requiredNow = (game.players ?? [])
-            .filter((p) => p.online)
-            .map(ctx.playerStableId);
+        requiredNow = (game.players ?? []).filter((p) => p.online).map(ctx.playerStableId);
 
         game.gameReady = {
             expected: Object.fromEntries(requiredNow.map((id) => [id, true])),
@@ -218,7 +223,7 @@ export const lobbyHandlers = {
 
         // Identify stable id exactly like the rest of your code
         // Prefer playerKey; fallback to playerName
-        const stable = (playerKey?.trim()) || String(playerName ?? "").trim();
+        const stable = playerKey?.trim() || String(playerName ?? "").trim();
         if (!stable) return;
 
         // Only count players we were expecting (don’t let random clients unblock)
@@ -228,7 +233,6 @@ export const lobbyHandlers = {
 
         const expectedIds = Object.keys(game.gameReady.expected);
         const allReady = expectedIds.every((id) => game.gameReady.acks[id]);
-
         if (!allReady) return;
 
         game.gameReady.done = true;
@@ -262,7 +266,6 @@ export const lobbyHandlers = {
                 const c = await ctx.aiHostSayRandomFromSlot(gameId, game, "welcome_outro", ctx);
                 const cMs = c?.ms ?? 0;
 
-
                 game.welcomeEndsAt = Date.now() + (cMs || fallback) + 600;
 
                 if (game.welcomeTimer) {
@@ -286,8 +289,6 @@ export const lobbyHandlers = {
                     });
                 }, (cMs || fallback) + 600);
             })();
-
-
         } else {
             game.phase = "board";
             game.welcomeEndsAt = null;
@@ -330,7 +331,14 @@ export const lobbyHandlers = {
 
         mark("start");
 
-        const { host, categories, playerKey } = data ?? {};
+        const {
+            host,
+            categories,
+            playerKey,
+            color: clientColor,
+            text_color: clientTextColor,
+        } = data ?? {};
+
         mark("parsed payload", {
             hostType: typeof host,
             categoriesType: typeof categories,
@@ -349,42 +357,17 @@ export const lobbyHandlers = {
         ws.gameId = newGameId;
         mark("ws.gameId set");
 
-        let color = "bg-blue-500";
-        let text_color = "text-white";
+        // ✅ NO DB LOOKUP: cosmetics come from client (sanitized), with defaults
+        const color = normalizeBgColor(clientColor, "bg-blue-500");
+        const text_color = normalizeTextColor(clientTextColor, "text-white");
 
-        // suspect call: supabase lookup inside getColorFromPlayerName
-        mark("color lookup begin", { host });
-        try {
-            const t0 = Date.now();
-            const c = await ctx.getColorFromPlayerName(host);
-            const dt = Date.now() - t0;
-
-            mark("color lookup end", {
-                ms: dt,
-                gotColor: Boolean(c?.color),
-                gotTextColor: Boolean(c?.text_color),
-            });
-
-            if (c?.color) color = c.color;
-            if (c?.text_color) text_color = c.text_color;
-
-            if (dt > 500) {
-                console.warn(`[create-lobby][${reqId}] getColorFromPlayerName SLOW`, { ms: dt, host });
-            }
-        } catch (e) {
-            console.error(`[create-lobby][${reqId}] color lookup failed`, e);
-        }
-
-        const stableKey =
-            typeof playerKey === "string" && playerKey.trim() ? playerKey.trim() : null;
+        const stableKey = typeof playerKey === "string" && playerKey.trim() ? playerKey.trim() : null;
         mark("stableKey computed", { hasStableKey: Boolean(stableKey) });
 
         mark("ctx.games[gameId] set begin");
         ctx.games[newGameId] = {
             host,
-            players: [
-                { id: ws.id, name: host, color, text_color, playerKey: stableKey, online: true },
-            ],
+            players: [{ id: ws.id, name: host, color, text_color, playerKey: stableKey, online: true }],
             inLobby: true,
             createdAt: Date.now(),
             categories: ctx.normalizeCategories11(categories),
@@ -433,8 +416,15 @@ export const lobbyHandlers = {
     },
 
     "join-lobby": async ({ ws, data, ctx }) => {
-        const { gameId, playerName, playerKey } = data;
-        if (!ctx.games[gameId]) {
+        const {
+            gameId,
+            playerName,
+            playerKey,
+            color: clientColor,
+            text_color: clientTextColor,
+        } = data ?? {};
+
+        if (!ctx.games?.[gameId]) {
             ws.send(JSON.stringify({ type: "error", message: "Lobby does not exist!" }));
             return;
         }
@@ -449,7 +439,23 @@ export const lobbyHandlers = {
         ctx.cancelLobbyCleanup(game);
 
         // Prefer stable identity (playerKey) for dedupe/reconnect.
-        const stableKey = typeof playerKey === "string" && playerKey.trim() ? playerKey.trim() : null;
+        const stableKey =
+            typeof playerKey === "string" && playerKey.trim() ? playerKey.trim() : null;
+
+        // Only treat cosmetics as "provided" if they are non-empty strings
+        const hasClientColor =
+            clientColor !== undefined &&
+            clientColor !== null &&
+            String(clientColor).trim().length > 0;
+
+        const hasClientTextColor =
+            clientTextColor !== undefined &&
+            clientTextColor !== null &&
+            String(clientTextColor).trim().length > 0;
+
+        // For NEW PLAYER only: fall back to defaults
+        const defaultColor = normalizeBgColor(clientColor, "bg-blue-500");
+        const defaultTextColor = normalizeTextColor(clientTextColor, "text-white");
 
         // 1) Reconnect by playerKey when available.
         const existingByKey = stableKey
@@ -459,47 +465,64 @@ export const lobbyHandlers = {
         // 2) Fallback: reconnect by name (legacy clients).
         const existingByName = game.players.find((p) => p.name === actualName);
 
+        const applyReconnectCosmetics = (player) => {
+            // Preserve what the lobby already has unless the client explicitly sent cosmetics
+            const prevColor = player.color ?? "bg-blue-500";
+            const prevText = player.text_color ?? "text-white";
+
+            if (hasClientColor) player.color = normalizeBgColor(clientColor, prevColor);
+            else player.color = prevColor;
+
+            if (hasClientTextColor) player.text_color = normalizeTextColor(clientTextColor, prevText);
+            else player.text_color = prevText;
+        };
+
         if (existingByKey) {
             console.log(`[Server] PlayerKey reconnect for ${actualName} -> Lobby ${gameId}`);
             existingByKey.id = ws.id;
             existingByKey.name = actualName; // allow display name changes
             existingByKey.online = true;
+
+            applyReconnectCosmetics(existingByKey);
+
             ws.gameId = gameId;
         } else if (existingByName) {
-            // RECONNECT: Update the socket ID to the new connection
             console.log(`[Server] Player ${actualName} reconnected to Lobby ${gameId}`);
             existingByName.id = ws.id;
             existingByName.online = true;
             if (stableKey && !existingByName.playerKey) existingByName.playerKey = stableKey;
+
+            applyReconnectCosmetics(existingByName);
+
             ws.gameId = gameId;
         } else {
             // NEW PLAYER: Add them to the list
-            const msg = await ctx.getColorFromPlayerName(actualName);
             const raceConditionCheck =
-                game.players.find(p => p.name === actualName) ||
-                (stableKey ? game.players.find(p => p.playerKey === stableKey) : null);
+                game.players.find((p) => p.name === actualName) ||
+                (stableKey ? game.players.find((p) => p.playerKey === stableKey) : null);
 
             if (raceConditionCheck) {
                 // Treat it as a reconnect/update instead of a new push
                 raceConditionCheck.id = ws.id;
                 raceConditionCheck.online = true;
                 if (stableKey && !raceConditionCheck.playerKey) raceConditionCheck.playerKey = stableKey;
+
+                applyReconnectCosmetics(raceConditionCheck);
+
                 ws.gameId = gameId;
             } else {
                 // Safe to push new player
-                const color = msg?.color || "bg-blue-500";
-                const text_color = msg?.text_color || "text-white";
-
                 ctx.cancelLobbyCleanup(game);
 
                 game.players.push({
                     id: ws.id,
                     name: actualName,
-                    color,
-                    text_color,
+                    color: defaultColor,
+                    text_color: defaultTextColor,
                     playerKey: stableKey,
                     online: true,
                 });
+
                 ws.gameId = gameId;
                 ctx.scheduleLobbyCleanupIfEmpty(gameId); // this will cancel if anyone is online
             }
@@ -594,7 +617,7 @@ export const lobbyHandlers = {
                 };
             }
 
-            const p = (typeof patch === "object" && patch !== null) ? patch : {};
+            const p = typeof patch === "object" && patch !== null ? patch : {};
 
             // Validate + apply
             if (typeof p.timeToBuzz === "number" && Number.isFinite(p.timeToBuzz)) {
@@ -637,7 +660,7 @@ export const lobbyHandlers = {
     },
 
     "check-lobby": async ({ ws, data, ctx }) => {
-        const {gameId} = data;
+        const { gameId } = data;
 
         let isValid = false;
         if (ctx.games[gameId] && ctx.games[gameId].inLobby === true) {
@@ -828,10 +851,7 @@ export const lobbyHandlers = {
             }
 
             // Map boardType/index -> global index in the flat 11 array
-            const globalIndex =
-                bt === "firstBoard" ? idx :
-                    bt === "secondBoard" ? 5 + idx :
-                        10;
+            const globalIndex = bt === "firstBoard" ? idx : bt === "secondBoard" ? 5 + idx : 10;
 
             if (!Array.isArray(game.categories) || globalIndex < 0 || globalIndex > 10) {
                 ws.send(JSON.stringify({ type: "error", message: "Server error: invalid categories state." }));
@@ -866,7 +886,6 @@ export const lobbyHandlers = {
             const next = ctx.normalizeCategories11(categories);
             game.categories = next;
 
-
             ctx.broadcast(gameId, {
                 type: "categories-updated",
                 categories: next,
@@ -874,10 +893,12 @@ export const lobbyHandlers = {
 
             console.log(`[Server] Categories updated for game ${gameId}:`, next);
         } else {
-            ws.send(JSON.stringify({
-                type: "error",
-                message: `Game ${gameId} not found while updating categories.`,
-            }));
+            ws.send(
+                JSON.stringify({
+                    type: "error",
+                    message: `Game ${gameId} not found while updating categories.`,
+                })
+            );
         }
     },
 
@@ -885,7 +906,7 @@ export const lobbyHandlers = {
         const gameId = data.gameId;
         const snapshot = ctx.buildLobbyState(gameId, ws);
         if (!snapshot) {
-            ws.send(JSON.stringify({ type: 'error', message: 'Lobby does not exist!' }));
+            ws.send(JSON.stringify({ type: "error", message: "Lobby does not exist!" }));
             return;
         }
         ws.send(JSON.stringify(snapshot));

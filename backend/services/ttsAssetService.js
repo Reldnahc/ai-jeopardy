@@ -176,11 +176,10 @@ export async function ensureTtsAsset(
         outputFormat = "mp3",
         languageCode = null,
     },
-    supabase,
+    pool,
     trace
 ) {
     if (!process.env.R2_BUCKET) throw new Error("Missing R2_BUCKET env var");
-
     const normalizedText = normalizeText(text);
     if (!normalizedText) throw new Error("TTS text is empty");
 
@@ -197,29 +196,26 @@ export async function ensureTtsAsset(
 
     return scheduleTtsWork(async () => {
         trace?.mark?.("tts_db_lookup_start");
-        const existing = await supabase
-            .from("tts_assets")
-            .select("id")
-            .eq("sha256", sha256)
-            .maybeSingle();
+        const existing = await pool.query(
+            `select id from public.tts_assets where sha256 = $1 limit 1`,
+            [sha256]
+        );
+        const hit = existing.rows?.[0]?.id;
         trace?.mark?.("tts_db_lookup_end", { hit: Boolean(existing?.data?.id) });
+        if (hit) return { id: hit, sha256, storageKey };
 
-        if (existing?.data?.id) {
-            return { id: existing.data.id, sha256, storageKey };
-        }
-
-        // Re-check inside scheduler to avoid thundering herd duplication
-        trace?.mark?.("tts_db_lookup_2_start");
-        const againExisting = await supabase
-            .from("tts_assets")
-            .select("id")
-            .eq("sha256", sha256)
-            .maybeSingle();
-        trace?.mark?.("tts_db_lookup_2_end", { hit: Boolean(againExisting?.data?.id) });
-
-        if (againExisting?.data?.id) {
-            return { id: againExisting.data.id, sha256, storageKey };
-        }
+        //
+        // // Re-check inside scheduler
+        // // trace?.mark?.("tts_db_lookup_2_start");
+        // const again = await pool.query(
+        //     `select id from public.tts_assets where sha256 = $1 limit 1`,
+        //     [sha256]
+        // );
+        // trace?.mark?.("tts_db_lookup_2_end", { hit: Boolean(againExisting?.data?.id) });
+        //
+        // if (againExisting?.data?.id) {
+        //     return { id: againExisting.data.id, sha256, storageKey };
+        // }
 
         // Synthesize
         trace?.mark?.("tts_polly_start");
@@ -266,8 +262,8 @@ export async function ensureTtsAsset(
         }
 
         const row = {
-            storage_key: storageKey,
             sha256,
+            storage_key: storageKey,
             content_type: "audio/mpeg",
             bytes: mp3Buffer.length,
             text: normalizedText,
@@ -278,24 +274,35 @@ export async function ensureTtsAsset(
         };
 
         trace?.mark?.("tts_db_insert_start");
-        const inserted = await supabase
-            .from("tts_assets")
-            .insert(row)
-            .select("id")
-            .maybeSingle();
+
+        const inserted = await pool.query(
+            `
+              insert into public.tts_assets
+                (sha256, storage_key, content_type, bytes, text, text_type, voice_id, engine, language_code)
+              values
+                ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+              on conflict (sha256)
+              do update set sha256 = excluded.sha256
+              returning id
+              `,
+            [
+                row.sha256,
+                row.storage_key,
+                row.content_type,
+                row.bytes,
+                row.text,
+                row.text_type,
+                row.voice_id,
+                row.engine,
+                row.language_code,
+            ]
+        );
+
         trace?.mark?.("tts_db_insert_end");
 
-        if (inserted?.data?.id) {
-            return { id: inserted.data.id, sha256, storageKey };
-        }
+        const id = inserted.rows?.[0]?.id;
+        if (!id) throw new Error("Failed to upsert tts_assets row");
 
-        // Race fallback
-        const race = await supabase
-            .from("tts_assets")
-            .select("id")
-            .eq("sha256", sha256)
-            .single();
-
-        return { id: race.data.id, sha256, storageKey };
+        return { id, sha256, storageKey };
     });
 }
