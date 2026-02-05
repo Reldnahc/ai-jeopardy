@@ -253,20 +253,15 @@ export const lobbyHandlers = {
             });
 
             void (async () => {
-                const fallback = 900;
+                const pad = 150;
 
-                const a = await ctx.aiHostSayRandomFromSlot(gameId, game, "welcome_intro", ctx);
-                const aMs = a?.ms ?? 0;
-                await ctx.sleep((aMs || fallback) + 200);
+                await ctx.aiHostVoiceSequence(ctx, gameId, game, [
+                    {slot: "welcome_intro", pad},
+                    {slot: selectorName, pad},
+                    {slot: "welcome_outro"},
+                ]);
 
-                const b = await ctx.aiHostSayPlayerName(gameId, game, selectorName, ctx);
-                const bMs = b?.ms ?? 0;
-                await ctx.sleep((bMs || fallback) + 100);
-
-                const c = await ctx.aiHostSayRandomFromSlot(gameId, game, "welcome_outro", ctx);
-                const cMs = c?.ms ?? 0;
-
-                game.welcomeEndsAt = Date.now() + (cMs || fallback) + 600;
+                //game.welcomeEndsAt = Date.now() + (cMs || fallback) + 600;
 
                 if (game.welcomeTimer) {
                     clearTimeout(game.welcomeTimer);

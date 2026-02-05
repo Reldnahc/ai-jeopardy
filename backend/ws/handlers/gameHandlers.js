@@ -1,3 +1,5 @@
+import {aiHostSayByKey} from "../../game/host.js";
+
 export const gameHandlers = {
     "join-game": async ({ ws, data, ctx }) => {
         const { gameId, playerName } = data;
@@ -228,17 +230,9 @@ export const gameHandlers = {
         game.buzzerLocked = true;
         ctx.broadcast(gameId, { type: "buzzer-locked" });
 
-        // Say the player's name (Jeopardy-style), then start answer capture
-        let nameMs = 0;
-        try {
-            const said = await ctx.aiHostSayPlayerName(gameId, game, player.name, ctx);
-            nameMs = said?.ms ?? 0;
-        } catch (e) {
-            console.error("[buzz] aiHostSayPlayerName failed:", e);
-        }
+        await ctx.aiHostSayByKey(ctx, gameId, game, player.name);
 
-    // Delay answer capture until name finishes (+ buffer)
-        const startCaptureAfterMs = Math.max(0, nameMs + 150);
+        const startCaptureAfterMs = 0;
 
         setTimeout(() => {
             const g = ctx.games?.[gameId];
@@ -464,7 +458,6 @@ export const gameHandlers = {
             });
             return ctx.autoResolveAfterJudgement(ctx, gameId, game, player.name, "incorrect")
                 .catch((err) => console.error("[answer-audio-blob-error] autoResolve failed:", err));
-
         }
 
         ctx.broadcast(gameId, {
@@ -634,9 +627,8 @@ export const gameHandlers = {
         game.buzzerLocked = true;
         game.buzzLockouts = {};
 
-        const said = await ctx.aiHostSayCategory(gameId, game, game.selectedClue.category, ctx);
-        const ms = said?.ms ?? 0;
-        await ctx.sleep(ms + 200);
+        await ctx.aiHostSayByKey(ctx, gameId, game, game.selectedClue.category);
+
 
         ctx.broadcast(gameId, {
             type: "clue-selected",

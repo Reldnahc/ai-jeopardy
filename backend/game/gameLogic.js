@@ -63,26 +63,12 @@ function returnToBoard(game, gameId, ctx){
     ctx.broadcast(gameId, { type: "returned-to-board", selectedClue: null, boardSelectionLocked: game.boardSelectionLocked });
 
     (async () => {
-        const g0 = ctx.games?.[gameId];
-        if (!g0) return;
-        // If something else re-locked the board since we started, don’t proceed
-        if ((g0.boardSelectionLockVersion || 0) !== lockVersion) return;
-        const a = await ctx.aiHostSayPlayerName(gameId, g0, selectorName, ctx);
-        const aMs = a?.ms ?? 0;
-        // schedule “your_up” after name finishes
-        ctx.aiAfter(gameId, (aMs || 650) + 150, async () => {
-            const g1 = ctx.games?.[gameId];
-            if (!g1) return;
-            if ((g1.boardSelectionLockVersion || 0) !== lockVersion) return;
-            const b = await ctx.aiHostSayRandomFromSlot(gameId, g1, "your_up", ctx);
-            const bMs = b?.ms ?? 0;
-            // unlock shortly after “your_up” finishes
-            ctx.aiAfter(gameId, (bMs || 650) + 150, () => {
-                const g2 = ctx.games?.[gameId];
-                if (!g2) return;
-                unlockBoardSelection(ctx, gameId, g2, lockVersion);
-            });
-        });
+        const pad = 100;
+
+        await ctx.aiHostVoiceSequence(ctx, gameId, game, [
+            {slot: selectorName, pad},
+            {slot: "your_up", pad, after: () => unlockBoardSelection(ctx, gameId, game, lockVersion) },
+        ]);
     })();
 }
 
@@ -124,21 +110,20 @@ export async function autoResolveAfterJudgement(ctx, gameId, game, playerName, v
     if (verdict === "correct") {
         game.selectedClue.isAnswerRevealed = true;
 
-        const said = await ctx.aiHostSayRandomFromSlot(gameId, game, "correct", ctx);
-        const ms = said?.ms ?? 0;
 
-        ctx.broadcast(gameId, { type: "answer-revealed", clue: game.selectedClue });
+        await ctx.aiHostVoiceSequence(ctx, gameId, game, [
+            {slot: "correct", pad: 200, after: () => ctx.broadcast(gameId, { type: "answer-revealed", clue: game.selectedClue })},
+
+        ]);
 
         // Correct player becomes selector
         const p = (game.players || []).find(x => x?.name === playerName);
         game.selectorKey = ctx.playerStableId(p || { name: playerName });
         game.selectorName = playerName;
 
-        ctx.aiAfter(gameId, ms + 3500, () => {
-            const g = ctx.games?.[gameId];
-            if (!g) return;
-            finishClueAndReturnToBoard(ctx, gameId, g);
-        });
+        await ctx.sleep(3000);
+
+        finishClueAndReturnToBoard(ctx, gameId, g)
 
         return;
     }
@@ -172,22 +157,19 @@ export async function autoResolveAfterJudgement(ctx, gameId, game, playerName, v
         game.buzzerLocked = true;
         ctx.broadcast(gameId, { type: "buzzer-locked" });
 
-        let ms = 0;
-        try {
-            const said = await ctx.aiHostSayRandomFromSlot(gameId, game, "incorrect", ctx);
-            ms = said?.ms ?? 0;
-        } catch (e) {
-            console.error("[autoResolveAfterJudgement] aiHostSayRandomFromSlot failed:", e);
-        }
 
-        game.selectedClue.isAnswerRevealed = true;
-        ctx.broadcast(gameId, { type: "answer-revealed", clue: game.selectedClue });
+        await ctx.aiHostVoiceSequence(ctx, gameId, game, [
+            {slot: "incorrect", pad: 200, after: () => {
+                    game.selectedClue.isAnswerRevealed = true;
+                    ctx.broadcast(gameId, { type: "answer-revealed", clue: game.selectedClue });
+                }
+            },
 
-        ctx.aiAfter(gameId, ms + 3500, () => {
-            const g = ctx.games?.[gameId];
-            if (!g) return;
-            finishClueAndReturnToBoard(ctx, gameId, g);
-        });
+        ]);
+
+        await ctx.sleep(3000);
+
+        finishClueAndReturnToBoard(ctx, gameId, g)
 
         return;
     }
@@ -196,35 +178,15 @@ export async function autoResolveAfterJudgement(ctx, gameId, game, playerName, v
     game.buzzerLocked = true;
     ctx.broadcast(gameId, { type: "buzzer-locked" });
 
-    let msIncorrect = 0;
-    try {
-        const said = await ctx.aiHostSayRandomFromSlot(gameId, game, "incorrect", ctx);
-        msIncorrect = said?.ms ?? 0;
-    } catch (e) {
-        console.error("[autoResolveAfterJudgement] aiHostSayRandomFromSlot incorrect failed:", e);
-    }
 
-// After "incorrect", play "rebuzz" (ONLY when someone is still eligible)
-    let msRebuzz = 0;
-    ctx.aiAfter(gameId, msIncorrect + 1000, async () => {
-        const g = ctx.games?.[gameId];
-        if (!g) return;
-
-        try {
-            const said2 = await ctx.aiHostSayRandomFromSlot(gameId, g, "rebuzz", ctx);
-            msRebuzz = said2?.ms ?? 0;
-        } catch (e) {
-            console.error("[autoResolveAfterJudgement] aiHostSayRandomFromSlot rebuzz failed:", e);
-        }
-
-        // Unlock after both lines finish
-        ctx.aiAfter(gameId, msRebuzz + 700, () => {
-            const game = ctx.games?.[gameId];
-            if (!game) return;
-            ctx.broadcast(gameId, { type: "buzzer-ui-reset" });
-            ctx.doUnlockBuzzerAuthoritative(gameId, game, ctx);
-        });
-    });
+    await ctx.aiHostVoiceSequence(ctx, gameId, game, [
+        {slot: "incorrect", pad: 1000},
+        {slot: "rebuzz", pad: 700, after: () => {
+                ctx.broadcast(gameId, { type: "buzzer-ui-reset" });
+                ctx.doUnlockBuzzerAuthoritative(gameId, game, ctx);
+            }
+        },
+    ]);
 }
 
 export function cancelAutoUnlock(game) {
@@ -264,27 +226,23 @@ export function doUnlockBuzzerAuthoritative( gameId, game, ctx) {
             ctx.broadcast(gameId, { type: "buzzer-locked" });
 
             (async () => {
-                const said = await ctx.aiHostSayRandomFromSlot(gameId, game, "nobody", ctx);
-                const ms = said?.ms ?? 0;
-                // Reveal once
-                game.selectedClue.isAnswerRevealed = true;
-                ctx.broadcast(gameId, { type: "answer-revealed", clue: game.selectedClue });
+                await ctx.aiHostVoiceSequence(ctx, gameId, game, [
+                    {slot: "nobody", pad: 200, after: () => {
+                            game.selectedClue.isAnswerRevealed = true;
+                            ctx.broadcast(gameId, { type: "answer-revealed", clue: game.selectedClue });
+                        }},
+                ]);
 
-                // After the line finishes, return to board + clear clue
-                ctx.aiAfter(gameId, ms + 3500, () => {
-                    const game = ctx.games?.[gameId];
-                    if (!game) return;
-                    if (!game.selectedClue) return;
+                await ctx.sleep(3000);
 
-                    if (!game.clearedClues) game.clearedClues = new Set();
-                    const clueId = `${game.selectedClue.value}-${game.selectedClue.question}`;
-                    game.clearedClues.add(clueId);
-                    ctx.broadcast(gameId, { type: "clue-cleared", clueId });
+                if (!game.clearedClues) game.clearedClues = new Set();
+                const clueId = `${game.selectedClue.value}-${game.selectedClue.question}`;
+                game.clearedClues.add(clueId);
+                ctx.broadcast(gameId, { type: "clue-cleared", clueId });
+                ctx.checkBoardTransition(game, gameId, ctx)
 
-                    ctx.checkBoardTransition(game, gameId, ctx)
+                returnToBoard(game, gameId, ctx);
 
-                    returnToBoard(game, gameId, ctx);
-                });
             })();
         }
     );

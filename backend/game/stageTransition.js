@@ -38,16 +38,6 @@ async function startDoubleJeopardy(game, gameId, ctx) {
     game.activeBoard = "secondBoard";
 
     const pad = 200;
-
-    const saidA = await ctx.aiHostSayRandomFromSlot(gameId, game, "double_jeopardy", ctx);
-    const msA = saidA?.ms ?? 0;
-    await ctx.sleep(msA + pad);
-
-    const saidB = await ctx.aiHostSayRandomFromSlot(gameId, game, "double_jeopardy2", ctx);
-    const msB = saidB?.ms ?? 0;
-    await ctx.sleep(msB);
-
-    // Pick the player with the lowest score
     const players = game.players ?? [];
     const pick =
         players.length === 0
@@ -66,20 +56,15 @@ async function startDoubleJeopardy(game, gameId, ctx) {
         game.selectorKey = null;
         game.selectorName = null;
     }
-
-    ctx.broadcast(gameId, {type: "transition-to-second-board"});
-    //TODO Verify everyone made it.
-
     const selectorName = String(game.selectorName ?? "").trim();
-    await ctx.sleep(pad);
 
-    const saidC = await ctx.aiHostSayPlayerName(gameId, game, selectorName, ctx);
-    const msC = saidC?.ms ?? 0;
-    await ctx.sleep(msC + pad / 2);
-
-    const saidD = await ctx.aiHostSayRandomFromSlot(gameId, game, "your_up", ctx);
-    const msD = saidD?.ms ?? 0;
-    await ctx.sleep(msD);
+    //TODO Verify everyone made it.
+    await ctx.aiHostVoiceSequence(ctx, gameId, game, [
+        {slot: "double_jeopardy", pad},
+        {slot: "double_jeopardy2", pad, after: () => ctx.broadcast(gameId, {type: "transition-to-second-board"}) },
+        {slot: selectorName, pad},
+        {slot: "your_up", pad},
+    ]);
 
     ctx.broadcast(gameId, {
         type: "phase-changed",
@@ -89,14 +74,22 @@ async function startDoubleJeopardy(game, gameId, ctx) {
     });
 }
 
-
-function startFinalJeopardy(game, gameId, ctx) {
+async function startFinalJeopardy(game, gameId, ctx) {
     game.activeBoard = "finalJeopardy";
     game.isFinalJeopardy = true;
     game.finalJeopardyStage = "wager";
 
+    const pad = 200;
+
+    await ctx.aiHostVoiceSequence(ctx, gameId, game, [
+        {slot: "final_jeopardy", pad},
+        {slot: "final_jeopardy2", pad},
+        //{slot: "", pad, after: null},
+    ]);
+
+
     game.wagers = {};
     game.drawings = {};
 
-    ctx.broadcast(gameId, { type: "final-jeopardy" });
+    ctx.broadcast(gameId, {type: "final-jeopardy"});
 }

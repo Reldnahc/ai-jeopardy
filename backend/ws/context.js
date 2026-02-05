@@ -42,12 +42,10 @@ import {
     scheduleAutoUnlockForClue
 } from "../game/gameLogic.js";
 import {
-    aiAfter,
-    aiHostSayCategory,
-    aiHostSayPlayerName,
-    aiHostSayRandomFromSlot,
+    aiHostSayByKey,
+    aiHostVoiceSequence,
     ensureAiHostTtsBank
-} from "../game/host.js";
+} from "../game/host.ts";
 import {verifyJwt} from "../auth/jwt.js";
 import {pool} from "../config/pg.js";
 import {getBearerToken, playerStableId, verifyAccessToken} from "../services/userService.js";
@@ -135,15 +133,12 @@ export const createWsContext = (wss) => {
         scheduleAutoUnlockForClue,
         doUnlockBuzzerAuthoritative,
 
-        aiAfter,
         ensureAiHostTtsBank,
         playerStableId,
         getBearerToken,
         verifyAccessToken,
-
-        aiHostSayRandomFromSlot,
-        aiHostSayPlayerName,
-        aiHostSayCategory,
+        aiHostVoiceSequence,
+        aiHostSayByKey,
         verifyJwt,
         setupPreloadHandshake,
         initPreloadState,
