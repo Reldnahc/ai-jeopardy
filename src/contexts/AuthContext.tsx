@@ -25,9 +25,14 @@ const AuthContext = createContext<AuthContextType | null>(null);
 const TOKEN_KEY = "aiJeopardy.jwt";
 
 function getApiBase() {
-    return import.meta.env.VITE_API_BASE || "http://localhost:3002";
-}
+    // In dev, allow explicit override
+    if (import.meta.env.DEV) {
+        return import.meta.env.VITE_API_BASE || "http://localhost:3002";
+    }
 
+    // In prod, use same-origin
+    return "";
+}
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<AppUser | null>(null);
     const [token, setToken] = useState<string | null>(localStorage.getItem(TOKEN_KEY));

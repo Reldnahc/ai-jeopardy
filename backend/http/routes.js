@@ -1,9 +1,6 @@
 // backend/http/routes.js
 import path from "path";
-import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { pool } from "../config/pg.js";
-import { r2 } from "../services/r2Client.js";
-
 
 const TTS_CACHE_TTL_MS = 5 * 60 * 1000;
 
@@ -51,31 +48,23 @@ export function registerHttpRoutes(app, { distPath }) {
             const { assetId } = req.params;
 
             const { rows } = await pool.query(
-                `select storage_key, content_type from public.image_assets where id = $1 limit 1`,
+                `select data, bytes, content_type from public.image_assets where id = $1 limit 1`,
                 [assetId]
             );
-            const data = rows?.[0];
-            if (!data) return res.status(404).json({ error: "Image asset not found" });
 
-            const storageKey = data.storage_key;
-            const contentType = data.content_type || "image/webp";
+            const row = rows?.[0];
+            if (!row?.data) return res.status(404).json({ error: "Image asset not found" });
 
-            const cmd = new GetObjectCommand({
-                Bucket: process.env.R2_BUCKET,
-                Key: storageKey,
-            });
-
-            const obj = await r2.send(cmd);
-
-            res.setHeader("Content-Type", contentType);
+            res.setHeader("Content-Type", row.content_type || "image/webp");
+            res.setHeader("Content-Length", String(row.bytes || row.data.length));
             res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-
-            obj.Body.pipe(res);
+            return res.status(200).end(row.data);
         } catch (e) {
             console.error("GET /api/images/:assetId failed:", e);
-            res.status(500).json({ error: "Failed to load image" });
+            return res.status(500).json({ error: "Failed to load image" });
         }
     });
+
 
     app.get("/api/image-assets/:assetId", async (req, res) => {
         const { assetId } = req.params;
@@ -106,7 +95,7 @@ export function registerHttpRoutes(app, { distPath }) {
           </style>
         </head>
         <body>
-          <h2>R2 Image Serve Test</h2>
+          <h2>Image Serve Test</h2>
           <p>assetId: <code>${assetId}</code></p>
           <p>URL: <code>/api/images/${assetId}</code></p>
           <img src="/api/images/${assetId}" alt="test image" />
@@ -117,30 +106,54 @@ export function registerHttpRoutes(app, { distPath }) {
 
     // --- TTS -----------------------------------------------------------------
 
+    function parseRange(rangeHeader, total) {
+        // supports: "bytes=start-end" and "bytes=start-"
+        if (!rangeHeader || !rangeHeader.startsWith("bytes=")) return null;
+        const m = rangeHeader.replace("bytes=", "").split("-");
+
+        let start = Number(m[0]);
+        let end = m[1] ? Number(m[1]) : (total - 1);
+
+        if (!Number.isFinite(start) || start < 0) return null;
+        if (!Number.isFinite(end) || end < start) end = total - 1;
+
+        end = Math.min(end, total - 1);
+        return { start, end };
+    }
+
     app.get("/api/tts/:assetId", async (req, res) => {
         const { assetId } = req.params;
 
         try {
             const { rows } = await pool.query(
-                `select storage_key, content_type from public.tts_assets where id = $1 limit 1`,
+                `select data, bytes, content_type from public.tts_assets where id = $1 limit 1`,
                 [assetId]
             );
 
-            const data = rows?.[0];
-            if (!data) return res.status(404).json({ error: "TTS asset not found" });
+            const row = rows?.[0];
+            if (!row?.data) return res.status(404).json({ error: "TTS asset not found" });
 
-            const storageKey = data.storage_key;
-            const contentType = data.content_type || "audio/mpeg";
+            const buf = row.data;
+            const total = Number(row.bytes || buf.length);
+            const contentType = row.content_type || "audio/mpeg";
 
-            const cmd = new GetObjectCommand({
-                Bucket: process.env.R2_BUCKET,
-                Key: storageKey,
-            });
-            const obj = await r2.send(cmd);
             res.setHeader("Content-Type", contentType);
+            res.setHeader("Accept-Ranges", "bytes");
             res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-            return obj.Body.pipe(res);
 
+            const r = parseRange(req.headers.range, total);
+            if (!r) {
+                res.setHeader("Content-Length", String(total));
+                return res.status(200).end(buf);
+            }
+
+            const { start, end } = r;
+            const chunk = buf.subarray(start, end + 1);
+
+            res.status(206);
+            res.setHeader("Content-Range", `bytes ${start}-${end}/${total}`);
+            res.setHeader("Content-Length", String(chunk.length));
+            return res.end(chunk);
         } catch (e) {
             console.error("GET /api/tts/:assetId failed:", e);
             res.setHeader("Cache-Control", "no-store");
@@ -234,7 +247,7 @@ export function registerHttpRoutes(app, { distPath }) {
           </style>
         </head>
         <body>
-          <h2>R2 TTS Serve Test</h2>
+          <h2>TTS Serve Test</h2>
           <p>assetId: <code>${assetId}</code></p>
           <p>URL: <code>/api/tts/${assetId}</code></p>
           <audio controls src="/api/tts/${assetId}"></audio>

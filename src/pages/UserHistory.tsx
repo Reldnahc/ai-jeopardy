@@ -32,8 +32,15 @@ type ApiErrorPayload = {
 const PAGE_SIZE = 10;
 
 function getApiBase() {
-    return import.meta.env.VITE_API_BASE || "http://localhost:3002";
+    // In dev, allow explicit override
+    if (import.meta.env.DEV) {
+        return import.meta.env.VITE_API_BASE || "http://localhost:3002";
+    }
+
+    // In prod, use same-origin
+    return "";
 }
+
 
 function isRecord(v: unknown): v is Record<string, unknown> {
     return typeof v === "object" && v !== null;

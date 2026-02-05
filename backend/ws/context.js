@@ -34,7 +34,6 @@ import {
 } from "./handlers/game/createGameHelpers.js";
 import {ensureTtsAsset} from "../services/ttsAssetService.js";
 import {createTtsDurationService} from "../services/ttsDurationService.js";
-import {r2} from "../services/r2Client.js";
 import {clearAnswerWindow, startAnswerWindow} from "../game/answerWindow.js";
 import {
     autoResolveAfterJudgement,
@@ -58,7 +57,7 @@ import {getBearerToken, playerStableId, verifyAccessToken} from "../services/use
 export const createWsContext = (wss) => {
     const { broadcast, broadcastAll } = makeBroadcaster(wss);
 
-    const ttsDuration = createTtsDurationService({ pool, r2 });
+    const ttsDuration = createTtsDurationService({ pool });
 
     const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -68,7 +67,6 @@ export const createWsContext = (wss) => {
         games,
         modelsByValue,
         pool,
-        r2,
         getTtsDurationMs: (assetId) => ttsDuration.getDurationMs(assetId),
         sleep,
 

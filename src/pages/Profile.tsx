@@ -27,7 +27,13 @@ interface RouteParams extends Record<string, string | undefined> {
 }
 
 function getApiBase() {
-    return import.meta.env.VITE_API_BASE || "http://localhost:3002";
+    // In dev, allow explicit override
+    if (import.meta.env.DEV) {
+        return import.meta.env.VITE_API_BASE || "http://localhost:3002";
+    }
+
+    // In prod, use same-origin
+    return "";
 }
 
 const Profile: React.FC = () => {

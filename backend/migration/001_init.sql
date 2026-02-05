@@ -75,38 +75,50 @@ ALTER TABLE ONLY public.jeopardy_boards
 -- IMAGE_ASSETS
 CREATE TABLE IF NOT EXISTS public.image_assets (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    storage_key text NOT NULL,
+    storage_key text,
     sha256 text NOT NULL UNIQUE,
     content_type text NOT NULL DEFAULT 'image/webp',
-    bytes integer,
+
+    data bytea,
+    bytes integer NOT NULL,
     width integer,
     height integer,
     source_url text,
     license text,
     attribution text,
-    created_at timestamptz NOT NULL DEFAULT now()
-    );
+    created_at timestamptz NOT NULL DEFAULT now(),
+
+    CONSTRAINT image_assets_payload_chk
+        CHECK (data IS NOT NULL OR storage_key IS NOT NULL)
+);
 
 CREATE INDEX IF NOT EXISTS image_assets_created_at_idx
     ON public.image_assets USING btree (created_at DESC);
+
 
 -- TTS_ASSETS
 CREATE TABLE IF NOT EXISTS public.tts_assets (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     sha256 text NOT NULL UNIQUE,
-    storage_key text NOT NULL,
+    storage_key text,
     content_type text NOT NULL DEFAULT 'audio/mpeg',
-    bytes integer,
+
+    data bytea,
+    bytes integer NOT NULL,
     text text NOT NULL,
     text_type text NOT NULL DEFAULT 'text',
     voice_id text NOT NULL DEFAULT 'Matthew',
     engine text NOT NULL DEFAULT 'standard',
     language_code text,
-    created_at timestamptz NOT NULL DEFAULT now()
-    );
+    created_at timestamptz NOT NULL DEFAULT now(),
+
+    CONSTRAINT tts_assets_payload_chk
+        CHECK (data IS NOT NULL OR storage_key IS NOT NULL)
+);
 
 CREATE INDEX IF NOT EXISTS tts_assets_created_at_idx
     ON public.tts_assets USING btree (created_at DESC);
+
 
 -- Helper: username availability
 CREATE OR REPLACE FUNCTION public.is_username_taken(candidate text)

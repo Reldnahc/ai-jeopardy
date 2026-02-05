@@ -1,9 +1,40 @@
 import { useEffect, useRef } from "react";
 import type {BoardData, Category, Clue} from "../../types";
 
-function getApiBase() {
-    return import.meta.env.VITE_API_BASE || "http://localhost:3002";
+function preloadAudio(url: string) {
+    return new Promise<void>((resolve) => {
+        const audio = new Audio();
+        audio.preload = "auto";
+        audio.src = url;
+
+        const done = () => {
+            audio.removeEventListener("canplaythrough", done);
+            audio.removeEventListener("loadeddata", done);
+            audio.removeEventListener("error", done);
+            resolve();
+        };
+
+        // canplaythrough is ideal, but not always reliable across browsers
+        audio.addEventListener("canplaythrough", done, { once: true });
+        audio.addEventListener("loadeddata", done, { once: true });
+        audio.addEventListener("error", done, { once: true });
+
+        // Kick it
+        audio.load();
+    });
 }
+
+
+function getApiBase() {
+    // In dev, allow explicit override
+    if (import.meta.env.DEV) {
+        return import.meta.env.VITE_API_BASE || "http://localhost:3002";
+    }
+
+    // In prod, use same-origin
+    return "";
+}
+
 function ttsUrl(id: string) {
     return `${getApiBase()}/api/tts/${encodeURIComponent(id)}`;
 }
@@ -86,7 +117,7 @@ export function usePreload(boardData: BoardData | null | undefined, enabled: boo
 
         const controller = new AbortController();
         const { signal } = controller;
-        const CONCURRENCY = 2;
+        const CONCURRENCY = 5;
 
         const queue = ids
             .map((id) => `/api/images/${id}`)
@@ -135,35 +166,8 @@ async function preloadAudioOne(url: string, signal: AbortSignal): Promise<void> 
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
         if (signal.aborted) return;
 
-        // Exponential-ish backoff with jitter:
-        // 0: 150ms, 1: 250ms, 2: 400ms, 3: 650ms, 4: 1000ms, ...
-        const delayMs = Math.min(2000, Math.round(150 * Math.pow(1.6, attempt)));
-        const jitter = Math.round(Math.random() * 80);
+        await preloadAudio(url);
 
-        const r = await fetch(url, { signal, cache: "force-cache" });
-
-        // ✅ Not ready yet
-        if (r.status === 202) {
-            await new Promise((res) => setTimeout(res, delayMs + jitter));
-            continue;
-        }
-
-        // Optional: treat 404 as "maybe not ready yet" for a couple retries
-        if (r.status === 404 && attempt < 2) {
-            await new Promise((res) => setTimeout(res, delayMs + jitter));
-            continue;
-        }
-
-        if (!r.ok) {
-            throw new Error(`preload failed ${r.status} ${url}`);
-        }
-
-        const ct = r.headers.get("content-type") || "";
-        if (!ct.startsWith("audio/")) {
-            throw new Error(`preload got non-audio (${ct}) ${url}`);
-        }
-
-        await r.arrayBuffer();
         return;
     }
 
@@ -227,7 +231,7 @@ export function usePreloadAudioAssetIds(
             return;
         }
 
-        const CONCURRENCY = 2;
+        const CONCURRENCY = 5;
 
         while (enabled) {
             while (inFlightRef.current < CONCURRENCY && pendingRef.current.length > 0) {
@@ -356,7 +360,7 @@ export function usePreloadImageAssetIds(
             return;
         }
 
-        const CONCURRENCY = 2;
+        const CONCURRENCY = 5;
 
         while (enabled) {
             // Start more work if possible

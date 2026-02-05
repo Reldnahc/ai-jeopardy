@@ -14,8 +14,15 @@ import {usePreload} from "../hooks/game/usePreload.ts";
 import {useEarlyMicPermission} from "../hooks/earlyMicPermission.ts";
 
 function getApiBase() {
-    return import.meta.env.VITE_API_BASE || "http://localhost:3002";
+    // In dev, allow explicit override
+    if (import.meta.env.DEV) {
+        return import.meta.env.VITE_API_BASE || "http://localhost:3002";
+    }
+
+    // In prod, use same-origin
+    return "";
 }
+
 function ttsUrl(id: string) {
     return `${getApiBase()}/api/tts/${encodeURIComponent(id)}`;
 }

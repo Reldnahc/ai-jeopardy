@@ -220,7 +220,6 @@ export async function aiHostSayRandomFromSlot(gameId, game, slot, ctx) {
     // Fire-and-forget: client can start playing immediately
     aiHostSayAsset(gameId, assetId, ctx);
 
-    // Duration is best-effort; NEVER block game flow on Supabase/R2
     const ms = await withTimeout(
         ctx.getTtsDurationMs(assetId),
         1000,     // <= key change: cap how long we wait

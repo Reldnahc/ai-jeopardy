@@ -4,7 +4,7 @@ import 'dotenv/config';
 import { modelsByValue } from "../../shared/models.js";
 import { pickCommonsImageForQueries } from "./commonsService.js";
 import { pickBraveImageForQueries } from "./braveImageService.js";
-import { ingestImageToR2FromUrl } from "./imageAssetService.js";
+import { ingestImageToDbFromUrl } from "./imageAssetService.js";
 import { ensureTtsAsset } from "./ttsAssetService.js";
 import {pool} from "../config/pg.js";
 
@@ -243,8 +243,7 @@ async function populateCategoryVisuals(cat, settings, progressTick) {
                 continue;
             }
 
-            // "Caching" here is ingesting to R2 (dedupe + upload + DB)
-            const assetId = await ingestImageToR2FromUrl(
+            const assetId = await ingestImageToDbFromUrl(
                 found.downloadUrl,
                 {
                     sourceUrl: found.sourceUrl,
@@ -294,7 +293,6 @@ async function populateBoardVisuals(board, settings, progressTick) {
         }
     }
 
-    // At this point, all ingestion to R2 is complete for this run.
     if (typeof progressTick === "function") progressTick(1);
 }
 

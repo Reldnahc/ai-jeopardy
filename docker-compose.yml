@@ -1,40 +1,45 @@
 services:
   db:
     image: postgres:16
+    container_name: ai-jeopardy-db
+    restart: unless-stopped
     environment:
       POSTGRES_DB: ai_jeopardy
       POSTGRES_USER: ai_jeopardy
-      POSTGRES_PASSWORD: ai_jeopardy_dev_password
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - /mnt/user/appdata/ai-jeopardy/postgres:/var/lib/postgresql/data
+      - /mnt/user/appdata/ai-jeopardy/sql:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ai_jeopardy -d ai_jeopardy"]
       interval: 5s
-      timeout: 5s
-      retries: 20
-    restart: unless-stopped
+      timeout: 3s
+      retries: 30
+      start_period: 5s
 
   app:
     image: ghcr.io/reldnahc/ai-jeopardy:latest
-    ports:
-      - "3002:3002"
-    environment:
-      NODE_ENV: production
-
-      DATABASE_URL: ${DATABASE_URL}
-      JWT_SECRET: ${JWT_SECRET}
-
-      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID}
-      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}
-      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY}
-      R2_BUCKET: ${R2_BUCKET}
-
+    container_name: ai-jeopardy
+    restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
-    restart: unless-stopped
+    environment:
+      # IMPORTANT: use the docker service name "db" as hostname
+      DATABASE_URL: postgres://ai_jeopardy:${DATABASE_PASSWORD}@db:5432/ai_jeopardy
 
-volumes:
-  pgdata:
+      JWT_SECRET: ${JWT_SECRET}
 
+      BRAVE_API_KEY: ${BRAVE_API_KEY}
 
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_REGION: ${AWS_REGION}
+
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+
+      NODE_ENV: production
+    ports:
+      - "3002:3002"
