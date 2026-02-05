@@ -7,9 +7,11 @@
  * - schedules lobby grace cleanup if applicable
  * - unblocks Final Jeopardy stages if required players disappear
  */
-export function handleSocketClose(ws, ctx) {
+export function handleSocketClose(ws, ctx, interval) {
     try {
         console.log(`WebSocket closed for socket ${ws.id}`);
+
+        clearInterval(interval);
 
         const gameId = ws.gameId;
         const game = gameId ? ctx.games[gameId] : null;

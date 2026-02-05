@@ -54,7 +54,15 @@ export const attachWebSocketServer = (wss) => {
             }
         });
 
-        ws.on("close", () => handleSocketClose(ws, ctx));
+        const interval = setInterval(() => {
+            wss.clients.forEach((ws) => {
+                if (ws.isAlive === false) return ws.terminate();
+                ws.isAlive = false;
+                ws.ping();
+            });
+        }, 25_000);
+
+        ws.on("close", () => handleSocketClose(ws, ctx, interval));
     });
 
     return ctx;
