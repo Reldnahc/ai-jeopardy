@@ -261,8 +261,6 @@ export const lobbyHandlers = {
                     {slot: "welcome_outro"},
                 ]);
 
-                //game.welcomeEndsAt = Date.now() + (cMs || fallback) + 600;
-
                 if (game.welcomeTimer) {
                     clearTimeout(game.welcomeTimer);
                     game.welcomeTimer = null;
@@ -282,7 +280,7 @@ export const lobbyHandlers = {
                         selectorKey: g.selectorKey ?? null,
                         selectorName: g.selectorName ?? null,
                     });
-                }, (cMs || fallback) + 600);
+                }, 600);
             })();
         } else {
             game.phase = "board";

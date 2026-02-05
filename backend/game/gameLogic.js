@@ -123,7 +123,7 @@ export async function autoResolveAfterJudgement(ctx, gameId, game, playerName, v
 
         await ctx.sleep(3000);
 
-        finishClueAndReturnToBoard(ctx, gameId, g)
+        finishClueAndReturnToBoard(ctx, gameId, game)
 
         return;
     }
@@ -169,7 +169,7 @@ export async function autoResolveAfterJudgement(ctx, gameId, game, playerName, v
 
         await ctx.sleep(3000);
 
-        finishClueAndReturnToBoard(ctx, gameId, g)
+        finishClueAndReturnToBoard(ctx, gameId, game)
 
         return;
     }

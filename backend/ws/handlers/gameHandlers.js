@@ -627,8 +627,9 @@ export const gameHandlers = {
         game.buzzerLocked = true;
         game.buzzLockouts = {};
 
-        await ctx.aiHostSayByKey(ctx, gameId, game, game.selectedClue.category);
-
+        await ctx.aiHostVoiceSequence(ctx, gameId, game, [
+            {slot: game.selectedClue.category, pad: 100},
+        ]);
 
         ctx.broadcast(gameId, {
             type: "clue-selected",
@@ -639,9 +640,6 @@ export const gameHandlers = {
         ctx.broadcast(gameId, { type: "buzzer-ui-reset" });
         ctx.broadcast(gameId, { type: "buzzer-locked" });
 
-        // --- AUTO UNLOCK AFTER TTS DURATION ---
-        const narrationEnabled = Boolean(game?.lobbySettings?.narrationEnabled);
-        if (!narrationEnabled) return;
 
         const ttsAssetId = game.boardData?.ttsByClueKey?.[clueKey] || null;
 

@@ -1,10 +1,9 @@
-import React, {useEffect} from "react";
-import { ReactSketchCanvas } from "react-sketch-canvas";
+import React, { useEffect } from "react";
 import { Clue } from "../../types.ts";
 import { useWebSocket } from "../../contexts/WebSocketContext.tsx";
-import {useDeviceContext} from "../../contexts/DeviceContext.tsx";
 import BuzzAnimation from "./BuzzAnimation.tsx";
 import Timer from "./Timer.tsx";
+import FinalJeopardyPanel from "./FinalJeopardyPanel.tsx";
 
 interface SelectedClueDisplayProps {
     localSelectedClue: Clue;
@@ -33,7 +32,6 @@ interface SelectedClueDisplayProps {
 
     answerError: string | null;
     effectivePlayerName: string | null;
-
 }
 
 const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
@@ -54,10 +52,10 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                                                                      timerDuration,
                                                                      answerCapture,
                                                                      answerError,
-                                                                     effectivePlayerName
+                                                                     effectivePlayerName,
                                                                  }) => {
     const { sendJson } = useWebSocket();
-    const {deviceType} = useDeviceContext();
+
     const imageAssetId =
         localSelectedClue?.media?.type === "image"
             ? localSelectedClue.media.assetId
@@ -84,6 +82,7 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
         if (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported("audio/webm")) return "audio/webm";
         return ""; // let browser pick
     }
+
     const isAnsweringPlayer =
         !!answerCapture &&
         !!effectivePlayerName &&
@@ -117,20 +116,25 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                 const mime = pickMimeType();
 
                 chunksRef.current = [];
-                const rec = new MediaRecorder(stream, mime ? {
-                    mimeType: mime,
-                    audioBitsPerSecond: 8000,   // try 16000–32000
-                    bitsPerSecond: 8000,
-                } : {
-                    audioBitsPerSecond: 8000,
-                    bitsPerSecond: 8000,
-                });
+                const rec = new MediaRecorder(
+                    stream,
+                    mime
+                        ? {
+                            mimeType: mime,
+                            audioBitsPerSecond: 8000, // try 16000–32000
+                            bitsPerSecond: 8000,
+                        }
+                        : {
+                            audioBitsPerSecond: 8000,
+                            bitsPerSecond: 8000,
+                        }
+                );
                 recorderRef.current = rec;
 
                 // --- VAD setup (detect when they've spoken, then stop after silence) ---
-                const END_SILENCE_MS = 900;     // stop after this much silence *after speech*
-                const VAD_INTERVAL_MS = 80;     // how often to sample audio
-                const RMS_THRESHOLD = 0.018;    // tweak: lower = more sensitive, higher = less sensitive
+                const END_SILENCE_MS = 900; // stop after this much silence *after speech*
+                const VAD_INTERVAL_MS = 80; // how often to sample audio
+                const RMS_THRESHOLD = 0.018; // tweak: lower = more sensitive, higher = less sensitive
 
                 audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
                 source = audioCtx.createMediaStreamSource(stream);
@@ -196,9 +200,21 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                     }
 
                     // Cleanup audio graph
-                    try { source?.disconnect(); } catch { /* ignore */ }
-                    try { analyser?.disconnect(); } catch { /* ignore */ }
-                    try { await audioCtx?.close(); } catch { /* ignore */ }
+                    try {
+                        source?.disconnect();
+                    } catch {
+                        /* ignore */
+                    }
+                    try {
+                        analyser?.disconnect();
+                    } catch {
+                        /* ignore */
+                    }
+                    try {
+                        await audioCtx?.close();
+                    } catch {
+                        /* ignore */
+                    }
 
                     // Stop tracks
                     try {
@@ -236,7 +252,6 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                         return;
                     }
 
-
                     const blob = new Blob(chunksRef.current, { type: rec.mimeType || "audio/webm" });
                     chunksRef.current = [];
 
@@ -261,7 +276,7 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                     });
                 };
 
-                // Start recording; collect chunks every 250ms
+                // Start recording; collect chunks every 1000ms
                 rec.start(1000);
 
                 // Start VAD loop
@@ -278,15 +293,30 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                         // ignore
                     }
                 }, hardStopInMs);
-
             } catch (err) {
                 console.error("Mic capture failed:", err);
 
                 // Cleanup if getUserMedia fails partway
-                try { stream?.getTracks().forEach((t) => t.stop()); } catch { /* ignore */ }
-                try { source?.disconnect(); } catch { /* ignore */ }
-                try { analyser?.disconnect(); } catch { /* ignore */ }
-                try { await audioCtx?.close(); } catch { /* ignore */ }
+                try {
+                    stream?.getTracks().forEach((t) => t.stop());
+                } catch {
+                    /* ignore */
+                }
+                try {
+                    source?.disconnect();
+                } catch {
+                    /* ignore */
+                }
+                try {
+                    analyser?.disconnect();
+                } catch {
+                    /* ignore */
+                }
+                try {
+                    await audioCtx?.close();
+                } catch {
+                    /* ignore */
+                }
 
                 // If mic fails, do nothing — backend timeout will mark incorrect
             }
@@ -309,7 +339,6 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
         };
     }, [answerCapture, isAnsweringPlayer, gameId, sendJson]);
 
-
     useEffect(() => {
         if (localSelectedClue?.media?.type === "image") {
             const img = new Image();
@@ -322,150 +351,87 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
             <div className="absolute left-8 top-0 ">
                 <Timer endTime={timerEndTime} duration={timerDuration} />
             </div>
-                <BuzzAnimation playerName={buzzResult} />
 
-                <div className="text-center cursor-pointer w-full">
-                    {imageAssetId ? (
-                        <div className="flex flex-col items-center gap-4 w-full">
-                            <img
-                                src={`/api/images/${imageAssetId}`}
-                                alt="Visual clue"
-                                className="max-h-[55vh] max-w-[85vw] object-contain rounded-lg shadow-2xl border border-white/20"
-                                loading="eager"
-                                decoding="async"
-                                draggable={false}
-                                onError={(e) => {
-                                    // Fail-soft: hide broken image if something goes wrong
-                                    (e.currentTarget as HTMLImageElement).style.display = "none";
-                                }}
-                            />
+            <BuzzAnimation playerName={buzzResult} />
 
-                            {/* Clue text below image, smaller than normal */}
-                            <p
-                                style={{ fontSize: "clamp(0.9rem, 2vw, 2rem)" }}
-                                className="md:max-w-[65vw] mx-auto leading-snug"
-                            >
-                                {localSelectedClue.question}
-                            </p>
-                        </div>
-                    ) : (
-                        <h1
-                            style={{ fontSize: "clamp(0.75rem, 3vw, 4rem)" }}
-                            className="mb-1 md:max-w-[65vw] mx-auto"
+            <div className="text-center cursor-pointer w-full">
+                {imageAssetId ? (
+                    <div className="flex flex-col items-center gap-4 w-full">
+                        <img
+                            src={`/api/images/${imageAssetId}`}
+                            alt="Visual clue"
+                            className="max-h-[55vh] max-w-[85vw] object-contain rounded-lg shadow-2xl border border-white/20"
+                            loading="eager"
+                            decoding="async"
+                            draggable={false}
+                            onError={(e) => {
+                                (e.currentTarget as HTMLImageElement).style.display = "none";
+                            }}
+                        />
+
+                        <p
+                            style={{ fontSize: "clamp(0.9rem, 2vw, 2rem)" }}
+                            className="md:max-w-[65vw] mx-auto leading-snug"
                         >
                             {localSelectedClue.question}
-                        </h1>
-                    )}
-
-                    {/* Reserve space for the answer */}
-                {(isFinalJeopardy ? (
-                        <div className="flex justify-center items-center">
-                            {(showAnswer) && (
-                                <p style={{ fontSize: "clamp(1.5rem, 4vw, 3rem)" }} className="mt-5 text-yellow-300">
-                                    {localSelectedClue.answer}
-                                </p>
-                            )}
-                        </div>
-                    ):(
-                        <div className="sm:min-h-[70px] md:min-h-[100px] flex justify-center items-center">
-                            {(showAnswer) && (
-                                <p style={{ fontSize: "clamp(1.5rem, 4vw, 3rem)" }} className="mt-5 text-yellow-300">
-                                    {localSelectedClue.answer}
-                                </p>
-                            )}
-                        </div>
-                ))}
-
-                {isFinalJeopardy && drawingSubmitted[currentPlayer] && !drawings && (
-                    <p style={{ fontSize: "clamp(1rem, 2vw, 1.5rem)" }}>
-                        Answer Submitted, waiting for others...
-                    </p>
+                        </p>
+                    </div>
+                ) : (
+                    <h1
+                        style={{ fontSize: "clamp(0.75rem, 3vw, 4rem)" }}
+                        className="mb-1 md:max-w-[65vw] mx-auto"
+                    >
+                        {localSelectedClue.question}
+                    </h1>
                 )}
 
-                {isFinalJeopardy && !drawingSubmitted[currentPlayer] && (
-                    <div className="flex flex-col items-center justify-center w-full text-white p-5">
-                        <h2 style={{ fontSize: "clamp(1.5rem, 3vw, 2.5rem)" }} className="mb-5">
-                            Write Your Answer
-                        </h2>
-
-                        <div className="flex items-start gap-4">
-                            {( deviceType === 'mobile' ? (
-                                    <ReactSketchCanvas
-                                        ref={canvasRef}
-                                        className="border-2 border-white rounded-lg bg-white"
-                                        width="60vw"
-                                        height="25vh"
-                                        strokeWidth={4}
-                                        strokeColor="black"
-                                    />
-                                ):(
-                                    <ReactSketchCanvas
-                                        ref={canvasRef}
-                                        className="border-2 border-white rounded-lg bg-white"
-                                        width="600px"
-                                        height="250px"
-                                        strokeWidth={4}
-                                        strokeColor="black"
-                                    />
-                                )
-                            )}
-
-                            <div className="flex flex-col gap-3">
-                                {/* Clear Canvas */}
-                                <button
-                                    onClick={() => canvasRef.current?.clearCanvas()}
-                                    className="px-5 py-2 rounded-lg bg-red-500 text-white cursor-pointer
-                             hover:bg-red-600 transition-colors duration-200 shadow-lg"
-                                >
-                                    Clear
-                                </button>
-
-                                {/* Submit Drawing */}
-                                <button
-                                    onClick={() => {
-                                        canvasRef.current?.exportImage("png").then((pngDataUrl: string) => {
-                                            sendJson({
-                                                type: "submit-drawing",
-                                                gameId,
-                                                player: currentPlayer,
-                                                drawing: pngDataUrl,
-                                            });
-
-                                            setDrawingSubmitted((prev) => ({
-                                                ...prev,
-                                                [currentPlayer]: true,
-                                            }));
-                                        });
-                                    }}
-                                    className="px-5 py-2 rounded-lg bg-blue-500 text-white cursor-pointer
-                             hover:bg-blue-600 transition-colors duration-200 shadow-lg"
-                                >
-                                    Submit
-                                </button>
-                            </div>
-                        </div>
+                {/* Reserve space for the answer */}
+                {isFinalJeopardy ? (
+                    <div className="flex justify-center items-center">
+                        {showAnswer && (
+                            <p style={{ fontSize: "clamp(1.5rem, 4vw, 3rem)" }} className="mt-5 text-yellow-300">
+                                {localSelectedClue.answer}
+                            </p>
+                        )}
+                    </div>
+                ) : (
+                    <div className="sm:min-h-[70px] md:min-h-[100px] flex justify-center items-center">
+                        {showAnswer && (
+                            <p style={{ fontSize: "clamp(1.5rem, 4vw, 3rem)" }} className="mt-5 text-yellow-300">
+                                {localSelectedClue.answer}
+                            </p>
+                        )}
                     </div>
                 )}
-                    {answerCapture && !showAnswer && (
-                        <div className="mt-4 text-center">
-                            <div className="text-lg font-bold">
-                                {answerCapture.playerName} is answering…
-                            </div>
-                            {isAnsweringPlayer && (
-                                <div className="text-sm opacity-80 mt-1">Recording your mic now…</div>
-                            )}
-                            {answerError && (
-                                <div className="mt-2 text-sm text-red-200">{answerError}</div>
-                            )}
-                        </div>
-                    )}
+
+                {/* Final Jeopardy UI extracted */}
+                {isFinalJeopardy && (
+                    <FinalJeopardyPanel
+                        gameId={gameId}
+                        currentPlayer={currentPlayer}
+                        canvasRef={canvasRef}
+                        drawings={drawings}
+                        drawingSubmitted={drawingSubmitted}
+                        setDrawingSubmitted={setDrawingSubmitted}
+                        showAnswer={showAnswer}
+                    />
+                )}
+
+                {answerCapture && !showAnswer && (
+                    <div className="mt-4 text-center">
+                        <div className="text-lg font-bold">{answerCapture.playerName} is answering…</div>
+                        {isAnsweringPlayer && (
+                            <div className="text-sm opacity-80 mt-1">Recording your mic now…</div>
+                        )}
+                        {answerError && <div className="mt-2 text-sm text-red-200">{answerError}</div>}
+                    </div>
+                )}
 
                 {!isFinalJeopardy && !showAnswer && (
                     <button
                         onClick={handleBuzz}
                         disabled={!!buzzResult || buzzLockedOut || !!answerCapture}
                         style={{ fontSize: "clamp(1.5rem, 3vw, 2.5rem)" }}
-
                         className={`mt-4 px-12 py-5 rounded-xl font-bold shadow-2xl min-w-64 intext-white transition duration-300 ease-in-out ${
                             buzzLockedOut
                                 ? "bg-orange-500"
@@ -477,35 +443,6 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                         {buzzLockedOut ? "Locked Out" : buzzerLocked ? "Buzz Early" : "Buzz!"}
                     </button>
                 )}
-
-                <div className="flex flex-wrap gap-4">
-                    {drawings &&
-                        !Array.isArray(drawings) &&
-                        Object.entries(drawings).map(([player, pngDataUrl]) => (
-                            <div key={player} className="mb-5 z-0 w-auto">
-                                <div className="flex flex-col items-center">
-                                    {/* Customize avatar display */}
-                                    <h2
-                                        style={{ fontSize: "clamp(1rem, 2vw, 1.5rem)" }}
-                                        className="text-center font-semibold mb-2"
-                                    >
-                                        {player}'s answer:
-                                    </h2>
-                                    <img
-                                        src={pngDataUrl}
-                                        alt={`${player} final jeopardy answer`}
-                                        className="max-h-[35vh] max-w-[45vw] object-contain rounded-lg shadow-2xl border border-white/20 bg-white"
-                                        loading="lazy"
-                                        decoding="async"
-                                        draggable={false}
-                                        onError={(e) => {
-                                            (e.currentTarget as HTMLImageElement).style.display = "none";
-                                        }}
-                                    />
-                                </div>
-                            </div>
-                        ))}
-                </div>
             </div>
         </div>
     );
