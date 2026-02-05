@@ -10,7 +10,7 @@ export const userHandlers = {
             serverNow: Date.now(),
         }));
     },
-    "auth": async ({ ws, data }) => {
+    "auth": async ({ ws, data, ctx }) => {
         const token = data?.token;
 
         if (!token) {
@@ -21,12 +21,21 @@ export const userHandlers = {
 
         try {
             const payload = ctx.verifyJwt(token);
-            ws.auth = {
-                isAuthed: true,
-                userId: payload.sub,
-                role: payload.role || "default",
-            };
-            ws.send(JSON.stringify({ type: "auth-result", ok: true, role: ws.auth.role, userId: ws.auth.userId }));
+            const userId = payload?.sub;
+
+            let role = payload?.role || "default";
+
+            // Prefer DB role (prevents stale tokens)
+            if (userId) {
+                const { rows } = await ctx.pool.query(
+                    "select role from profiles where id = $1 limit 1",
+                    [userId]
+                );
+                if (rows?.[0]?.role) role = rows[0].role;
+            }
+
+            ws.auth = { isAuthed: true, userId, role };
+            ws.send(JSON.stringify({ type: "auth-result", ok: true, role, userId }));
         } catch {
             ws.auth = { isAuthed: false, userId: null, role: "default" };
             ws.send(JSON.stringify({ type: "auth-result", ok: false }));

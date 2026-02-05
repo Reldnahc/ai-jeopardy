@@ -140,13 +140,31 @@ export async function transcribeAnswerAudio(buffer, mimeType, context) {
             : String(context ?? "").slice(0, 80),
     });
 
-    const file = await toFile(buffer, "answer.webm", { type: ct });
-
     try {
-        // -------------------------
-        // PASS 1: probe (no prompt, any language)
-        // -------------------------
-        const probe = await detectComprehensibleSpeech(file, model);
+        // IMPORTANT:
+        // Each OpenAI request must get its own File object.
+        // Streams are not safely reusable in parallel.
+        const probeFilePromise  = toFile(buffer, "answer.webm", { type: ct });
+        const biasedFilePromise = prompt
+            ? toFile(buffer, "answer.webm", { type: ct })
+            : null;
+
+        // Kick everything immediately
+        const probePromise = probeFilePromise.then((file) =>
+            detectComprehensibleSpeech(file, model)
+        );
+
+        const biasedPromise = prompt && biasedFilePromise
+            ? biasedFilePromise.then((file) =>
+                transcribeWithExpectedAnswer(file, model, prompt)
+            )
+            : null;
+
+        // Wait for all in parallel
+        const [probe, biasedText] = await Promise.all([
+            probePromise,
+            biasedPromise ?? Promise.resolve(null),
+        ]);
 
         console.log("[stt] probe", {
             hasSpeech: probe.hasSpeech,
@@ -155,23 +173,21 @@ export async function transcribeAnswerAudio(buffer, mimeType, context) {
             preview: probe.text.slice(0, 120),
         });
 
+        // Final decision (no early return path)
         if (!probe.hasSpeech || !probe.looksComprehensible) {
             return "";
         }
 
-        // If no expected-answer hint, the probe is our best neutral result
         if (!prompt) {
             return probe.text;
         }
 
-        // -------------------------
-        // PASS 2: biased w/ prompt (English)
-        // -------------------------
-        const text = await transcribeWithExpectedAnswer(file, model, prompt);
+        console.log("[stt] ok", {
+            chars: biasedText.length,
+            preview: biasedText.slice(0, 120),
+        });
 
-        console.log("[stt] ok", { chars: text.length, preview: text.slice(0, 120) });
-
-        return text;
+        return biasedText;
     } catch (err) {
         const info = describeOpenAiError(err);
         console.error("[stt] failed", safeJson(info));
