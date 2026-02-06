@@ -56,7 +56,6 @@ async function advanceToFinalePhase(game, gameId, drawings, ctx) {
 
     const wagers = game.wagers;
     const verdicts = game.finalVerdicts;
-    const transcripts = game.finalTranscripts;
     const scores = game.scores;
 
     for (const player of game.players) {
@@ -72,16 +71,71 @@ async function advanceToFinalePhase(game, gameId, drawings, ctx) {
     }
     await ctx.sleep(5_000);//5 secs with answer
 
-    const top3 = Object.entries(scores)
+    const top = Object.entries(scores)
         .map(([name, score]) => ({ name, score }))
         .sort((a, b) => b.score - a.score)
         .slice(0, 3);
 
-    for (let i = top3.length - 1; i >= 0; i--) {
-        ctx.broadcast(gameId, {type: "display-finalist", finalist: top3[i].name});
+    for (let i = top.length - 1; i >= 0; i--) {
+        ctx.broadcast(gameId, {type: "display-finalist", finalist: top[i].name});
         await ctx.sleep(5_000);//5 secs on each finalist
-        ctx.broadcast(gameId, {type: "update-score", player: top3[i].name, score: top3[i].score});
+        ctx.broadcast(gameId, {type: "update-score", player: top[i].name, score: top[i].score});
         await ctx.sleep(5_000);//5 secs on each finalist score update
+    }
+
+    const fireAndForget = (p, label) => {
+        Promise.resolve(p).catch((err) => {
+            console.error(`[bg:${label}]`, err);
+        });
+    };
+
+    const finalScores = Object.fromEntries(game.players.map((p) => [p.name, 0]));
+
+    if (top[0]) finalScores[top[0].name] = top[0].score;
+    if (top[1]) finalScores[top[1].name] = 3000;
+    if (top[2]) finalScores[top[2].name] = 2000;
+
+    game.scores = finalScores;
+
+    const usernames = new Set();
+    for (const p of game.players) usernames.add(ctx.normalizeName(p.name));
+    for (const p of top.slice(0, 3)) if (p) usernames.add(ctx.normalizeName(p.name));
+
+    const idByUsername = new Map();
+    await Promise.all(
+        [...usernames].map(async (u) => {
+            const id = await ctx.repos.profiles.getIdByUsername(u);
+            idByUsername.set(u, id);
+        })
+    );
+
+    if (top[0]) {
+        const id = idByUsername.get(ctx.normalizeName(top[0].name));
+        if (id) {
+            fireAndForget(ctx.repos.profiles.incrementGamesWon(id), "incrementGamesWon");
+            fireAndForget(ctx.repos.profiles.addMoneyWon(id, top[0].score), "addMoneyWon:winner");
+        }
+    }
+
+    if (top[1]) {
+        const id = idByUsername.get(ctx.normalizeName(top[1].name));
+        if (id) {
+            fireAndForget(ctx.repos.profiles.addMoneyWon(id, 3000), "addMoneyWon:second");
+        }
+    }
+
+    if (top[2]) {
+        const id = idByUsername.get(ctx.normalizeName(top[2].name));
+        if (id) {
+            fireAndForget(ctx.repos.profiles.addMoneyWon(id, 2000), "addMoneyWon:third");
+        }
+    }
+
+    // 4) Fire-and-forget: everyone finished
+    for (const p of game.players) {
+        const id = idByUsername.get(ctx.normalizeName(p.name));
+        if (!id) continue;
+        fireAndForget(ctx.repos.profiles.incrementGamesFinished(id), "incrementGamesFinished");
     }
 
     //update all the scores.

@@ -20,6 +20,7 @@ interface ProfileData {
     boards_generated?: number | null;
     games_won?: number | null;
     games_finished?: number | null;
+    money_won?: number | null;
 }
 
 interface RouteParams extends Record<string, string | undefined> {
@@ -159,10 +160,12 @@ const Profile: React.FC = () => {
     ];
 
     const textColors = [
-        "#ffffff", "#000000", "#111827", "#1f2937",
-        "#ef4444", "#f97316", "#f59e0b", "#eab308",
-        "#22c55e", "#10b981", "#06b6d4", "#3b82f6",
-        "#6366f1", "#a855f7", "#ec4899",
+        "#3b82f6", "#6366f1", "#06b6d4", "#0ea5e9",
+        "#22c55e", "#10b981", "#14b8a6", "#84cc16",
+        "#eab308", "#f59e0b", "#f97316", "#ef4444",
+        "#f43f5e", "#ec4899", "#d946ef", "#a855f7",
+        "#8b5cf6", "#6b7280", "#78716c", "#64748b",
+        "#71717a", "#000000", "#ffffff",
     ];
 
     if (loading) {
@@ -261,7 +264,7 @@ const Profile: React.FC = () => {
                     {/* Player Stats */}
                     <div>
                         <h2 className="text-2xl font-semibold mb-4 text-gray-800">Player Stats</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                             <div className="bg-gray-100 p-4 rounded-lg shadow">
                                 <p className="text-gray-800">Boards Generated</p>
                                 <p className="text-lg font-semibold text-gray-900">
@@ -278,6 +281,12 @@ const Profile: React.FC = () => {
                                 <p className="text-gray-800">Games Won</p>
                                 <p className="text-lg font-semibold text-gray-900">
                                     {profile.games_won ?? 0}
+                                </p>
+                            </div>
+                            <div className="bg-gray-100 p-4 rounded-lg shadow">
+                                <p className="text-gray-800">Money Won</p>
+                                <p className="text-lg font-semibold text-gray-900">
+                                    ${profile.money_won?.toLocaleString() ?? 0}
                                 </p>
                             </div>
                         </div>

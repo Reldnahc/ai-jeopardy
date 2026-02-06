@@ -42,9 +42,10 @@ import {
     scheduleAutoUnlockForClue
 } from "../game/gameLogic.js";
 import {
+    aiHostSayAsset,
     aiHostSayByKey,
     aiHostVoiceSequence,
-    ensureAiHostTtsBank
+    ensureAiHostTtsBank, ensureAiHostValueTts
 } from "../game/host.ts";
 import {verifyJwt} from "../auth/jwt.js";
 import {getBearerToken, playerStableId, verifyAccessToken} from "../services/userService.js";
@@ -55,6 +56,7 @@ export const createWsContext = (wss, repos) => {
     const ttsDuration = createTtsDurationService( repos );
 
     const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    const normalizeName = (name) => String(name || "").toLowerCase().trim();
 
     return {
         wss,
@@ -63,7 +65,7 @@ export const createWsContext = (wss, repos) => {
         getTtsDurationMs: (assetId) => ttsDuration.getDurationMs(assetId),
         sleep,
         repos,
-
+        normalizeName,
         // comms
         broadcast,
         broadcastAll,
@@ -130,11 +132,13 @@ export const createWsContext = (wss, repos) => {
         doUnlockBuzzerAuthoritative,
 
         ensureAiHostTtsBank,
+        ensureAiHostValueTts,
         playerStableId,
         getBearerToken,
         verifyAccessToken,
         aiHostVoiceSequence,
         aiHostSayByKey,
+        aiHostSayAsset,
         verifyJwt,
         setupPreloadHandshake,
         initPreloadState,

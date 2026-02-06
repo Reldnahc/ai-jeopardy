@@ -125,6 +125,27 @@ export const lobbyHandlers = {
 
         ctx.applyNewGameState({ game, boardData, timeToBuzz, timeToAnswer });
 
+        void (async () => {
+            try {
+                await ctx.ensureAiHostValueTts({ ctx, game, trace });
+                const ids = Array.isArray(game?.aiHostTts?.allAssetIds) ? game.aiHostTts.allAssetIds : [];
+
+                ctx.broadcastPreloadBatch({
+                    ctx,
+                    gameId,
+                    game,
+                    imageAssetIds: [],
+                    ttsAssetIds: ids,
+                    final: false,
+                    trace,
+                    reason: "ai-host-bank-values",
+                });
+            } catch (e) {
+                console.error("[create-game] ai host tts bank failed:", e);
+                game.aiHostTts = { slotAssets: {}, nameAssetsByPlayer: {}, allAssetIds: [], categoryAssetsByCategory: {}, valueAssetsByValue: {} };
+            }
+        })();
+
         // --- AI authority bootstrapping (selector + welcome audio) ---
         // Pick a starting selector (random online player; fallback to first player)
         const online = (game.players ?? []).filter((p) => p?.online !== false);

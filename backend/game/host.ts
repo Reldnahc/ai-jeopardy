@@ -65,6 +65,7 @@ export type AiHostTtsBank = {
     nameAssetsByPlayer: Record<string, string>;
     categoryAssetsByCategory: Record<string, string>;
     allAssetIds: string[];
+    valueAssetsByValue: Record<string, string>;
 };
 
 export type Player = { name?: string | null };
@@ -80,6 +81,7 @@ export type Game = {
     lobbySettings?: { narrationEnabled?: boolean | null } | null;
     players?: Player[] | null;
     categories?: Category[] | null;
+    boardData?: any;
     aiHostTts?: AiHostTtsBank | null;
 };
 
@@ -107,6 +109,95 @@ export type VoiceStep = {
     after?: () => void | Promise<void>;
 };
 
+function collectBoardValues(game: Game): number[] {
+    const valueSet = new Set<number>();
+
+    const boards = [
+        game.boardData?.firstBoard?.categories ?? [],
+        game.boardData?.secondBoard?.categories ?? [],
+    ];
+
+    for (const boardCats of boards) {
+        for (const cat of boardCats) {
+            for (const clue of cat?.values ?? []) {
+                const v = Number(clue?.value);
+                if (Number.isFinite(v) && v > 0) valueSet.add(v);
+            }
+        }
+    }
+
+    return Array.from(valueSet).sort((a, b) => a - b);
+}
+
+export async function ensureAiHostValueTts(opts: {
+    ctx: Ctx;
+    game: Game;
+    trace?: Trace;
+}): Promise<void> {
+    const { ctx, game, trace } = opts;
+
+    if (!game) return;
+
+    const narrationEnabled = Boolean(game?.lobbySettings?.narrationEnabled);
+    if (!narrationEnabled) return;
+
+    // Make sure bank exists (even if ensureAiHostTtsBank hasn't been called yet)
+    if (!game.aiHostTts || !Array.isArray(game.aiHostTts.allAssetIds)) {
+        game.aiHostTts = {
+            slotAssets: {},
+            nameAssetsByPlayer: {},
+            categoryAssetsByCategory: {},
+            valueAssetsByValue: {},
+            allAssetIds: [],
+        };
+    }
+
+    const tts = game.aiHostTts;
+
+    // If board data isn't ready yet, do nothing (call again later)
+    const values = collectBoardValues(game);
+    if (values.length === 0) return;
+
+    tts.valueAssetsByValue = tts.valueAssetsByValue || {};
+
+    const jobs: Array<Promise<void>> = [];
+
+    for (const v of values) {
+        const k = String(v);
+
+        // already ensured
+        if (tts.valueAssetsByValue[k]) continue;
+
+        jobs.push(
+            (async () => {
+                const asset = await ctx.ensureTtsAsset(
+                    {
+                        text: `For ${v} dollars.`,
+                        textType: "text",
+                        voiceId: "Matthew",
+                        engine: "standard",
+                        outputFormat: "mp3",
+                    },
+                    ctx.repos,
+                    trace
+                );
+
+                tts.valueAssetsByValue[k] = asset.id;
+                tts.allAssetIds.push(asset.id);
+            })()
+        );
+    }
+
+    await Promise.all(jobs);
+
+    // keep allAssetIds deduped
+    tts.allAssetIds = Array.from(new Set(tts.allAssetIds));
+
+    trace?.mark?.("tts_ensure_aihost_values_end", {
+        values: Object.keys(tts.valueAssetsByValue).length,
+        total: tts.allAssetIds.length,
+    });
+}
 
 export async function ensureAiHostTtsBank(opts: {
     ctx: Ctx;
@@ -124,6 +215,7 @@ export async function ensureAiHostTtsBank(opts: {
             slotAssets: {},
             nameAssetsByPlayer: {},
             categoryAssetsByCategory: {},
+            valueAssetsByValue: {},
             allAssetIds: [],
         };
         return;
@@ -135,6 +227,7 @@ export async function ensureAiHostTtsBank(opts: {
         slotAssets: {},
         nameAssetsByPlayer: {},
         categoryAssetsByCategory: {},
+        valueAssetsByValue: {},
         allAssetIds: [],
     };
 
@@ -244,7 +337,7 @@ export async function ensureAiHostTtsBank(opts: {
 
 /** ---------- say helpers ---------- */
 
-function aiHostSayAsset(ctx: Ctx, gameId: string, assetId: string | null | undefined): string | null {
+export function aiHostSayAsset(ctx: Ctx, gameId: string, assetId: string | null | undefined): string | null {
     if (!assetId) return null;
     ctx.broadcast(gameId, { type: "ai-host-say", assetId });
     return assetId;
@@ -278,6 +371,7 @@ export async function aiHostSayByKey(
     const resolved: string | string[] | null =
         tts.nameAssetsByPlayer?.[key] ||
         tts.categoryAssetsByCategory?.[key] ||
+        tts.valueAssetsByValue?.[key] ||
         tts.slotAssets?.[key] ||
         null;
 

@@ -1,7 +1,7 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useLocation, useNavigate, useParams} from 'react-router-dom';
 import JeopardyBoard from '../components/game/JeopardyBoard.tsx';
-import {Clue, BoardData} from "../types.ts";
+import {Clue} from "../types.ts";
 import Sidebar from "../components/game/Sidebar.tsx";
 import FinalScoreScreen from "../components/game/FinalScoreScreen.tsx";
 import {useWebSocket} from "../contexts/WebSocketContext.tsx";
@@ -118,15 +118,6 @@ export default function Game() {
     const lastRequestedKeyRef = useRef<string | null>(null);
     const prevSocketReadyRef = useRef<boolean>(false);
 
-    const clueOpenKey = useMemo(() => {
-        if (!selectedClue) return null;
-
-        const q = String(selectedClue.question ?? "").trim();
-        if (!q) return null;
-
-        const v = typeof selectedClue.value === "number" ? selectedClue.value : "?";
-        return `${activeBoard}:${v}:${q}`;
-    }, [activeBoard, selectedClue]);
 
 
 
@@ -273,50 +264,6 @@ export default function Game() {
             narratedKeysRef.current.clear();
         }
     }, [isSocketReady]);
-
-    useEffect(() => {
-        if (!narrationEnabled) {
-            lastRequestedKeyRef.current = null;
-            return;
-        }
-
-        if (audioMuted) {
-            lastRequestedKeyRef.current = null;
-            return;
-        }
-
-        // No clue open
-        if (!clueOpenKey || !selectedClue) {
-            lastRequestedKeyRef.current = null;
-            return;
-        }
-
-        // Prevent repeats if the selected clue object is recreated.
-        if (lastRequestedKeyRef.current === clueOpenKey) return;
-
-        // Only narrate a clue once per client session.
-        if (narratedKeysRef.current.has(clueOpenKey)) {
-            lastRequestedKeyRef.current = clueOpenKey;
-            return;
-        }
-
-        // ✅ FAST PATH: if server provided mapping, play immediately (no WS noise)
-        const mappedAssetId = (boardData as BoardData)?.ttsByClueKey?.[clueOpenKey];
-        if (typeof mappedAssetId === "string" && mappedAssetId.trim()) {
-            playAudioUrl(ttsUrl(mappedAssetId.trim()));
-            narratedKeysRef.current.add(clueOpenKey);
-            lastRequestedKeyRef.current = clueOpenKey;
-            return;
-        }
-
-        // Fallback: old on-demand behavior
-        const valuePart = `For ${selectedClue.value} dollars. `;
-        const text = `${valuePart}${selectedClue.question ?? ""}`.trim();
-        if (!text) return;
-        activeTtsRequestIdRef.current = requestTts({ text, textType: "text", voiceId: "Matthew" });
-        narratedKeysRef.current.add(clueOpenKey);
-        lastRequestedKeyRef.current = clueOpenKey;
-    }, [narrationEnabled, audioMuted, clueOpenKey, selectedClue, requestTts, boardData, playAudioUrl]);
 
     useEffect(() => {
         if (!ttsReady) return;

@@ -346,9 +346,7 @@ async function createBoardData(ctx, categories, model, host, options = {}) {
             const q = String(clue?.question ?? "").trim();
             if (!q) continue;
 
-            const prefix = v ? `For ${v} dollars. ` : "";
-            const text = `${prefix}${q}`.trim();
-
+            const text = `${q}`.trim();
             // Start the async job NOW (do not await here)
             const p = limitTts(async () => {
                 try {
