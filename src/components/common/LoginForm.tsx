@@ -1,11 +1,9 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import Signup from "./Signup";
-import Login from "./Login";
+import AuthForm from "./AuthForm.tsx";
 
 const LoginForm = () => {
     const [open, setOpen] = useState(false);
-    const [showSignup, setShowSignup] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
 
     // Close menu when clicking outside
@@ -63,61 +61,18 @@ const LoginForm = () => {
                         }}
 
                     >
-                        {/* Switch between login and signup (grow/shrink only) */}
                         <AnimatePresence mode="wait" initial={false}>
-                            {showSignup ? (
-                                <motion.div
-                                    key="signup"
-                                    variants={switchVariants}
-                                    initial="initial"
-                                    animate="animate"
-                                    exit="exit"
-                                    transition={{ duration: 0.15 }}
-                                    layout
-                                >
-                                    <Signup />
-                                    <p className="mt-4 text-center text-gray-700 text-sm">
-                                        Already have an account?
-                                        <br />
-                                        <a
-                                            href="#"
-                                            onClick={(e) => {
-                                                e.preventDefault();
-                                                setShowSignup(false);
-                                            }}
-                                            className="cursor-pointer text-blue-600 hover:underline"
-                                        >
-                                            Click here to log in!
-                                        </a>
-                                    </p>
-                                </motion.div>
-                            ) : (
-                                <motion.div
-                                    key="login"
-                                    variants={switchVariants}
-                                    initial="initial"
-                                    animate="animate"
-                                    exit="exit"
-                                    transition={{ duration: 0.15 }}
-                                    layout
-                                >
-                                    <Login />
-                                    <p className="mt-4 text-center text-gray-700 text-sm">
-                                        Need an account?
-                                        <br />
-                                        <a
-                                            href="#"
-                                            onClick={(e) => {
-                                                e.preventDefault();
-                                                setShowSignup(true);
-                                            }}
-                                            className="cursor-pointer text-blue-600 hover:underline"
-                                        >
-                                            Click here to sign up!
-                                        </a>
-                                    </p>
-                                </motion.div>
-                            )}
+                            <motion.div
+                                key="signup"
+                                variants={switchVariants}
+                                initial="initial"
+                                animate="animate"
+                                exit="exit"
+                                transition={{ duration: 0.15 }}
+                                layout
+                            >
+                                <AuthForm />
+                            </motion.div>
                         </AnimatePresence>
                     </motion.div>
                 )}

@@ -55,9 +55,8 @@ function advanceToFinalePhase(game, gameId, drawings, ctx) {
 
     const wagers = game.wagers;
     const verdicts = game.finalVerdicts;
+    const transcripts = game.finalTranscripts;
     const scores = game.scores;
-
-    console.log(game.players);
 
     for (const player of game.players) {
         const name = player.name;
@@ -83,9 +82,14 @@ export async function submitDrawing(game, gameId, player, drawing, ctx) {
     if (!game.finalVerdicts) {
         game.finalVerdicts = {};
     }
+    if (!game.finalTranscripts) {
+        game.finalTranscripts = {};
+    }
 
-    game.finalVerdicts[player] = await ctx.judgeImage(game.selectedClue?.answer, drawing);
-    console.log(game.finalVerdicts[player]);
+    const {verdict, transcript} = await ctx.judgeImage(game.selectedClue?.answer, drawing);
+    game.finalVerdicts[player] = verdict;
+    game.finalTranscripts[player] = transcript;
+
     checkAllDrawingsSubmitted(game, gameId, ctx);
 }
 

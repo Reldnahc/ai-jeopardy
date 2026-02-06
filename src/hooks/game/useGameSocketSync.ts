@@ -106,6 +106,8 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
     const [isFinalJeopardy, setIsFinalJeopardy] = useState(false);
     const [allWagersSubmitted, setAllWagersSubmitted] = useState(false);
     const [wagers, setWagers] = useState<Record<string, number>>({});
+    const [finalWagers, setFinalWagers] = useState<Record<string, number>>({});
+
     const [drawings, setDrawings] = useState<Record<string, string> | null>(null);
     const [isGameOver, setIsGameOver] = useState(false);
 
@@ -251,6 +253,7 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
                 if (fj) {
                     setWagers(m.wagers ?? {});
                     setAllWagersSubmitted(m.finalJeopardyStage !== "wager");
+                    if (allWagersSubmitted) setFinalWagers(wagers);
                 }
 
                 if (m.selectedClue) {
@@ -338,6 +341,7 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
                 const m = message as unknown as { wagers: Record<string, number> };
                 setAllWagersSubmitted(true);
                 setWagers(m.wagers);
+                setFinalWagers(wagers);
                 return;
             }
 
@@ -566,6 +570,7 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
         isFinalJeopardy,
         allWagersSubmitted,
         wagers,
+        finalWagers,
 
         drawings,
         isGameOver,

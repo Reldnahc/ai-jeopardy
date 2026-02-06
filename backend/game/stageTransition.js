@@ -79,17 +79,15 @@ async function startFinalJeopardy(game, gameId, ctx) {
     game.isFinalJeopardy = true;
     game.finalJeopardyStage = "wager";
 
+    game.wagers = {};
+    game.drawings = {};
+
     const pad = 200;
 
     await ctx.aiHostVoiceSequence(ctx, gameId, game, [
         {slot: "final_jeopardy", pad},
-        {slot: "final_jeopardy2", pad},
-        //{slot: "", pad, after: null},
+        {slot: "final_jeopardy2", pad, after: () => ctx.broadcast(gameId, {type: "final-jeopardy"})},
+        {slot: "all_wager", pad},
     ]);
 
-
-    game.wagers = {};
-    game.drawings = {};
-
-    ctx.broadcast(gameId, {type: "final-jeopardy"});
 }

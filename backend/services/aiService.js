@@ -753,6 +753,7 @@ async function judgeImage(expectedAnswer, imageUrl) {
         You are judging a final jeopardy clue. Look at the image to see what the player wrote. 
         
         Rules:
+        - Return a transcript of the audio, along with a verdict.
         - Be lenient on articles ("a", "an", "the"), punctuation, minor paraphrases, pluralization, and exact synonyms.
         - They still need to be Specific.
         - Do not accept close answers.
@@ -763,7 +764,7 @@ async function judgeImage(expectedAnswer, imageUrl) {
         - For numbers/dates/names, allow common spoken variants.
         
         Return STRICT JSON ONLY:
-        { "verdict": "correct"|"incorrect"}
+        { "verdict": "correct"|"incorrect", "transcript": "Detected text in image."}
         
         Player Input: See Image
         Expected Answer: ${JSON.stringify(String(expectedAnswer || ""))}
@@ -776,12 +777,13 @@ async function judgeImage(expectedAnswer, imageUrl) {
     try { parsed = JSON.parse(content); } catch { parsed = {}; }
 
     const verdict = parsed?.verdict;
+    const transcript = parsed?.transcript;
 
     if (verdict !== "correct" && verdict !== "incorrect") {
         return "incorrect";
     }
 
-    return verdict;
+    return {verdict, transcript};
 }
 
 export {

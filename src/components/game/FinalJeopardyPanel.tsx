@@ -10,24 +10,39 @@ type FinalJeopardyPanelProps = {
     // @ts-expect-error sketch type of issue
     canvasRef: React.RefObject<ReactSketchCanvas>;
     drawings: Record<string, string> | null;
+    finalWagers: Record<string, number>;
     drawingSubmitted: Record<string, boolean>;
     setDrawingSubmitted: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
     showAnswer: boolean;
 };
 
 const FinalJeopardyPanel: React.FC<FinalJeopardyPanelProps> = ({
-                                                                   gameId,
-                                                                   currentPlayer,
-                                                                   canvasRef,
-                                                                   drawings,
-                                                                   drawingSubmitted,
-                                                                   setDrawingSubmitted,
-                                                                   showAnswer,
+                                                                    gameId,
+                                                                    currentPlayer,
+                                                                    canvasRef,
+                                                                    drawings,
+                                                                    drawingSubmitted,
+                                                                    setDrawingSubmitted,
+                                                                    showAnswer,
+                                                                    finalWagers,
                                                                }) => {
     const { sendJson } = useWebSocket();
     const { deviceType } = useDeviceContext();
-
+    const [selectedPlayer, setSelectedPlayer] = React.useState<string | null>(null);
     const hasSubmitted = !!drawingSubmitted[currentPlayer];
+
+
+    React.useEffect(() => {
+        if (!drawings) return;
+        const players = Object.keys(drawings);
+        if (players.length === 0) return;
+
+        // If nothing selected yet, pick first available
+        if (!selectedPlayer || !players.includes(selectedPlayer)) {
+            setSelectedPlayer(players[0]);
+        }
+    }, [drawings, selectedPlayer]);
+
 
     // Show other people's drawings once present (your existing behavior)
     const shouldShowDrawings = !!drawings && !Array.isArray(drawings);
@@ -114,29 +129,68 @@ const FinalJeopardyPanel: React.FC<FinalJeopardyPanelProps> = ({
             {/* Render drawings when they exist */}
             {shouldShowDrawings && (
                 <div className="flex flex-wrap gap-4">
-                    {Object.entries(drawings!).map(([player, pngDataUrl]) => (
-                        <div key={player} className="mb-5 z-0 w-auto">
-                            <div className="flex flex-col items-center">
-                                <h2
-                                    style={{ fontSize: "clamp(1rem, 2vw, 1.5rem)" }}
-                                    className="text-center font-semibold mb-2"
-                                >
-                                    {player}&apos;s answer:
-                                </h2>
-                                <img
-                                    src={pngDataUrl}
-                                    alt={`${player} final jeopardy answer`}
-                                    className="max-h-[35vh] max-w-[45vw] object-contain rounded-lg shadow-2xl border border-white/20 bg-white"
-                                    loading="lazy"
-                                    decoding="async"
-                                    draggable={false}
-                                    onError={(e) => {
-                                        (e.currentTarget as HTMLImageElement).style.display = "none";
-                                    }}
-                                />
+                    {showAnswer && drawings && (
+                        <div className="flex flex-col items-center w-full">
+                            {/* Player selector */}
+                            <div className="flex flex-wrap gap-2 justify-center mb-4">
+                                {Object.keys(drawings).map((player) => {
+                                    const active = player === selectedPlayer;
+                                    return (
+                                        <button
+                                            key={player}
+                                            type="button"
+                                            onClick={() => setSelectedPlayer(player)}
+                                            className={[
+                                                "px-3 py-1 rounded border text-sm",
+                                                active
+                                                    ? "bg-blue-600 text-white border-blue-600"
+                                                    : "bg-white text-slate-800 border-slate-300 hover:bg-slate-50",
+                                            ].join(" ")}
+                                        >
+                                            {player}
+                                        </button>
+                                    );
+                                })}
                             </div>
+
+                            {/* Spotlight */}
+                            {selectedPlayer && (
+                                <div className="w-full flex flex-col items-center">
+                                    <h2
+                                        style={{ fontSize: "clamp(1rem, 2vw, 1.5rem)" }}
+                                        className="text-center font-semibold mb-2"
+                                    >
+                                        {selectedPlayer}&apos;s answer:
+                                    </h2>
+
+                                    {/* Wager under the answer */}
+                                    <div className="mb-3 text-center text-white/90">
+                                        Wager:{" "}
+                                        <span className="font-semibold">
+                                            ${Number(finalWagers?.[selectedPlayer] ?? 0).toLocaleString()}
+                                        </span>
+                                    </div>
+
+                                    {drawings[selectedPlayer] ? (
+                                        <img
+                                            src={drawings[selectedPlayer]}
+                                            alt={`${selectedPlayer} final jeopardy answer`}
+                                            className="max-h-[35vh] max-w-[45vw] object-contain rounded-lg shadow-2xl border border-white/20 bg-white"
+                                            loading="lazy"
+                                            decoding="async"
+                                            draggable={false}
+                                            onError={(e) => {
+                                                (e.currentTarget as HTMLImageElement).style.display = "none";
+                                            }}
+                                        />
+                                    ) : (
+                                        <div className="text-white/80">No answer submitted.</div>
+                                    )}
+                                </div>
+                            )}
                         </div>
-                    ))}
+                    )}
+
                 </div>
             )}
         </>

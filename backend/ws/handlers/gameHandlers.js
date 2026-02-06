@@ -1,5 +1,3 @@
-import {aiHostSayByKey} from "../../game/host.js";
-
 export const gameHandlers = {
     "join-game": async ({ ws, data, ctx }) => {
         const { gameId, playerName } = data;
@@ -690,7 +688,7 @@ export const gameHandlers = {
         const game = ctx.games[gameId];
 
         if (game) {
-            ctx.submitWager(game, gameId, player, wager, ctx);
+            await ctx.submitWager(game, gameId, player, wager, ctx);
         }
     },
     "submit-drawing": async ({ ws, data, ctx }) => {

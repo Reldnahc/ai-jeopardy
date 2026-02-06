@@ -59,6 +59,7 @@ export default function Game() {
         isFinalJeopardy,
         allWagersSubmitted,
         wagers,
+        finalWagers,
         drawings,
         isGameOver,
         markAllCluesComplete,
@@ -472,6 +473,7 @@ export default function Game() {
                             answerCapture={answerCapture}
                             answerError={answerError}
                             effectivePlayerName={effectivePlayerName}
+                            finalWagers={finalWagers}
                         />
                     </>
                 )}

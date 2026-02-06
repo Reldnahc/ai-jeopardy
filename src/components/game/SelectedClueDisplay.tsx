@@ -32,6 +32,7 @@ interface SelectedClueDisplayProps {
 
     answerError: string | null;
     effectivePlayerName: string | null;
+    finalWagers: Record<string, number>;
 }
 
 const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
@@ -53,6 +54,7 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                                                                      answerCapture,
                                                                      answerError,
                                                                      effectivePlayerName,
+                                                                     finalWagers
                                                                  }) => {
     const { sendJson } = useWebSocket();
 
@@ -385,24 +387,14 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                     </h1>
                 )}
 
-                {/* Reserve space for the answer */}
-                {isFinalJeopardy ? (
-                    <div className="flex justify-center items-center">
-                        {showAnswer && (
-                            <p style={{ fontSize: "clamp(1.5rem, 4vw, 3rem)" }} className="mt-5 text-yellow-300">
-                                {localSelectedClue.answer}
-                            </p>
-                        )}
-                    </div>
-                ) : (
-                    <div className="sm:min-h-[70px] md:min-h-[100px] flex justify-center items-center">
-                        {showAnswer && (
-                            <p style={{ fontSize: "clamp(1.5rem, 4vw, 3rem)" }} className="mt-5 text-yellow-300">
-                                {localSelectedClue.answer}
-                            </p>
-                        )}
-                    </div>
+                <div className="sm:min-h-[70px] md:min-h-[100px] flex justify-center items-center">
+                {showAnswer && (
+                    <p style={{ fontSize: "clamp(1.5rem, 4vw, 3rem)" }} className="mt-5 text-yellow-300">
+                        {localSelectedClue.answer}
+                    </p>
                 )}
+                </div>
+
 
                 {/* Final Jeopardy UI extracted */}
                 {isFinalJeopardy && (
@@ -414,6 +406,7 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                         drawingSubmitted={drawingSubmitted}
                         setDrawingSubmitted={setDrawingSubmitted}
                         showAnswer={showAnswer}
+                        finalWagers={finalWagers}
                     />
                 )}
 
