@@ -1,6 +1,5 @@
 // backend/http/authRoutes.js
 import bcrypt from "bcryptjs";
-import { pool } from "../config/pg.js";
 import { signJwt, verifyJwt } from "../auth/jwt.js";
 
 function normalizeEmail(email) {
@@ -12,7 +11,7 @@ function normalizeUsername(username) {
     return String(username ?? "").trim().toLowerCase();
 }
 
-export function registerAuthRoutes(app) {
+export function registerAuthRoutes(app, repos) {
     // Signup (email optional)
     app.post("/api/auth/signup", async (req, res) => {
         try {
@@ -33,17 +32,20 @@ export function registerAuthRoutes(app) {
 
             const passwordHash = await bcrypt.hash(password, 12);
 
-            const { rows } = await pool.query(
-                `insert into profiles (email, username, displayname, password_hash)
-                 values ($1, $2, $3, $4)
-                     returning id, email, username, displayname, role, color, text_color`,
-                [email, username, displayname, passwordHash]
-            );
+            const user = await repos.profiles.insertProfile({
+                email,
+                usernameRaw: usernameRaw,
+                displayname,
+                passwordHash,
+            });
 
-            const user = rows[0];
+            if (!user) {
+                return res.status(500).json({ error: "Signup failed" });
+            }
+
             const token = signJwt({ sub: user.id, username: user.username, role: user.role });
-
             res.json({ token, user });
+
         } catch (e) {
             const msg = String(e?.message || "");
             if (msg.includes("duplicate key value")) {
@@ -64,17 +66,10 @@ export function registerAuthRoutes(app) {
                 return res.status(400).json({ error: "Missing username/password" });
             }
 
-            const { rows } = await pool.query(
-                `select id, email, username, role, displayname, color, text_color, password_hash
-         from profiles
-         where username = $1
-         limit 1`,
-                [username]
-            );
+            const user = await repos.profiles.getLoginRowByUsername(username);
 
-            if (!rows.length) return res.status(401).json({ error: "Invalid credentials" });
+            if (!user) return res.status(401).json({ error: "Invalid credentials" });
 
-            const user = rows[0];
             const ok = await bcrypt.compare(password, user.password_hash);
             if (!ok) return res.status(401).json({ error: "Invalid credentials" });
 
@@ -100,15 +95,10 @@ export function registerAuthRoutes(app) {
             const userId = payload.sub || payload.id;
             if (!userId) return res.status(401).json({ error: "Invalid token payload" });
 
-            const { rows } = await pool.query(
-                `select id, email, username, role, displayname, color, text_color
-                 from profiles
-                 where id = $1`,
-                [userId]
-            );
+            const user = await repos.profiles.getPublicUserById(userId);
+            if (!user) return res.status(401).json({ error: "User not found" });
 
-            if (!rows.length) return res.status(401).json({ error: "User not found" });
-            res.json({ user: rows[0] });
+            res.json({ user });
         } catch {
             res.status(401).json({ error: "Invalid token" });
         }

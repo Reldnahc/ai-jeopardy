@@ -6,7 +6,6 @@ import { pickCommonsImageForQueries } from "./commonsService.js";
 import { pickBraveImageForQueries } from "./braveImageService.js";
 import { ingestImageToDbFromUrl } from "./imageAssetService.js";
 import { ensureTtsAsset } from "./ttsAssetService.js";
-import {pool} from "../config/pg.js";
 
 // Initialize AI clients
 const openai = new OpenAI();
@@ -131,47 +130,31 @@ function parseProviderJson(response) {
     throw new Error("Unknown AI response shape (cannot parse JSON).");
 }
 
-const saveBoardAsync = async ({ pool, host, board }) => {
+const saveBoardAsync = async (ctx, host, board) => {
     try {
-        const normalizedHost = host.toLowerCase().trim();
-        console.log(
-            "[Server][saveBoardAsync] Looking up profile for username:",
-            normalizedHost
-        );
+        const normalizedHost = String(host ?? "").toLowerCase().trim();
+        console.log("[Server][saveBoardAsync] Looking up profile for username:", normalizedHost);
 
-        const prof = await pool.query(
-            `select id from public.profiles where username = $1 limit 1`,
-            [normalizedHost]
-        );
+        const ownerId = await ctx.repos.profiles.getIdByUsername(normalizedHost);
 
-        const ownerId = prof.rows?.[0]?.id;
         if (!ownerId) {
-            console.warn("[Server][saveBoardAsync] ⚠️ No profile for:", normalizedHost);
+            console.warn("[Server][saveBoardAsync] No profile for:", normalizedHost);
             return;
         }
 
-        await pool.query(
-            `insert into public.jeopardy_boards (owner, board) values ($1, $2::jsonb)`,
-            [ownerId, board]
-        );
+        await ctx.repos.boards.insertBoard( ownerId, board );
 
-        await pool.query(
-            `update public.profiles set boards_generated = boards_generated + 1 where id = $1`,
-            [ownerId]
-        );
-
+        await ctx.repos.profiles.incrementBoardsGenerated(ownerId);
     } catch (e) {
-        console.error(
-            "[Server][saveBoardAsync] ❌ Unhandled exception while saving board",
-            {
-                message: e?.message ?? e,
-                stack: e?.stack,
-            }
-        );
+        console.error("[Server][saveBoardAsync] Unhandled exception while saving board", {
+            message: e?.message ?? e,
+            stack: e?.stack,
+        });
     } finally {
         console.log("[Server][saveBoardAsync] Finished board save attempt");
     }
 };
+
 
 
 function stripVisualWording(question) {
@@ -204,7 +187,7 @@ function makeLimiter(maxConcurrent) {
         });
 }
 
-async function populateCategoryVisuals(cat, settings, progressTick) {
+async function populateCategoryVisuals(ctx, cat, settings, progressTick) {
     if (!settings.includeVisuals) return;
 
     // Image provider is intentionally swappable: use either Commons OR Brave.
@@ -252,7 +235,7 @@ async function populateCategoryVisuals(cat, settings, progressTick) {
                     attribution: found.attribution,
                     trace: settings.trace,
                 },
-                pool
+                ctx.repos
             );
 
             clue.media = { type: "image", assetId };
@@ -278,27 +261,7 @@ async function populateCategoryVisuals(cat, settings, progressTick) {
     }
 }
 
-// Kept for compatibility / tests: enriches an entire board (sequentially).
-async function populateBoardVisuals(board, settings, progressTick) {
-    if (!settings.includeVisuals) return;
-
-    const rounds = [
-        board?.firstBoard?.categories,
-        board?.secondBoard?.categories,
-    ].filter(Array.isArray);
-
-    for (const categories of rounds) {
-        for (const cat of categories) {
-            await populateCategoryVisuals(cat, settings, progressTick);
-        }
-    }
-
-    if (typeof progressTick === "function") progressTick(1);
-}
-
-
-
-async function createBoardData(categories, model, host, options = {}) {
+async function createBoardData(ctx, categories, model, host, options = {}) {
     const settings = {
         includeVisuals: false,
         // Choose where visual clue images come from: "commons" or "brave".
@@ -397,7 +360,7 @@ async function createBoardData(categories, model, host, options = {}) {
                             engine: "standard",
                             outputFormat: "mp3",
                         },
-                        pool,
+                        ctx.repos,
                         trace
                     );
 
@@ -576,7 +539,7 @@ async function createBoardData(categories, model, host, options = {}) {
                 enqueueCategoryTts("firstBoard", json);
 
                 if (settings.includeVisuals && limitVisuals) {
-                    await limitVisuals(() => populateCategoryVisuals(json, settings, (n) => tick(n)));
+                    await limitVisuals(() => populateCategoryVisuals(ctx, json, settings, (n) => tick(n)));
                 }
 
                 return json;
@@ -605,7 +568,7 @@ async function createBoardData(categories, model, host, options = {}) {
                 enqueueCategoryTts("secondBoard", json);
 
                 if (settings.includeVisuals && limitVisuals) {
-                    await limitVisuals(() => populateCategoryVisuals(json, settings, (n) => tick(n)));
+                    await limitVisuals(() => populateCategoryVisuals(ctx, json, settings, (n) => tick(n)));
                 }
 
                 return json;
@@ -631,7 +594,7 @@ async function createBoardData(categories, model, host, options = {}) {
             enqueueCategoryTts("finalJeopardy", json);
 
             if (settings.includeVisuals && limitVisuals) {
-                await limitVisuals(() => populateCategoryVisuals(json, settings, (n) => tick(n)));
+                await limitVisuals(() => populateCategoryVisuals(ctx, json, settings, (n) => tick(n)));
             }
 
             return json;
@@ -665,7 +628,7 @@ async function createBoardData(categories, model, host, options = {}) {
         // Finalize the visual pipeline with one last tick (keeps progress accounting consistent).
         if (settings.includeVisuals) tick(1);
 
-        void saveBoardAsync({ pool, host, board });
+        void saveBoardAsync(ctx, host, board );
 
         trace?.mark("createBoardData DONE");
         return {

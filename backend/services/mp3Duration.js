@@ -33,7 +33,7 @@ const BITRATE_KBPS = {
     "2:1": [0,32,48,56,64,80,96,112,128,144,160,176,192,224,256,0],  // MPEG2/2.5 Layer I
 };
 
-export function estimateMp3DurationMsFromHeaderBytes({ headerBytes, totalBytes }) {
+export function estimateMp3DurationMsFromHeaderBytes( headerBytes, totalBytes ) {
     if (!headerBytes || headerBytes.length < 16 || !Number.isFinite(totalBytes) || totalBytes <= 0) return null;
 
     const id3Skip = skipId3(headerBytes);

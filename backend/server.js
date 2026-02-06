@@ -14,6 +14,8 @@ import { Agent, setGlobalDispatcher } from "undici";
 import { registerAuthRoutes } from "./http/authRoutes.js";
 import { registerProfileRoutes } from "./http/profileRoutes.js";
 import {registerBoardRoutes} from "./http/boardRoutes.js";
+import { pool } from "./config/pg.js";
+import {createRepos} from "./repositories/index.js";
 
 const app = express();
 app.use(cors({
@@ -33,16 +35,18 @@ const distPath = path.join(__dirname, "..", "dist");
 
 // --- 1. REGISTER API ROUTES FIRST ---
 // We do this before static files so /api/... requests don't hit the static middle-ware
-registerAuthRoutes(app);
-registerProfileRoutes(app);
-registerBoardRoutes(app);
+const repos = createRepos(pool);
+
+registerAuthRoutes(app, repos);
+registerProfileRoutes(app, repos);
+registerBoardRoutes(app, repos);
 // --- 2. SERVE STATIC ASSETS ---
 // This handles JS, CSS, and Images
 app.use(express.static(distPath));
 
 // --- 3. FRONTEND CATCH-ALL LAST ---
 // This handles React Router paths by serving index.html
-registerHttpRoutes(app, { distPath });
+registerHttpRoutes(app,  distPath, repos);
 
 // --- External Service Config ---
 setGlobalDispatcher(new Agent({
@@ -68,7 +72,7 @@ async function refreshCOTD() {
 
 async function bootstrap() {
     await refreshCOTD();
-    attachWebSocketServer(wss);
+    attachWebSocketServer(wss, repos);
 
     server.listen(PORT, () => {
         console.log(`HTTP + WS listening on :${PORT}`);

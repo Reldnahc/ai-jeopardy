@@ -3,8 +3,8 @@ import { createWsContext } from "./context.js";
 import { routeWsMessage } from "./router.js";
 import { handleSocketClose } from "./lifecycle.js";
 
-export const attachWebSocketServer = (wss) => {
-    const ctx = createWsContext(wss);
+export const attachWebSocketServer = (wss, repos) => {
+    const ctx = createWsContext(wss, repos);
 
     wss.on("connection", (ws) => {
         ws.id = crypto.randomUUID();

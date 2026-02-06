@@ -372,7 +372,7 @@ export async function getBoardDataOrFail({
 
         const ttsBatcher = makePreloadTtsBatcher({ ctx, gameId });
 
-        const boardData = await ctx.createBoardData(categories, selectedModel, host, {
+        const boardData = await ctx.createBoardData(ctx, categories, selectedModel, host, {
             includeVisuals: effectiveIncludeVisuals,
             imageProvider: effectiveImageProvider,
             maxVisualCluesPerCategory: 2,

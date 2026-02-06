@@ -1,6 +1,5 @@
 // backend/http/routes.js
 import path from "path";
-import { pool } from "../config/pg.js";
 
 const TTS_CACHE_TTL_MS = 5 * 60 * 1000;
 
@@ -35,24 +34,14 @@ function isConnectTimeoutError(err) {
     );
 }
 
-/**
- * Registers all Express HTTP routes (GET endpoints + SPA fallback).
- * @param {import("express").Express} app
- * @param {{ distPath: string }} deps
- */
-export function registerHttpRoutes(app, { distPath }) {
+export function registerHttpRoutes(app, distPath, repos ) {
     // --- Images --------------------------------------------------------------
 
     app.get("/api/images/:assetId", async (req, res) => {
         try {
             const { assetId } = req.params;
 
-            const { rows } = await pool.query(
-                `select data, bytes, content_type from public.image_assets where id = $1 limit 1`,
-                [assetId]
-            );
-
-            const row = rows?.[0];
+            const row = await repos.images.getImageBinaryById(assetId);
             if (!row?.data) return res.status(404).json({ error: "Image asset not found" });
 
             res.setHeader("Content-Type", row.content_type || "image/webp");
@@ -65,17 +54,18 @@ export function registerHttpRoutes(app, { distPath }) {
         }
     });
 
-
     app.get("/api/image-assets/:assetId", async (req, res) => {
-        const { assetId } = req.params;
+        try {
+            const { assetId } = req.params;
 
-        const { rows } = await pool.query(
-            `select storage_key, content_type from public.image_assets where id = $1 limit 1`,
-            [assetId]
-        );
-        const data = rows?.[0];
-        if (!data) return res.status(404).json({ error: "Image asset not found" });
-        res.json(data);
+            const data = await repos.images.getImageMetaById(assetId);
+            if (!data) return res.status(404).json({ error: "Image asset not found" });
+
+            res.json(data);
+        } catch (e) {
+            console.error("GET /api/image-assets/:assetId failed:", e);
+            return res.status(500).json({ error: "Failed to load image meta" });
+        }
     });
 
     app.get("/test/image/:assetId", async (req, res) => {
@@ -112,7 +102,7 @@ export function registerHttpRoutes(app, { distPath }) {
         const m = rangeHeader.replace("bytes=", "").split("-");
 
         let start = Number(m[0]);
-        let end = m[1] ? Number(m[1]) : (total - 1);
+        let end = m[1] ? Number(m[1]) : total - 1;
 
         if (!Number.isFinite(start) || start < 0) return null;
         if (!Number.isFinite(end) || end < start) end = total - 1;
@@ -125,12 +115,7 @@ export function registerHttpRoutes(app, { distPath }) {
         const { assetId } = req.params;
 
         try {
-            const { rows } = await pool.query(
-                `select data, bytes, content_type from public.tts_assets where id = $1 limit 1`,
-                [assetId]
-            );
-
-            const row = rows?.[0];
+            const row = await repos.tts.getBinaryById(assetId);
             if (!row?.data) return res.status(404).json({ error: "TTS asset not found" });
 
             const buf = row.data;
@@ -178,13 +163,7 @@ export function registerHttpRoutes(app, { distPath }) {
 
             if (!p) {
                 p = (async () => {
-
-                    const { rows } = await pool.query(
-                        'SELECT storage_key, content_type FROM public.tts_assets WHERE id = $1 LIMIT 1',
-                        [assetId]
-                    );
-
-                    const data = rows?.[0];
+                    const data = await repos.tts.getMetaById(assetId);
 
                     if (!data) {
                         const e = new Error("TTS_NOT_FOUND");
@@ -227,7 +206,6 @@ export function registerHttpRoutes(app, { distPath }) {
             }
         }
 
-        // Return the metadata JSON
         res.json({ storage_key: storageKey, content_type: contentType });
     });
 

@@ -74,6 +74,7 @@ export default function Game() {
         aiHostText,
         aiHostAsset,
         boardSelectionLocked,
+        selectedFinalist,
     } = useGameSocketSync({ gameId, playerName: effectivePlayerName });
 
     // Persistent WebSocket connection
@@ -426,8 +427,6 @@ export default function Game() {
                 />
             ) : (
                 <Sidebar
-                    isHost={isHost}
-                    host={host}
                     players={players}
                     scores={scores}
                     buzzResult={buzzResult}
@@ -474,6 +473,7 @@ export default function Game() {
                             answerError={answerError}
                             effectivePlayerName={effectivePlayerName}
                             finalWagers={finalWagers}
+                            selectedFinalist={selectedFinalist}
                         />
                     </>
                 )}

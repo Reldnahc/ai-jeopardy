@@ -46,12 +46,13 @@ function advanceToDrawingPhase(game, gameId, wagers, ctx) {
 
 }
 
-function advanceToFinalePhase(game, gameId, drawings, ctx) {
+async function advanceToFinalePhase(game, gameId, drawings, ctx) {
     game.finalJeopardyStage = "finale";
-    ctx.broadcast(gameId, { type: "all-drawings-submitted", drawings });
+    ctx.broadcast(gameId, {type: "all-drawings-submitted", drawings});
 
+    await ctx.sleep(5_000); //5 secs just clue
     game.selectedClue.isAnswerRevealed = true;
-    ctx.broadcast(gameId, { type: "answer-revealed", clue: game.selectedClue });
+    ctx.broadcast(gameId, {type: "answer-revealed", clue: game.selectedClue});
 
     const wagers = game.wagers;
     const verdicts = game.finalVerdicts;
@@ -61,15 +62,31 @@ function advanceToFinalePhase(game, gameId, drawings, ctx) {
     for (const player of game.players) {
         const name = player.name;
         const verdict = verdicts[name];
-        if (verdict === "correct"){
+
+        if (verdict === "correct") {
             scores[name] += wagers[name];
             continue;
         }
+
         scores[name] -= wagers[name];
     }
+    await ctx.sleep(5_000);//5 secs with answer
 
-    ctx.broadcast(gameId, { type: "update-scores", scores: game.scores });
-    ctx.broadcast(gameId, { type: "final-score-screen" });
+    const top3 = Object.entries(scores)
+        .map(([name, score]) => ({ name, score }))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 3);
+
+    for (let i = top3.length - 1; i >= 0; i--) {
+        ctx.broadcast(gameId, {type: "display-finalist", finalist: top3[i].name});
+        await ctx.sleep(5_000);//5 secs on each finalist
+        ctx.broadcast(gameId, {type: "update-score", player: top3[i].name, score: top3[i].score});
+        await ctx.sleep(5_000);//5 secs on each finalist score update
+    }
+
+    //update all the scores.
+    ctx.broadcast(gameId, {type: "update-scores", scores: game.scores});
+    ctx.broadcast(gameId, {type: "final-score-screen"});
 }
 
 export async function submitDrawing(game, gameId, player, drawing, ctx) {
@@ -137,6 +154,6 @@ export function checkAllDrawingsSubmitted(game, gameId, ctx) {
         );
 
     if (allSubmitted) {
-        advanceToFinalePhase(game, gameId, drawings, ctx);
+        void advanceToFinalePhase(game, gameId, drawings, ctx);
     }
 }

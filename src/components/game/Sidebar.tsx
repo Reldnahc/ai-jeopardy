@@ -4,8 +4,6 @@ import Avatar from "../common/Avatar.tsx";
 import {Player} from "../../types/Lobby.ts";
 
 interface SidebarProps {
-    isHost: boolean;
-    host: string | null;
     players: Player[];
     scores: Record<string, number>;
     lastQuestionValue: number;
@@ -21,8 +19,6 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
-                                             isHost,
-                                             host,
                                              players,
                                              scores,
                                              lastQuestionValue,
@@ -148,34 +144,30 @@ const Sidebar: React.FC<SidebarProps> = ({
                                 className={`flex items-center p-2.5 rounded-lg mb-2 text-base shadow-sm text-blue-500
                                     border-2 border-transparent
                                     ${player.online === false ? "opacity-50" : ""}
-                                    ${host === player.name
-                                    ? "bg-yellow-200 border-yellow-500"
-                                    : buzzResult === player.name
-                                        ? "bg-red-300 border-red-500"
-                                        : selectorName === player.name
-                                            ? "bg-blue-300 border-blue-500"
-                                            : "bg-gray-100"}
-                                    `}
+                                    ${buzzResult === player.name
+                                    ? "bg-red-300 border-red-500"
+                                    : selectorName === player.name
+                                        ? "bg-blue-300 border-blue-500"
+                                        : "bg-gray-100"}
+    `}
                             >
 
                             <Avatar name={player.name} size="8" color={player.color} textColor={player.text_color} />
                                 <div className="flex flex-col flex-1 ml-3">
-                                      <span className="font-bold">
+                                    <span className="font-bold">
                                         {player.name}
-                                      </span>
-                                    {host === player.name && players.length > 1 ? (
-                                        <span className="text-yellow-500 -mt-2 text-sm">Host</span>
-                                    ) : (
-                                        <span
-                                            className={`-mt-1.5 font-bold text-sm ${
-                                                scores[player.name] < 0 ? "text-red-500" : "text-green-500"
-                                            }`}
-                                        >
-                                         ${scores[player.name] || 0}
-                                        </span>
-                                    )}
+                                    </span>
+
+                                    <span
+                                        className={`-mt-1.5 font-bold text-sm ${
+                                            scores[player.name] < 0 ? "text-red-500" : "text-green-500"
+                                        }`}
+                                    >
+                                        ${scores[player.name] || 0}
+                                    </span>
+
                                 </div>
-                                {isHost && (player.name !== host || players.length === 1) && (
+                                {profile && profile.role === 'admin'  && (
                                     <div className="flex gap-2 ml-auto">
                                         <button
                                             onClick={() => handleScoreUpdate(player.name, -lastQuestionValue)}

@@ -38,13 +38,14 @@ interface JeopardyBoardProps {
     answerError: string | null;
     effectivePlayerName: string | null;
     finalWagers: Record<string, number>;
+    selectedFinalist: string;
 }
 
 const JeopardyBoard: React.FC<JeopardyBoardProps> =
     ({ boardData, canSelectClue, onClueSelected, selectedClue, gameId, clearedClues, players, scores,
          currentPlayer, allWagersSubmitted, isFinalJeopardy, drawings,
            handleBuzz, buzzerLocked, buzzResult, buzzLockedOut, timerEndTime, timerDuration,
-          answerCapture, answerError, effectivePlayerName, finalWagers}) => {
+          answerCapture, answerError, effectivePlayerName, finalWagers, selectedFinalist}) => {
     const [localSelectedClue, setLocalSelectedClue] = useState<Clue | null>(null);
     const [showClue, setShowClue] = useState(false);
     const [wagers, setWagers] = useState<Record<string, number>>({});
@@ -202,6 +203,7 @@ const JeopardyBoard: React.FC<JeopardyBoardProps> =
                         answerError={answerError}
                         effectivePlayerName={effectivePlayerName}
                         finalWagers={finalWagers}
+                        selectedFinalist={selectedFinalist}
                     />
                 )}
             </div>

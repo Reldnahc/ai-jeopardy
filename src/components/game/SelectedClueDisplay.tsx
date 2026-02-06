@@ -33,6 +33,7 @@ interface SelectedClueDisplayProps {
     answerError: string | null;
     effectivePlayerName: string | null;
     finalWagers: Record<string, number>;
+    selectedFinalist: string;
 }
 
 const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
@@ -54,7 +55,8 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                                                                      answerCapture,
                                                                      answerError,
                                                                      effectivePlayerName,
-                                                                     finalWagers
+                                                                     finalWagers,
+                                                                     selectedFinalist
                                                                  }) => {
     const { sendJson } = useWebSocket();
 
@@ -407,6 +409,7 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                         setDrawingSubmitted={setDrawingSubmitted}
                         showAnswer={showAnswer}
                         finalWagers={finalWagers}
+                        selectedFinalist={selectedFinalist}
                     />
                 )}
 

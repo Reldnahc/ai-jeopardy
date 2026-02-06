@@ -84,7 +84,7 @@ export type Game = {
 };
 
 export type Ctx = {
-    pool: any;
+    repos: any;
 
     ensureTtsAsset: (
         params: EnsureTtsAssetParams,
@@ -107,7 +107,6 @@ export type VoiceStep = {
     after?: () => void | Promise<void>;
 };
 
-/** ---------- ensure bank ---------- */
 
 export async function ensureAiHostTtsBank(opts: {
     ctx: Ctx;
@@ -160,7 +159,7 @@ export async function ensureAiHostTtsBank(opts: {
                             engine: "standard",
                             outputFormat: "mp3",
                         },
-                        ctx.pool,
+                        ctx.repos,
                         trace
                     );
 
@@ -187,7 +186,7 @@ export async function ensureAiHostTtsBank(opts: {
                         engine: "standard",
                         outputFormat: "mp3",
                     },
-                    ctx.pool,
+                    ctx.repos,
                     trace
                 );
 
@@ -217,7 +216,7 @@ export async function ensureAiHostTtsBank(opts: {
                         engine: "standard",
                         outputFormat: "mp3",
                     },
-                    ctx.pool,
+                    ctx.repos,
                     trace
                 );
 

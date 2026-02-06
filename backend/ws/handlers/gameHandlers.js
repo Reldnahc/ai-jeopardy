@@ -727,7 +727,7 @@ export const gameHandlers = {
                     engine: "standard",
                     outputFormat: "mp3",
                 },
-                ctx.pool,
+                ctx.repos,
                 trace
             );
 

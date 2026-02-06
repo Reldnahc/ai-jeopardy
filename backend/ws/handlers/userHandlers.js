@@ -27,11 +27,8 @@ export const userHandlers = {
 
             // Prefer DB role (prevents stale tokens)
             if (userId) {
-                const { rows } = await ctx.pool.query(
-                    "select role from profiles where id = $1 limit 1",
-                    [userId]
-                );
-                if (rows?.[0]?.role) role = rows[0].role;
+                const dbRole = await ctx.repos.profiles.getRoleById(userId);
+                if (dbRole) role = dbRole;
             }
 
             ws.auth = { isAuthed: true, userId, role };

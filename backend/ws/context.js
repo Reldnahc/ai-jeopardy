@@ -47,26 +47,22 @@ import {
     ensureAiHostTtsBank
 } from "../game/host.ts";
 import {verifyJwt} from "../auth/jwt.js";
-import {pool} from "../config/pg.js";
 import {getBearerToken, playerStableId, verifyAccessToken} from "../services/userService.js";
 
-
-
-export const createWsContext = (wss) => {
+export const createWsContext = (wss, repos) => {
     const { broadcast, broadcastAll } = makeBroadcaster(wss);
 
-    const ttsDuration = createTtsDurationService({ pool });
+    const ttsDuration = createTtsDurationService( repos );
 
     const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
 
     return {
         wss,
         games,
         modelsByValue,
-        pool,
         getTtsDurationMs: (assetId) => ttsDuration.getDurationMs(assetId),
         sleep,
+        repos,
 
         // comms
         broadcast,

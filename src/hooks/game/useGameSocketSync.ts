@@ -107,6 +107,8 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
     const [allWagersSubmitted, setAllWagersSubmitted] = useState(false);
     const [wagers, setWagers] = useState<Record<string, number>>({});
     const [finalWagers, setFinalWagers] = useState<Record<string, number>>({});
+    const [selectedFinalist, setSelectedFinalist] = useState("");
+
 
     const [drawings, setDrawings] = useState<Record<string, string> | null>(null);
     const [isGameOver, setIsGameOver] = useState(false);
@@ -341,7 +343,7 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
                 const m = message as unknown as { wagers: Record<string, number> };
                 setAllWagersSubmitted(true);
                 setWagers(m.wagers);
-                setFinalWagers(wagers);
+                setFinalWagers(m.wagers);
                 return;
             }
 
@@ -488,6 +490,24 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
                 return;
             }
 
+            if (message.type === "display-finalist") {
+                const m = message as unknown as { finalist: string };
+                setSelectedFinalist(m.finalist);
+
+                return;
+            }
+
+            if (message.type === "update-score") {
+                const m = message as unknown as { player: string; score: number };
+
+                setScores(prev => ({
+                    ...prev,
+                    [m.player]: m.score,
+                }));
+
+                return;
+            }
+
             if (message.type === "update-scores") {
                 const m = message as unknown as { scores: Record<string, number> };
                 setScores(m.scores);
@@ -571,6 +591,7 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
         allWagersSubmitted,
         wagers,
         finalWagers,
+        selectedFinalist,
 
         drawings,
         isGameOver,
