@@ -32,12 +32,12 @@ export function registerAuthRoutes(app, repos) {
 
             const passwordHash = await bcrypt.hash(password, 12);
 
-            const user = await repos.profiles.insertProfile({
+            const user = await repos.profiles.insertProfile(
                 email,
-                usernameRaw: usernameRaw,
+                usernameRaw,
                 displayname,
                 passwordHash,
-            });
+            );
 
             if (!user) {
                 return res.status(500).json({ error: "Signup failed" });
