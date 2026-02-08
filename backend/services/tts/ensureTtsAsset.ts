@@ -1,8 +1,8 @@
 // backend/services/tts/ensureTtsAsset.ts
-import type { EnsureTtsDeps, EnsureTtsResult, TtsRequest } from "./types.js";
-import { normalizeText, hashForRequest } from "./dedupe.js";
-import { selectProvider } from "./providerSelector.js";
-import { getLimiter } from "./limiter.js";
+import type { EnsureTtsDeps, EnsureTtsResult, TtsRequest } from "./types";
+import { normalizeText, hashForRequest } from "./dedupe";
+import { selectProvider } from "./providerSelector";
+import { getLimiter } from "./limiter";
 
 export async function ensureTtsAsset(
     input: Partial<TtsRequest> & { text: string },

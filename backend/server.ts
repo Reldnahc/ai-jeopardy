@@ -1,23 +1,27 @@
 // backend/server.ts
+// backend/server.ts
 import { WebSocketServer } from "ws";
 import "dotenv/config";
-import http from "http";
+
+import { createServer } from "node:http";
 import express from "express";
 import cors from "cors";
 import bodyParser from "body-parser";
-import path from "path";
-import { fileURLToPath } from "url";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { Agent, setGlobalDispatcher } from "undici";
 
-import { createCategoryOfTheDay } from "./services/aiService.js";
-import { attachWebSocketServer } from "./ws/index.js";
-import { getCOTD, setCOTD } from "./state/cotdStore.js";
-import { registerHttpRoutes } from "./http/routes.js";
-import { registerAuthRoutes } from "./http/authRoutes.js";
-import { registerProfileRoutes } from "./http/profileRoutes.js";
-import { registerBoardRoutes } from "./http/boardRoutes.js";
-import { pool } from "./config/pg.js";
-import { createRepos } from "./repositories/index.js";
+import { createCategoryOfTheDay } from "./services/aiService";
+import { attachWebSocketServer } from "./ws";
+import { getCOTD, setCOTD } from "./state/cotdStore";
+import { registerHttpRoutes } from "./http/routes";
+import { registerAuthRoutes } from "./http/authRoutes";
+import { registerProfileRoutes } from "./http/profileRoutes";
+import { registerBoardRoutes } from "./http/boardRoutes";
+import { pool } from "./config/pg";
+import { createRepos } from "./repositories";
+
 
 const app = express();
 
@@ -32,12 +36,12 @@ app.use(
 
 app.use(bodyParser.json());
 
-const server = http.createServer(app);
+const server = createServer(app);
 const wss = new WebSocketServer({ server });
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const distPath = path.join(__dirname, "..", "dist");
+const __dirname = dirname(__filename);
+const distPath = join(__dirname, "..", "dist");
 
 // --- 1. REGISTER API ROUTES FIRST ---
 const repos = createRepos(pool);

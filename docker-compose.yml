@@ -27,19 +27,32 @@ services:
     environment:
       # IMPORTANT: use the docker service name "db" as hostname
       DATABASE_URL: postgres://ai_jeopardy:${DATABASE_PASSWORD}@db:5432/ai_jeopardy
-
       JWT_SECRET: ${JWT_SECRET}
 
       BRAVE_API_KEY: ${BRAVE_API_KEY}
-
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
-      AWS_REGION: ${AWS_REGION}
 
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
 
+      PIPER_URL: http://piper:8000
+
       NODE_ENV: production
     ports:
       - "3002:3002"
+
+  piper:
+    image: ghcr.io/reldnahc/ai-jeopardy-piper-api:latest
+    environment:
+      PIPER_MODEL: /models/en_US-amy-low.onnx
+      PIPER_USE_CUDA: "0"
+      MAX_INFLIGHT_PER_WORKER: "16"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [ gpu ]
+    ports:
+      - "8000:8000"

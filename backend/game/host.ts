@@ -6,7 +6,7 @@ import type {
     Ctx,
     SayResult,
     VoiceStep,
-} from "../ws/context.types.js";
+} from "../ws/context.types";
 
 // Variety banks (add as many as you want)
 const AI_HOST_VARIANTS: Record<string, string[]> = {

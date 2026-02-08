@@ -32,7 +32,7 @@ export interface TraceLike {
 export interface TtsProvider {
     name: TtsProviderName;
     supports: (req: TtsRequest) => boolean;
-    synthesize: (req: TtsRequest, ctx: { trace?: TraceLike }) => Promise<TtsSynthesisResult>;
+    synthesize: (req: TtsRequest) => Promise<TtsSynthesisResult>;
 }
 
 /**

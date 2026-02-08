@@ -1,5 +1,5 @@
 // backend/services/tts/providers/piperProvider.ts
-import type { TtsProvider } from "../types.js";
+import type { TtsProvider } from "../types";
 
 function mustGetEnv(name: string): string {
     const v = process.env[name];
