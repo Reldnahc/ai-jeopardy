@@ -20,7 +20,7 @@ services:
       NODE_ENV: development
       DATABASE_URL: ${DATABASE_URL}
       JWT_SECRET: ${JWT_SECRET}
-    command: ["bash","-lc","npm install && npm run dev:backend"]
+    command: ["bash","-lc","npm install && npm run build:backend && npm run dev:backend"]
     ports:
       - "3002:3002"
     depends_on:
