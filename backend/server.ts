@@ -1,29 +1,35 @@
-import { WebSocketServer } from 'ws';
-import 'dotenv/config';
-import { createCategoryOfTheDay } from './services/aiService.js';
+// backend/server.ts
+import { WebSocketServer } from "ws";
+import "dotenv/config";
 import http from "http";
 import express from "express";
 import cors from "cors";
 import bodyParser from "body-parser";
 import path from "path";
 import { fileURLToPath } from "url";
+import { Agent, setGlobalDispatcher } from "undici";
+
+import { createCategoryOfTheDay } from "./services/aiService.js";
 import { attachWebSocketServer } from "./ws/index.js";
 import { getCOTD, setCOTD } from "./state/cotdStore.js";
 import { registerHttpRoutes } from "./http/routes.js";
-import { Agent, setGlobalDispatcher } from "undici";
 import { registerAuthRoutes } from "./http/authRoutes.js";
 import { registerProfileRoutes } from "./http/profileRoutes.js";
-import {registerBoardRoutes} from "./http/boardRoutes.js";
+import { registerBoardRoutes } from "./http/boardRoutes.js";
 import { pool } from "./config/pg.js";
-import {createRepos} from "./repositories/index.js";
+import { createRepos } from "./repositories/index.js";
 
 const app = express();
-app.use(cors({
-    origin: "http://localhost:5173",
-    credentials: true,
-    methods: ["GET","POST","PUT","PATCH","DELETE","OPTIONS"],
-    allowedHeaders: ["Content-Type","Authorization"],
-}));
+
+app.use(
+    cors({
+        origin: "http://localhost:5173",
+        credentials: true,
+        methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allowedHeaders: ["Content-Type", "Authorization"],
+    })
+);
+
 app.use(bodyParser.json());
 
 const server = http.createServer(app);
@@ -34,30 +40,30 @@ const __dirname = path.dirname(__filename);
 const distPath = path.join(__dirname, "..", "dist");
 
 // --- 1. REGISTER API ROUTES FIRST ---
-// We do this before static files so /api/... requests don't hit the static middle-ware
 const repos = createRepos(pool);
 
 registerAuthRoutes(app, repos);
 registerProfileRoutes(app, repos);
 registerBoardRoutes(app, repos);
+
 // --- 2. SERVE STATIC ASSETS ---
-// This handles JS, CSS, and Images
 app.use(express.static(distPath));
 
 // --- 3. FRONTEND CATCH-ALL LAST ---
-// This handles React Router paths by serving index.html
-registerHttpRoutes(app,  distPath, repos);
+registerHttpRoutes(app, distPath, repos);
 
 // --- External Service Config ---
-setGlobalDispatcher(new Agent({
-    keepAliveTimeout: 60_000,
-    keepAliveMaxTimeout: 60_000,
-    connectTimeout: 10_000,
-    headersTimeout: 30_000,
-    bodyTimeout: 30_000,
-}));
+setGlobalDispatcher(
+    new Agent({
+        keepAliveTimeout: 60_000,
+        keepAliveMaxTimeout: 60_000,
+        connectTimeout: 10_000,
+        headersTimeout: 30_000,
+        bodyTimeout: 30_000,
+    })
+);
 
-const PORT = Number(3002);
+const PORT = 3002;
 
 async function refreshCOTD() {
     try {
@@ -79,7 +85,7 @@ async function bootstrap() {
     });
 
     setInterval(() => {
-        refreshCOTD().catch(() => {});
+        void refreshCOTD();
     }, 1000 * 60 * 60);
 }
 

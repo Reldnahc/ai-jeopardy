@@ -1,73 +1,136 @@
-// backend/repositories/profileRepository.js
+// backend/repositories/profileRepository.ts
+import type { Pool } from "pg";
 
-function normalizeUsername(u) {
+function normalizeUsername(u: unknown): string {
     return String(u ?? "").trim().toLowerCase();
 }
 
-function normalizeEmail(email) {
+function normalizeEmail(email: unknown): string | null {
     const v = String(email ?? "").trim().toLowerCase();
     return v.length ? v : null;
 }
 
-export function createProfileRepository( pool ) {
+export interface PublicUserRow {
+    id: string;
+    email: string | null;
+    username: string;
+    role: string;
+    displayname: string;
+    color: string;
+    text_color: string;
+}
+
+export interface LoginRow extends PublicUserRow {
+    password_hash: string;
+}
+
+export interface MeProfileRow extends PublicUserRow {
+    tokens: number;
+    bio: string | null;
+    games_finished: number;
+    games_won: number;
+    boards_generated: number;
+    money_won: number;
+    created_at: string; // pg returns string unless you configure parsers
+    updated_at: string;
+}
+
+export interface PublicProfileRow {
+    id: string;
+    username: string;
+    displayname: string;
+    bio: string | null;
+    color: string;
+    text_color: string;
+    games_finished: number;
+    games_won: number;
+    boards_generated: number;
+    money_won: number;
+    created_at: string;
+}
+
+export interface SearchProfileRow {
+    username: string;
+    displayname: string;
+    color: string;
+    text_color: string;
+}
+
+type IncrementableStat =
+| "tokens"
+| "boards_generated"
+| "games_finished"
+| "games_won"
+| "money_won";
+
+export type StatDeltas = Partial<Record<IncrementableStat, number>>;
+
+export function createProfileRepository(pool: Pool) {
     if (!pool) throw new Error("createProfileRepository: missing pool");
 
-    async function getRoleById(userId) {
+    async function getRoleById(userId: string | null | undefined): Promise<string | null> {
         if (!userId) return null;
-        const { rows } = await pool.query(
+
+        const { rows } = await pool.query<{ role: string }>(
             "select role from profiles where id = $1 limit 1",
-            [userId]
+                [userId]
         );
+
         return rows?.[0]?.role ?? null;
     }
 
-    async function insertProfile( email, usernameRaw, displayname, passwordHash ) {
+    async function insertProfile(
+        email: string | null | undefined,
+        usernameRaw: string,
+        displayname: string,
+        passwordHash: string
+    ): Promise<PublicUserRow | null> {
         const username = normalizeUsername(usernameRaw);
         const emailNorm = normalizeEmail(email);
 
-        const { rows } = await pool.query(
+        const { rows } = await pool.query<PublicUserRow>(
             `insert into profiles (email, username, displayname, password_hash)
        values ($1, $2, $3, $4)
        returning id, email, username, displayname, role, color, text_color`,
-            [emailNorm, username, displayname, passwordHash]
+                [emailNorm, username, displayname, passwordHash]
         );
 
         return rows?.[0] ?? null;
     }
 
-    async function getLoginRowByUsername(usernameRaw) {
+    async function getLoginRowByUsername(usernameRaw: string): Promise<LoginRow | null> {
         const username = normalizeUsername(usernameRaw);
         if (!username) return null;
 
-        const { rows } = await pool.query(
+        const { rows } = await pool.query<LoginRow>(
             `select id, email, username, role, displayname, color, text_color, password_hash
        from profiles
        where username = $1
        limit 1`,
-            [username]
+                [username]
         );
 
         return rows?.[0] ?? null;
     }
 
-    async function getPublicUserById(userId) {
+    async function getPublicUserById(userId: string | null | undefined): Promise<PublicUserRow | null> {
         if (!userId) return null;
 
-        const { rows } = await pool.query(
+        const { rows } = await pool.query<PublicUserRow>(
             `select id, email, username, role, displayname, color, text_color
        from profiles
        where id = $1
        limit 1`,
-            [userId]
+                [userId]
         );
 
         return rows?.[0] ?? null;
     }
 
-    async function getMeProfile(userId) {
+    async function getMeProfile(userId: string | null | undefined): Promise<MeProfileRow | null> {
         if (!userId) return null;
 
-        const { rows } = await pool.query(
+        const { rows } = await pool.query<MeProfileRow>(
             `select
         id,
         email,
@@ -87,13 +150,16 @@ export function createProfileRepository( pool ) {
        from profiles
        where id = $1
        limit 1`,
-            [userId]
+                [userId]
         );
 
         return rows?.[0] ?? null;
     }
 
-    async function searchProfiles(q, limit = 5) {
+    async function searchProfiles(
+        q: unknown,
+        limit: number = 5
+    ): Promise<SearchProfileRow[]> {
         const query = String(q ?? "").trim();
         if (!query || query.length < 2) return [];
 
@@ -103,7 +169,7 @@ export function createProfileRepository( pool ) {
 
         const like = `%${query}%`;
 
-        const { rows } = await pool.query(
+        const { rows } = await pool.query<SearchProfileRow>(
             `select
           username,
           displayname,
@@ -120,17 +186,17 @@ export function createProfileRepository( pool ) {
           end,
           username asc
        limit $3`,
-            [like, `${query}%`, safeLimit]
+                [like, `${query}%`, safeLimit]
         );
 
         return rows ?? [];
     }
 
-    async function getPublicProfileByUsername(usernameRaw) {
+    async function getPublicProfileByUsername(usernameRaw: string): Promise<PublicProfileRow | null> {
         const username = normalizeUsername(usernameRaw);
         if (!username) return null;
 
-        const { rows } = await pool.query(
+        const { rows } = await pool.query<PublicProfileRow>(
             `select
          id,
          username,
@@ -146,29 +212,33 @@ export function createProfileRepository( pool ) {
        from profiles
        where username = $1
        limit 1`,
-            [username]
+                [username]
         );
 
         return rows?.[0] ?? null;
     }
 
-    async function getIdByUsername(usernameRaw) {
+    async function getIdByUsername(usernameRaw: string): Promise<string | null> {
         const username = normalizeUsername(usernameRaw);
         if (!username) return null;
 
-        const { rows } = await pool.query(
+        const { rows } = await pool.query<{ id: string }>(
             `select id from public.profiles where username = $1 limit 1`,
-            [username]
+                [username]
         );
 
         return rows?.[0]?.id ?? null;
     }
 
-    async function updateCosmetics( userId, color, text_color ) {
+    async function updateCosmetics(
+        userId: string | null | undefined,
+        color: string | undefined,
+        text_color: string | undefined
+    ): Promise<MeProfileRow | null> {
         if (!userId) return null;
 
-        const updates = [];
-        const values = [];
+        const updates: string[] = [];
+        const values: unknown[] = [];
         let i = 1;
 
         if (color !== undefined) {
@@ -185,22 +255,25 @@ export function createProfileRepository( pool ) {
 
         values.push(userId);
 
-        const { rows } = await pool.query(
+        const { rows } = await pool.query<MeProfileRow>(
             `update profiles
        set ${updates.join(", ")}, updated_at = now()
        where id = $${i}
        returning id, email, username, displayname, role, tokens, bio, color, text_color,
                  games_finished, games_won, boards_generated, money_won, created_at, updated_at`,
-            values
+                values
         );
 
         return rows?.[0] ?? null;
     }
 
-    async function incrementStats(userId, deltas) {
+    async function incrementStats(
+        userId: string | null | undefined,
+        deltas: StatDeltas
+    ): Promise<MeProfileRow | null> {
         if (!userId) return null;
 
-        const allowed = new Set([
+        const allowed = new Set<IncrementableStat>([
             "tokens",
             "boards_generated",
             "games_finished",
@@ -209,15 +282,15 @@ export function createProfileRepository( pool ) {
         ]);
 
         const entries = Object.entries(deltas ?? {}).filter(([k, v]) => {
-            if (!allowed.has(k)) return false;
+            if (!allowed.has(k as IncrementableStat)) return false;
             const n = Number(v);
             return Number.isFinite(n) && n !== 0;
-        });
+        }) as Array<[IncrementableStat, number]>;
 
         if (entries.length === 0) return null;
 
-        const sets = [];
-        const values = [];
+        const sets: string[] = [];
+        const values: unknown[] = [];
         let i = 1;
 
         for (const [k, v] of entries) {
@@ -227,39 +300,38 @@ export function createProfileRepository( pool ) {
 
         values.push(userId);
 
-        const { rows } = await pool.query(
+        const { rows } = await pool.query<MeProfileRow>(
             `update profiles
-             set ${sets.join(", ")}, updated_at = now()
-             where id = $${i}
-               returning
-               id, email, username, displayname, role,
-               tokens, bio, color, text_color,
-               games_finished, games_won, boards_generated, money_won,
-               created_at, updated_at
-               `,
-            values
+         set ${sets.join(", ")}, updated_at = now()
+         where id = $${i}
+         returning
+           id, email, username, displayname, role,
+           tokens, bio, color, text_color,
+           games_finished, games_won, boards_generated, money_won,
+           created_at, updated_at`,
+                values
         );
 
         return rows?.[0] ?? null;
     }
 
-    async function addTokens(userId, amount) {
+    async function addTokens(userId: string, amount: number) {
         return incrementStats(userId, { tokens: amount });
     }
 
-    async function incrementBoardsGenerated(userId, n = 1) {
+    async function incrementBoardsGenerated(userId: string, n: number = 1) {
         return incrementStats(userId, { boards_generated: n });
     }
 
-    async function incrementGamesFinished(userId, n = 1) {
+    async function incrementGamesFinished(userId: string, n: number = 1) {
         return incrementStats(userId, { games_finished: n });
     }
 
-    async function incrementGamesWon(userId, n = 1) {
+    async function incrementGamesWon(userId: string, n: number = 1) {
         return incrementStats(userId, { games_won: n });
     }
 
-    async function addMoneyWon(userId, amount) {
+    async function addMoneyWon(userId: string, amount: number) {
         return incrementStats(userId, { money_won: amount });
     }
 

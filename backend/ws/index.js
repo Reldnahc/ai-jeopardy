@@ -1,4 +1,4 @@
-// backend/ws/index.js
+// backend/ws/index.ts
 import { createWsContext } from "./context.ts";
 import { routeWsMessage } from "./router.js";
 import { handleSocketClose } from "./lifecycle.js";

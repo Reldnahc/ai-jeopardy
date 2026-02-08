@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "start": "tsx backend/server.js",
+    "start": "tsx backend/server.ts",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
@@ -17,7 +17,7 @@
     "dev:docker:down": "docker compose -f docker-compose.dev.yml down",
     "dev:docker:logs": "docker compose -f docker-compose.dev.yml logs -f",
     "dev:web": "vite --host 0.0.0.0 --port 5173",
-    "dev:backend": "tsx --watch backend/server.js"
+    "dev:backend": "tsx --watch backend/server.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.36.3",
@@ -45,6 +45,10 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
+    "@types/body-parser": "^1.19.6",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.2.2",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",

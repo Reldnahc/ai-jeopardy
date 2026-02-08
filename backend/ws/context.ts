@@ -52,10 +52,10 @@ import {
     aiHostVoiceSequence,
     ensureAiHostTtsBank,
     ensureAiHostValueTts,
-} from "../game/host";
+} from "../game/host.js";
 import { verifyJwt } from "../auth/jwt.js";
 import { getBearerToken, playerStableId, verifyAccessToken } from "../services/userService.js";
-import {ensureTtsAsset} from "../services/tts/ensureTtsAsset";
+import {ensureTtsAsset} from "../services/tts/ensureTtsAsset.js";
 
 // Minimal type for now; we’ll tighten later as you TS-migrate more modules.
 export type WsContext = ReturnType<typeof createWsContext>;

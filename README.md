@@ -61,7 +61,7 @@ There is no external object storage. All generated assets are stored directly in
 │   ├── http/
 │   ├── services/
 │   ├── ws/
-│   └── server.js
+│   └── server.ts
 ├── shared/
 ├── dist/                # built frontend
 ├── sql/
