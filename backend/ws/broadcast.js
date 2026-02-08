@@ -1,13 +1,3 @@
-export const safeSend = (ws, payload) => {
-    if (!ws || ws.readyState !== 1) return false;
-    try {
-        ws.send(JSON.stringify(payload));
-        return true;
-    } catch {
-        return false;
-    }
-};
-
 export const makeBroadcaster = (wss) => {
     const broadcast = (gameId, payload) => {
         const msg = JSON.stringify(payload);

@@ -7,26 +7,20 @@
   "scripts": {
     "dev": "vite",
     "dev:web": "vite --host 0.0.0.0 --port 5173",
-
     "dev:backend": "tsx backend/server.ts",
     "build:web": "vite build",
     "build:backend": "tsc -p tsconfig.backend.json",
     "build": "npm run build:web && npm run build:backend",
-
     "start": "node dist-backend/server.js",
-
     "lint": "eslint .",
     "preview": "vite preview",
-
     "predeploy": "npm run build:web",
     "deploy": "gh-pages -d dist --cname ai-jeopardy.com",
-
     "dev:docker": "docker compose -f docker-compose.dev.yml up",
     "dev:docker:detached": "docker compose -f docker-compose.dev.yml up -d",
     "dev:docker:down": "docker compose -f docker-compose.dev.yml down",
     "dev:docker:logs": "docker compose -f docker-compose.dev.yml logs -f"
   },
-
   "dependencies": {
     "@anthropic-ai/sdk": "^0.36.3",
     "@tanstack/react-query": "^5.64.2",
@@ -58,6 +52,7 @@
     "@types/pg": "^8.16.0",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
+    "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
     "eslint": "^9.17.0",
