@@ -64,14 +64,12 @@ export default function Game() {
         isGameOver,
         markAllCluesComplete,
         narrationEnabled,
-        requestTts,
         ttsReady,
         answerCapture,
         answerError,
         phase,
         selectorKey,
         selectorName,
-        aiHostText,
         aiHostAsset,
         boardSelectionLocked,
         selectedFinalist,
@@ -81,28 +79,53 @@ export default function Game() {
     const { sendJson } = useWebSocket();
     const { deviceType } = useDeviceContext();
     const audioRef = useRef<HTMLAudioElement | null>(null);
-    const [audioMuted, setAudioMuted] = useState<boolean>(() => {
+    const audioCtxRef = useRef<AudioContext | null>(null);
+    const gainNodeRef = useRef<GainNode | null>(null);
+    const compressorRef = useRef<DynamicsCompressorNode | null>(null);
+
+    const AUDIO_VOLUME_KEY = "aj_audioVolume";
+    const AUDIO_LAST_NONZERO_KEY = "aj_audioLastNonZeroVolume";
+
+    const [audioVolume, setAudioVolume] = useState<number>(() => {
         try {
-            return localStorage.getItem("aj_audioMuted") === "1";
+            const raw = localStorage.getItem(AUDIO_VOLUME_KEY);
+            const v = raw == null ? 1 : Number(raw);
+            if (!Number.isFinite(v)) return 1;
+            return Math.min(1, Math.max(0, v));
         } catch {
-            return false;
+            return 1;
         }
     });
 
+    const audioMuted = audioVolume <= 0;
+
+    useEffect(() => {
+        try {
+            localStorage.setItem(AUDIO_VOLUME_KEY, String(audioVolume));
+            if (audioVolume > 0) {
+                localStorage.setItem(AUDIO_LAST_NONZERO_KEY, String(audioVolume));
+            }
+        } catch {
+            // ignore
+        }
+    }, [audioVolume]);
+
+
     const toggleAudioMuted = useCallback(() => {
-        setAudioMuted((prev) => {
-            const next = !prev;
-            try { localStorage.setItem("aj_audioMuted", next ? "1" : "0"); } catch {
-                //ignore
-            }
+        setAudioVolume((prev) => {
+            if (prev > 0) return 0;
 
-            if (audioRef.current) {
-                audioRef.current.muted = next;
+            try {
+                const raw = localStorage.getItem(AUDIO_LAST_NONZERO_KEY);
+                const v = raw == null ? 1 : Number(raw);
+                if (Number.isFinite(v) && v > 0) return Math.min(1, Math.max(0, v));
+            } catch {
+                // ignore
             }
-
-            return next;
+            return 1;
         });
     }, []);
+
 
     const isSelectorOnBoard = Boolean(
         phase === "board" &&
@@ -159,18 +182,28 @@ export default function Game() {
     const playAudioUrl = useCallback((url: string) => {
         const a = audioRef.current;
         if (!a) return;
+
         try {
             a.pause();
-            a.muted = audioMuted;
+
+            // Volume-based “mute”
+            a.muted = false;
+            const gain = gainNodeRef.current;
+            if (gain) {
+                gain.gain.value = audioVolume;
+            }
+
             a.currentTime = 0;
             a.src = url;
+
+            // If volume is 0, do nothing (acts as mute)
+            if (audioVolume <= 0) return;
+
             void a.play();
         } catch (e) {
             console.debug("TTS play blocked:", e);
         }
-    }, [audioMuted]);
-
-    const lastAiHostSpokenRef = useRef<string | null>(null);
+    }, [audioVolume]);
 
     const lastAiHostAssetPlayedRef = useRef<string | null>(null);
 
@@ -216,42 +249,56 @@ export default function Game() {
         }, [aiHostAsset, narrationEnabled, audioMuted, playAudioUrl]);
 
 
-
     useEffect(() => {
-        if (!aiHostText) return;
+        const audio = new Audio();
+        audio.preload = "auto";
+        audio.crossOrigin = "anonymous";
 
-        // aiHostText is "seq::text"
-        if (lastAiHostSpokenRef.current === aiHostText) return;
-        lastAiHostSpokenRef.current = aiHostText;
+        const ctx = new AudioContext();
+        const source = ctx.createMediaElementSource(audio);
 
-        const idx = aiHostText.indexOf("::");
-        const text = (idx >= 0 ? aiHostText.slice(idx + 2) : aiHostText).trim();
-        if (!text) return;
+        const gain = ctx.createGain();
+        const compressor = ctx.createDynamicsCompressor();
 
-        // Page owns audio policy:
-        if (!narrationEnabled) return;
-        if (audioMuted) return;
+        // Gentle loudness boost without distortion
+        compressor.threshold.value = -18;
+        compressor.knee.value = 12;
+        compressor.ratio.value = 3;
+        compressor.attack.value = 0.003;
+        compressor.release.value = 0.25;
 
-        activeTtsRequestIdRef.current = requestTts({
-            text,
-            textType: "text",
-            voiceId: "Matthew",
-        });
-    }, [aiHostText, narrationEnabled, audioMuted, requestTts]);
+        source.connect(gain);
+        gain.connect(compressor);
+        compressor.connect(ctx.destination);
 
-
-    useEffect(() => {
-        audioRef.current = new Audio();
-        audioRef.current.preload = "auto";
+        audioRef.current = audio;
+        audioCtxRef.current = ctx;
+        gainNodeRef.current = gain;
+        compressorRef.current = compressor;
 
         return () => {
-            if (audioRef.current) {
-                audioRef.current.pause();
-                audioRef.current.src = "";
-                audioRef.current = null;
-            }
+            audio.pause();
+            audio.src = "";
+
+            source.disconnect();
+            gain.disconnect();
+            compressor.disconnect();
+
+            void ctx.close();
+
+            audioRef.current = null;
+            audioCtxRef.current = null;
+            gainNodeRef.current = null;
+            compressorRef.current = null;
         };
     }, []);
+
+    useEffect(() => {
+        const gain = gainNodeRef.current;
+        if (!gain) return;
+
+        gain.gain.value = audioVolume;
+    }, [audioVolume]);
 
     useEffect(() => {
         const wasReady = prevSocketReadyRef.current;
@@ -378,8 +425,8 @@ export default function Game() {
                     scores={scores}
                     buzzResult={buzzResult}
                     narrationEnabled={narrationEnabled}
-                    audioMuted={audioMuted}
-                    onToggleAudioMuted={toggleAudioMuted}
+                    audioVolume={audioVolume}
+                    onChangeAudioVolume={setAudioVolume}
                     lastQuestionValue={lastQuestionValue}
                     activeBoard={activeBoard}
                     handleScoreUpdate={handleScoreUpdate}

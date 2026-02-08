@@ -358,8 +358,7 @@ async function createBoardData(ctx, categories, model, host, options = {}) {
                             outputFormat: "mp3",
                             provider: "piper"
                         },
-                        ctx.repos,
-                        trace
+                        ctx.repos
                     );
 
                     ttsIds.add(asset.id);

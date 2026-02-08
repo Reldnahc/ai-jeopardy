@@ -730,8 +730,7 @@ export const gameHandlers = {
                     engine: "standard",
                     outputFormat: "mp3",
                 },
-                ctx.repos,
-                trace
+                ctx.repos
             );
 
             ws.send(JSON.stringify({

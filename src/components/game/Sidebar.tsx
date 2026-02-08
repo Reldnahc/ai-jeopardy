@@ -2,6 +2,8 @@ import React from "react";
 import {useProfile} from "../../contexts/ProfileContext.tsx";
 import Avatar from "../common/Avatar.tsx";
 import {Player} from "../../types/Lobby.ts";
+import MutedIcon from "../../icons/MutedIcon.tsx";
+import LoudIcon from "../../icons/LoudIcon.tsx";
 
 interface SidebarProps {
     players: Player[];
@@ -12,10 +14,10 @@ interface SidebarProps {
     markAllCluesComplete: () => void;
     buzzResult: string | null;
     narrationEnabled: boolean;
-    audioMuted: boolean;
-    onToggleAudioMuted: () => void;
     onLeaveGame: () => void;
     selectorName: string | null;
+    audioVolume: number; // 0..1
+    onChangeAudioVolume: (v: number) => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -27,10 +29,10 @@ const Sidebar: React.FC<SidebarProps> = ({
                                              markAllCluesComplete,
                                              buzzResult,
                                              narrationEnabled,
-                                             audioMuted,
-                                             onToggleAudioMuted,
                                              onLeaveGame,
                                              selectorName,
+                                             audioVolume,
+                                             onChangeAudioVolume,
                                          }) => {
 
     const { profile } = useProfile();
@@ -74,59 +76,38 @@ const Sidebar: React.FC<SidebarProps> = ({
                                 </svg>
 
                             </button>
-                            {/* Narration toggle (icon only) */}
+                            {/* Narration toggle */}
                             {narrationEnabled && (
-                                <button
-                                    type="button"
-                                    onClick={onToggleAudioMuted}
-                                    className={`
-                                                group
-                                                inline-flex items-center justify-center
-                                                w-9 h-9
-                                                rounded-xl
-                                                border
-                                                shadow-sm
-                                                transition
-                                                active:scale-[0.98]
-                                                focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500
-                                                ${
-                                        audioMuted
-                                            ? "bg-gray-900 text-white border-gray-900"
-                                            : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
-                                             }
-                                        `}
-                                    title={audioMuted ? "Unmute narration" : "Mute narration"}
-                                    aria-label={audioMuted ? "Unmute narration" : "Mute narration"}
-                                    aria-pressed={audioMuted}
-                                >
-                                    {audioMuted ? (
-                                        // Muted icon
-                                        <svg
-                                            className="w-5 h-5"
-                                            viewBox="0 0 24 24"
-                                            fill="currentColor"
-                                            aria-hidden="true"
-                                        >
-                                            <path d="M4 9v6h4l5 5V4L8 9H4z" />
-                                            <path d="M21 3.8 19.6 2.4 2.4 19.6 3.8 21 21 3.8z" />
-                                        </svg>
-                                    ) : (
-                                        // Volume icon
-                                        <svg
-                                            className="w-5 h-5"
-                                            viewBox="0 0 24 24"
-                                            fill="currentColor"
-                                            aria-hidden="true"
-                                        >
-                                            <path d="M4 9v6h4l5 5V4L8 9H4z" />
-                                            <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v8.06c1.48-.74 2.5-2.26 2.5-4.03z" />
-                                            <path d="M19 12c0 2.5-1.5 4.66-3.66 5.65l.74 1.5C18.74 18.01 20.5 15.18 20.5 12s-1.76-6.01-4.42-7.15l-.74 1.5C17.5 7.34 19 9.5 19 12z" />
-                                        </svg>
-                                    )}
-                                </button>
+                                <div className="flex items-center gap-3 ml-2 select-none">
+                                    {/* Muted speaker */}
+                                    <MutedIcon
+                                        className={"-mr-3"}
+                                    />
+
+                                    {/* Slider */}
+                                    <input
+                                        type="range"
+                                        min={0}
+                                        max={200}
+                                        step={1}
+                                        value={Math.round(audioVolume * 100)}
+                                        onChange={(e) => onChangeAudioVolume(Number(e.target.value) / 100)}
+                                        className="
+                                                    w-32
+                                                    accent-white
+                                                    cursor-pointer
+                                                  "
+                                        aria-label="Audio volume"
+                                    />
+
+                                    {/* Loud speaker */}
+                                    <LoudIcon
+                                        className={"-ml-2"}
+                                    />
+
+                                </div>
+
                             )}
-
-
                         </div>
                     </div>
                 </div>
@@ -141,7 +122,14 @@ const Sidebar: React.FC<SidebarProps> = ({
                         {players.map((player) => (
                             <li
                                 key={player.name}
-                                className={`flex items-center p-2.5 rounded-lg mb-2 text-base shadow-sm text-blue-500
+                                className={`
+                                    flex items-center
+                                    p-2
+                                    min-h-[96px]
+                                    rounded-xl
+                                    mb-3
+                                    text-blue-500
+                                    shadow-sm
                                     border-2 border-transparent
                                     ${player.online === false ? "opacity-50" : ""}
                                     ${buzzResult === player.name
@@ -149,41 +137,73 @@ const Sidebar: React.FC<SidebarProps> = ({
                                     : selectorName === player.name
                                         ? "bg-blue-300 border-blue-500"
                                         : "bg-gray-100"}
-    `}
+                                    `}
                             >
+                                {/* Bigger avatar */}
+                                <Avatar
+                                    name={player.name}
+                                    size="16"
+                                    color={player.color}
+                                    textColor={player.text_color}
+                                />
 
-                            <Avatar name={player.name} size="8" color={player.color} textColor={player.text_color} />
-                                <div className="flex flex-col flex-1 ml-3">
-                                    <span className="font-bold">
-                                        {player.name}
+                                {/* Bigger name + money */}
+                                <div className="flex flex-col flex-1 ml-2 leading-tight">
+                                    <span className="font-extrabold text-xl">
+                                      {player.name}
                                     </span>
 
                                     <span
-                                        className={`-mt-1.5 font-bold text-sm ${
-                                            scores[player.name] < 0 ? "text-red-500" : "text-green-500"
+                                        className={`mt-1 font-extrabold text-2xl ${
+                                            scores[player.name] < 0 ? "text-red-600" : "text-green-600"
                                         }`}
                                     >
-                                        ${scores[player.name] || 0}
+                                      ${scores[player.name] || 0}
                                     </span>
-
                                 </div>
-                                {profile && profile.role === 'admin'  && (
-                                    <div className="flex gap-2 ml-auto">
-                                        <button
-                                            onClick={() => handleScoreUpdate(player.name, -lastQuestionValue)}
-                                            className="w-8 h-8 p-0 bg-red-500 text-white rounded-full flex items-center justify-center text-sm hover:bg-red-600"
-                                        >
-                                            −
-                                        </button>
+
+                                {/* Admin controls: stacked vertically */}
+                                {profile && profile.role === "admin" && (
+                                    <div className="flex flex-col gap-2 ml-3">
                                         <button
                                             onClick={() => handleScoreUpdate(player.name, lastQuestionValue)}
-                                            className="w-8 h-8 p-0 bg-green-500 text-white rounded-full flex items-center justify-center text-sm hover:bg-green-600"
+                                            className="
+                                              w-6 h-6
+                                              bg-green-500 text-white
+                                              rounded-xl
+                                              flex items-center justify-center
+                                              text-lg font-black
+                                              shadow-sm
+                                              hover:bg-green-600
+                                              active:scale-[0.98]
+                                            "
+                                            aria-label={`Increase ${player.name} score`}
+                                            title={`+${lastQuestionValue}`}
                                         >
                                             ＋
+                                        </button>
+
+                                        <button
+                                            onClick={() => handleScoreUpdate(player.name, -lastQuestionValue)}
+                                            className="
+                                              w-6 h-6
+                                              bg-red-500 text-white
+                                              rounded-xl
+                                              flex items-center justify-center
+                                              text-lg font-black
+                                              shadow-sm
+                                              hover:bg-red-600
+                                              active:scale-[0.98]
+                                            "
+                                            aria-label={`Decrease ${player.name} score`}
+                                            title={`-${lastQuestionValue}`}
+                                        >
+                                            −
                                         </button>
                                     </div>
                                 )}
                             </li>
+
                         ))}
                     </ul>
                 </div>

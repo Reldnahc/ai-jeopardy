@@ -1,5 +1,5 @@
 // backend/services/tts/providers/piperProvider.ts
-import type { TtsProvider } from "../types";
+import type { TtsProvider } from "../types.js";
 
 function mustGetEnv(name: string): string {
     const v = process.env[name];
@@ -13,11 +13,9 @@ export const piperProvider: TtsProvider = {
         // up to you; keep strict initially
         return req.outputFormat === "mp3" || req.outputFormat === "wav";
     },
-    async synthesize(req, { trace }) {
+    async synthesize(req) {
         const baseUrl = mustGetEnv("PIPER_URL"); // e.g. http://piper:8000
         const url = `${baseUrl.replace(/\/+$/, "")}/tts`;
-
-        trace?.mark?.("piper_http_start");
 
         const resp = await fetch(url, {
             method: "POST",
@@ -40,8 +38,6 @@ export const piperProvider: TtsProvider = {
 
         const arrayBuf = await resp.arrayBuffer();
         const audioBuffer = Buffer.from(arrayBuf);
-
-        trace?.mark?.("piper_http_end", { bytes: audioBuffer.length });
 
         return { audioBuffer, meta: { voiceId: req.voiceId, outputFormat: req.outputFormat } };
     },

@@ -47,7 +47,6 @@ export type Ctx = {
     ensureTtsAsset: (
         params: EnsureTtsAssetParams,
         pool: any,
-        trace?: Trace
     ) => Promise<TtsAsset>;
 
     getTtsDurationMs: (assetId: string) => Promise<number>;

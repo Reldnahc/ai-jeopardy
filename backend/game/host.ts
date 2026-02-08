@@ -120,8 +120,7 @@ export async function ensureAiHostValueTts(opts: {
                         engine: "standard",
                         outputFormat: "mp3",
                     },
-                    ctx.repos,
-                    trace
+                    ctx.repos
                 );
 
                 tts.valueAssetsByValue[k] = asset.id;
@@ -194,8 +193,7 @@ export async function ensureAiHostTtsBank(opts: {
                             engine: "standard",
                             outputFormat: "mp3",
                         },
-                        ctx.repos,
-                        trace
+                        ctx.repos
                     );
 
                     out.slotAssets[slot].push(asset.id);
@@ -221,8 +219,7 @@ export async function ensureAiHostTtsBank(opts: {
                         engine: "standard",
                         outputFormat: "mp3",
                     },
-                    ctx.repos,
-                    trace
+                    ctx.repos
                 );
 
                 out.nameAssetsByPlayer[name] = asset.id;
@@ -251,8 +248,7 @@ export async function ensureAiHostTtsBank(opts: {
                         engine: "standard",
                         outputFormat: "mp3",
                     },
-                    ctx.repos,
-                    trace
+                    ctx.repos
                 );
 
                 out.categoryAssetsByCategory[categoryName] = asset.id;

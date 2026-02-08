@@ -1,13 +1,12 @@
 // backend/services/tts/ensureTtsAsset.ts
-import type { EnsureTtsDeps, EnsureTtsResult, TraceLike, TtsRequest } from "./types";
-import { normalizeText, hashForRequest } from "./dedupe";
-import { selectProvider } from "./providerSelector";
-import { getLimiter } from "./limiter";
+import type { EnsureTtsDeps, EnsureTtsResult, TtsRequest } from "./types.js";
+import { normalizeText, hashForRequest } from "./dedupe.js";
+import { selectProvider } from "./providerSelector.js";
+import { getLimiter } from "./limiter.js";
 
 export async function ensureTtsAsset(
     input: Partial<TtsRequest> & { text: string },
     repos: EnsureTtsDeps,
-    trace?: TraceLike
 ): Promise<EnsureTtsResult> {
     if (!repos?.tts) throw new Error("ensureTtsAsset: missing deps.repos.tts");
 
@@ -25,35 +24,22 @@ export async function ensureTtsAsset(
 
     const { provider, effectiveReq } = selectProvider(req);
 
-    // IMPORTANT: provider-aware hash
     const sha256 = hashForRequest(effectiveReq, provider.name);
 
     const limiter = getLimiter(provider.name);
 
     return limiter.schedule(async () => {
-        trace?.mark?.("tts_db_lookup_start", { provider: provider.name });
-
-        // Step 3: this must become provider-aware in the repo.
 
         const existingId = await repos.tts.getIdBySha256Provider(
             sha256,
             provider.name
         );
-
-        trace?.mark?.("tts_db_lookup_end", { hit: Boolean(existingId), provider: provider.name });
         if (existingId) return { id: existingId, sha256, provider: provider.name };
 
-        trace?.mark?.("tts_synth_start", { provider: provider.name });
-
-        const { audioBuffer } = await provider.synthesize(effectiveReq, { trace });
-
-        trace?.mark?.("tts_synth_end", { provider: provider.name, bytes: audioBuffer.length });
+        const { audioBuffer } = await provider.synthesize(effectiveReq);
 
         if (!audioBuffer.length) throw new Error(`${provider.name} returned empty audio`);
 
-        trace?.mark?.("tts_db_upsert_start", { provider: provider.name });
-
-        // Step 3: include provider in the upsert and conflict target.
         const id = await repos.tts.upsertTtsAsset(
             sha256,
             provider.name,
@@ -65,8 +51,6 @@ export async function ensureTtsAsset(
             effectiveReq.engine,
             effectiveReq.languageCode
         );
-
-        trace?.mark?.("tts_db_upsert_end", { provider: provider.name });
 
         if (!id) throw new Error("Failed to upsert tts_assets");
         return { id, sha256, provider: provider.name };
