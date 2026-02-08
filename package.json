@@ -11,10 +11,10 @@
     "dev:backend": "tsx backend/server.ts",
 
     "build:web": "vite build",
-    "build:backend": "tsc -p tsconfig.backend.json",
+    "build:backend": "tsc -p tsconfig.backend.json && node -e \"const fs=require('fs'); fs.renameSync('dist-backend/server.js','dist-backend/server.cjs')\"",
     "build": "npm run build:web && npm run build:backend",
 
-    "start": "node dist-backend/server.js",
+    "start": "node dist-backend/server.cjs",
 
     "lint": "eslint .",
     "preview": "vite preview",
