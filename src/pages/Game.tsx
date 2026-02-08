@@ -83,6 +83,8 @@ export default function Game() {
     const gainNodeRef = useRef<GainNode | null>(null);
     const compressorRef = useRef<DynamicsCompressorNode | null>(null);
 
+    const buzzSeqRef = useRef(0);
+
     const AUDIO_VOLUME_KEY = "aj_audioVolume";
     const AUDIO_LAST_NONZERO_KEY = "aj_audioLastNonZeroVolume";
 
@@ -379,13 +381,34 @@ export default function Game() {
 
     usePreload(memoizedBoardData, Boolean(memoizedBoardData));
 
+    const { nowFromPerfMs, perfNowMs, lastSyncAgeMs } = useWebSocket();
+
     const handleBuzz = () => {
         if (!gameId) return;
         if (buzzResult || buzzLockedOut) return;
 
-        // Always let server decide (including “buzz early” lockout)
-        sendJson({ type: "buzz", gameId });
+        // if sync is stale, either force a sync or fall back (I’d still send, server can decide)
+
+        const clientBuzzPerfMs = perfNowMs();
+        const clientSeq = ++buzzSeqRef.current;
+
+        const syncAge = lastSyncAgeMs?.() ?? Number.POSITIVE_INFINITY;
+
+        const payload: any = {
+            type: "buzz",
+            gameId,
+            clientBuzzPerfMs,
+            clientSeq,
+            syncAgeMs: syncAge,
+        };
+
+        if (Number.isFinite(syncAge) && syncAge <= 20_000) {
+            payload.estimatedServerBuzzAtMs = nowFromPerfMs();
+        }
+
+        sendJson(payload);
     };
+
 
 
     const onClueSelected = useCallback((clue: Clue) => {

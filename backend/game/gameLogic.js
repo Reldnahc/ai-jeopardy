@@ -204,8 +204,18 @@ export function doUnlockBuzzerAuthoritative( gameId, game, ctx) {
     // (prevents stale timers from instantly expiring after a rebuzz)
     ctx.clearGameTimer(game);
 
+
+    if (!game.clueState) game.clueState = {};
+    game.clueState.buzzOpenAtMs = Date.now();
+
     game.buzzerLocked = false;
     ctx.broadcast(gameId, { type: "buzzer-unlocked" });
+
+    // Reset pending buzz window whenever you unlock
+    if (game.pendingBuzz?.timer) clearTimeout(game.pendingBuzz.timer);
+    game.pendingBuzz = null;
+    game.buzzed = null;
+
 
     if (game.timeToBuzz === -1) return;
 

@@ -10,7 +10,10 @@ interface WebSocketContextType {
     sendJson: (payload: object) => void;
     subscribe: (listener: Listener) => () => void;
     setLobbyPresence: (presence: { gameId: string; playerId: string } | null) => void;
-    nowMs: () => number;
+    nowMs: () => number;            // Date-based server-now
+    nowFromPerfMs: () => number;    // perf-based server-now
+    perfNowMs: () => number;
+    lastSyncAgeMs: () => number;    // optional guard
 }
 
 const WebSocketContext = createContext<WebSocketContextType | null>(null);
@@ -27,9 +30,22 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const lastLobbyRef = useRef<{ gameId: string; playerId: string } | null>(null);
 
     const serverOffsetMsRef = useRef(0);
+    const serverOffsetPerfMsRef = useRef(0);
+    const lastSyncPerfRef = useRef(0);
+
+    const perfNowMs = useCallback(() => {
+        // safe in browser; if you ever SSR this, guard it
+        return typeof performance !== "undefined" ? performance.now() : 0;
+    }, []);
 
     const nowMs = useCallback(() => Date.now() + serverOffsetMsRef.current, []);
+    const nowFromPerfMs = useCallback(() => perfNowMs() + serverOffsetPerfMsRef.current, [perfNowMs]);
 
+    const lastSyncAgeMs = useCallback(() => {
+        const nowP = perfNowMs();
+        const last = lastSyncPerfRef.current;
+        return last > 0 ? (nowP - last) : Number.POSITIVE_INFINITY;
+    }, [perfNowMs]);
 
     // const { profile, error } = useProfile();
     // const { loading } = useAuth();
@@ -66,9 +82,35 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                 ws.send(JSON.stringify({ type: "auth", token }));
             }
 
+            // periodic resync (keeps drift + mobile background weirdness from hurting buzzer fairness)
+            const SYNC_EVERY_MS = 15_000;
 
-            const clientSentAt = Date.now();
-            ws.send(JSON.stringify({ type: "request-time-sync", clientSentAt}));
+            let syncInterval: number | null = null;
+
+            const doSync = () => {
+                const clientSentAt = Date.now();
+                const clientSentPerf = perfNowMs();
+                ws.send(JSON.stringify({ type: "request-time-sync", clientSentAt, clientSentPerf }));
+            };
+
+            doSync();
+            syncInterval = window.setInterval(() => {
+                if (ws.readyState === WebSocket.OPEN) doSync();
+            }, SYNC_EVERY_MS);
+
+            const onVis = () => {
+                if (document.visibilityState === "visible" && ws.readyState === WebSocket.OPEN) {
+                    doSync();
+                }
+            };
+            document.addEventListener("visibilitychange", onVis);
+
+            (ws as any).__cleanupSync = () => {
+                if (syncInterval) window.clearInterval(syncInterval);
+                document.removeEventListener("visibilitychange", onVis);
+            };
+
+
 
             setIsSocketReady(true);
             flushQueue();
@@ -82,6 +124,9 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
         ws.onclose = (e) => {
             console.warn("[WS] closed", { code: e.code, reason: e.reason, wasClean: e.wasClean });
+            try { (ws as any).__cleanupSync?.(); } catch {
+                //ignore
+            }
 
             // Only clear if THIS ws is still the active one
             if (socketRef.current === ws) {
@@ -109,16 +154,27 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             ) return;
 
             const msg = parsed as WSMessage;
+
             if (msg.type === "send-time-sync") {
                 const clientSentAt = Number((msg as any).clientSentAt || 0);
+                const clientSentPerf = Number((msg as any).clientSentPerf || 0);
                 const serverNow = Number((msg as any).serverNow || 0);
+
                 const clientRecvAt = Date.now();
+                const clientRecvPerf = perfNowMs();
 
                 if (clientSentAt > 0 && serverNow > 0) {
-                    const midpoint = (clientSentAt + clientRecvAt) / 2;
-                    serverOffsetMsRef.current = serverNow - midpoint;
+                    const midpointDate = (clientSentAt + clientRecvAt) / 2;
+                    serverOffsetMsRef.current = serverNow - midpointDate;
+                }
+
+                if (clientSentPerf > 0 && serverNow > 0) {
+                    const midpointPerf = (clientSentPerf + clientRecvPerf) / 2;
+                    serverOffsetPerfMsRef.current = serverNow - midpointPerf;
+                    lastSyncPerfRef.current = clientRecvPerf;
                 }
             }
+
             for (const listener of listenersRef.current) listener(msg);
         };
     }, [flushQueue]);
@@ -199,8 +255,11 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         sendJson,
         subscribe,
         setLobbyPresence,
-        nowMs
-    }), [isSocketReady, nowMs, sendJson, setLobbyPresence, subscribe]);
+        nowMs,
+        nowFromPerfMs,
+        perfNowMs,
+        lastSyncAgeMs
+    }), [isSocketReady, lastSyncAgeMs, nowFromPerfMs, nowMs, perfNowMs, sendJson, setLobbyPresence, subscribe]);
 
     return <WebSocketContext.Provider value={value}>{children}</WebSocketContext.Provider>;
 };

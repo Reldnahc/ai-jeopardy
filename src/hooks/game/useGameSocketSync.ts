@@ -527,13 +527,6 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
         });
     }, [isSocketReady, subscribe, applyLockoutUntil, resetLocalTimerState, isHost, gameId, sendJson]);
 
-    // outbound actions (page uses these)
-    const buzz = useCallback(() => {
-        if (!gameId) return;
-        if (buzzResult || buzzLockedOut) return;
-        sendJson({ type: "buzz", gameId });
-    }, [gameId, buzzResult, buzzLockedOut, sendJson]);
-
     const markAllCluesComplete = useCallback(() => {
         if (!gameId) return;
         sendJson({ type: "mark-all-complete", gameId });
@@ -596,7 +589,6 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
         drawings,
         isGameOver,
         // actions
-        buzz,
         markAllCluesComplete,
         updateScore,
         leaveGame,
