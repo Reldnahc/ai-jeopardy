@@ -1,5 +1,5 @@
 // backend/services/tts/limiter.ts
-import type { TtsProviderName } from "./types";
+import type { TtsProviderName } from "./types.js";
 
 type Job<T> = {
     fn: () => Promise<T>;

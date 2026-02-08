@@ -1,6 +1,6 @@
 // backend/services/tts/dedupe.ts
 import { createHash } from "crypto";
-import type { TtsRequest, TtsProviderName } from "./types";
+import type { TtsRequest, TtsProviderName } from "./types.js";
 
 export function normalizeText(s: unknown): string {
     return String(s ?? "")

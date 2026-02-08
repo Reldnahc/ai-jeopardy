@@ -1,7 +1,7 @@
 // backend/services/tts/providers/registry.ts
-import type { TtsProvider, TtsProviderName } from "../types";
-import { piperProvider } from "./piperProvider";
-import { openaiProvider } from "./openaiProvider";
+import type { TtsProvider, TtsProviderName } from "../types.js";
+import { piperProvider } from "./piperProvider.js";
+import { openaiProvider } from "./openaiProvider.js";
 
 let _providers: Map<TtsProviderName, TtsProvider> | null = null;
 

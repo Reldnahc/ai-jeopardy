@@ -1,5 +1,5 @@
 // backend/services/tts/providers/openaiProvider.ts
-import type { TtsProvider } from "../types";
+import type { TtsProvider } from "../types.js";
 
 export const openaiProvider: TtsProvider = {
     name: "openai",

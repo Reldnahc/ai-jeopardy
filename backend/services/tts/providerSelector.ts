@@ -1,6 +1,6 @@
 // backend/services/tts/providerSelector.ts
-import type { TtsProvider, TtsRequest, TtsProviderName } from "./types";
-import { getProviders } from "./providers/registry";
+import type { TtsProvider, TtsRequest, TtsProviderName } from "./types.js";
+import { getProviders } from "./providers/registry.js";
 
 function stripPrefixVoice(voiceId: string): { provider: TtsProviderName | null; voiceId: string } {
     const v = String(voiceId ?? "");
