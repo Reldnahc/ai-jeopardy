@@ -1,71 +1,82 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { games } from "../state/gamesStore.js";
-import {modelsByValue} from "../../shared/models.js";
+import { modelsByValue } from "../../shared/models.js";
 import { makeBroadcaster } from "./broadcast.js";
 import { scheduleLobbyCleanupIfEmpty, cancelLobbyCleanup } from "../lobby/cleanup.js";
 import { sendLobbySnapshot, buildLobbyState, getPlayerForSocket } from "../lobby/snapshot.js";
 import { startGameTimer, clearGameTimer } from "../game/timer.js";
 import { validateImportedBoardData, parseBoardJson, normalizeCategories11 } from "../validation/boardImport.js";
 import { requireHost, isHostSocket } from "../auth/hostGuard.js";
-import {createTrace} from "../services/trace.js";
-import {createBoardData, judgeClueAnswerFast, judgeImage} from "../services/aiService.js";
+import { createTrace } from "../services/trace.js";
+import { createBoardData, judgeClueAnswerFast, judgeImage } from "../services/aiService.js";
 import {
     checkAllDrawingsSubmitted,
     checkAllWagersSubmitted,
     submitDrawing,
-    submitWager
+    submitWager,
 } from "../game/finalJeopardy.js";
-import {checkBoardTransition, isBoardFullyCleared} from "../game/stageTransition.js";
-import {getCOTD} from "../state/cotdStore.js";
-import {collectImageAssetIdsFromBoard} from "../services/imageAssetService.js";
+import { checkBoardTransition, isBoardFullyCleared } from "../game/stageTransition.js";
+import { getCOTD } from "../state/cotdStore.js";
+import { collectImageAssetIdsFromBoard } from "../services/imageAssetService.js";
 import { transcribeAnswerAudio } from "../services/sttService.js";
 
 import {
-    applyNewGameState, broadcastPreloadBatch,
+    applyNewGameState,
+    broadcastPreloadBatch,
     clearGenerationProgress,
     ensureHostOrFail,
-    ensureLobbySettings, getBoardDataOrFail,
-    getGameOrFail, initPreloadState,
+    ensureLobbySettings,
+    getBoardDataOrFail,
+    getGameOrFail,
+    initPreloadState,
     normalizeRole,
     resetGenerationProgressAndNotify,
     resolveModelOrFail,
     resolveVisualPolicy,
     safeAbortGeneration,
-    setupPreloadHandshake
+    setupPreloadHandshake,
 } from "./handlers/game/createGameHelpers.js";
-import {ensureTtsAsset} from "../services/ttsAssetService.js";
-import {createTtsDurationService} from "../services/ttsDurationService.js";
-import {clearAnswerWindow, startAnswerWindow} from "../game/answerWindow.js";
+import { createTtsDurationService } from "../services/ttsDurationService.js";
+import { clearAnswerWindow, startAnswerWindow } from "../game/answerWindow.js";
 import {
     autoResolveAfterJudgement,
-    cancelAutoUnlock, doUnlockBuzzerAuthoritative, findCategoryForClue,
+    cancelAutoUnlock,
+    doUnlockBuzzerAuthoritative,
+    findCategoryForClue,
     parseClueValue,
-    scheduleAutoUnlockForClue
+    scheduleAutoUnlockForClue,
 } from "../game/gameLogic.js";
 import {
     aiHostSayAsset,
     aiHostSayByKey,
     aiHostVoiceSequence,
-    ensureAiHostTtsBank, ensureAiHostValueTts
-} from "../game/host.ts";
-import {verifyJwt} from "../auth/jwt.js";
-import {getBearerToken, playerStableId, verifyAccessToken} from "../services/userService.js";
+    ensureAiHostTtsBank,
+    ensureAiHostValueTts,
+} from "../game/host";
+import { verifyJwt } from "../auth/jwt.js";
+import { getBearerToken, playerStableId, verifyAccessToken } from "../services/userService.js";
+import {ensureTtsAsset} from "../services/tts/ensureTtsAsset";
 
-export const createWsContext = (wss, repos) => {
+// Minimal type for now; we’ll tighten later as you TS-migrate more modules.
+export type WsContext = ReturnType<typeof createWsContext>;
+
+export const createWsContext = (wss: any, repos: any) => {
     const { broadcast, broadcastAll } = makeBroadcaster(wss);
 
-    const ttsDuration = createTtsDurationService( repos );
+    const ttsDuration = createTtsDurationService(repos);
 
-    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-    const normalizeName = (name) => String(name || "").toLowerCase().trim();
+    const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+    const normalizeName = (name: unknown) => String(name || "").toLowerCase().trim();
 
     return {
         wss,
         games,
         modelsByValue,
-        getTtsDurationMs: (assetId) => ttsDuration.getDurationMs(assetId),
+        getTtsDurationMs: (assetId: string) => ttsDuration.getDurationMs(assetId),
         sleep,
         repos,
         normalizeName,
+
         // comms
         broadcast,
         broadcastAll,
@@ -103,7 +114,7 @@ export const createWsContext = (wss, repos) => {
 
         findCategoryForClue,
 
-        //create-game
+        // create-game
         getGameOrFail,
         ensureHostOrFail,
         ensureLobbySettings,
@@ -145,6 +156,6 @@ export const createWsContext = (wss, repos) => {
         broadcastPreloadBatch,
         checkBoardTransition,
         parseClueValue,
-        autoResolveAfterJudgement
+        autoResolveAfterJudgement,
     };
 };

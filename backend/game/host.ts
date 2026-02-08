@@ -1,5 +1,12 @@
 // aiHostTts.ts
-/* eslint-disable @typescript-eslint/no-explicit-any */
+import type {
+    Trace,
+    AiHostTtsBank,
+    Game,
+    Ctx,
+    SayResult,
+    VoiceStep,
+} from "../ws/context.types";
 
 // Variety banks (add as many as you want)
 const AI_HOST_VARIANTS: Record<string, string[]> = {
@@ -43,71 +50,6 @@ const AI_HOST_VARIANTS: Record<string, string[]> = {
 function nameCalloutText(name: string): string {
     return `${name}!`;
 }
-
-/** ---------- Types (minimal, but useful) ---------- */
-
-export type Trace = {
-    mark?: (name: string, data?: any) => void;
-};
-
-export type EnsureTtsAssetParams = {
-    text: string;
-    textType: "text";
-    voiceId: string;
-    engine: string;
-    outputFormat: string;
-};
-
-export type TtsAsset = { id: string };
-
-export type AiHostTtsBank = {
-    slotAssets: Record<string, string[]>;
-    nameAssetsByPlayer: Record<string, string>;
-    categoryAssetsByCategory: Record<string, string>;
-    allAssetIds: string[];
-    valueAssetsByValue: Record<string, string>;
-};
-
-export type Player = { name?: string | null };
-
-export type Category =
-    | string
-    | {
-    name?: string | null;
-    category?: string | null;
-};
-
-export type Game = {
-    lobbySettings?: { narrationEnabled?: boolean | null } | null;
-    players?: Player[] | null;
-    categories?: Category[] | null;
-    boardData?: any;
-    aiHostTts?: AiHostTtsBank | null;
-};
-
-export type Ctx = {
-    repos: any;
-
-    ensureTtsAsset: (
-        params: EnsureTtsAssetParams,
-        pool: any,
-        trace?: Trace
-    ) => Promise<TtsAsset>;
-
-    getTtsDurationMs: (assetId: string) => Promise<number>;
-
-    broadcast: (gameId: string, msg: any) => void;
-    sleep: (ms: number) => Promise<void>;
-};
-
-export type SayResult = { assetId: string; ms: number };
-
-export type VoiceStep = {
-    // In your current JS steps use { slot, pad?, after? }
-    slot: string;
-    pad?: number;
-    after?: () => void | Promise<void>;
-};
 
 function collectBoardValues(game: Game): number[] {
     const valueSet = new Set<number>();
@@ -174,7 +116,7 @@ export async function ensureAiHostValueTts(opts: {
                     {
                         text: `For ${v} dollars.`,
                         textType: "text",
-                        voiceId: "Matthew",
+                        voiceId: "amy",
                         engine: "standard",
                         outputFormat: "mp3",
                     },
@@ -248,7 +190,7 @@ export async function ensureAiHostTtsBank(opts: {
                         {
                             text,
                             textType: "text",
-                            voiceId: "Matthew",
+                            voiceId: "amy",
                             engine: "standard",
                             outputFormat: "mp3",
                         },
@@ -275,7 +217,7 @@ export async function ensureAiHostTtsBank(opts: {
                     {
                         text: nameCalloutText(name),
                         textType: "text",
-                        voiceId: "Matthew",
+                        voiceId: "amy",
                         engine: "standard",
                         outputFormat: "mp3",
                     },
@@ -305,7 +247,7 @@ export async function ensureAiHostTtsBank(opts: {
                     {
                         text: categoryName,
                         textType: "text",
-                        voiceId: "Matthew",
+                        voiceId: "amy",
                         engine: "standard",
                         outputFormat: "mp3",
                     },

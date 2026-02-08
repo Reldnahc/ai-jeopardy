@@ -46,7 +46,7 @@ function advanceToDrawingPhase(game, gameId, wagers, ctx) {
 
 }
 
-async function advanceToFinalePhase(game, gameId, drawings, ctx) {
+async function finishGame(game, gameId, drawings, ctx) {
     game.finalJeopardyStage = "finale";
     ctx.broadcast(gameId, {type: "all-drawings-submitted", drawings});
 
@@ -208,6 +208,6 @@ export function checkAllDrawingsSubmitted(game, gameId, ctx) {
         );
 
     if (allSubmitted) {
-        void advanceToFinalePhase(game, gameId, drawings, ctx);
+        void finishGame(game, gameId, drawings, ctx);
     }
 }

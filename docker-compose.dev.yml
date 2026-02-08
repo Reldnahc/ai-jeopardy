@@ -42,5 +42,21 @@ services:
     depends_on:
       - backend
 
+  piper-api:
+    image: ghcr.io/reldnahc/ai-jeopardy-piper-api:latest
+    environment:
+      PIPER_MODEL: /models/en_US-amy-low.onnx
+      PIPER_USE_CUDA: "0"
+      MAX_INFLIGHT_PER_WORKER: "16"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    ports:
+      - "8000:8000"
+
 volumes:
   pgdata:

@@ -5,7 +5,6 @@ import { modelsByValue } from "../../shared/models.js";
 import { pickCommonsImageForQueries } from "./commonsService.js";
 import { pickBraveImageForQueries } from "./braveImageService.js";
 import { ingestImageToDbFromUrl } from "./imageAssetService.js";
-import { ensureTtsAsset } from "./ttsAssetService.js";
 
 // Initialize AI clients
 const openai = new OpenAI();
@@ -350,13 +349,14 @@ async function createBoardData(ctx, categories, model, host, options = {}) {
             // Start the async job NOW (do not await here)
             const p = limitTts(async () => {
                 try {
-                    const asset = await ensureTtsAsset(
+                    const asset = await ctx.ensureTtsAsset(
                         {
                             text,
                             textType: "text",
-                            voiceId: "Matthew",
+                            voiceId: "amy",
                             engine: "standard",
                             outputFormat: "mp3",
+                            provider: "piper"
                         },
                         ctx.repos,
                         trace

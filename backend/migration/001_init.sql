@@ -105,6 +105,7 @@ CREATE TABLE IF NOT EXISTS public.tts_assets (
 
     data bytea,
     bytes integer NOT NULL,
+    provider text NOT NULL,
     text text NOT NULL,
     text_type text NOT NULL DEFAULT 'text',
     voice_id text NOT NULL DEFAULT 'Matthew',
