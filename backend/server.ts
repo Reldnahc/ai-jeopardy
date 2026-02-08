@@ -1,5 +1,4 @@
 // backend/server.ts
-// backend/server.ts
 import { WebSocketServer } from "ws";
 import "dotenv/config";
 
@@ -7,8 +6,8 @@ import { createServer } from "node:http";
 import express from "express";
 import cors from "cors";
 import bodyParser from "body-parser";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
+
 
 import { Agent, setGlobalDispatcher } from "undici";
 
@@ -21,7 +20,6 @@ import { registerProfileRoutes } from "./http/profileRoutes";
 import { registerBoardRoutes } from "./http/boardRoutes";
 import { pool } from "./config/pg";
 import { createRepos } from "./repositories";
-
 
 const app = express();
 
@@ -39,10 +37,7 @@ app.use(bodyParser.json());
 const server = createServer(app);
 const wss = new WebSocketServer({ server });
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const distPath = join(__dirname, "..", "dist");
-
+const distPath = join(process.cwd(), "dist");
 // --- 1. REGISTER API ROUTES FIRST ---
 const repos = createRepos(pool);
 

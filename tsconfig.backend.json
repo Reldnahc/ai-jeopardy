@@ -6,9 +6,9 @@
     "rootDir": "backend",
     "outDir": "dist-backend",
     "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
     "resolveJsonModule": true,
     "skipLibCheck": true
   },
   "include": ["backend/**/*.ts"],
-  "exclude": ["node_modules", "dist", "dist-backend"]
 }
