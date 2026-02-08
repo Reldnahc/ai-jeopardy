@@ -25,4 +25,4 @@ COPY --from=build /app/shared ./shared
 ENV NODE_ENV=production
 EXPOSE 3002
 
-CMD ["node", "dist-backend/server.cjs"]
+CMD ["node", "dist-backend/server.js"]

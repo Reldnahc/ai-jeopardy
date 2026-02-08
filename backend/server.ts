@@ -11,15 +11,16 @@ import { join } from "node:path";
 
 import { Agent, setGlobalDispatcher } from "undici";
 
-import { createCategoryOfTheDay } from "./services/aiService";
-import { attachWebSocketServer } from "./ws";
-import { getCOTD, setCOTD } from "./state/cotdStore";
-import { registerHttpRoutes } from "./http/routes";
-import { registerAuthRoutes } from "./http/authRoutes";
-import { registerProfileRoutes } from "./http/profileRoutes";
-import { registerBoardRoutes } from "./http/boardRoutes";
-import { pool } from "./config/pg";
-import { createRepos } from "./repositories";
+import { createCategoryOfTheDay } from "./services/aiService.js";
+import { attachWebSocketServer } from "./ws/index.js";
+import { getCOTD, setCOTD } from "./state/cotdStore.js";
+import { registerHttpRoutes } from "./http/routes.js";
+import { registerAuthRoutes } from "./http/authRoutes.js";
+import { registerProfileRoutes } from "./http/profileRoutes.js";
+import { registerBoardRoutes } from "./http/boardRoutes.js";
+import { pool } from "./config/pg.js";
+import { createRepos } from "./repositories/index.js";
+
 
 const app = express();
 

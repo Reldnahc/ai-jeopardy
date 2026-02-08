@@ -9,12 +9,11 @@
     "dev:web": "vite --host 0.0.0.0 --port 5173",
 
     "dev:backend": "tsx backend/server.ts",
-
     "build:web": "vite build",
-    "build:backend": "tsc -p tsconfig.backend.json && node -e \"const fs=require('fs'); fs.renameSync('dist-backend/server.js','dist-backend/server.cjs')\"",
+    "build:backend": "tsc -p tsconfig.backend.json",
     "build": "npm run build:web && npm run build:backend",
 
-    "start": "node dist-backend/server.cjs",
+    "start": "node dist-backend/server.js",
 
     "lint": "eslint .",
     "preview": "vite preview",
