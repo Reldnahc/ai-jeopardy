@@ -1,6 +1,7 @@
 import { pickCommonsImageForQueries } from "../commonsService.js";
 import { pickBraveImageForQueries } from "../braveImageService.js";
 import { ingestImageToDbFromUrl } from "../imageAssetService.js";
+import {Ctx} from "../../ws/context.types.js";
 
 type TraceLike = { mark: (event: string, meta?: Record<string, unknown>) => void };
 
@@ -10,6 +11,7 @@ export type VisualSettings = {
     maxVisualCluesPerCategory: number;
     maxImageSearchTries: number;
     preferPhotos: boolean;
+    commonsThumbWidth?: number;
     trace?: TraceLike;
 };
 
@@ -53,7 +55,7 @@ export function makeLimiter(maxConcurrent: number) {
 }
 
 export async function populateCategoryVisuals(
-    ctx: any,
+    ctx: Ctx,
     cat: any,
     settings: VisualSettings,
     progressTick?: ProgressTick

@@ -56,6 +56,7 @@ import {
 import { verifyJwt } from "../auth/jwt.js";
 import { getBearerToken, playerStableId, verifyAccessToken } from "../services/userService.js";
 import {ensureTtsAsset} from "../services/tts/ensureTtsAsset.js";
+import {makeLimiter, plannedVisualSlots, populateCategoryVisuals} from "../services/ai/visuals.js";
 
 // Minimal type for now; we’ll tighten later as you TS-migrate more modules.
 export type WsContext = ReturnType<typeof createWsContext>;
@@ -157,5 +158,9 @@ export const createWsContext = (wss: any, repos: any) => {
         checkBoardTransition,
         parseClueValue,
         autoResolveAfterJudgement,
+
+        plannedVisualSlots,
+        makeLimiter,
+        populateCategoryVisuals
     };
 };

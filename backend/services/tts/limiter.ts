@@ -7,7 +7,7 @@ type Job<T> = {
     reject: (err: unknown) => void;
 };
 
-type Limiter = {
+export type Limiter = {
     schedule: <T>(fn: () => Promise<T>) => Promise<T>;
 };
 

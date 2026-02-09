@@ -1,11 +1,33 @@
-import { modelsByValue } from "../../../shared/models.js";
-import type { BoardData } from "../../../shared/types/board.js";
-import { makeLimiter, plannedVisualSlots, populateCategoryVisuals, type VisualSettings } from "./visuals.js";
-import {Ctx} from "../../ws/context.types.js";
+import type {BoardData, Clue} from "../../../shared/types/board.js";
+import type {VisualSettings} from "./visuals.js";
+import type {Ctx} from "../../ws/context.types.js";
+import {Board} from "../../http/boardRoutes.js";
 
 type TraceLike = { mark: (event: string, meta?: Record<string, unknown>) => void };
 
 type ProgressEvent = { done: number; total: number; progress: number };
+
+type ClueKeyInput = { value?: number; question: string };
+
+type AiClue = {
+    value: number;
+    question: string;
+    answer: string;
+    category?: string;
+    visual?: unknown; // or your real visual type if you have one
+};
+
+type AiFinalClue = {
+    question: string;
+    answer: string;
+    category?: string;
+    visual?: unknown;
+};
+
+
+type AiCategoryJson = { category: string; values: AiClue[] };
+type AiFinalCategoryJson = { category: string; values: AiFinalClue[] };
+
 
 export type CreateBoardOptions = Partial<VisualSettings> & {
     reasoningEffort?: "off" | "low" | "medium" | "high";
@@ -18,8 +40,30 @@ export type CreateBoardOptions = Partial<VisualSettings> & {
 function clamp01(n: number) {
     return Math.max(0, Math.min(1, n));
 }
+function toBoardCategory(json: AiCategoryJson) {
+    const cat = json.category.trim();
 
-async function saveBoardAsync(ctx: any, host: string, board: any) {
+    const values: Clue[] = json.values.map((c) => ({
+        ...c,
+        category: cat, // stamp the category string onto each clue
+        // ensure value is present + numeric already
+    })) as Clue[];
+
+    return { category: cat, values };
+}
+function toFinalCategory(json: AiFinalCategoryJson) {
+    const cat = json.category.trim();
+
+    const values: Clue[] = json.values.map((c) => ({
+        ...c,
+        category: cat,
+        value: 0, // or whatever your Final Jeopardy clue expects; pick a consistent sentinel
+    })) as Clue[];
+
+    return { category: cat, values };
+}
+
+async function saveBoardAsync(ctx: Ctx, host: string, board: Board) {
     try {
         const normalizedHost = String(host ?? "").toLowerCase().trim();
         const ownerId = await ctx.repos.profiles.getIdByUsername(normalizedHost);
@@ -27,11 +71,9 @@ async function saveBoardAsync(ctx: any, host: string, board: any) {
 
         await ctx.repos.boards.insertBoard(ownerId, board);
         await ctx.repos.profiles.incrementBoardsGenerated(ownerId);
-    } catch (e: any) {
-        console.error("[Server][saveBoardAsync] Unhandled exception while saving board", {
-            message: e?.message ?? e,
-            stack: e?.stack,
-        });
+    } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error("[TTS] ensureTtsAsset failed:", msg);
     }
 }
 
@@ -42,8 +84,7 @@ export async function createBoardData(
     host: string,
     options: CreateBoardOptions = {}
 ): Promise<BoardData> {
-    const settings: Required<Omit<CreateBoardOptions, "onProgress" | "onTtsReady" | "trace">> &
-        Pick<CreateBoardOptions, "onProgress" | "onTtsReady" | "trace"> = {
+    const settings = {
         includeVisuals: false,
         imageProvider: "commons",
         maxVisualCluesPerCategory: 2,
@@ -59,7 +100,8 @@ export async function createBoardData(
         trace: undefined,
 
         ...options,
-    } as any;
+    } satisfies Required<Omit<CreateBoardOptions, "onProgress" | "onTtsReady" | "trace">> &
+        Pick<CreateBoardOptions, "onProgress" | "onTtsReady" | "trace">;
 
     const trace = settings.trace;
     trace?.mark("aiService_enter", { model, includeVisuals: settings.includeVisuals });
@@ -74,10 +116,10 @@ export async function createBoardData(
         categories[10],
     ];
 
-    const modelDef = (modelsByValue as any)[model];
+    const modelDef = (ctx.modelsByValue)[model];
     if (!modelDef) throw new Error(`Unknown model: ${model}`);
 
-    const total = 11 + (settings.includeVisuals ? plannedVisualSlots(settings) + 1 : 0);
+    const total = 11 + (settings.includeVisuals ? ctx.plannedVisualSlots(settings) + 1 : 0);
     let done = 0;
 
     const report = () => {
@@ -97,25 +139,57 @@ export async function createBoardData(
         report();
     };
 
-    const limitVisuals = settings.includeVisuals ? makeLimiter(2) : null;
-    const limitTts = settings.narrationEnabled ? makeLimiter(3) : null;
+    const limitVisuals = settings.includeVisuals ? ctx.makeLimiter(2) : null;
+    const limitTts = settings.narrationEnabled ? ctx.makeLimiter(3) : null;
 
     const ttsPromises: Array<Promise<unknown>> = [];
     const ttsIds = new Set<string>();
     const ttsByClueKey: Record<string, string> = Object.create(null);
 
-    const clueKeyFor = (boardType: string, clue: any) => {
-        const v = typeof clue?.value === "number" ? clue.value : null;
-        const q = String(clue?.question ?? "").trim();
+    const clueKeyFor = (boardType: string, clue: ClueKeyInput) => {
+        const v = typeof clue.value === "number" ? clue.value : null;
+        const q = clue.question.trim();
         if (!q) return null;
         return `${boardType}:${v ?? "?"}:${q}`;
     };
 
-    const enqueueCategoryTts = (boardType: string, json: any) => {
+    function isRecord(v: unknown): v is Record<string, unknown> {
+        return typeof v === "object" && v !== null;
+    }
+
+
+    function isAiCategoryJson(v: unknown): v is AiCategoryJson {
+        if (!isRecord(v)) return false;
+        if (typeof v.category !== "string") return false;
+        if (!Array.isArray(v.values)) return false;
+
+        // ensure each clue has required fields for normal board
+        return v.values.every((c) =>
+            isRecord(c) &&
+            typeof c.value === "number" &&
+            typeof c.question === "string" &&
+            typeof c.answer === "string"
+        );
+    }
+
+    function isAiFinalCategoryJson(v: unknown): v is AiFinalCategoryJson {
+        if (!isRecord(v)) return false;
+        if (typeof v.category !== "string") return false;
+        if (!Array.isArray(v.values) || v.values.length !== 1) return false;
+
+        const c = v.values[0];
+        return (
+            isRecord(c) &&
+            typeof c.question === "string" &&
+            typeof c.answer === "string"
+        );
+    }
+
+    const enqueueCategoryTts = (boardType: "firstBoard" | "secondBoard", json: AiCategoryJson) => {
         if (!settings.narrationEnabled || !limitTts) return;
 
-        for (const clue of json?.values ?? []) {
-            const q = String(clue?.question ?? "").trim();
+        for (const clue of json.values) {
+            const q = clue.question.trim();
             if (!q) continue;
 
             const p = limitTts(async () => {
@@ -142,8 +216,51 @@ export async function createBoardData(
 
                     const k = clueKeyFor(boardType, clue);
                     if (k) ttsByClueKey[k] = asset.id;
-                } catch (e: any) {
-                    console.error("[TTS] ensureTtsAsset failed:", e?.message ?? e);
+                } catch (e: unknown) {
+                    const msg = e instanceof Error ? e.message : String(e);
+                    console.error("[TTS] ensureTtsAsset failed:", msg);
+                }
+            });
+
+            ttsPromises.push(p);
+        }
+    };
+
+    const enqueueFinalTts = (json: AiFinalCategoryJson) => {
+        if (!settings.narrationEnabled || !limitTts) return;
+
+        for (const clue of json.values) {
+            const q = clue.question.trim();
+            if (!q) continue;
+
+            const p = limitTts(async () => {
+                try {
+                    const asset = await ctx.ensureTtsAsset(
+                        {
+                            text: q,
+                            textType: "text",
+                            voiceId: "amy",
+                            engine: "standard",
+                            outputFormat: "mp3",
+                            provider: "piper",
+                        },
+                        ctx.repos
+                    );
+
+                    ttsIds.add(asset.id);
+
+                    try {
+                        settings.onTtsReady?.(asset.id);
+                    } catch {
+                        // ignore
+                    }
+
+                    // Final has no value -> clueKeyFor handles missing value
+                    const k = clueKeyFor("finalJeopardy", { question: clue.question });
+                    if (k) ttsByClueKey[k] = asset.id;
+                } catch (e: unknown) {
+                    const msg = e instanceof Error ? e.message : String(e);
+                    console.error("[TTS] ensureTtsAsset failed:", msg);
                 }
             });
 
@@ -266,18 +383,6 @@ STRICT:
         }
     };
 
-    const stampCategoryOnClues = (categoryJson: any) => {
-        const cat = String(categoryJson?.category || "").trim();
-        if (!cat || !Array.isArray(categoryJson?.values)) return categoryJson;
-
-        categoryJson.values = categoryJson.values.map((clue: any) => ({
-            ...clue,
-            category: cat,
-        }));
-
-        return categoryJson;
-    };
-
     const { callOpenAiJson, parseOpenAiJson } = await import("./openaiClient.js");
 
     trace?.mark("createBoardData BEGIN");
@@ -288,71 +393,103 @@ STRICT:
                 const r = await callOpenAiJson(model, categoryPrompt(cat, false), {
                     reasoningEffort: settings.reasoningEffort,
                 });
-                const json = parseOpenAiJson<any>(r);
 
-                if (!json || typeof json.category !== "string" || !Array.isArray(json.values)) {
-                    throw new Error(`Single category ${i} missing {category, values}`);
+                const ai = parseOpenAiJson<unknown>(r);
+                if (!isAiCategoryJson(ai)) {
+                    throw new Error(`Single category ${i} missing required fields`);
                 }
-                return stampCategoryOnClues(json);
-            }).then(async (json) => {
+
+                const category = toBoardCategory( ai);
+                return { ai, category };
+            }).then(async ({ ai, category }) => {
                 tick(1);
 
-                enqueueCategoryTts("firstBoard", json);
+                enqueueCategoryTts("firstBoard", ai);
 
                 if (settings.includeVisuals && limitVisuals) {
-                    await limitVisuals(() => populateCategoryVisuals(ctx, json, settings as any, (n) => tick(n)));
+                    const visualSettings: VisualSettings = {
+                        includeVisuals: settings.includeVisuals,
+                        imageProvider: settings.imageProvider,
+                        maxVisualCluesPerCategory: settings.maxVisualCluesPerCategory,
+                        maxImageSearchTries: settings.maxImageSearchTries,
+                        commonsThumbWidth: settings.commonsThumbWidth,
+                        preferPhotos: settings.preferPhotos,
+                    };
+                    await limitVisuals(() => ctx.populateCategoryVisuals(ctx, category, visualSettings, tick));
                 }
 
-                return json;
+                return category;
             })
         );
+
 
         const secondCategoryPromises = secondCategories.map((cat, i) =>
             timed(`DOUBLE C${i + 1} (${cat})`, async () => {
                 const r = await callOpenAiJson(model, categoryPrompt(cat, true), {
                     reasoningEffort: settings.reasoningEffort,
                 });
-                const json = parseOpenAiJson<any>(r);
 
-                if (!json || typeof json.category !== "string" || !Array.isArray(json.values)) {
-                    throw new Error(`Double category ${i} missing {category, values}`);
+                const ai = parseOpenAiJson<unknown>(r);
+                if (!isAiCategoryJson(ai)) {
+                    throw new Error(`Double category ${i} missing required fields`);
                 }
-                return stampCategoryOnClues(json);
-            }).then(async (json) => {
+
+                const category = toBoardCategory( ai);
+                return { ai, category };
+            }).then(async ({ ai, category }) => {
                 tick(1);
 
-                enqueueCategoryTts("secondBoard", json);
+                enqueueCategoryTts("secondBoard", ai);
 
                 if (settings.includeVisuals && limitVisuals) {
-                    await limitVisuals(() => populateCategoryVisuals(ctx, json, settings as any, (n) => tick(n)));
+                    const visualSettings: VisualSettings = {
+                        includeVisuals: settings.includeVisuals,
+                        imageProvider: settings.imageProvider,
+                        maxVisualCluesPerCategory: settings.maxVisualCluesPerCategory,
+                        maxImageSearchTries: settings.maxImageSearchTries,
+                        commonsThumbWidth: settings.commonsThumbWidth,
+                        preferPhotos: settings.preferPhotos,
+                    };
+                    await limitVisuals(() => ctx.populateCategoryVisuals(ctx, category, visualSettings, tick));
                 }
 
-                return json;
+                return category;
             })
         );
+
 
         const finalPromise = timed(`FINAL (${finalCategory})`, async () => {
             const r = await callOpenAiJson(model, finalPrompt(finalCategory), {
                 reasoningEffort: settings.reasoningEffort,
             });
-            const json = parseOpenAiJson<any>(r);
 
-            if (!json || typeof json.category !== "string" || !Array.isArray(json.values)) {
-                throw new Error("Final jeopardy missing {category, values}");
+            const ai = parseOpenAiJson<unknown>(r);
+            if (!isAiFinalCategoryJson(ai)) {
+                throw new Error("Final jeopardy missing required fields");
             }
 
-            return stampCategoryOnClues(json);
-        }).then(async (json) => {
+            const category = toFinalCategory(ai);
+            return { ai, category };
+        }).then(async ({ ai, category }) => {
             tick(1);
 
-            enqueueCategoryTts("finalJeopardy", json);
+            enqueueFinalTts(ai);
 
             if (settings.includeVisuals && limitVisuals) {
-                await limitVisuals(() => populateCategoryVisuals(ctx, json, settings as any, (n) => tick(n)));
+                const visualSettings: VisualSettings = {
+                    includeVisuals: settings.includeVisuals,
+                    imageProvider: settings.imageProvider,
+                    maxVisualCluesPerCategory: settings.maxVisualCluesPerCategory,
+                    maxImageSearchTries: settings.maxImageSearchTries,
+                    commonsThumbWidth: settings.commonsThumbWidth,
+                    preferPhotos: settings.preferPhotos,
+                };
+                await limitVisuals(() => ctx.populateCategoryVisuals(ctx, category, visualSettings, tick));
             }
 
-            return json;
+            return category;
         });
+
 
         const [firstCategoryResults, secondCategoryResults, finalBuilt] = await timed("AWAIT ALL RESULTS", async () =>
             Promise.all([Promise.all(firstCategoryPromises), Promise.all(secondCategoryPromises), finalPromise])
@@ -379,9 +516,9 @@ STRICT:
             ttsAssetIds: Array.from(ttsIds),
             ttsByClueKey,
         };
-    } catch (error: any) {
-        trace?.mark("createBoardData ERROR");
-        console.error("[Server] Error generating board data:", error?.message ?? error);
-        throw error;
+    } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error("[Server] Error generating board data:", msg);
+        throw e;
     }
 }

@@ -1,9 +1,16 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+import {
+    ProgressTick,
+    VisualSettings
+} from "../services/ai/visuals.js";
+import type {TtsProviderName} from "../services/tts/types.js";
+import type { Limiter as TtsLimiter } from "../services/tts/limiter.js";
+
 export type Trace = {
     mark?: (name: string, data?: any) => void;
 };
-
+export type AsyncLimiter = <T>(fn: () => Promise<T>) => Promise<T>;
 // This matches your current ensureTtsAsset signature (old Polly style).
 // Later we’ll replace this with your new providers-based ensureTtsAsset types.
 export type EnsureTtsAssetParams = {
@@ -51,9 +58,26 @@ export type Ctx = {
     ) => Promise<TtsAsset>;
 
     getTtsDurationMs: (assetId: string) => Promise<number>;
+    modelsByValue: Record<string, any>;
     provider: string;
+
     broadcast: (gameId: string, msg: any) => void;
     sleep: (ms: number) => Promise<void>;
+
+    plannedVisualSlots: (
+        settings: Pick<VisualSettings, "includeVisuals" | "maxVisualCluesPerCategory">
+    ) => number;
+
+    makeLimiter: (maxConcurrent: number) => AsyncLimiter;
+
+    getLimiter: (provider: TtsProviderName) => TtsLimiter;
+
+    populateCategoryVisuals: (
+        ctx: Ctx,
+        cat: any,
+        settings: VisualSettings,
+        progressTick?: ProgressTick
+    ) => Promise<void>;
 };
 
 export type SayResult = { assetId: string; ms: number };
