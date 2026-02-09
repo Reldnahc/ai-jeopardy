@@ -1,5 +1,5 @@
 import React from "react";
-import { Category, Clue } from "../../types.ts";
+import { Category, Clue } from "../../../shared/types/board.ts";
 
 interface JeopardyGridProps {
     boardData: Category[];

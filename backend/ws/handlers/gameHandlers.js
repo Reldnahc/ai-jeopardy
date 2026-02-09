@@ -980,9 +980,10 @@ export const gameHandlers = {
                 {
                     text,
                     textType: textType || "text",
-                    voiceId: voiceId || "Matthew",
+                    voiceId: voiceId || "amy",
                     engine: "standard",
                     outputFormat: "mp3",
+                    provider: "piper"
                 },
                 ctx.repos
             );

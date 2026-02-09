@@ -1,4 +1,4 @@
-// backend/services/tts/types.ts
+// backend/services/tts/board.ts
 
 export type TtsProviderName = "piper" | "openai";
 

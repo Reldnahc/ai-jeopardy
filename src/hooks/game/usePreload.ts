@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import type {BoardData, Category, Clue} from "../../types";
+import type {BoardData, Category, Clue} from "../../../shared/types/board.ts";
 
 function preloadAudio(url: string) {
     return new Promise<void>((resolve) => {

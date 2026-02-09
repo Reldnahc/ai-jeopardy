@@ -12,6 +12,7 @@ export type EnsureTtsAssetParams = {
     voiceId: string;
     engine: string;
     outputFormat: string;
+    provider: string;
 };
 
 export type TtsAsset = { id: string };
@@ -50,7 +51,7 @@ export type Ctx = {
     ) => Promise<TtsAsset>;
 
     getTtsDurationMs: (assetId: string) => Promise<number>;
-
+    provider: string;
     broadcast: (gameId: string, msg: any) => void;
     sleep: (ms: number) => Promise<void>;
 };

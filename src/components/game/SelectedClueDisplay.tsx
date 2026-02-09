@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { Clue } from "../../types.ts";
+import { Clue } from "../../../shared/types/board.ts";
 import { useWebSocket } from "../../contexts/WebSocketContext.tsx";
 import BuzzAnimation from "./BuzzAnimation.tsx";
 import Timer from "./Timer.tsx";

@@ -119,6 +119,7 @@ export async function ensureAiHostValueTts(opts: {
                         voiceId: "amy",
                         engine: "standard",
                         outputFormat: "mp3",
+                        provider: "piper"
                     },
                     ctx.repos
                 );
@@ -192,6 +193,7 @@ export async function ensureAiHostTtsBank(opts: {
                             voiceId: "amy",
                             engine: "standard",
                             outputFormat: "mp3",
+                            provider: "piper"
                         },
                         ctx.repos
                     );
@@ -218,6 +220,7 @@ export async function ensureAiHostTtsBank(opts: {
                         voiceId: "amy",
                         engine: "standard",
                         outputFormat: "mp3",
+                        provider: "piper"
                     },
                     ctx.repos
                 );
@@ -247,6 +250,7 @@ export async function ensureAiHostTtsBank(opts: {
                         voiceId: "amy",
                         engine: "standard",
                         outputFormat: "mp3",
+                        provider: "piper"
                     },
                     ctx.repos
                 );

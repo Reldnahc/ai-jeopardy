@@ -1,4 +1,4 @@
-// backend/repositories/types.ts
+// backend/repositories/board.ts
 export type PublicUser = Record<string, unknown>;
 export type PublicProfile = Record<string, unknown>;
 

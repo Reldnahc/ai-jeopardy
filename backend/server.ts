@@ -12,6 +12,7 @@ import { join } from "node:path";
 import { Agent, setGlobalDispatcher } from "undici";
 
 import { createCategoryOfTheDay } from "./services/aiService.js";
+
 import { attachWebSocketServer } from "./ws/index.js";
 import { getCOTD, setCOTD } from "./state/cotdStore.js";
 import { registerHttpRoutes } from "./http/routes.js";

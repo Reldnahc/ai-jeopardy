@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState} from 'react';
-import {Category, Clue} from "../../types.ts";
+import {Category, Clue} from "../../../shared/types/board.ts";
 import JeopardyGrid from "./JeopardyGrid.tsx"; // Import the grid component
 import WagerInput from "./WagerInput.tsx"; // Import the wager input component
 import SelectedClueDisplay from "./SelectedClueDisplay.tsx";
