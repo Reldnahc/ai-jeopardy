@@ -1,7 +1,6 @@
-import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {useCallback, useEffect, useRef, useState} from 'react';
 import {useLocation, useNavigate, useParams} from 'react-router-dom';
 import JeopardyBoard from '../components/game/JeopardyBoard.tsx';
-import {Clue} from "../board.ts";
 import Sidebar from "../components/game/Sidebar.tsx";
 import FinalScoreScreen from "../components/game/FinalScoreScreen.tsx";
 import {useWebSocket} from "../contexts/WebSocketContext.tsx";
@@ -12,6 +11,7 @@ import {useGameSocketSync} from "../hooks/game/useGameSocketSync.ts";
 import {usePlayerIdentity} from "../hooks/usePlayerIdentity.ts";
 import {usePreload} from "../hooks/game/usePreload.ts";
 import {useEarlyMicPermission} from "../hooks/earlyMicPermission.ts";
+import {Clue} from "../../shared/types/board.ts";
 
 function getApiBase() {
     // In dev, allow explicit override
@@ -371,15 +371,7 @@ export default function Game() {
         boardDataRef.current = boardData;
     }, [boardData]);
 
-    // Memoize the board data so the preloader doesn't reset on every re-render
-    const memoizedBoardData = useMemo(() => boardData, [
-        // Only change if the actual content (like categories length) changes
-        boardData?.firstBoard?.categories?.length,
-        boardData?.secondBoard?.categories?.length,
-        boardData?.finalJeopardy?.categories?.length
-    ]);
-
-    usePreload(memoizedBoardData, Boolean(memoizedBoardData));
+    usePreload(boardData, Boolean(boardData));
 
     const { nowFromPerfMs, perfNowMs, lastSyncAgeMs } = useWebSocket();
 

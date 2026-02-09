@@ -36,13 +36,13 @@ function getApiBase() {
 }
 
 function ttsUrl(id: string) {
-    return `${getApiBase()}/api/tts/${encodeURIComponent(id)}`;
+    return `${getApiBase()}/api/tts/${encodeURIComponent(id).trim()}`;
+}
+function imageUrl(id: string) {
+    return `${getApiBase()}/api/images/${ encodeURIComponent(String(id).trim())}`;
 }
 
 function collectImageAssetIds(boardData: BoardData): string[] {
-    if (!boardData) return [];
-
-    // Defensive check: handle if boardData is the whole object or just an array
     const allCats: Category[] = [
         ...(boardData.firstBoard?.categories ?? []),
         ...(boardData.secondBoard?.categories ?? []),
@@ -60,45 +60,47 @@ function collectImageAssetIds(boardData: BoardData): string[] {
         }
     }
 
-    console.log(`[Preloader] Found ${ids.size} unique image IDs.`);
     return Array.from(ids);
 }
 
-async function preloadOne(
-    url: string,
-    signal: AbortSignal,
-    onSuccess?: (url: string) => void
-): Promise<void> {
+async function preloadOne(url: string, signal: AbortSignal): Promise<void> {
     return new Promise<void>((resolve) => {
         if (signal.aborted) return resolve();
 
         const img = new Image();
-        console.log(`[Preloader] Starting download: ${url}`);
 
         const cleanup = () => {
             img.onload = null;
             img.onerror = null;
+            signal.removeEventListener("abort", onAbort);
         };
 
-        img.onload = async () => {
+        const onAbort = () => {
             cleanup();
+            // Stop loading ASAP
             try {
-                if (typeof img.decode === "function") {
-                    await img.decode();
-                    console.log(`[Preloader] Decoded and cached: ${url}`);
-                }
-            } catch (e) {
-                console.warn(`[Preloader] Decode failed for ${url}, but image is cached.` + e);
+                img.src = "";
+            } catch {
+                // ignore
             }
-
-            onSuccess?.(url);
             resolve();
         };
 
+        signal.addEventListener("abort", onAbort, { once: true });
+
+        img.onload = async () => {
+            cleanup();
+            // decode() helps ensure it’s actually decoded & cached when supported
+            try {
+                if (typeof img.decode === "function") await img.decode();
+            } catch {
+                // decode can fail even if cached; ignore
+            }
+            resolve();
+        };
 
         img.onerror = () => {
             cleanup();
-            console.error(`[Preloader] Failed to load: ${url}`);
             resolve();
         };
 
@@ -108,6 +110,7 @@ async function preloadOne(
 
 export function usePreload(boardData: BoardData | null | undefined, enabled: boolean) {
     const requestedRef = useRef<Set<string>>(new Set());
+    const lastKeyRef = useRef<string>("");
 
     useEffect(() => {
         if (!enabled || !boardData) return;
@@ -115,20 +118,21 @@ export function usePreload(boardData: BoardData | null | undefined, enabled: boo
         const ids = collectImageAssetIds(boardData);
         if (!ids.length) return;
 
+        // Only rerun when the actual set of asset IDs changes
+        const key = ids.slice().sort().join("|");
+        if (key === lastKeyRef.current) return;
+        lastKeyRef.current = key;
+
         const controller = new AbortController();
         const { signal } = controller;
+
         const CONCURRENCY = 5;
 
         const queue = ids
-            .map((id) => `/api/images/${id}`)
+            .map((id) => imageUrl(id))
             .filter((url) => !requestedRef.current.has(url));
 
-        if (!queue.length) {
-            console.log("[Preloader] All found images already requested/cached.");
-            return;
-        }
-
-        console.log(`[Preloader] Queueing ${queue.length} new images.`);
+        if (!queue.length) return;
 
         let inFlight = 0;
         let index = 0;
@@ -142,24 +146,22 @@ export function usePreload(boardData: BoardData | null | undefined, enabled: boo
 
                 // micro-stagger to avoid bursty connects
                 setTimeout(() => {
-                    preloadOne(url, signal, (u) => requestedRef.current.add(u)).finally(() => {
+                    preloadOne(url, signal).finally(() => {
+                        requestedRef.current.add(url);
                         inFlight--;
                         pump();
                     });
-                }, 75);
-
+                }, 50);
             }
         };
 
         pump();
 
         return () => {
-            console.log("[Preloader] Aborting active preloads (component unmount or data change).");
             controller.abort();
         };
     }, [boardData, enabled]);
 }
-
 async function preloadAudioOne(url: string, signal: AbortSignal): Promise<void> {
     const MAX_ATTEMPTS = 7;
 
@@ -309,7 +311,7 @@ export function usePreloadImageAssetIds(
         // empty batch should still allow "done" if nothing pending
         const next = Array.isArray(assetIds) ? assetIds : [];
         for (const id of next) {
-            const url = `/api/images/${String(id).trim()}`;
+            const url = imageUrl(id);
             if (!url.trim()) continue;
             if (requestedRef.current.has(url)) continue;
             if (pendingRef.current.includes(url)) continue;
@@ -381,7 +383,7 @@ export function usePreloadImageAssetIds(
                         }
 
                         // Now load via Image() so it lands in the image cache
-                        await preloadOne(url, new AbortController().signal, () => {});
+                        await preloadOne(url, new AbortController().signal);
                         requestedRef.current.add(url);
                         retryRef.current.delete(url);
                     } catch {
