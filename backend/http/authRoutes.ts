@@ -26,20 +26,26 @@ function normalizeUsername(username: unknown): string {
   return String(username ?? "").trim().toLowerCase();
 }
 
+function asRecord(v: unknown): Record<string, unknown> {
+  return typeof v === "object" && v !== null ? (v as Record<string, unknown>) : {};
+}
+
 export function registerAuthRoutes(app: Application, repos: AuthRepos) {
   // Signup (email optional)
   app.post("/api/auth/signup", async (req: Request, res: Response) => {
     try {
-      const usernameRaw = String((req.body as any)?.username ?? "");
+      const body = asRecord(req.body);
+
+      const usernameRaw = String(body.username ?? "");
       const username = normalizeUsername(usernameRaw);
 
       const displayname =
-        String((req.body as any)?.displayname ?? "").trim() ||
-        usernameRaw.trim() ||
-        username;
+          String(body.displayname ?? "").trim() ||
+          usernameRaw.trim() ||
+          username;
 
-      const email = normalizeEmail((req.body as any)?.email);
-      const password = String((req.body as any)?.password ?? "");
+      const email = normalizeEmail(body.email);
+      const password = String(body.password ?? "");
 
       if (!username || !password) {
         return res.status(400).json({ error: "Missing username/password" });
@@ -58,12 +64,17 @@ export function registerAuthRoutes(app: Application, repos: AuthRepos) {
         return res.status(500).json({ error: "Signup failed" });
       }
 
-      const token = signJwt({ sub: user.id, username: user.username, role: user.role });
+      const token = signJwt( user.id, user.username,user.role );
       return res.json({ token, user });
-    } catch (e: any) {
-      const msg = String(e?.message || "");
+    } catch (e: unknown) {
+      const msg = String(
+          (e as { message?: unknown } | null | undefined)?.message ?? ""
+      );
+
       if (msg.includes("duplicate key value")) {
-        return res.status(409).json({ error: "Username (or email) already exists" });
+        return res
+            .status(409)
+            .json({ error: "Username (or email) already exists" });
       }
 
       console.error("POST /api/auth/signup failed:", e);
@@ -74,8 +85,10 @@ export function registerAuthRoutes(app: Application, repos: AuthRepos) {
   // Login (username only)
   app.post("/api/auth/login", async (req: Request, res: Response) => {
     try {
-      const username = normalizeUsername((req.body as any)?.username);
-      const password = String((req.body as any)?.password ?? "");
+      const body = asRecord(req.body);
+
+      const username = normalizeUsername(body.username);
+      const password = String(body.password ?? "");
 
       if (!username || !password) {
         return res.status(400).json({ error: "Missing username/password" });
@@ -88,10 +101,10 @@ export function registerAuthRoutes(app: Application, repos: AuthRepos) {
       const ok = await bcrypt.compare(password, user.password_hash);
       if (!ok) return res.status(401).json({ error: "Invalid credentials" });
 
-      const token = signJwt({ sub: user.id, username: user.username, role: user.role });
+      const token = signJwt( user.id, user.username, user.role );
 
       // don't leak hash
-      delete (user as any).password_hash;
+      delete user.password_hash;
       return res.json({ token, user });
     } catch (e) {
 

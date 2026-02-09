@@ -6,12 +6,13 @@ import {Repos} from "../repositories/index.js";
 
 type ProfileRepos = Pick<Repos, "profiles" | "boards">;
 
-function isValidHexColor(s: unknown): s is string {
-  return typeof s === "string" && /^#[0-9a-fA-F]{6}$/.test(s);
-}
 
 function normalizeUsername(u: unknown): string {
   return String(u || "").trim().toLowerCase();
+}
+
+function asRecord(v: unknown): Record<string, unknown> {
+  return typeof v === "object" && v !== null ? (v as Record<string, unknown>) : {};
 }
 
 export function registerProfileRoutes(app: Application, repos: ProfileRepos) {
@@ -37,13 +38,15 @@ export function registerProfileRoutes(app: Application, repos: ProfileRepos) {
 
   app.get("/api/profile/search", async (req: Request, res: Response) => {
     try {
-      const q = String((req.query as any).q ?? "").trim();
+      const query = req.query as Record<string, unknown>;
+      const q = String(query.q ?? "").trim();
+
       if (!q) return res.json({ users: [] });
 
-      const limitRaw = Number((req.query as any).limit ?? 5);
+      const limitRaw = Number(query.limit ?? 5);
       const limit = Number.isFinite(limitRaw)
-        ? Math.min(Math.max(limitRaw, 1), 20)
-        : 5;
+          ? Math.min(Math.max(limitRaw, 1), 20)
+          : 5;
 
       const users = await repos.profiles.searchProfiles(q, limit);
       return res.json({ users });
@@ -77,15 +80,21 @@ export function registerProfileRoutes(app: Application, repos: ProfileRepos) {
   app.get("/api/profile/:username/boards", async (req: Request, res: Response) => {
     try {
       const username = normalizeUsername(req.params.username);
-      if (!username) return res.status(400).json({ error: "Missing username" });
+      if (!username) {
+        return res.status(400).json({ error: "Missing username" });
+      }
 
-      const limitRaw = Number((req.query as any).limit ?? 10);
+      const query = req.query as Record<string, unknown>;
+
+      const limitRaw = Number(query.limit ?? 10);
       const limit = Number.isFinite(limitRaw)
-        ? Math.min(Math.max(limitRaw, 1), 50)
-        : 10;
+          ? Math.min(Math.max(limitRaw, 1), 50)
+          : 10;
 
-      const offsetRaw = Number((req.query as any).offset ?? 0);
-      const offset = Number.isFinite(offsetRaw) ? Math.max(offsetRaw, 0) : 0;
+      const offsetRaw = Number(query.offset ?? 0);
+      const offset = Number.isFinite(offsetRaw)
+          ? Math.max(offsetRaw, 0)
+          : 0;
 
       const boards = await repos.boards.listBoardsByUsername(username, limit, offset);
 
@@ -101,20 +110,16 @@ export function registerProfileRoutes(app: Application, repos: ProfileRepos) {
 
   app.patch("/api/profile/me", requireAuth, async (req: Request, res: Response) => {
     try {
-      const userIdRaw = req.user?.sub ?? req.user?.id ?? req.user?.userId;
-      if (!userIdRaw) return res.status(401).json({ error: "Unauthorized" });
-
-      const userId = String(userIdRaw); // ✅ now it's a string
-
-      const colorRaw = (req.body as any)?.color as unknown;
-      const textColorRaw = (req.body as any)?.text_color as unknown;
-
-      if (colorRaw !== undefined && !isValidHexColor(colorRaw)) {
-        return res.status(400).json({ error: "Invalid color" });
+      const userIdRaw = req.user?.sub;
+      if (!userIdRaw) {
+        return res.status(401).json({ error: "Unauthorized" });
       }
-      if (textColorRaw !== undefined && !isValidHexColor(textColorRaw)) {
-        return res.status(400).json({ error: "Invalid text_color" });
-      }
+
+      const userId = String(userIdRaw);
+      const body = asRecord(req.body);
+
+      const colorRaw = body.color;
+      const textColorRaw = body.text_color;
 
       const color = colorRaw === undefined ? undefined : (colorRaw as string);
       const text_color = textColorRaw === undefined ? undefined : (textColorRaw as string);

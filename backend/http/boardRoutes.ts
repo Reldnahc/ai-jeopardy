@@ -8,18 +8,20 @@ export type BoardRepos = Pick<Repos, "boards">;
 export function registerBoardRoutes(app: Application, repos: BoardRepos) {
   app.get("/api/boards/recent", async (req: Request, res: Response) => {
     try {
-      const limitRaw = Number((req.query as any).limit ?? 10);
-      const limit = Number.isFinite(limitRaw)
-        ? Math.min(Math.max(limitRaw, 1), 50)
-        : 10;
+      const query = req.query as Record<string, unknown>;
 
-      const offsetRaw = Number((req.query as any).offset ?? 0);
+      const limitRaw = Number(query.limit ?? 10);
+      const limit = Number.isFinite(limitRaw)
+          ? Math.min(Math.max(limitRaw, 1), 50)
+          : 10;
+
+      const offsetRaw = Number(query.offset ?? 0);
       const offset = Number.isFinite(offsetRaw) ? Math.max(offsetRaw, 0) : 0;
 
       const model =
-        typeof (req.query as any).model === "string" && (req.query as any).model.trim()
-          ? (req.query as any).model.trim()
-          : null;
+          typeof query.model === "string" && query.model.trim()
+              ? query.model.trim()
+              : null;
 
       const boards = await repos.boards.listRecentBoards(limit, offset, model);
 

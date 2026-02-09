@@ -29,9 +29,14 @@ function setCachedTtsMeta(assetId: string, storageKey: string, contentType: stri
 }
 
 function isConnectTimeoutError(err: unknown): boolean {
-  const e = err as any;
-  const msg = String(e?.message || "");
-  const details = String(e?.details || "");
+  const e =
+      typeof err === "object" && err !== null
+          ? (err as { message?: unknown; details?: unknown })
+          : {};
+
+  const msg = String(e.message ?? "");
+  const details = String(e.details ?? "");
+
   return (
       msg.includes("fetch failed") ||
       msg.includes("UND_ERR_CONNECT_TIMEOUT") ||
