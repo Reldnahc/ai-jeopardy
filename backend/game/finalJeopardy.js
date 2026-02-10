@@ -49,10 +49,7 @@ function advanceToDrawingPhase(game, gameId, wagers, ctx) {
 async function finishGame(game, gameId, drawings, ctx) {
     game.finalJeopardyStage = "finale";
     ctx.broadcast(gameId, {type: "all-drawings-submitted", drawings});
-
-    await ctx.sleep(5_000); //5 secs just clue
-    game.selectedClue.isAnswerRevealed = true;
-    ctx.broadcast(gameId, {type: "answer-revealed", clue: game.selectedClue});
+    const pad = 200;
 
     const wagers = game.wagers;
     const verdicts = game.finalVerdicts;
@@ -69,25 +66,57 @@ async function finishGame(game, gameId, drawings, ctx) {
 
         scores[name] -= wagers[name];
     }
-    await ctx.sleep(5_000);//5 secs with answer
 
     const top = Object.entries(scores)
         .map(([name, score]) => ({ name, score }))
         .sort((a, b) => b.score - a.score)
         .slice(0, 3);
 
+    let alive = await ctx.aiHostVoiceSequence(ctx, gameId, game, [{slot: "final_jeopardy_finale", pad}]);
+    if (!alive) return;
+
     for (let i = top.length - 1; i >= 0; i--) {
+        const maybeRevealAnswer = () => {
+            if (verdicts[top[i].name] === "correct" && !game.selectedClue.isAnswerRevealed) {
+                game.selectedClue.isAnswerRevealed = true;
+                ctx.broadcast(gameId, {type: "answer-revealed", clue: game.selectedClue});
+            }
+        }
+
+        const updateScore = async () => {
+            ctx.broadcast(gameId, {type: "update-score", player: top[i].name, score: top[i].score});
+            await ctx.sleep(5_000);//5 secs on each finalist score update
+        }
+
         ctx.broadcast(gameId, {type: "display-finalist", finalist: top[i].name});
-        await ctx.sleep(5_000);//5 secs on each finalist
-        ctx.broadcast(gameId, {type: "update-score", player: top[i].name, score: top[i].score});
-        await ctx.sleep(5_000);//5 secs on each finalist score update
+
+        alive = await ctx.aiHostVoiceSequence(ctx, gameId, game, [
+            {slot: "final_jeopardy_finale2", pad},
+            {slot: top[i].name, pad},
+            {slot: "placeholder", pad, after: maybeRevealAnswer}, // TODO Answer
+            {slot: verdicts[top[i].name], pad, after: updateScore}, // correct or incorrect
+
+        ]);
+        if (!alive) return;
     }
 
-    const fireAndForget = (p, label) => {
-        Promise.resolve(p).catch((err) => {
-            console.error(`[bg:${label}]`, err);
-        });
-    };
+    // all wrong :(
+    if (!game.selectedClue.isAnswerRevealed) {
+        alive = await ctx.aiHostVoiceSequence(ctx, gameId, game, [
+            {slot: "nobody", pad},
+            //{slot: "", pad}, // say real answer
+        ]);
+        if (!alive) return;
+        game.selectedClue.isAnswerRevealed = true;
+        ctx.broadcast(gameId, {type: "answer-revealed", clue: game.selectedClue});
+    }
+
+    alive = await ctx.aiHostVoiceSequence(ctx, gameId, game, [
+        {slot: "final_jeopardy_end", pad},
+        {slot: top[0].name, pad},
+        {slot: "final_jeopardy_end2", pad},
+    ]);
+    if (!alive) return;
 
     const finalScores = Object.fromEntries(game.players.map((p) => [p.name, 0]));
 
@@ -112,22 +141,22 @@ async function finishGame(game, gameId, drawings, ctx) {
     if (top[0]) {
         const id = idByUsername.get(ctx.normalizeName(top[0].name));
         if (id) {
-            fireAndForget(ctx.repos.profiles.incrementGamesWon(id), "incrementGamesWon");
-            fireAndForget(ctx.repos.profiles.addMoneyWon(id, top[0].score), "addMoneyWon:winner");
+            ctx.fireAndForget(ctx.repos.profiles.incrementGamesWon(id), "incrementGamesWon");
+            ctx.fireAndForget(ctx.repos.profiles.addMoneyWon(id, top[0].score), "addMoneyWon:winner");
         }
     }
 
     if (top[1]) {
         const id = idByUsername.get(ctx.normalizeName(top[1].name));
         if (id) {
-            fireAndForget(ctx.repos.profiles.addMoneyWon(id, 3000), "addMoneyWon:second");
+            ctx.fireAndForget(ctx.repos.profiles.addMoneyWon(id, 3000), "addMoneyWon:second");
         }
     }
 
     if (top[2]) {
         const id = idByUsername.get(ctx.normalizeName(top[2].name));
         if (id) {
-            fireAndForget(ctx.repos.profiles.addMoneyWon(id, 2000), "addMoneyWon:third");
+            ctx.fireAndForget(ctx.repos.profiles.addMoneyWon(id, 2000), "addMoneyWon:third");
         }
     }
 
@@ -135,7 +164,7 @@ async function finishGame(game, gameId, drawings, ctx) {
     for (const p of game.players) {
         const id = idByUsername.get(ctx.normalizeName(p.name));
         if (!id) continue;
-        fireAndForget(ctx.repos.profiles.incrementGamesFinished(id), "incrementGamesFinished");
+        ctx.fireAndForget(ctx.repos.profiles.incrementGamesFinished(id), "incrementGamesFinished");
     }
 
     //update all the scores.

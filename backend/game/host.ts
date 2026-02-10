@@ -42,8 +42,14 @@ const AI_HOST_VARIANTS: Record<string, string[]> = {
     double_jeopardy2: ["Coming up, Double Jeopardy", "Coming next, Double Jeopardy", "Up next, Double Jeopardy"],
     final_jeopardy: ["That’s the end of the Double Jeopardy round."],
     final_jeopardy2: ["It’s time for Final Jeopardy"],
+    final_jeopardy_finale: ["Answers are in. Let's see our top contestants."],
+    final_jeopardy_finale2: ["lets look at the answer from"],
+    final_jeopardy_end: ["That's the end of the game, "],
+    final_jeopardy_end2: ["is today's Jeopardy champion."],
     final_jeopardy_category: ["Here is the category."],
     final_jeopardy_clue: ["Here is the Final Jeopardy clue."],
+
+    placeholder: ["placeholder audio"]
 };
 
 // “Name callout” should feel like Jeopardy: short + punchy.
@@ -337,16 +343,18 @@ export async function aiHostVoiceSequence(
     gameId: string,
     game: Game,
     steps: VoiceStep[]
-): Promise<void> {
+): Promise<boolean> {
     for (const step of steps) {
 
         const said = await aiHostSayByKey(ctx, gameId, game, step.slot);
 
         const ms = said?.ms ?? 0;
-        await ctx.sleep(ms + (step.pad ?? 0));
+        const alive = await ctx.sleepAndCheckGame(ms + (step.pad ?? 0), gameId);
+        if (!alive) return false;
 
         if (typeof step.after === "function") {
             await step.after();
         }
     }
+    return true;
 }

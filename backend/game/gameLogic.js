@@ -111,10 +111,11 @@ export async function autoResolveAfterJudgement(ctx, gameId, game, playerName, v
         game.selectedClue.isAnswerRevealed = true;
 
 
-        await ctx.aiHostVoiceSequence(ctx, gameId, game, [
+        const alive = await ctx.aiHostVoiceSequence(ctx, gameId, game, [
             {slot: "correct", pad: 200, after: () => ctx.broadcast(gameId, { type: "answer-revealed", clue: game.selectedClue })},
-
         ]);
+        console.log(alive);
+        if (!alive) return;
 
         // Correct player becomes selector
         const p = (game.players || []).find(x => x?.name === playerName);

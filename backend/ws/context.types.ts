@@ -51,7 +51,7 @@ export type Game = {
 
 export type Ctx = {
     repos: any;
-
+    games: Game[];
     ensureTtsAsset: (
         params: EnsureTtsAssetParams,
         pool: any,
@@ -78,6 +78,8 @@ export type Ctx = {
         settings: VisualSettings,
         progressTick?: ProgressTick
     ) => Promise<void>;
+
+    sleepAndCheckGame: (ms: number, gameId: string) => Promise<boolean>;
 };
 
 export type SayResult = { assetId: string; ms: number };

@@ -119,7 +119,7 @@ const FinalJeopardyPanel: React.FC<FinalJeopardyPanelProps> = ({
             {/* Render drawings when they exist */}
             {shouldShowDrawings && (
                 <div className="flex flex-wrap gap-4">
-                    {showAnswer && drawings && (
+                    { drawings && (
                         <div className="flex flex-col items-center w-full">
                             {/* Spotlight */}
                             {selectedFinalist && (

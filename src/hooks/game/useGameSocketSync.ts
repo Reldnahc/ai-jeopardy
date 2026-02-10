@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useWebSocket } from "../../contexts/WebSocketContext";
 import type { Player } from "../../types/Lobby";
-import type {BoardData, Clue} from "../../types";
+import type {BoardData, Clue} from "../../../shared/types/board.ts";
 import {LobbySettings} from "../lobby/useLobbySocketSync.tsx";
 
 type ActiveBoard = "firstBoard" | "secondBoard" | "finalJeopardy";

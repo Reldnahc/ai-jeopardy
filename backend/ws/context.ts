@@ -57,6 +57,7 @@ import { verifyJwt } from "../auth/jwt.js";
 import { getBearerToken, playerStableId, verifyAccessToken } from "../services/userService.js";
 import {ensureTtsAsset} from "../services/tts/ensureTtsAsset.js";
 import {makeLimiter, plannedVisualSlots, populateCategoryVisuals} from "../services/ai/visuals.js";
+import {Game} from "./context.types.js";
 
 // Minimal type for now; we’ll tighten later as you TS-migrate more modules.
 export type WsContext = ReturnType<typeof createWsContext>;
@@ -66,8 +67,20 @@ export const createWsContext = (wss: any, repos: any) => {
 
     const ttsDuration = createTtsDurationService(repos);
 
-    const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
     const normalizeName = (name: unknown) => String(name || "").toLowerCase().trim();
+
+    const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+    const sleepAndCheck = async (ms: number, check: () => boolean): Promise<boolean> => {
+        await sleep(ms);
+        return check();
+    };
+
+    const fireAndForget = (p: PromiseLike<unknown>, label: string) => {
+        Promise.resolve(p).catch((err) => {
+            console.error(`[bg:${label}]`, err);
+        });
+    };
 
     return {
         wss,
@@ -77,6 +90,8 @@ export const createWsContext = (wss: any, repos: any) => {
         sleep,
         repos,
         normalizeName,
+        fireAndForget,
+        sleepAndCheckGame: (ms: number, gameId: string)=> sleepAndCheck(ms, () => Boolean(games[gameId])),
 
         // comms
         broadcast,
