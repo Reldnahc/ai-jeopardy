@@ -11,7 +11,7 @@
     "build:web": "vite build",
     "build:backend": "tsc -p tsconfig.backend.json",
     "build": "npm run build:web && npm run build:backend",
-    "start": "node dist-backend/server.js",
+    "start": "node dist-backend/backend/server.js",
     "lint": "eslint .",
     "preview": "vite preview",
     "predeploy": "npm run build:web",
