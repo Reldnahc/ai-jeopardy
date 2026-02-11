@@ -137,13 +137,16 @@ const PlayerSearch: React.FC = () => {
 
 
             {isDropdownVisible && matchingUsers.length > 0 && (
-                <ul className="absolute w-full mt-2 bg-white border border-gray-300 rounded shadow-lg z-10">
+                <ul
+                    className="absolute left-0 right-0 bg-white border border-gray-300 rounded shadow-lg z-10"
+                    style={{ top: "calc(100% - 1rem)" }} // subtract the helper line height (min-h-[1rem])
+                >
                     {matchingUsers.map((user) => (
                         <li
                             key={user.username}
                             className="p-3 hover:bg-blue-100 cursor-pointer text-black flex items-center space-x-3"
                             style={{ minHeight: "3rem" }}
-                            onMouseDown={(ev) => ev.preventDefault()} // prevents blur before click
+                            onMouseDown={(ev) => ev.preventDefault()}
                             onClick={() => handleUserSelect(user.username)}
                         >
                             <Avatar
@@ -158,6 +161,7 @@ const PlayerSearch: React.FC = () => {
                     ))}
                 </ul>
             )}
+
         </div>
     );
 };
