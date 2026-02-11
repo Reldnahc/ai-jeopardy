@@ -29,6 +29,7 @@ export const env = Object.freeze({
     OPENAI_API_KEY: requireEnv("OPENAI_API_KEY"),
     JWT_SECRET: requireEnv("JWT_SECRET"),
     PIPER_URL: requireEnv("PIPER_URL"),
+    NODE_ENV: requireEnv("NODE_ENV"),
 
     BRAVE_API_KEY: optionalEnv("BRAVE_API_KEY", ""),
     OPENAI_DEFAULT_MODEL: optionalEnv("DEFAULT_MODEL", "gpt-4o-mini"),
