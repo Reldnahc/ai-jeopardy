@@ -84,7 +84,7 @@ async function bootstrap() {
 
     setInterval(() => {
         void refreshCOTD();
-    }, 1000 * 60 * 60);
+    }, 86_400_000);//1 day
 }
 
 bootstrap().catch((err) => {
