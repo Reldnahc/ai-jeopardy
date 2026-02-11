@@ -1,4 +1,4 @@
-function makePreloadTtsBatcher({ ctx, gameId, flushMs = 250, maxBatch = 12 }) {
+function makePreloadTtsBatcher({ ctx, gameId, game, flushMs = 250, maxBatch = 12, trace }) {
     let buf = [];
     let timer = null;
 
@@ -9,18 +9,25 @@ function makePreloadTtsBatcher({ ctx, gameId, flushMs = 250, maxBatch = 12 }) {
         const batch = buf;
         buf = [];
 
-        ctx.broadcast(gameId, {
-            type: "preload-images",
-            assetIds: [],        // no images here
-            ttsAssetIds: batch,  // ✅ partial TTS
-            partial: true,
+        // ✅ New protocol (tokened)
+        ctx.broadcastPreloadBatch({
+            ctx,
+            gameId,
+            game,
+            imageAssetIds: [],
+            ttsAssetIds: batch,
+            final: false,
+            trace,
+            reason: "board-tts-partial",
         });
     };
 
     return {
         push(id) {
-            if (!id) return;
-            buf.push(id);
+            const v = String(id ?? "").trim();
+            if (!v) return;
+
+            buf.push(v);
 
             if (buf.length >= maxBatch) {
                 flush();
@@ -370,7 +377,7 @@ export async function getBoardDataOrFail({
         game.isGenerating = true;
         trace?.mark?.("createBoardData_start");
 
-        const ttsBatcher = makePreloadTtsBatcher({ ctx, gameId });
+        const ttsBatcher = makePreloadTtsBatcher({ ctx, gameId, game, trace });
 
         const boardData = await ctx.createBoardData(ctx, categories, selectedModel, host, {
             includeVisuals: effectiveIncludeVisuals,

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import type {BoardData, Category, Clue} from "../../../shared/types/board.ts";
+import { preloadAudioToBlobUrl } from "../../audio/audioCache"; // adjust path
 
 export function preloadAudio(url: string) {
     return new Promise<void>((resolve) => {
@@ -169,13 +170,16 @@ async function preloadAudioOne(url: string, signal: AbortSignal): Promise<void> 
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
         if (signal.aborted) return;
 
-        await preloadAudio(url);
+        const blobUrl = await preloadAudioToBlobUrl(url, signal);
+        if (blobUrl) return;
 
-        return;
+        // backoff
+        await new Promise((r) => setTimeout(r, Math.min(2500, 200 * Math.pow(1.6, attempt))));
     }
 
-    throw new Error(`preload timed out waiting for ready: ${url}`);
+    throw new Error(`preload failed: ${url}`);
 }
+
 
 
 export function usePreloadAudioAssetIds(

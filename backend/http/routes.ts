@@ -130,8 +130,8 @@ export function registerHttpRoutes(app: Application, distPath: string, repos: Ht
 
   // --- TTS -----------------------------------------------------------------
 
-  app.get("/api/tts/:assetId", async (req: Request<AssetIdParams>, res: Response) => {
-    const { assetId } = req.params; // ✅ string
+  app.get("/api/tts/:assetId", async (req, res) => {
+    const { assetId } = req.params;
 
     try {
       const row = await repos.tts.getBinaryById(assetId);
@@ -139,17 +139,46 @@ export function registerHttpRoutes(app: Application, distPath: string, repos: Ht
 
       const buf = row.data;
       const total = Number(row.bytes || buf.length);
-      const contentType = row.content_type || "audio/mpeg";
+      const contentType = row.content_type || "audio/wav";
 
+      // ---- Cache headers (always) ----
       res.setHeader("Content-Type", contentType);
       res.setHeader("Accept-Ranges", "bytes");
       res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
 
-      const r = parseRange(req.headers.range, total);
-      if (!r) {
+      // ✅ Strong-ish validator:
+      // If assetId is immutable (new id per new audio), this is enough.
+      // If not immutable, include updated_at or a hash.
+      const etag = `"tts-${assetId}-${total}"`;
+      res.setHeader("ETag", etag);
+
+      // ---- 304 support (no Range) ----
+      // (Browsers use this to confidently reuse cached content)
+      const ifNoneMatch = req.headers["if-none-match"];
+      const wantsRange = typeof req.headers.range === "string" && req.headers.range.startsWith("bytes=");
+      if (!wantsRange && ifNoneMatch === etag) {
+        return res.status(304).end();
+      }
+
+      const range = req.headers.range;
+
+      // ---- No Range: send full 200 ----
+      if (!range) {
         res.setHeader("Content-Length", String(total));
         return res.status(200).end(buf);
       }
+
+      // ---- If-Range handling ----
+      // If client sends If-Range and it doesn't match, must send full body (200)
+      const ifRange = req.headers["if-range"];
+      if (typeof ifRange === "string" && ifRange.length > 0 && ifRange !== etag) {
+        res.setHeader("Content-Length", String(total));
+        return res.status(200).end(buf);
+      }
+
+      // ---- Range parse ----
+      const r = parseRange(range, total);
+      if (!r) return res.status(416).end();
 
       const { start, end } = r;
       const chunk = buf.subarray(start, end + 1);
@@ -164,6 +193,7 @@ export function registerHttpRoutes(app: Application, distPath: string, repos: Ht
       return res.status(500).json({ error: "TTS endpoint failed" });
     }
   });
+
 
   app.get("/api/tts-assets/:assetId", async (req: Request<AssetIdParams>, res: Response) => {
     const { assetId } = req.params; // ✅ string

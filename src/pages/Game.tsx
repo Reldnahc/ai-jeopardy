@@ -12,6 +12,7 @@ import {usePlayerIdentity} from "../hooks/usePlayerIdentity.ts";
 import {usePreload} from "../hooks/game/usePreload.ts";
 import {useEarlyMicPermission} from "../hooks/earlyMicPermission.ts";
 import {Clue} from "../../shared/types/board.ts";
+import {getCachedAudioBlobUrl} from "../audio/audioCache.ts";
 
 function getApiBase() {
     // In dev, allow explicit override
@@ -64,7 +65,6 @@ export default function Game() {
         isGameOver,
         markAllCluesComplete,
         narrationEnabled,
-        ttsReady,
         answerCapture,
         answerError,
         phase,
@@ -144,9 +144,6 @@ export default function Game() {
     const prevSocketReadyRef = useRef<boolean>(false);
 
 
-
-
-    const activeTtsRequestIdRef = useRef<string | null>(null);
     const boardDataRef = useRef(boardData);
 
     const handleScoreUpdate = (player: string, delta: number) => {
@@ -181,7 +178,7 @@ export default function Game() {
         navigate("/");
     }, [gameId, effectivePlayerName, isSocketReady, sendJson, clearSession, navigate]);
 
-    const playAudioUrl = useCallback((url: string) => {
+    const playAudioUrl = useCallback((httpUrl: string) => {
         const a = audioRef.current;
         if (!a) return;
 
@@ -191,14 +188,14 @@ export default function Game() {
             // Volume-based “mute”
             a.muted = false;
             const gain = gainNodeRef.current;
-            if (gain) {
-                gain.gain.value = audioVolume;
-            }
+            if (gain) gain.gain.value = audioVolume;
 
             a.currentTime = 0;
-            a.src = url;
 
-            // If volume is 0, do nothing (acts as mute)
+            // ✅ If we preloaded this URL, use the blob URL so there is NO network on play.
+            const blobUrl = getCachedAudioBlobUrl(httpUrl);
+            a.src = blobUrl || httpUrl;
+
             if (audioVolume <= 0) return;
 
             void a.play();
@@ -206,6 +203,7 @@ export default function Game() {
             console.debug("TTS play blocked:", e);
         }
     }, [audioVolume]);
+
 
     const lastAiHostAssetPlayedRef = useRef<string | null>(null);
 
@@ -313,29 +311,6 @@ export default function Game() {
             narratedKeysRef.current.clear();
         }
     }, [isSocketReady]);
-
-    useEffect(() => {
-        if (!ttsReady) return;
-
-        if (audioMuted) return;
-
-        // Ignore stale responses
-        if (ttsReady.requestId && activeTtsRequestIdRef.current && ttsReady.requestId !== activeTtsRequestIdRef.current) {
-            return;
-        }
-
-        const a = audioRef.current;
-        if (!a) return;
-
-        try {
-            a.pause();
-            a.currentTime = 0;
-            playAudioUrl(ttsReady.url);
-        } catch (e) {
-            // autoplay policies can block play(); ignore safely
-            console.debug("TTS play blocked:", e);
-        }
-    }, [ttsReady, audioMuted]);
 
     useEffect(() => {
         if (!gameId || !effectivePlayerName) return;
