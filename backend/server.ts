@@ -1,6 +1,5 @@
 // backend/server.ts
 import { WebSocketServer } from "ws";
-import "dotenv/config";
 
 import { createServer } from "node:http";
 import express from "express";
