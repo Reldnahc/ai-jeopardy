@@ -21,6 +21,7 @@ import { registerProfileRoutes } from "./http/profileRoutes.js";
 import { registerBoardRoutes } from "./http/boardRoutes.js";
 import { pool } from "./config/pg.js";
 import { createRepos } from "./repositories/index.js";
+import {appConfig} from "./config/appConfig.js";
 
 
 const app = express();
@@ -64,7 +65,7 @@ setGlobalDispatcher(
     })
 );
 
-const PORT = 3002;
+const PORT = appConfig.server.port;
 
 async function refreshCOTD() {
     try {

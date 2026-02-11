@@ -3,6 +3,7 @@ import type { JudgeTextResult, Verdict } from "./types.js";
 import { normalizeJeopardyText, hasAnyAlphaNum } from "./normalize.js";
 import { inferAnswerType, isTooGeneric, shouldRejectForZeroOverlap } from "./heuristics.js";
 import { buildJudgePrompt } from "./prompt.js";
+import {appConfig} from "../../../config/appConfig.js";
 
 export async function judgeClueAnswerFast(
     expectedAnswer: string,
@@ -40,7 +41,7 @@ export async function judgeClueAnswerFast(
         strictness: "lenient",
     });
 
-    const r = await callOpenAiJson("gpt-4o-mini", prompt, {
+    const r = await callOpenAiJson(appConfig.ai.judgeModel, prompt, {
         reasoningEffort: "off",
     });
 

@@ -1,4 +1,5 @@
 import { callOpenAiJson, parseOpenAiJson } from "./openaiClient.js";
+import {appConfig} from "../../config/appConfig.js";
 
 export type CategoryOfTheDay = {
     category: string;
@@ -19,6 +20,6 @@ Return JSON only:
 }
   `.trim();
 
-    const response = await callOpenAiJson("gpt-4o-mini", prompt, {});
+    const response = await callOpenAiJson(appConfig.ai.cotdModel, prompt, {});
     return parseOpenAiJson<CategoryOfTheDay>(response);
 }

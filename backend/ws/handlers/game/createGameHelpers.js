@@ -219,13 +219,13 @@ export function ensureHostOrFail({ ws, ctx, gameId, game }) {
     return true;
 }
 
-export function ensureLobbySettings(game) {
+export function ensureLobbySettings(game, appConfig) {
     if (game.lobbySettings) return game.lobbySettings;
 
     game.lobbySettings = {
         timeToBuzz: 10,
         timeToAnswer: 10,
-        selectedModel: "gpt-5-mini",
+        selectedModel: appConfig.ai.defaultModel,
         reasoningEffort: "off",
         visualMode: "off", // "off" | "commons" | "brave"
         narrationEnabled: false,
@@ -253,7 +253,7 @@ export function resolveModelOrFail({ ws, ctx, gameId, game, selectedModel, role 
     if (m.disabled) {
         ws.send(JSON.stringify({ type: "error", message: "That model is currently disabled." }));
         // Optional: force lobby setting back to a free default
-        game.lobbySettings.selectedModel = "gpt-5-mini";
+        game.lobbySettings.selectedModel = ctx.appConfig.ai.defaultModel;
         ctx.sendLobbySnapshot(ws, gameId);
         return null;
     }
@@ -270,7 +270,7 @@ export function resolveModelOrFail({ ws, ctx, gameId, game, selectedModel, role 
                 message: "Your account is not allowed to use paid models.",
             }));
             // Optional: force downgrade
-            game.lobbySettings.selectedModel = "gpt-5-mini";
+            game.lobbySettings.selectedModel = ctx.appConfig.ai.defaultModel;
             ctx.sendLobbySnapshot(ws, gameId);
             return null;
         }

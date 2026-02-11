@@ -58,6 +58,7 @@ import {ensureTtsAsset} from "../services/tts/ensureTtsAsset.js";
 import {makeLimiter, plannedVisualSlots, populateCategoryVisuals} from "../services/ai/visuals.js";
 import {Game} from "./context.types.js";
 import {Clue} from "../../shared/types/board.js";
+import {appConfig} from "../config/appConfig.js";
 
 // Minimal type for now; we’ll tighten later as you TS-migrate more modules.
 
@@ -89,6 +90,7 @@ export const createWsContext = (wss: any, repos: any) => {
         wss,
         games,
         modelsByValue,
+        appConfig,
         getTtsDurationMs: (assetId: string) => ttsDuration.getDurationMs(assetId),
         sleep,
         getClueKey,

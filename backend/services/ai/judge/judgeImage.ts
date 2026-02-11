@@ -3,6 +3,7 @@ import type { JudgeImageResult } from "./types.js";
 import { normalizeJeopardyText, hasAnyAlphaNum } from "./normalize.js";
 import { inferAnswerType, isTooGeneric } from "./heuristics.js";
 import { buildImageJudgePrompt } from "./prompt.js";
+import {appConfig} from "../../../config/appConfig.js";
 
 export async function judgeImage(
     expectedAnswer: string,
@@ -16,7 +17,7 @@ export async function judgeImage(
         answerType,
     });
 
-    const r = await callOpenAiJson("gpt-4.1-mini", prompt, {
+    const r = await callOpenAiJson(appConfig.ai.imageJudgeModel, prompt, {
         image: imageUrl,
     });
 

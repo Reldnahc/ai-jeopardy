@@ -27,7 +27,7 @@ export const lobbyHandlers = {
         // Host-only (prevents spoofing)
         if (!ctx.ensureHostOrFail({ ws, ctx, gameId, game })) return;
 
-        const s = ctx.ensureLobbySettings(game);
+        const s = ctx.ensureLobbySettings(game, ctx.appConfig);
 
         const host = game.host;
         const categories = game.categories;
@@ -320,15 +320,6 @@ export const lobbyHandlers = {
         const startedAt = Date.now();
         const reqId = `${startedAt}-${Math.random().toString(16).slice(2, 6)}`;
 
-        const mark = (label, extra) => {
-            const ms = Date.now() - startedAt;
-            if (extra) {
-                console.log(`[create-lobby][${reqId}] +${ms}ms ${label}`, extra);
-            } else {
-                console.log(`[create-lobby][${reqId}] +${ms}ms ${label}`);
-            }
-        };
-
         const sendTimed = (type, payloadObj) => {
             const t0 = Date.now();
             try {
@@ -343,8 +334,6 @@ export const lobbyHandlers = {
             }
         };
 
-        mark("start");
-
         const {
             host,
             categories,
@@ -353,32 +342,19 @@ export const lobbyHandlers = {
             text_color: clientTextColor,
         } = data ?? {};
 
-        mark("parsed payload", {
-            hostType: typeof host,
-            categoriesType: typeof categories,
-            categoriesLen: Array.isArray(categories) ? categories.length : null,
-            hasPlayerKey: typeof playerKey === "string" && playerKey.trim().length > 0,
-        });
-
         // game id generation
         let newGameId;
-        mark("gameId generation begin");
         do {
             newGameId = Math.random().toString(36).substr(2, 5).toUpperCase();
         } while (ctx.games[newGameId]);
-        mark("gameId generated", { gameId: newGameId });
 
         ws.gameId = newGameId;
-        mark("ws.gameId set");
 
-        // ✅ NO DB LOOKUP: cosmetics come from client (sanitized), with defaults
         const color = normalizeBgColor(clientColor, "bg-blue-500");
         const text_color = normalizeTextColor(clientTextColor, "text-white");
 
         const stableKey = typeof playerKey === "string" && playerKey.trim() ? playerKey.trim() : null;
-        mark("stableKey computed", { hasStableKey: Boolean(stableKey) });
 
-        mark("ctx.games[gameId] set begin");
         ctx.games[newGameId] = {
             host,
             players: [{ id: ws.id, name: host, color, text_color, playerKey: stableKey, online: true }],
@@ -388,7 +364,7 @@ export const lobbyHandlers = {
             lobbySettings: {
                 timeToBuzz: 10,
                 timeToAnswer: 10,
-                selectedModel: "gpt-5-mini",
+                selectedModel: ctx.appConfig.ai.defaultModel,
                 reasoningEffort: "off",
                 visualMode: "off", // "off" | "commons" | "brave"
                 narrationEnabled: true,
@@ -405,24 +381,18 @@ export const lobbyHandlers = {
             emptySince: null,
             cleanupTimer: null,
         };
-        mark("ctx.games[gameId] set end");
 
         // send responses
-        mark("ws.send lobby-created begin");
         sendTimed("lobby-created", {
             type: "lobby-created",
             gameId: newGameId,
             categories: ctx.normalizeCategories11(categories),
             players: [{ id: ws.id, name: host, color, text_color }],
         });
-        mark("ws.send lobby-created end");
 
-        mark("ws.send lobby state begin");
         sendTimed("lobby-state", ctx.buildLobbyState(newGameId, ws));
-        mark("ws.send lobby state end");
 
         const total = Date.now() - startedAt;
-        mark("done", { totalMs: total });
 
         if (total > 1000) {
             console.warn(`[create-lobby][${reqId}] TOTAL SLOW`, { totalMs: total, gameId: newGameId });
@@ -623,7 +593,7 @@ export const lobbyHandlers = {
                 game.lobbySettings = {
                     timeToBuzz: 10,
                     timeToAnswer: 10,
-                    selectedModel: "gpt-5-mini",
+                    selectedModel: ctx.appConfig.ai.defaultModel,
                     reasoningEffort: "off",
                     visualMode: "off",
                     narrationEnabled: true,
