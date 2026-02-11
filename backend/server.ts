@@ -1,15 +1,12 @@
 // backend/server.ts
 import { WebSocketServer } from "ws";
-
 import { createServer } from "node:http";
 import express from "express";
 import cors from "cors";
 import bodyParser from "body-parser";
 import { join } from "node:path";
 import "dotenv/config"; //for openai
-
 import { Agent, setGlobalDispatcher } from "undici";
-
 import { createCategoryOfTheDay } from "./services/aiService.js";
 
 import { attachWebSocketServer } from "./ws/index.js";

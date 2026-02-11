@@ -310,56 +310,72 @@ export default function MainPage() {
                                 </summary>
 
                                 <p className="mt-4 text-lg text-gray-700">
-                                    Welcome to <strong>AI Jeopardy!</strong> This project is still evolving, so thank you for your patience as new features and improvements are rolled out.
+                                    Welcome to <strong>AI Jeopardy!</strong> This is a multiplayer game inspired by the classic TV show. The project is still evolving, so thank you for your patience as new features are added and improved.
                                 </p>
 
-                                <ul className="list-disc ml-6 mt-4 text-lg text-gray-700 space-y-2">
+                                <h3 className="mt-6 text-xl font-semibold text-gray-800">Getting Started</h3>
+                                <ul className="list-disc ml-6 mt-3 text-lg text-gray-700 space-y-2">
                                     <li>
-                                        To create a game, you’ll first need to create an account using the menu in the top-right corner.
+                                        You must create an account using the menu in the top-right corner to host or join a game.
                                     </li>
                                     <li>
-                                        You <strong>do</strong> need an account to join a game. Create one using the menu in the top-right corner.
+                                        Once in a lobby, players choose the categories they’d like questions generated from.
                                     </li>
                                     <li>
-                                        Creating an account allows you to customize your profile, host games, and access additional features.
-                                    </li>
-                                    <li>
-                                        Once you’re in a lobby, players select the categories they want questions to be generated from.
-                                    </li>
-                                    <li>
-                                        When everyone is ready, the host starts the game by pressing the <strong>“Start Game”</strong> button.
-                                    </li>
-                                    <li>
-                                        During gameplay, the host reads the question and then unlocks the buzzer. Players race to buzz in if they know the answer.
-                                    </li>
-                                    <li>
-                                        Most importantly—have fun, compete, and enjoy the experience!
+                                        When everyone is ready, the host presses <strong>“Start Game”</strong> to begin.
                                     </li>
                                 </ul>
+
+                                <h3 className="mt-6 text-xl font-semibold text-gray-800">How Jeopardy Works</h3>
+                                <ul className="list-disc ml-6 mt-3 text-lg text-gray-700 space-y-2">
+                                    <li>
+                                        The board contains categories with increasing dollar values. Higher values are more difficult.
+                                    </li>
+                                    <li>
+                                        The player who answered the previous clue correctly selects the next clue.
+                                    </li>
+                                    <li>
+                                        The AI reads the clue aloud. After it finishes, the buzzer unlocks.
+                                    </li>
+                                    <li>
+                                        Players race to buzz in. The first player to buzz gets the chance to answer.
+                                    </li>
+                                    <li>
+                                        If the answer is correct, that player earns the clue’s dollar value.
+                                    </li>
+                                    <li>
+                                        If the answer is incorrect, that player is <strong>locked out</strong> from buzzing on that clue again, and other players may buzz in.
+                                    </li>
+                                    <li>
+                                        If no one answers correctly before time runs out, the answer is revealed and no points are awarded.
+                                    </li>
+                                </ul>
+
+                                <h3 className="mt-6 text-xl font-semibold text-gray-800">Final Jeopardy</h3>
+                                <ul className="list-disc ml-6 mt-3 text-lg text-gray-700 space-y-2">
+                                    <li>
+                                        After all clues are played, the game moves to <strong>Final Jeopardy</strong>.
+                                    </li>
+                                    <li>
+                                        Players secretly submit a wager based on their current score.
+                                    </li>
+                                    <li>
+                                        The final clue is revealed, and all players submit their answers.
+                                    </li>
+                                    <li>
+                                        Correct answers add the wagered amount to the player’s score. Incorrect answers subtract it.
+                                    </li>
+                                    <li>
+                                        The player with the highest total score at the end wins!
+                                    </li>
+                                </ul>
+
+                                <p className="mt-6 text-lg text-gray-700">
+                                    Most importantly—have fun, compete, and enjoy the experience!
+                                </p>
                             </details>
                         </div>
 
-                        <div className="mt-8">
-                            <details className="bg-gray-50 p-6 rounded-lg border border-gray-200 shadow" open>
-                                <summary className="text-2xl font-semibold text-gray-800 cursor-pointer">
-                                    About Models
-                                </summary>
-
-                                <p className="mt-4 text-lg text-gray-700">
-                                    <span className="block text-xl font-semibold text-red-500 mb-2">
-                                        Model selection is currently limited.
-                                    </span>
-                                    <span className="block">
-                                        At this time, only the available free models can be selected. Additional model options are visible but locked while the project is in its early stages.
-                                    </span>
-                                </p>
-
-                                <p className="mt-4 text-lg text-gray-700">
-                                    The host will see a model selection field in the lobby settings. In most cases, you can safely leave this set to the default option.
-                                    If you’d like to experiment, you can open the dropdown and choose from the available models listed.
-                                </p>
-                            </details>
-                        </div>
 
                     </div>
             </div>
