@@ -6,7 +6,7 @@ import express from "express";
 import cors from "cors";
 import bodyParser from "body-parser";
 import { join } from "node:path";
-
+import "dotenv/config"; //for openai
 
 import { Agent, setGlobalDispatcher } from "undici";
 
