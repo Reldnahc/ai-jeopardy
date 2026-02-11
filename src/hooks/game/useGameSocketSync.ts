@@ -3,6 +3,7 @@ import { useWebSocket } from "../../contexts/WebSocketContext";
 import type { Player } from "../../types/Lobby";
 import type {BoardData, Clue} from "../../../shared/types/board.ts";
 import {LobbySettings} from "../lobby/useLobbySocketSync.tsx";
+import {preloadAudio, ttsUrl} from "./usePreload.ts";
 
 type ActiveBoard = "firstBoard" | "secondBoard" | "finalJeopardy";
 
@@ -414,6 +415,12 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
 
             if (message.type === "tts-error") {
                 console.error(message);
+                return;
+            }
+
+            if (message.type === "preload-final-jeopardy-answer") {
+                const m = message as unknown as { assetId: string;};
+                void preloadAudio(ttsUrl(m.assetId));
                 return;
             }
 

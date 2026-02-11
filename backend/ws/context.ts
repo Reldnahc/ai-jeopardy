@@ -44,23 +44,22 @@ import {
     doUnlockBuzzerAuthoritative,
     findCategoryForClue,
     parseClueValue,
-    scheduleAutoUnlockForClue,
 } from "../game/gameLogic.js";
 import {
     aiHostSayAsset,
     aiHostSayByKey,
     aiHostVoiceSequence,
     ensureAiHostTtsBank,
-    ensureAiHostValueTts,
+    ensureAiHostValueTts, ensureFinalJeopardyAnswer,
 } from "../game/host.js";
 import { verifyJwt } from "../auth/jwt.js";
 import { getBearerToken, playerStableId, verifyAccessToken } from "../services/userService.js";
 import {ensureTtsAsset} from "../services/tts/ensureTtsAsset.js";
 import {makeLimiter, plannedVisualSlots, populateCategoryVisuals} from "../services/ai/visuals.js";
 import {Game} from "./context.types.js";
+import {Clue} from "../../shared/types/board.js";
 
 // Minimal type for now; we’ll tighten later as you TS-migrate more modules.
-export type WsContext = ReturnType<typeof createWsContext>;
 
 export const createWsContext = (wss: any, repos: any) => {
     const { broadcast, broadcastAll } = makeBroadcaster(wss);
@@ -82,17 +81,23 @@ export const createWsContext = (wss: any, repos: any) => {
         });
     };
 
+    const getClueKey = (game: Game, clue: Clue) =>
+        `${game.activeBoard ?? "firstBoard"}:${clue.value ?? ""}:${clue.question?.trim() ?? ""}`;
+
+
     return {
         wss,
         games,
         modelsByValue,
         getTtsDurationMs: (assetId: string) => ttsDuration.getDurationMs(assetId),
         sleep,
+        getClueKey,
         repos,
         normalizeName,
         fireAndForget,
         sleepAndCheckGame: (ms: number, gameId: string)=> sleepAndCheck(ms, () => Boolean(games[gameId])),
 
+        ensureFinalJeopardyAnswer,
         // comms
         broadcast,
         broadcastAll,
@@ -155,7 +160,6 @@ export const createWsContext = (wss: any, repos: any) => {
         collectImageAssetIdsFromBoard,
 
         cancelAutoUnlock,
-        scheduleAutoUnlockForClue,
         doUnlockBuzzerAuthoritative,
 
         ensureAiHostTtsBank,

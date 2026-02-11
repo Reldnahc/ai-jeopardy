@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import type {BoardData, Category, Clue} from "../../../shared/types/board.ts";
 
-function preloadAudio(url: string) {
+export function preloadAudio(url: string) {
     return new Promise<void>((resolve) => {
         const audio = new Audio();
         audio.preload = "auto";
@@ -35,9 +35,10 @@ function getApiBase() {
     return "";
 }
 
-function ttsUrl(id: string) {
+export function ttsUrl(id: string) {
     return `${getApiBase()}/api/tts/${encodeURIComponent(id).trim()}`;
 }
+
 function imageUrl(id: string) {
     return `${getApiBase()}/api/images/${ encodeURIComponent(String(id).trim())}`;
 }
@@ -242,7 +243,6 @@ export function usePreloadAudioAssetIds(
 
                 void (async () => {
                     try {
-                        // ✅ Use your existing retry/backoff logic for "too early"
                         // Create a per-request controller; we won't abort it on batch updates.
                         const controller = new AbortController();
                         await preloadAudioOne(url, controller.signal);

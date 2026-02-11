@@ -1,11 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-
-import {
-    ProgressTick,
-    VisualSettings
-} from "../services/ai/visuals.js";
-import type {TtsProviderName} from "../services/tts/types.js";
-import type { Limiter as TtsLimiter } from "../services/tts/limiter.js";
+import {createWsContext} from "./context.js";
 
 export type Trace = {
     mark?: (name: string, data?: any) => void;
@@ -29,6 +23,7 @@ export type AiHostTtsBank = {
     nameAssetsByPlayer: Record<string, string>;
     categoryAssetsByCategory: Record<string, string>;
     valueAssetsByValue: Record<string, string>;
+    finalJeopardyAnswersByPlayer: Record<string, string>;
     allAssetIds: string[];
 };
 
@@ -41,51 +36,23 @@ export type Category =
     category?: string | null;
 };
 
+type ActiveBoard = "firstBoard" | "secondBoard" | "finalJeopardy";
+
 export type Game = {
     lobbySettings?: { narrationEnabled?: boolean | null } | null;
     players?: Player[] | null;
     categories?: Category[] | null;
     boardData?: any;
     aiHostTts?: AiHostTtsBank | null;
+    activeBoard?: ActiveBoard;
 };
-
-export type Ctx = {
-    repos: any;
-    games: Game[];
-    ensureTtsAsset: (
-        params: EnsureTtsAssetParams,
-        pool: any,
-    ) => Promise<TtsAsset>;
-
-    getTtsDurationMs: (assetId: string) => Promise<number>;
-    modelsByValue: Record<string, any>;
-    provider: string;
-
-    broadcast: (gameId: string, msg: any) => void;
-    sleep: (ms: number) => Promise<void>;
-
-    plannedVisualSlots: (
-        settings: Pick<VisualSettings, "includeVisuals" | "maxVisualCluesPerCategory">
-    ) => number;
-
-    makeLimiter: (maxConcurrent: number) => AsyncLimiter;
-
-    getLimiter: (provider: TtsProviderName) => TtsLimiter;
-
-    populateCategoryVisuals: (
-        ctx: Ctx,
-        cat: any,
-        settings: VisualSettings,
-        progressTick?: ProgressTick
-    ) => Promise<void>;
-
-    sleepAndCheckGame: (ms: number, gameId: string) => Promise<boolean>;
-};
+export type Ctx = ReturnType<typeof createWsContext>;
 
 export type SayResult = { assetId: string; ms: number };
 
 export type VoiceStep = {
-    slot: string;
+    slot?: string;
+    assetId?: string;
     pad?: number;
     after?: () => void | Promise<void>;
 };

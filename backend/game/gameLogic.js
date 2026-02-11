@@ -124,7 +124,7 @@ export async function autoResolveAfterJudgement(ctx, gameId, game, playerName, v
 
         await ctx.sleep(3000);
 
-        finishClueAndReturnToBoard(ctx, gameId, game)
+        finishClueAndReturnToBoard(ctx, gameId, game);
 
         return;
     }
@@ -158,20 +158,22 @@ export async function autoResolveAfterJudgement(ctx, gameId, game, playerName, v
         game.buzzerLocked = true;
         ctx.broadcast(gameId, { type: "buzzer-locked" });
 
+        const revealAnswer = async () => {
+            game.selectedClue.isAnswerRevealed = true;
+            ctx.broadcast(gameId, {type: "answer-revealed", clue: game.selectedClue});
+        }
+
+        const clueKey =  ctx.getClueKey(game,game.selectedClue);
+        const assetId = game.boardData?.ttsByAnswerKey?.[clueKey] || null;
 
         await ctx.aiHostVoiceSequence(ctx, gameId, game, [
-            {slot: "incorrect", pad: 200, after: () => {
-                    game.selectedClue.isAnswerRevealed = true;
-                    ctx.broadcast(gameId, { type: "answer-revealed", clue: game.selectedClue });
-                }
-            },
-
+            {slot: "incorrect", pad: 200},
+            {slot: "answer_was", pad: 200, after: revealAnswer},
+            {assetId, pad: 200},
         ]);
 
-        await ctx.sleep(3000);
 
-        finishClueAndReturnToBoard(ctx, gameId, game)
-
+        finishClueAndReturnToBoard(ctx, gameId, game);
         return;
     }
 
@@ -217,7 +219,6 @@ export function doUnlockBuzzerAuthoritative( gameId, game, ctx) {
     game.pendingBuzz = null;
     game.buzzed = null;
 
-
     if (game.timeToBuzz === -1) return;
 
     ctx.startGameTimer(
@@ -237,55 +238,27 @@ export function doUnlockBuzzerAuthoritative( gameId, game, ctx) {
             ctx.broadcast(gameId, { type: "buzzer-locked" });
 
             (async () => {
+                const revealAnswer = async () => {
+                    game.selectedClue.isAnswerRevealed = true;
+                    ctx.broadcast(gameId, {type: "answer-revealed", clue: game.selectedClue});
+                }
+
+                const finish = async () => {
+                    await ctx.sleepAndCheckGame(3000, gameId);
+                    finishClueAndReturnToBoard(ctx, gameId, game);
+                }
+
+                const clueKey =  ctx.getClueKey(game,game.selectedClue);
+                const assetId = game.boardData?.ttsByAnswerKey?.[clueKey] || null;
                 await ctx.aiHostVoiceSequence(ctx, gameId, game, [
-                    {slot: "nobody", pad: 200, after: () => {
-                            game.selectedClue.isAnswerRevealed = true;
-                            ctx.broadcast(gameId, { type: "answer-revealed", clue: game.selectedClue });
-                        }},
+                    {slot: "nobody", pad: 200, after: revealAnswer},
+                    {slot: "answer_was", pad: 200},
+                    {assetId, pad: 200, after: finish},
                 ]);
-
-                await ctx.sleep(3000);
-
-                if (!game.clearedClues) game.clearedClues = new Set();
-                const clueId = `${game.selectedClue.value}-${game.selectedClue.question}`;
-                game.clearedClues.add(clueId);
-                ctx.broadcast(gameId, { type: "clue-cleared", clueId });
-                ctx.checkBoardTransition(game, gameId, ctx)
-
-                returnToBoard(game, gameId, ctx);
 
             })();
         }
     );
-}
-
-export async function scheduleAutoUnlockForClue({ gameId, game, clueKey, ttsAssetId, ctx }) {
-    if (!game) return;
-
-    cancelAutoUnlock(game);
-
-    // if no asset id, just unlock immediately (never deadlock)
-    if (!ttsAssetId) {
-        doUnlockBuzzerAuthoritative( gameId, game, ctx);
-        return;
-    }
-
-    const durationMs = await ctx.getTtsDurationMs(ttsAssetId);
-
-    // If we couldn't compute duration, unlock immediately (still safe)
-    const waitMs = Math.max(0, (durationMs ?? 0) + 150); // +buffer for decode/play
-    game.autoUnlockClueKey = clueKey;
-
-    game.autoUnlockTimer = setTimeout(() => {
-        const game = ctx.games?.[gameId];
-        if (!game) return;
-
-        // Only unlock if we're still on the same clue
-        if (game.autoUnlockClueKey !== clueKey) return;
-
-        game.autoUnlockTimer = null;
-        doUnlockBuzzerAuthoritative( gameId, game, ctx );
-    }, waitMs);
 }
 
 export function findCategoryForClue(game, clue) {

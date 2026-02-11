@@ -1,3 +1,5 @@
+import {doUnlockBuzzerAuthoritative} from "../../game/gameLogic.js";
+
 function buzzLog(gameId, msg, extra) {
     console.log(`[buzz] ${msg}`, { t: Date.now(), gameId, ...extra });
 }
@@ -880,31 +882,27 @@ export const gameHandlers = {
         game.buzzLockouts = {};
 
         const pad = 100;
+        const ttsAssetId = game.boardData?.ttsByClueKey?.[clueKey] || null;
+
+        const broadcastClueSelected = () => {
+            ctx.broadcast(gameId, { type: "buzzer-ui-reset" });
+            ctx.broadcast(gameId, { type: "buzzer-locked" });
+            ctx.broadcast(gameId, {
+                type: "clue-selected",
+                clue: game.selectedClue,
+                clearedClues: Array.from(game.clearedClues),
+            });
+
+        }
 
         await ctx.aiHostVoiceSequence(ctx, gameId, game, [
             {slot: game.selectedClue.category, pad},
-            {slot: game.selectedClue.value},
+            {slot: game.selectedClue.value, pad: 50, after: broadcastClueSelected},
+            {assetId: ttsAssetId},
+
         ]);
 
-        ctx.broadcast(gameId, {
-            type: "clue-selected",
-            clue: game.selectedClue,
-            clearedClues: Array.from(game.clearedClues),
-        });
-
-        const ttsAssetId = game.boardData?.ttsByClueKey?.[clueKey] || null;
-        ctx.aiHostSayAsset(ctx, gameId, ttsAssetId);
-
-        ctx.broadcast(gameId, { type: "buzzer-ui-reset" });
-        ctx.broadcast(gameId, { type: "buzzer-locked" });
-
-        await ctx.scheduleAutoUnlockForClue({
-            gameId,
-            game,
-            clueKey,
-            ttsAssetId,
-            ctx
-        });
+        doUnlockBuzzerAuthoritative( gameId, game, ctx);
     },
     "reveal-answer": async ({ ws, data, ctx }) => {
         const { gameId } = data;

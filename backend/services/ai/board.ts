@@ -4,9 +4,7 @@ import type {Ctx} from "../../ws/context.types.js";
 import {Board} from "../../http/boardRoutes.js";
 
 type TraceLike = { mark: (event: string, meta?: Record<string, unknown>) => void };
-
 type ProgressEvent = { done: number; total: number; progress: number };
-
 type ClueKeyInput = { value?: number; question: string };
 
 type AiClue = {
@@ -24,10 +22,8 @@ type AiFinalClue = {
     visual?: unknown;
 };
 
-
 type AiCategoryJson = { category: string; values: AiClue[] };
 type AiFinalCategoryJson = { category: string; values: AiFinalClue[] };
-
 
 export type CreateBoardOptions = Partial<VisualSettings> & {
     reasoningEffort?: "off" | "low" | "medium" | "high";
@@ -145,6 +141,7 @@ export async function createBoardData(
     const ttsPromises: Array<Promise<unknown>> = [];
     const ttsIds = new Set<string>();
     const ttsByClueKey: Record<string, string> = Object.create(null);
+    const ttsByAnswerKey: Record<string, string> = Object.create(null);
 
     const clueKeyFor = (boardType: string, clue: ClueKeyInput) => {
         const v = typeof clue.value === "number" ? clue.value : null;
@@ -156,7 +153,6 @@ export async function createBoardData(
     function isRecord(v: unknown): v is Record<string, unknown> {
         return typeof v === "object" && v !== null;
     }
-
 
     function isAiCategoryJson(v: unknown): v is AiCategoryJson {
         if (!isRecord(v)) return false;
@@ -185,44 +181,73 @@ export async function createBoardData(
         );
     }
 
-    const enqueueCategoryTts = (boardType: "firstBoard" | "secondBoard", json: AiCategoryJson) => {
+    const enqueueCategoryTts = (
+        boardType: "firstBoard" | "secondBoard",
+        json: AiCategoryJson
+    ) => {
         if (!settings.narrationEnabled || !limitTts) return;
 
         for (const clue of json.values) {
-            const q = clue.question.trim();
-            if (!q) continue;
+            const clueText = clue.question.trim();
+            const answerText = clue.answer.trim();
+            const key = clueKeyFor(boardType, clue);
+            if (!key) continue;
 
-            const p = limitTts(async () => {
-                try {
-                    const asset = await ctx.ensureTtsAsset(
-                        {
-                            text: q,
-                            textType: "text",
-                            voiceId: "amy",
-                            engine: "standard",
-                            outputFormat: "mp3",
-                            provider: "piper",
-                        },
-                        ctx.repos
-                    );
-
-                    ttsIds.add(asset.id);
-
+            // ---- CLUE TTS ----
+            if (clueText) {
+                const p = limitTts(async () => {
                     try {
+                        const asset = await ctx.ensureTtsAsset(
+                            {
+                                text: clueText,
+                                textType: "text",
+                                voiceId: "amy",
+                                engine: "standard",
+                                outputFormat: "mp3",
+                                provider: "piper",
+                            },
+                            ctx.repos
+                        );
+
+                        ttsIds.add(asset.id);
+                        ttsByClueKey[key] = asset.id;
+
                         settings.onTtsReady?.(asset.id);
-                    } catch {
-                        // ignore
+                    } catch (e: unknown) {
+                        console.error("[TTS] clue failed:", e);
                     }
+                });
 
-                    const k = clueKeyFor(boardType, clue);
-                    if (k) ttsByClueKey[k] = asset.id;
-                } catch (e: unknown) {
-                    const msg = e instanceof Error ? e.message : String(e);
-                    console.error("[TTS] ensureTtsAsset failed:", msg);
-                }
-            });
+                ttsPromises.push(p);
+            }
 
-            ttsPromises.push(p);
+            // ---- ANSWER TTS ----
+            if (answerText) {
+                const p = limitTts(async () => {
+                    try {
+                        const asset = await ctx.ensureTtsAsset(
+                            {
+                                text: answerText,
+                                textType: "text",
+                                voiceId: "amy",
+                                engine: "standard",
+                                outputFormat: "mp3",
+                                provider: "piper",
+                            },
+                            ctx.repos
+                        );
+
+                        ttsIds.add(asset.id);
+                        ttsByAnswerKey[key] = asset.id;
+
+                        settings.onTtsReady?.(asset.id);
+                    } catch (e: unknown) {
+                        console.error("[TTS] answer failed:", e);
+                    }
+                });
+
+                ttsPromises.push(p);
+            }
         }
     };
 
@@ -230,41 +255,66 @@ export async function createBoardData(
         if (!settings.narrationEnabled || !limitTts) return;
 
         for (const clue of json.values) {
-            const q = clue.question.trim();
-            if (!q) continue;
+            const clueText = clue.question.trim();
+            const answerText = clue.answer.trim();
+            const key = clueKeyFor("finalJeopardy", { question: clue.question });
+            if (!key) continue;
 
-            const p = limitTts(async () => {
-                try {
-                    const asset = await ctx.ensureTtsAsset(
-                        {
-                            text: q,
-                            textType: "text",
-                            voiceId: "amy",
-                            engine: "standard",
-                            outputFormat: "mp3",
-                            provider: "piper",
-                        },
-                        ctx.repos
-                    );
-
-                    ttsIds.add(asset.id);
-
+            // ---- CLUE TTS ----
+            if (clueText) {
+                const p = limitTts(async () => {
                     try {
+                        const asset = await ctx.ensureTtsAsset(
+                            {
+                                text: clueText,
+                                textType: "text",
+                                voiceId: "amy",
+                                engine: "standard",
+                                outputFormat: "mp3",
+                                provider: "piper",
+                            },
+                            ctx.repos
+                        );
+
+                        ttsIds.add(asset.id);
+                        ttsByClueKey[key] = asset.id;
+
                         settings.onTtsReady?.(asset.id);
-                    } catch {
-                        // ignore
+                    } catch (e: unknown) {
+                        console.error("[TTS] final clue failed:", e);
                     }
+                });
 
-                    // Final has no value -> clueKeyFor handles missing value
-                    const k = clueKeyFor("finalJeopardy", { question: clue.question });
-                    if (k) ttsByClueKey[k] = asset.id;
-                } catch (e: unknown) {
-                    const msg = e instanceof Error ? e.message : String(e);
-                    console.error("[TTS] ensureTtsAsset failed:", msg);
-                }
-            });
+                ttsPromises.push(p);
+            }
 
-            ttsPromises.push(p);
+            // ---- ANSWER TTS ----
+            if (answerText) {
+                const p = limitTts(async () => {
+                    try {
+                        const asset = await ctx.ensureTtsAsset(
+                            {
+                                text: answerText,
+                                textType: "text",
+                                voiceId: "amy",
+                                engine: "standard",
+                                outputFormat: "mp3",
+                                provider: "piper",
+                            },
+                            ctx.repos
+                        );
+
+                        ttsIds.add(asset.id);
+                        ttsByAnswerKey[key] = asset.id;
+
+                        settings.onTtsReady?.(asset.id);
+                    } catch (e: unknown) {
+                        console.error("[TTS] final answer failed:", e);
+                    }
+                });
+
+                ttsPromises.push(p);
+            }
         }
     };
 
@@ -515,6 +565,7 @@ STRICT:
             finalJeopardy,
             ttsAssetIds: Array.from(ttsIds),
             ttsByClueKey,
+            ttsByAnswerKey,
         };
     } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : String(e);

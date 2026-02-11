@@ -48,6 +48,7 @@ const AI_HOST_VARIANTS: Record<string, string[]> = {
     final_jeopardy_end2: ["is today's Jeopardy champion."],
     final_jeopardy_category: ["Here is the category."],
     final_jeopardy_clue: ["Here is the Final Jeopardy clue."],
+    answer_was: ["The answer was", "It was"],
 
     placeholder: ["placeholder audio"]
 };
@@ -96,6 +97,7 @@ export async function ensureAiHostValueTts(opts: {
             nameAssetsByPlayer: {},
             categoryAssetsByCategory: {},
             valueAssetsByValue: {},
+            finalJeopardyAnswersByPlayer: {},
             allAssetIds: [],
         };
     }
@@ -147,6 +149,26 @@ export async function ensureAiHostValueTts(opts: {
     });
 }
 
+export async function ensureFinalJeopardyAnswer(ctx: Ctx, game: Game, gameId: string, playerName: string, text: string): Promise<void> {
+    const tts = game.aiHostTts;
+    const asset = await ctx.ensureTtsAsset(
+        {
+            text,
+            textType: "text",
+            voiceId: "amy",
+            engine: "standard",
+            outputFormat: "mp3",
+            provider: "piper"
+        },
+        ctx.repos
+    );
+
+    tts.finalJeopardyAnswersByPlayer["fja" + playerName] = asset.id;
+    tts.allAssetIds.push(asset.id);
+
+    ctx.broadcast(gameId, {type: "preload-final-jeopardy-answer", assetId: asset.id });
+}
+
 export async function ensureAiHostTtsBank(opts: {
     ctx: Ctx;
     game: Game;
@@ -164,6 +186,7 @@ export async function ensureAiHostTtsBank(opts: {
             nameAssetsByPlayer: {},
             categoryAssetsByCategory: {},
             valueAssetsByValue: {},
+            finalJeopardyAnswersByPlayer: {},
             allAssetIds: [],
         };
         return;
@@ -176,6 +199,7 @@ export async function ensureAiHostTtsBank(opts: {
         nameAssetsByPlayer: {},
         categoryAssetsByCategory: {},
         valueAssetsByValue: {},
+        finalJeopardyAnswersByPlayer: {},
         allAssetIds: [],
     };
 
@@ -305,6 +329,20 @@ const withTimeout = async <T>(p: Promise<T>, ms: number, fallback: T): Promise<T
     }
 };
 
+export async function aiHostSayByAsset(
+    ctx: Ctx,
+    gameId: string,
+    assetId: string
+): Promise<SayResult | null> {
+    if (!assetId) return null;
+
+    aiHostSayAsset(ctx, gameId, assetId);
+
+    const ms = await withTimeout(ctx.getTtsDurationMs(assetId), 1000, 0);
+    return { assetId, ms: Number(ms) || 0 };
+}
+
+
 export async function aiHostSayByKey(
     ctx: Ctx,
     gameId: string,
@@ -320,6 +358,7 @@ export async function aiHostSayByKey(
         tts.nameAssetsByPlayer?.[key] ||
         tts.categoryAssetsByCategory?.[key] ||
         tts.valueAssetsByValue?.[key] ||
+        tts.finalJeopardyAnswersByPlayer?.[key] ||
         tts.slotAssets?.[key] ||
         null;
 
@@ -345,8 +384,9 @@ export async function aiHostVoiceSequence(
     steps: VoiceStep[]
 ): Promise<boolean> {
     for (const step of steps) {
-
-        const said = await aiHostSayByKey(ctx, gameId, game, step.slot);
+        const said: SayResult = step.slot
+            ? await aiHostSayByKey(ctx, gameId, game, step.slot)
+            : await aiHostSayByAsset(ctx, gameId, step.assetId);
 
         const ms = said?.ms ?? 0;
         const alive = await ctx.sleepAndCheckGame(ms + (step.pad ?? 0), gameId);

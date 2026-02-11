@@ -93,7 +93,7 @@ async function finishGame(game, gameId, drawings, ctx) {
         alive = await ctx.aiHostVoiceSequence(ctx, gameId, game, [
             {slot: "final_jeopardy_finale2", pad},
             {slot: top[i].name, pad},
-            {slot: "placeholder", pad, after: maybeRevealAnswer}, // TODO Answer
+            {slot: "fja" + top[i].name, pad, after: maybeRevealAnswer},
             {slot: verdicts[top[i].name], pad, after: updateScore}, // correct or incorrect
 
         ]);
@@ -189,6 +189,7 @@ export async function submitDrawing(game, gameId, player, drawing, ctx) {
     const {verdict, transcript} = await ctx.judgeImage(game.selectedClue?.answer, drawing);
     game.finalVerdicts[player] = verdict;
     game.finalTranscripts[player] = transcript;
+    void ctx.ensureFinalJeopardyAnswer(ctx, game, gameId, player, transcript);
 
     checkAllDrawingsSubmitted(game, gameId, ctx);
 }

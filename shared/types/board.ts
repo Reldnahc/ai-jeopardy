@@ -25,4 +25,5 @@ export type BoardData = {
     // without sending a WS "tts-ensure" for each clue.
     ttsAssetIds?: string[];
     ttsByClueKey?: Record<string, string>;
+    ttsByAnswerKey?: Record<string, string>;
 };
