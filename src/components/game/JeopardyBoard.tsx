@@ -46,6 +46,7 @@ interface JeopardyBoardProps {
 
     ddWagerError: string | null;
     showDdModal: DailyDoubleShowModalMsg | null;
+    showWager: boolean;
 }
 
 const JeopardyBoard: React.FC<JeopardyBoardProps> =
@@ -53,7 +54,7 @@ const JeopardyBoard: React.FC<JeopardyBoardProps> =
          currentPlayer, allWagersSubmitted, isFinalJeopardy, drawings,
            handleBuzz, buzzerLocked, buzzResult, buzzLockedOut, timerEndTime, timerDuration,
           answerCapture, answerError, effectivePlayerName, finalWagers, selectedFinalist, ddWagerCapture, ddWagerError,
-         showDdModal}) => {
+         showDdModal, showWager}) => {
     const [localSelectedClue, setLocalSelectedClue] = useState<Clue | null>(null);
     const [showClue, setShowClue] = useState(false);
     const [wagers, setWagers] = useState<Record<string, number>>({});
@@ -229,6 +230,7 @@ const JeopardyBoard: React.FC<JeopardyBoardProps> =
                         finalWagers={finalWagers}
                         selectedFinalist={selectedFinalist}
                         showDdModal={showDdModal}
+                        showWager={showWager}
                     />
                 )}
             </div>

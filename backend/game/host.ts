@@ -30,6 +30,10 @@ const AI_HOST_VARIANTS: Record<string, string[]> = {
         "Time's up—no one got it.",
         "We didn't get an answer on that one.",
     ],
+    nobody_final_jeopardy: [
+        "Looks like nobody got it.",
+        "Nobody got the final clue today.",
+    ],
     welcome_intro: ["Welcome to AI Jeopardy."],
     welcome_outro: ["will be starting us off today.", "you're up first."],
     your_up: ["you're up.", "go ahead.", "pick the next clue."],
@@ -51,8 +55,35 @@ const AI_HOST_VARIANTS: Record<string, string[]> = {
     answer_was: ["The answer was", "It was"],
     i_didnt_catch_that: ["I didn't catch that.", "Sorry, I didn't catch that."],
     say_wager_again: ["Please say your wager again", "Please repeat your wager"],
+    their_wager_was: ["Their wager was "],
     todays_clue: ["Today's final jeopardy clue is.", "Today's clue is.", "Today's final clue is."],
     you_have: ["You have 30 seconds."],
+    correct_followup_sm: [
+        "That adds a little more to your score.",
+        "Nice pickup there.",
+        "That helps.",
+        "Every bit counts.",
+    ],
+    correct_followup_lg: [
+        "And that is a huge swing.",
+        "Big wager, big reward.",
+        "That pays off in a big way.",
+        "That’s a massive boost to your score.",
+    ],
+    incorrect_followup_sm: [
+        "That’ll cost you a bit.",
+        "A small setback there.",
+        "That drops you down slightly.",
+        "Not too much damage done.",
+    ],
+    incorrect_followup_lg: [
+        "And that is a costly miss.",
+        "That’s a big drop.",
+        "A huge swing in the wrong direction.",
+        "That’s going to hurt your score.",
+    ],
+
+
     placeholder: ["placeholder audio"]
 };
 
@@ -101,6 +132,7 @@ export async function ensureAiHostValueTts(opts: {
             categoryAssetsByCategory: {},
             valueAssetsByValue: {},
             finalJeopardyAnswersByPlayer: {},
+            finalJeopardyWagersByPlayer: {},
             allAssetIds: [],
         };
     }
@@ -160,7 +192,7 @@ export async function ensureFinalJeopardyAnswer(ctx: Ctx, game: Game, gameId: st
             textType: "text",
             voiceId: "amy",
             engine: "standard",
-            outputFormat: "mp3",
+            outputFormat: "wav",
             provider: "piper"
         },
         ctx.repos
@@ -169,8 +201,29 @@ export async function ensureFinalJeopardyAnswer(ctx: Ctx, game: Game, gameId: st
     tts.finalJeopardyAnswersByPlayer["fja" + playerName] = asset.id;
     tts.allAssetIds.push(asset.id);
 
-    ctx.broadcast(gameId, {type: "preload-final-jeopardy-answer", assetId: asset.id });
+    ctx.broadcast(gameId, {type: "preload-final-jeopardy-asset", assetId: asset.id });
 }
+
+export async function ensureFinalJeopardyWager(ctx: Ctx, game: Game, gameId: string, playerName: string, wager: number): Promise<void> {
+    const tts = game.aiHostTts;
+    const asset = await ctx.ensureTtsAsset(
+        {
+            text: ctx.numberToWords(wager),
+            textType: "text",
+            voiceId: "amy",
+            engine: "standard",
+            outputFormat: "wav",
+            provider: "piper"
+        },
+        ctx.repos
+    );
+
+    tts.finalJeopardyWagersByPlayer["fjw" + playerName] = asset.id;
+    tts.allAssetIds.push(asset.id);
+
+    ctx.broadcast(gameId, {type: "preload-final-jeopardy-asset", assetId: asset.id });
+}
+
 
 export async function ensureAiHostTtsBank(opts: {
     ctx: Ctx;
@@ -190,6 +243,7 @@ export async function ensureAiHostTtsBank(opts: {
             categoryAssetsByCategory: {},
             valueAssetsByValue: {},
             finalJeopardyAnswersByPlayer: {},
+            finalJeopardyWagersByPlayer: {},
             allAssetIds: [],
         };
         return;
@@ -203,6 +257,7 @@ export async function ensureAiHostTtsBank(opts: {
         categoryAssetsByCategory: {},
         valueAssetsByValue: {},
         finalJeopardyAnswersByPlayer: {},
+        finalJeopardyWagersByPlayer: {},
         allAssetIds: [],
     };
 
@@ -362,6 +417,7 @@ export async function aiHostSayByKey(
         tts.categoryAssetsByCategory?.[key] ||
         tts.valueAssetsByValue?.[key] ||
         tts.finalJeopardyAnswersByPlayer?.[key] ||
+        tts.finalJeopardyWagersByPlayer?.[key] ||
         tts.slotAssets?.[key] ||
         null;
 

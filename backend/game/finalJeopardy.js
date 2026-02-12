@@ -120,31 +120,44 @@ async function finishGame(game, gameId, drawings, ctx) {
     if (!alive) return;
 
     for (let i = top.length - 1; i >= 0; i--) {
+        const playerName = top[i].name;
+
         const maybeRevealAnswer = () => {
-            if (verdicts[top[i].name] === "correct" && !game.selectedClue.isAnswerRevealed) {
+            if (verdicts[playerName] === "correct" && !game.selectedClue.isAnswerRevealed) {
                 game.selectedClue.isAnswerRevealed = true;
                 ctx.broadcast(gameId, { type: "answer-revealed", clue: game.selectedClue });
             }
         };
 
         const updateScore = async () => {
-            ctx.broadcast(gameId, { type: "update-score", player: top[i].name, score: top[i].score });
-            await ctx.sleep(5_000);
+            ctx.broadcast(gameId, { type: "update-score", player: playerName, score: top[i].score });
+
         };
 
-        ctx.broadcast(gameId, { type: "display-finalist", finalist: top[i].name });
+        const revealWager = async () => {
+            ctx.broadcast(gameId, { type: "reveal-finalist-wager"});
+        };
+
+        ctx.broadcast(gameId, { type: "display-finalist", finalist: playerName });
+
+        const wager = Number(game.wagers[playerName] ?? 0);
+        const sizeSuffix = wager > 5000 ? "lg" : "sm";
+        const followupSlot = verdicts[playerName] + "_followup_" + sizeSuffix;
 
         alive = await ctx.aiHostVoiceSequence(ctx, gameId, game, [
             { slot: "final_jeopardy_finale2", pad },
-            { slot: top[i].name, pad },
-            { slot: "fja" + top[i].name, pad, after: maybeRevealAnswer },
-            { slot: verdicts[top[i].name], pad, after: updateScore },
+            { slot: playerName, pad },
+            { slot: "fja" + playerName, pad, after: maybeRevealAnswer },
+            { slot: verdicts[playerName], pad },
+            { slot: "their_wager_was", pad, after: revealWager },
+            { slot: "fjw" + playerName, pad, after: updateScore },
+            { slot: followupSlot, pad },
         ]);
         if (!alive) return;
     }
 
     if (!game.selectedClue.isAnswerRevealed) {
-        alive = await ctx.aiHostVoiceSequence(ctx, gameId, game, [{ slot: "nobody", pad }]);
+        alive = await ctx.aiHostVoiceSequence(ctx, gameId, game, [{ slot: "nobody_final_jeopardy", pad }]);
         if (!alive) return;
         game.selectedClue.isAnswerRevealed = true;
         ctx.broadcast(gameId, { type: "answer-revealed", clue: game.selectedClue });
@@ -236,6 +249,7 @@ export function submitWager(game, gameId, player, wager, ctx) {
         game.wagers = {};
     }
     game.wagers[player] = wager;
+    void ctx.ensureFinalJeopardyWager(ctx, game, gameId, player, Number(wager));
 
     checkAllWagersSubmitted(game, gameId, ctx);
 }

@@ -167,6 +167,7 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
     const [ddWagerLocked, setDdWagerLocked] = useState<DailyDoubleWagerLockedMsg | null>(null);
     const [ddWagerError, setDdWagerError] = useState<string | null>(null);
     const [showDdModal, setShowDdModal] = useState<DailyDoubleShowModalMsg | null>(null);
+    const [showWager, setShowWager] = useState<boolean>(false);
 
 
     const aiHostSeqRef = useRef<number>(0);
@@ -410,6 +411,10 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
                 setDdWagerError(String(m.message || "Daily Double error"));
                 return;
             }
+            if (message.type === "reveal-finalist-wager") {
+                setShowWager(true);
+                return;
+            }
 
             if (message.type === "final-jeopardy") {
                 setActiveBoard("finalJeopardy");
@@ -516,7 +521,7 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
                 return;
             }
 
-            if (message.type === "preload-final-jeopardy-answer") {
+            if (message.type === "preload-final-jeopardy-asset") {
                 const m = message as unknown as { assetId: string;};
                 void preloadAudio(ttsUrl(m.assetId));
                 return;
@@ -598,8 +603,8 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
 
             if (message.type === "display-finalist") {
                 const m = message as unknown as { finalist: string };
+                setShowWager(false);
                 setSelectedFinalist(m.finalist);
-
                 return;
             }
 
@@ -719,5 +724,6 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
         ddWagerLocked,
         ddWagerError,
         showDdModal,
+        showWager,
     };
 }

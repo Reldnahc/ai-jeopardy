@@ -75,7 +75,8 @@ export default function Game() {
         selectedFinalist,
         ddWagerCapture,
         ddWagerError,
-        showDdModal
+        showDdModal,
+        showWager
     } = useGameSocketSync({ gameId, playerName: effectivePlayerName });
 
     // Persistent WebSocket connection
@@ -471,6 +472,7 @@ export default function Game() {
                             ddWagerCapture={ddWagerCapture}
                             ddWagerError={ddWagerError}
                             showDdModal={showDdModal}
+                            showWager={showWager}
                         />
                     </>
                 )}

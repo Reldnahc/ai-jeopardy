@@ -14,7 +14,7 @@ type FinalJeopardyPanelProps = {
     drawingSubmitted: Record<string, boolean>;
     setDrawingSubmitted: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
     selectedFinalist: string;
-
+    showWager: boolean;
     timerEndTime: number | null;
 };
 
@@ -28,6 +28,7 @@ const FinalJeopardyPanel: React.FC<FinalJeopardyPanelProps> = ({
                                                                    finalWagers,
                                                                    selectedFinalist,
                                                                    timerEndTime,
+                                                                   showWager,
                                                                }) => {
     const { sendJson, nowMs } = useWebSocket();
     const { deviceType } = useDeviceContext();
@@ -141,14 +142,14 @@ const FinalJeopardyPanel: React.FC<FinalJeopardyPanelProps> = ({
                                     >
                                         {selectedFinalist}&apos;s answer:
                                     </h2>
-
-                                    <div className="mb-3 text-center text-white/90">
-                                        Wager:{" "}
-                                        <span className="font-semibold">
-                                            ${Number(finalWagers?.[selectedFinalist] ?? 0).toLocaleString()}
-                                        </span>
-                                    </div>
-
+                                    {showWager && (
+                                        <div className="mb-3 text-center text-2xl text-white/90">
+                                            Wager:{" "}
+                                            <span className="font-semibold">
+                                                ${Number(finalWagers?.[selectedFinalist] ?? 0).toLocaleString()}
+                                            </span>
+                                        </div>
+                                    )}
                                     {drawings[selectedFinalist] ? (
                                         <img
                                             src={drawings[selectedFinalist]}

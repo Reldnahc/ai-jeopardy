@@ -24,6 +24,7 @@ export type AiHostTtsBank = {
     categoryAssetsByCategory: Record<string, string>;
     valueAssetsByValue: Record<string, string>;
     finalJeopardyAnswersByPlayer: Record<string, string>;
+    finalJeopardyWagersByPlayer: Record<string, string>;
     allAssetIds: string[];
 };
 

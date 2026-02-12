@@ -49,7 +49,7 @@ import {
     aiHostSayByKey,
     aiHostVoiceSequence,
     ensureAiHostTtsBank,
-    ensureAiHostValueTts, ensureFinalJeopardyAnswer,
+    ensureAiHostValueTts, ensureFinalJeopardyAnswer, ensureFinalJeopardyWager,
 } from "../game/host.js";
 import { verifyJwt } from "../auth/jwt.js";
 import { getBearerToken, playerStableId, verifyAccessToken } from "../services/userService.js";
@@ -67,6 +67,7 @@ import {
     finalizeDailyDoubleWagerAndStartClue
 
 } from "../game/dailyDouble.js"
+import {numberToWords} from "../services/numberToWords.js";
 // Minimal type for now; we’ll tighten later as you TS-migrate more modules.
 
 export const createWsContext = (wss: any, repos: any) => {
@@ -107,6 +108,10 @@ export const createWsContext = (wss: any, repos: any) => {
         sleepAndCheckGame: (ms: number, gameId: string)=> sleepAndCheck(ms, () => Boolean(games[gameId])),
 
         ensureFinalJeopardyAnswer,
+        ensureFinalJeopardyWager,
+
+        numberToWords,
+
         // comms
         broadcast,
         broadcastAll,
