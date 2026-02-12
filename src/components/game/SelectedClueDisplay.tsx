@@ -4,6 +4,7 @@ import { useWebSocket } from "../../contexts/WebSocketContext.tsx";
 import BuzzAnimation from "./BuzzAnimation.tsx";
 import Timer from "./Timer.tsx";
 import FinalJeopardyPanel from "./FinalJeopardyPanel.tsx";
+import {DailyDoubleShowModalMsg} from "../../hooks/game/useGameSocketSync.ts";
 
 interface SelectedClueDisplayProps {
     localSelectedClue: Clue;
@@ -34,6 +35,8 @@ interface SelectedClueDisplayProps {
     effectivePlayerName: string | null;
     finalWagers: Record<string, number>;
     selectedFinalist: string;
+    showDdModal: DailyDoubleShowModalMsg | null;
+
 }
 
 const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
@@ -56,7 +59,8 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                                                                      answerError,
                                                                      effectivePlayerName,
                                                                      finalWagers,
-                                                                     selectedFinalist
+                                                                     selectedFinalist,
+                                                                     showDdModal
                                                                  }) => {
     const { sendJson } = useWebSocket();
 
@@ -433,7 +437,7 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                 </div>
 
                 {/* Buzz button stays at the bottom */}
-                {!isFinalJeopardy && !showAnswer && (
+                {!isFinalJeopardy && !showDdModal && !showAnswer && (
                     <button
                         onClick={handleBuzz}
                         disabled={!!buzzResult || buzzLockedOut || !!answerCapture}

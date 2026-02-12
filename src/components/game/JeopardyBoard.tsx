@@ -228,6 +228,7 @@ const JeopardyBoard: React.FC<JeopardyBoardProps> =
                         effectivePlayerName={effectivePlayerName}
                         finalWagers={finalWagers}
                         selectedFinalist={selectedFinalist}
+                        showDdModal={showDdModal}
                     />
                 )}
             </div>
