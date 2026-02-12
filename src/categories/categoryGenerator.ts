@@ -9,12 +9,12 @@ function isValid(mod: string, subject: string) {
     return !BLOCKED[mod]?.includes(subject);
 }
 
-const MODIFIER_CHANCE = 0.6;
+const MODIFIER_CHANCE = 0.35;
 
 export function generateTemplateCategory(): string {
     const subject = randomFrom(SUBJECTS);
 
-    // 40% of the time, return the plain subject
+    // 20% of the time, return the plain subject
     if (Math.random() > MODIFIER_CHANCE) {
         return subject;
     }

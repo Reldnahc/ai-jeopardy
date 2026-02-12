@@ -14,8 +14,6 @@ export const SUBJECTS = [
     'Feudal Japan',
     'Samurai Culture',
     'Chinese Dynasties',
-    'The Ming Dynasty',
-    'The Qing Dynasty',
     'The Crusades',
     'The Renaissance',
     'The Reformation',

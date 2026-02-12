@@ -1,14 +1,49 @@
 export const MODIFIERS = [
     'History of',
     'Origins of',
-    'Early History of',
-    'Modern History of',
-    'The Rise of',
-    'The Fall of',
-    'The Rise and Fall of',
+    'Early Days of',
+    'Modern Era of',
+    'Rise of',
+    'Fall of',
     'Foundations of',
-    'Fundamentals of',
-    'Key Concepts in',
+    'Basics of',
+    'Core Concepts of',
+    'Legends of',
+    'Icons of',
+    'Giants of',
+    'Masters of',
+    'Pioneers of',
+    'Leaders in',
+    'Champions of',
+    'Movements in',
+    'Schools of',
+    'Styles of',
+    'Trends in',
+    'Forces Behind',
+    'Power Players in',
+    'Game-Changers in',
+    'Behind the Scenes of',
+    'Anatomy of',
+    'Structure of',
+    'Evolution of',
+    'Timeline of',
+    'Golden Age of',
+    'Dark Side of',
+    'Wonders of',
+    'Mysteries of',
+    'Rivalries in',
+    'Battles in',
+    'Expansion of',
+    'Collapse of',
+    'Systems of',
+    'Theory of',
+    'Art of',
+    'Science of',
+    'Politics of',
+    'Culture of',
+    'Economics of',
+    'Geography of',
+    'Key Moments in',
     'Major Events in',
     'Turning Points in',
     'Milestones in',
@@ -16,32 +51,29 @@ export const MODIFIERS = [
     'Discoveries in',
     'Inventions in',
     'Innovations in',
-    'Failures in',
-    'Mistakes in',
+    'Failures of',
+    'Mistakes of',
     'Controversies in',
     'Debates in',
     'Secrets of',
-    'Hidden Facts About',
+    'Hidden Side of',
     'Lesser-Known Facts About',
     'Strange Facts About',
-    'Unusual Facts About',
     'Famous Figures in',
-    'Notable People in',
-    'Important Works in',
-    'Classic Examples of',
+    'Influential People in',
+    'Great Works of',
     'Defining Moments in',
-    'Landmark Events in',
-    'Firsts in',
-    'Lasts in',
-    'Records in',
+    'Firsts of',
+    'Records of',
     'Extremes of',
     'Oddities of',
 ];
 
 
+
 export const BLOCKED: Record<string, string[]> = {
-    // ===== FAILURE / MISTAKE MODIFIERS =====
-    'Failures in': [
+    // ===== FAILURE / NEGATIVE MODIFIERS =====
+    'Failures of': [
         'World Capitals',
         'Capital Cities',
         'Time Zones',
@@ -54,7 +86,7 @@ export const BLOCKED: Record<string, string[]> = {
         'Periodic Table',
     ],
 
-    'Mistakes in': [
+    'Mistakes of': [
         'World Capitals',
         'Capital Cities',
         'Time Zones',
@@ -67,7 +99,27 @@ export const BLOCKED: Record<string, string[]> = {
         'Periodic Table',
     ],
 
-    // ===== CONTROVERSY / DEBATE MODIFIERS =====
+    'Dark Side of': [
+        'World Capitals',
+        'Capital Cities',
+        'Measurement Systems',
+        'Time Zones',
+        'Currencies',
+        'National Anthems',
+        'Writing Systems',
+        'Periodic Table',
+    ],
+
+    'Collapse of': [
+        'World Capitals',
+        'Capital Cities',
+        'Measurement Systems',
+        'Time Zones',
+        'Currencies',
+        'Flags',
+    ],
+
+    // ===== CONTROVERSY / DEBATE =====
     'Controversies in': [
         'World Capitals',
         'Capital Cities',
@@ -89,14 +141,13 @@ export const BLOCKED: Record<string, string[]> = {
         'Time Zones',
     ],
 
-    // ===== INVENTION / CREATION MODIFIERS =====
+    // ===== INVENTION / INNOVATION =====
     'Inventions in': [
         'Ancient Egypt',
         'Roman Empire',
         'World War I',
         'World War II',
         'The Cold War',
-        'The Renaissance',
         'The Crusades',
         'Feudal Japan',
     ],
@@ -105,13 +156,13 @@ export const BLOCKED: Record<string, string[]> = {
         'World Capitals',
         'Capital Cities',
         'Mountain Ranges',
-        'Rivers',
+        'Major Rivers',
         'Oceans and Seas',
         'Deserts',
         'Rainforests',
     ],
 
-    // ===== PEOPLE-FOCUSED MODIFIERS =====
+    // ===== PEOPLE-FOCUSED =====
     'Famous Figures in': [
         'Algorithms',
         'Data Structures',
@@ -123,7 +174,7 @@ export const BLOCKED: Record<string, string[]> = {
         'Ethics',
     ],
 
-    'Notable People in': [
+    'Influential People in': [
         'Algorithms',
         'Data Structures',
         'Measurement Systems',
@@ -134,43 +185,35 @@ export const BLOCKED: Record<string, string[]> = {
         'Ethics',
     ],
 
-    // ===== RISE / FALL MODIFIERS =====
-    'The Rise of': [
-        'World Capitals',
-        'Capital Cities',
-        'Time Zones',
-        'Measurement Systems',
-        'Currencies',
-        'Flags',
+    // ===== STRUCTURAL / ABSTRACT MODIFIERS =====
+    'Structure of': [
+        'Pop Music',
+        'Hit Songs',
+        'Celebrity Culture',
+        'Memes',
+        'Influencers',
     ],
 
-    'The Fall of': [
-        'World Capitals',
-        'Capital Cities',
-        'Time Zones',
-        'Measurement Systems',
-        'Currencies',
-        'Flags',
+    'Theory of': [
+        'Pop Music',
+        'Hit Songs',
+        'Famous Bands',
+        'Celebrity Culture',
+        'Memes',
+        'Boy Bands',
+        'Girl Groups',
     ],
 
-    'The Rise and Fall of': [
-        'World Capitals',
-        'Capital Cities',
-        'Time Zones',
-        'Measurement Systems',
-        'Currencies',
-        'Flags',
+    'Systems of': [
+        'Pop Music',
+        'Hit Songs',
+        'Celebrity Culture',
+        'Memes',
+        'Famous Actors',
     ],
 
-    // ===== RECORD / EXTREME MODIFIERS =====
-    'Records in': [
-        'Ethics',
-        'Logic',
-        'Philosophy',
-        'Political Philosophy',
-    ],
-
-    'Extremes of': [
+    // ===== RECORD / EXTREME =====
+    'Records of': [
         'Ethics',
         'Logic',
         'Philosophy',
@@ -178,7 +221,14 @@ export const BLOCKED: Record<string, string[]> = {
         'Music Theory',
     ],
 
-    // ===== ODD / SECRET MODIFIERS =====
+    'Extremes of': [
+        'Ethics',
+        'Logic',
+        'Political Philosophy',
+        'Music Theory',
+    ],
+
+    // ===== SECRET / ODD =====
     'Secrets of': [
         'World Capitals',
         'Capital Cities',
@@ -194,5 +244,19 @@ export const BLOCKED: Record<string, string[]> = {
         'Political Philosophy',
         'Music Theory',
     ],
-};
 
+    // ===== ERA-SPECIFIC MODIFIERS =====
+    'Golden Age of': [
+        'Algorithms',
+        'Data Structures',
+        'Measurement Systems',
+        'Time Zones',
+        'Currencies',
+    ],
+
+    'Modern Era of': [
+        'Ancient Egypt',
+        'Mesopotamia',
+        'Indus Valley Civilization',
+    ],
+};
