@@ -1,3 +1,5 @@
+import {appConfig} from "../config/appConfig.js";
+
 function getExpectedFinalists(game) {
     const players = Array.isArray(game?.players) ? game.players : [];
 
@@ -8,13 +10,13 @@ function getExpectedFinalists(game) {
     });
 }
 
-function advanceToDrawingPhase(game, gameId, wagers, ctx) {
+async function advanceToDrawingPhase(game, gameId, wagers, ctx) {
     // ✅ stop wager timer once complete
     ctx.clearGameTimer(game, gameId, ctx);
 
     game.finalJeopardyStage = "drawing";
 
-    ctx.broadcast(gameId, { type: "all-wagers-submitted", wagers });
+    ctx.broadcast(gameId, {type: "all-wagers-submitted", wagers});
 
     // Reveal the final clue immediately after wagers are locked in
     const fjCat = game.boardData?.finalJeopardy?.categories?.[0] || null;
@@ -37,16 +39,31 @@ function advanceToDrawingPhase(game, gameId, wagers, ctx) {
     game.buzzerLocked = true;
     game.buzzed = null;
     game.buzzLockouts = {};
-    ctx.broadcast(gameId, { type: "buzzer-locked" });
-    ctx.broadcast(gameId, { type: "buzzer-ui-reset" });
-    ctx.broadcast(gameId, {
-        type: "clue-selected",
-        clue: game.selectedClue,
-        clearedClues: Array.from(game.clearedClues || []),
-    });
+    ctx.broadcast(gameId, {type: "buzzer-locked"});
+    ctx.broadcast(gameId, {type: "buzzer-ui-reset"});
 
-    // ✅ 30s drawing timer (server-authoritative)
-    const DRAW_SECONDS = 30;
+    const selectClue = () => {
+        ctx.broadcast(gameId, {
+            type: "clue-selected",
+            clue: game.selectedClue,
+            clearedClues: Array.from(game.clearedClues || []),
+        });
+    }
+
+    const pad = 200;
+
+    const DRAW_SECONDS = appConfig.gameplay.drawSeconds;
+
+    const assetId = game.boardData?.ttsByClueKey?.[`finalJeopardy:?:${game.selectedClue.question?.trim()}`] || null;
+
+    const alive = await ctx.aiHostVoiceSequence(ctx, gameId, game, [
+        {slot: "todays_clue", pad, after: selectClue},
+        {assetId, pad},
+        {slot: "you_have", pad},
+       //tODO TIME SUPPORT
+    ]);
+    if (!alive) return;
+
 
     ctx.startGameTimer(gameId, game, ctx, DRAW_SECONDS, "final-draw", () => {
         if (!game?.isFinalJeopardy) return;
@@ -72,7 +89,6 @@ function advanceToDrawingPhase(game, gameId, wagers, ctx) {
 }
 
 async function finishGame(game, gameId, drawings, ctx) {
-    // ✅ stop drawing timer once complete
     ctx.clearGameTimer(game, gameId, ctx);
 
     game.finalJeopardyStage = "finale";
@@ -236,7 +252,7 @@ export function checkAllWagersSubmitted(game, gameId, ctx) {
         expected.every((name) => Object.prototype.hasOwnProperty.call(wagers, name));
 
     if (allSubmitted) {
-        advanceToDrawingPhase(game, gameId, wagers, ctx);
+        void advanceToDrawingPhase(game, gameId, wagers, ctx);
     }
 }
 

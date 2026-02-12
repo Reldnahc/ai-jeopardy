@@ -35,7 +35,9 @@ EXPECTED ANSWER TYPE: ${answerType}
 
 ACCEPTANCE RULES:
 - Ignore articles ("a", "an", "the"), punctuation, and minor spelling differences.
-- Accept minor paraphrases and very close synonyms ONLY if they refer to the same specific thing.
+- Accept acronyms/initialisms/abbreviations if they clearly refer to the same specific answer
+  (e.g., "USA" vs "United States of America", "UK" vs "United Kingdom").
+- Accept widely-used alternate names if they refer to the same entity (e.g., "Holland" vs "Netherlands" when intended).
 - Do NOT require the response to be phrased as a question.
 - If expected is a PERSON: accept last name only, or first name omitted (e.g., "Doe" for "Jane Doe") IF it remains unambiguous.
 - If expected is a PLACE: accept common short forms (e.g., "NYC" for "New York City") IF it’s the same place.

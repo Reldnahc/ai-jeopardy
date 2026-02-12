@@ -217,8 +217,8 @@ export default function MainPage() {
                                   </span>
                                 </div>
 
-                                <h3 className="text-4xl font-bold text-gray-900 text-center mb-3">
-                                    {cotd.category}
+                                <h3 className="text-6xl text-shadow-jeopardy font-swiss911 text-yellow-400 tracking-widest text-center mb-3">
+                                    {cotd.category.toUpperCase()}
                                 </h3>
 
                                 <p className="text-lg text-gray-700 text-center max-w-2xl mx-auto leading-relaxed">

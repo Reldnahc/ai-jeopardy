@@ -2,49 +2,20 @@ import type { AnswerType } from "./types.js";
 
 export function isTooGeneric(norm: string) {
     const bad = new Set([
-        "it",
-        "this",
-        "that",
-        "thing",
-        "stuff",
-        "someone",
-        "somebody",
-        "something",
-        "anything",
-        "everything",
-        "idk",
-        "i dont know",
-        "dont know",
-        "unknown",
+        "it","this","that","thing","stuff",
+        "someone","somebody","something",
+        "anything","everything",
+        "idk","i dont know","dont know","unknown",
     ]);
 
     if (bad.has(norm)) return true;
-    if (norm.length <= 2) return true;
-    return false;
-}
 
-function tokenSet(norm: string) {
-    return new Set(norm.split(" ").filter(Boolean));
-}
+    // Reject 1-char garbage, but allow 2+ chars
+    if (norm.length <= 1) return true;
 
-function tokenOverlap(a: Set<string>, b: Set<string>) {
-    let hit = 0;
-    for (const t of a) if (b.has(t)) hit++;
-    return hit;
-}
+    // Reject single-token filler verbs only if you want (optional)
+    // if (norm === "go" || norm === "do" || norm === "say") return true;
 
-/**
- * Returns true if we can confidently short-circuit to "incorrect" due to zero overlap,
- * ONLY when expected answer is multi-token.
- */
-export function shouldRejectForZeroOverlap(normExpected: string, normTranscript: string) {
-    const aTokens = tokenSet(normExpected);
-    const tTokens = tokenSet(normTranscript);
-
-    if (aTokens.size >= 2) {
-        const overlap = tokenOverlap(aTokens, tTokens);
-        return overlap === 0;
-    }
     return false;
 }
 

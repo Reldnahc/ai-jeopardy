@@ -1,7 +1,7 @@
 import { callOpenAiJson, parseOpenAiJson } from "../openaiClient.js";
 import type { JudgeTextResult, Verdict } from "./types.js";
-import { normalizeJeopardyText, hasAnyAlphaNum } from "./normalize.js";
-import { inferAnswerType, isTooGeneric, shouldRejectForZeroOverlap } from "./heuristics.js";
+import { normalizeJeopardyText } from "./normalize.js";
+import { inferAnswerType, isTooGeneric } from "./heuristics.js";
 import { buildJudgePrompt } from "./prompt.js";
 import {appConfig} from "../../../config/appConfig.js";
 
@@ -15,20 +15,17 @@ export async function judgeClueAnswerFast(
     const normT = normalizeJeopardyText(transcriptRaw);
     const normA = normalizeJeopardyText(expectedRaw);
 
-    // Fast deterministic rejections
-    if (!hasAnyAlphaNum(normT) || isTooGeneric(normT)) {
-        return { verdict: "incorrect" };
-    }
 
     // Fast deterministic accept
     if (normT && normA && normT === normA) {
         return { verdict: "correct" };
     }
 
-    // Multi-token zero overlap → almost certainly wrong
-    if (shouldRejectForZeroOverlap(normA, normT)) {
-        return { verdict: "incorrect" };
-    }
+    const tGeneric = isTooGeneric(normT);
+    const aGeneric = isTooGeneric(normA);
+
+    // only reject generic transcript if expected isn't also generic/short
+    if (tGeneric && !aGeneric) return { verdict: "incorrect" };
 
     const answerType = inferAnswerType(expectedRaw);
 

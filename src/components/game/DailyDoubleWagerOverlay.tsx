@@ -208,7 +208,7 @@ export default function DailyDoubleWagerOverlay({
             </div>
 
             <div className="w-[min(820px,94vw)] rounded-3xl bg-blue-950 p-12 text-white shadow-2xl">
-                <div className="text-6xl font-extrabold text-blue-400 tracking-wide">
+                <div className="text-6xl font-extrabold text-yellow-400 font-swiss911 text-shadow-jeopardy tracking-wider">
                     Daily Double!
                 </div>
 

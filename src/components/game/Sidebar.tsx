@@ -222,8 +222,8 @@ const Sidebar: React.FC<SidebarProps> = ({
                 </div>
 
                 <div>
-                    <h2 className="text-4xl  mt-3 font-extrabold font-swiss911 text-shadow-jeopardy tracking-widest bg-blue-700 text-white px-5 py-5 rounded-lg text-center flex items-center gap-2.5 shadow-md mb-3">
-                        Contestants
+                    <h2 className="text-4xl  mt-3 font-extrabold font-swiss911 text-shadow-jeopardy tracking-wider bg-blue-700 text-white px-5 py-5 rounded-lg text-center w-full gap-2.5 shadow-md mb-3">
+                        CONTESTANTS
                     </h2>
                     <ul className="list-none p-0 m-0">
                         {players.map((player) => {

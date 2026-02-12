@@ -89,7 +89,7 @@ const Header: React.FC = () => {
                 <div className="flex items-center space-x-6">
                     <Link
                         to="/"
-                        className="text-2xl md:text-3xl font-bold hover:underline text-blue-700 hover:text-blue-500"
+                        className="text-4xl md:text-5xl text-shadow-jeopardy font-swiss911 tracking-wider font-bold hover:underline text-white hover:text-blue-600"
                     >
                         AI-Jeopardy.com
                     </Link>

@@ -51,7 +51,8 @@ const AI_HOST_VARIANTS: Record<string, string[]> = {
     answer_was: ["The answer was", "It was"],
     i_didnt_catch_that: ["I didn't catch that.", "Sorry, I didn't catch that."],
     say_wager_again: ["Please say your wager again", "Please repeat your wager"],
-
+    todays_clue: ["Today's final jeopardy clue is.", "Today's clue is.", "Today's final clue is."],
+    you_have: ["You have 30 seconds."],
     placeholder: ["placeholder audio"]
 };
 
