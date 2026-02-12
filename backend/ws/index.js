@@ -32,20 +32,20 @@ export const attachWebSocketServer = (wss, repos) => {
             } catch {
                 // ignore parse; router may handle other formats if any
             }
-            if (data) {
-                console.log("[WS:IN]", {
-                    socketId: ws.id,
-                    gameId: ws.gameId,
-                    type: data?.type,
-                    payload: data,
-                });
-            } else {
-                console.log("[WS:IN]", {
-                    socketId: ws.id,
-                    gameId: ws.gameId,
-                    raw: text,
-                });
-            }
+            // if (data) {
+            //     console.log("[WS:IN]", {
+            //         socketId: ws.id,
+            //         gameId: ws.gameId,
+            //         type: data?.type,
+            //         payload: data,
+            //     });
+            // } else {
+            //     console.log("[WS:IN]", {
+            //         socketId: ws.id,
+            //         gameId: ws.gameId,
+            //         raw: text,
+            //     });
+            // }
 
             try {
                 await routeWsMessage(ws, raw, ctx);

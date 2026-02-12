@@ -1,9 +1,3 @@
-import {doUnlockBuzzerAuthoritative} from "../../game/gameLogic.js";
-
-function buzzLog(gameId, msg, extra) {
-    console.log(`[buzz] ${msg}`, { t: Date.now(), gameId, ...extra });
-}
-
 export const gameHandlers = {
     "join-game": async ({ ws, data, ctx }) => {
         const { gameId, playerName } = data;
@@ -36,7 +30,7 @@ export const gameHandlers = {
         } else {
             // NEW PLAYER LOGIC
             // Only add if they truly aren't in the list
-            const colorData = await ctx.getColorFromPlayerName(playerName);
+            const profile = await ctx.repos.profiles.getPublicProfileByUsername(playerName);
             const raceConditionCheck = ctx.games[gameId].players.find((p) => p.name === playerName);
 
             if (raceConditionCheck) {
@@ -47,8 +41,8 @@ export const gameHandlers = {
                 const newPlayer = {
                     id: ws.id,
                     name: playerName,
-                    color: colorData?.color || "bg-blue-500",
-                    text_color: colorData?.text_color || "text-white",
+                    color: profile?.color || "bg-blue-500",
+                    text_color: profile?.text_color || "text-white",
                     online: true
                 };
                 ctx.games[gameId].players.push(newPlayer);
@@ -100,6 +94,7 @@ export const gameHandlers = {
             boardSelectionLocked: Boolean(game.boardSelectionLocked),
             boardSelectionLockReason: game.boardSelectionLockReason || null,
             boardSelectionLockVersion: game.boardSelectionLockVersion || 0,
+            dailyDouble: game.dailyDouble || null,
         }));
 
         // Notify others
@@ -179,12 +174,6 @@ export const gameHandlers = {
         const stable = ctx.playerStableId(player);
         const lockedOut = game.clueState?.lockedOut || {};
         if (game.clueState?.clueKey && lockedOut[stable]) {
-            buzzLog(gameId, "deny already-attempted", {
-                wsId: ws.id,
-                playerName: player.name,
-                stableId: stable,
-                clueKey: game.clueState?.clueKey ?? null,
-            });
 
             ws.send(JSON.stringify({
                 type: "buzz-denied",
@@ -203,29 +192,8 @@ export const gameHandlers = {
         if (!game._buzzMsgSeq) game._buzzMsgSeq = 0;
         const msgSeq = ++game._buzzMsgSeq;
 
-        buzzLog(gameId, "recv", {
-            msgSeq,
-            wsId: ws.id,
-            playerName: player.name,
-            stableId: stable,
-            buzzerLocked: Boolean(game.buzzerLocked),
-            buzzed: game.buzzed || null,
-            estRaw: data?.estimatedServerBuzzAtMs ?? null,
-            clientSeq: data?.clientSeq ?? null,
-            lockoutUntil,
-            lockoutRemainingMs: Math.max(0, lockoutUntil - now),
-            now,
-        });
-
         // Already buzzed by someone else
         if (game.buzzed) {
-            buzzLog(gameId, "deny already-buzzed", {
-                msgSeq,
-                playerName: player.name,
-                currentWinner: game.buzzed,
-                lockoutUntil,
-                now,
-            });
 
             ws.send(JSON.stringify({
                 type: "buzz-denied",
@@ -237,13 +205,6 @@ export const gameHandlers = {
 
         // Player is currently locked out (from early buzzing)
         if (lockoutUntil > now) {
-            buzzLog(gameId, "deny locked-out", {
-                msgSeq,
-                playerName: player.name,
-                lockoutUntil,
-                remainingMs: lockoutUntil - now,
-                now,
-            });
 
             ws.send(JSON.stringify({
                 type: "buzz-denied",
@@ -258,14 +219,6 @@ export const gameHandlers = {
             const EARLY_BUZZ_LOCKOUT_MS = 1000;
             const until = now + EARLY_BUZZ_LOCKOUT_MS;
             game.buzzLockouts[player.name] = until;
-
-            buzzLog(gameId, "deny early", {
-                msgSeq,
-                playerName: player.name,
-                now,
-                until,
-                earlyLockoutMs: EARLY_BUZZ_LOCKOUT_MS,
-            });
 
             ws.send(JSON.stringify({
                 type: "buzz-denied",
@@ -297,27 +250,12 @@ export const gameHandlers = {
             const MAX_FUTURE_MS = 250;
 
             if (openAt > 0 && est < openAt - MAX_EARLY_MS) {
-                buzzLog(gameId, "deny bad-timestamp (early)", {
-                    msgSeq,
-                    playerName: player.name,
-                    est,
-                    openAt,
-                    now,
-                    maxEarlyMs: MAX_EARLY_MS,
-                });
 
                 ws.send(JSON.stringify({ type: "buzz-denied", reason: "bad-timestamp", lockoutUntil: 0 }));
                 return;
             }
 
             if (est > now + MAX_FUTURE_MS) {
-                buzzLog(gameId, "deny bad-timestamp (future)", {
-                    msgSeq,
-                    playerName: player.name,
-                    est,
-                    now,
-                    maxFutureMs: MAX_FUTURE_MS,
-                });
 
                 ws.send(JSON.stringify({ type: "buzz-denied", reason: "bad-timestamp", lockoutUntil: 0 }));
                 return;
@@ -335,13 +273,6 @@ export const gameHandlers = {
                 timer: null,
             };
 
-            buzzLog(gameId, "pending-init", {
-                msgSeq,
-                now,
-                collectMs: COLLECT_MS,
-                deadline: game.pendingBuzz.deadline,
-                epsMs: EPS_MS,
-            });
 
             game.pendingBuzz.timer = setTimeout(async () => {
                 const g = ctx.games?.[gameId];
@@ -349,11 +280,6 @@ export const gameHandlers = {
 
                 // If buzzer got locked / winner set some other way, drop it
                 if (g.buzzed || g.buzzerLocked) {
-                    buzzLog(gameId, "pending-drop (already resolved)", {
-                        now: Date.now(),
-                        buzzed: g.buzzed || null,
-                        buzzerLocked: Boolean(g.buzzerLocked),
-                    });
 
                     try { if (g.pendingBuzz.timer) clearTimeout(g.pendingBuzz.timer); } catch {}
                     g.pendingBuzz = null;
@@ -362,28 +288,11 @@ export const gameHandlers = {
 
                 const candidates = g.pendingBuzz.candidates || [];
 
-                buzzLog(gameId, "pending-fire", {
-                    now: Date.now(),
-                    deadline: g.pendingBuzz.deadline,
-                    lateByMs: Math.max(0, Date.now() - g.pendingBuzz.deadline),
-                    candidateCount: candidates.length,
-                });
 
                 g.pendingBuzz = null;
 
                 if (candidates.length === 0) return;
 
-                buzzLog(gameId, "candidates-unsorted", {
-                    epsMs: EPS_MS,
-                    candidates: candidates.map((c) => ({
-                        playerName: c.playerName,
-                        est: c.est,
-                        arrival: c.arrival,
-                        msgSeq: c.msgSeq,
-                        clientSeq: c.clientSeq,
-                        arrivalMinusEst: c.arrival - c.est,
-                    })),
-                });
 
                 candidates.sort((a, b) => {
                     const dt = a.est - b.est;
@@ -396,29 +305,8 @@ export const gameHandlers = {
                     return dt;
                 });
 
-                buzzLog(gameId, "candidates-sorted", {
-                    epsMs: EPS_MS,
-                    sorted: candidates.map((c) => ({
-                        playerName: c.playerName,
-                        est: c.est,
-                        arrival: c.arrival,
-                        msgSeq: c.msgSeq,
-                        clientSeq: c.clientSeq,
-                        arrivalMinusEst: c.arrival - c.est,
-                    })),
-                });
-
                 const winner = candidates[0];
                 if (!winner?.playerName) return;
-
-                buzzLog(gameId, "winner-selected", {
-                    winner: winner.playerName,
-                    winnerEst: winner.est,
-                    winnerArrival: winner.arrival,
-                    winnerMsgSeq: winner.msgSeq,
-                    winnerClientSeq: winner.clientSeq,
-                    now: Date.now(),
-                });
 
                 // Accept winner (same as your old "Accept buzz" block)
                 g.buzzed = winner.playerName;
@@ -426,11 +314,6 @@ export const gameHandlers = {
 
                 g.buzzerLocked = true;
                 ctx.broadcast(gameId, { type: "buzzer-locked" });
-
-                buzzLog(gameId, "buzzer-locked-after-winner", {
-                    winner: winner.playerName,
-                    now: Date.now(),
-                });
 
                 await ctx.aiHostSayByKey(ctx, gameId, g, winner.playerName);
 
@@ -468,15 +351,6 @@ export const gameHandlers = {
 
                     const deadlineAt = Date.now() + RECORD_MS;
 
-                    buzzLog(gameId, "answer-capture-start", {
-                        winner: winner.playerName,
-                        answerSeconds: ANSWER_SECONDS,
-                        recordMs: RECORD_MS,
-                        deadlineAt,
-                        answerSessionId: gg.answerSessionId,
-                        clueKey,
-                        now: Date.now(),
-                    });
 
                     ctx.broadcast(gameId, {
                         type: "answer-capture-start",
@@ -501,12 +375,6 @@ export const gameHandlers = {
                         if (ggg.answeringPlayerKey !== winner.playerName) return;
                         if (!ggg.selectedClue) return;
 
-                        buzzLog(gameId, "answer-window-timeout", {
-                            winner: winner.playerName,
-                            answerSessionId: ggg.answerSessionId,
-                            clueKey: ggg.answerClueKey,
-                            now: Date.now(),
-                        });
 
                         ggg.phase = "RESULT";
                         ggg.answerTranscript = "";
@@ -539,20 +407,6 @@ export const gameHandlers = {
         // Optional dedupe: avoid multiple from same player
         const already = game.pendingBuzz.candidates.find((c) => c.playerName === player.name);
         if (!already) {
-            const deadline = game.pendingBuzz.deadline;
-
-            buzzLog(gameId, "candidate-add", {
-                msgSeq,
-                playerName: player.name,
-                clientSeq,
-                est,
-                arrival: now,
-                deadline,
-                timeLeftMs: deadline - now,
-                deltaArrivalMinusEstMs: now - est,
-                looksLikeEpochMs,
-            });
-
             game.pendingBuzz.candidates.push({
                 playerName: player.name,
                 est,
@@ -561,21 +415,23 @@ export const gameHandlers = {
                 msgSeq,
             });
         } else {
-            buzzLog(gameId, "candidate-skip-duplicate", {
-                msgSeq,
-                playerName: player.name,
-                clientSeq,
-                existing: {
-                    playerName: already.playerName,
-                    est: already.est,
-                    arrival: already.arrival,
-                    msgSeq: already.msgSeq,
-                    clientSeq: already.clientSeq,
-                },
-                now,
-            });
+
         }
     },
+
+    "dd-snipe-next": async ({ ws, data, ctx }) => {
+        const { gameId, enabled } = data || {};
+        const game = ctx.games?.[gameId];
+        if (!game) return;
+
+        game.ddSnipeNext = Boolean(enabled);
+
+        ctx.broadcast(gameId, {
+            type: "dd-snipe-next-set",
+            enabled: Boolean(game.ddSnipeNext),
+        });
+    },
+
     "unlock-buzzer": async ({ ws, data, ctx }) => {
         const { gameId } = data;
         const game = ctx.games[gameId];
@@ -667,7 +523,15 @@ export const gameHandlers = {
                     const n = Number(String(val || "").replace(/[^0-9]/g, ""));
                     return Number.isFinite(n) ? n : 0;
                 };
-                const clueValue = parseValue(game.selectedClue?.value);
+
+                const ddWorth =
+                    game.dailyDouble?.clueKey === game.clueState?.clueKey &&
+                    Number.isFinite(Number(game.dailyDouble?.wager))
+                        ? Number(game.dailyDouble.wager)
+                        : null;
+
+                const worth = ddWorth !== null ? ddWorth : parseValue(game.selectedClue?.value);
+
 
                 game.phase = "RESULT";
                 game.answerTranscript = "";
@@ -682,7 +546,7 @@ export const gameHandlers = {
                     transcript: "",
                     verdict: "incorrect",
                     confidence: 0.0,
-                    suggestedDelta: -clueValue,
+                    suggestedDelta: -worth,
                 });
                 return ctx.autoResolveAfterJudgement(ctx, gameId, game, player.name, "incorrect")
                     .catch((e) => console.error("[answer-audio-blob] autoResolve failed:", e));
@@ -736,15 +600,21 @@ export const gameHandlers = {
         }
 
         // Suggest delta but do NOT mutate scores yet (keeps this ripple-free)
-        const parseValue = (val) => {
-            const n = Number(String(val || "").replace(/[^0-9]/g, ""));
-            return Number.isFinite(n) ? n : 0;
-        };
-        const clueValue = parseValue(game.selectedClue?.value);
+        const clueValue = ctx.parseClueValue(game.selectedClue?.value);
+
+        const ddWorth =
+            game.dailyDouble?.clueKey === game.clueState?.clueKey &&
+            Number.isFinite(Number(game.dailyDouble?.wager))
+                ? Number(game.dailyDouble.wager)
+                : null;
+
+        const worth = ddWorth !== null ? ddWorth : clueValue;
+
         const suggestedDelta =
-            verdict === "correct" ? clueValue :
-                verdict === "incorrect" ? -clueValue :
+            verdict === "correct" ? worth :
+                verdict === "incorrect" ? -worth :
                     0;
+
 
         game.phase = "RESULT";
         game.answerTranscript = transcript;
@@ -869,6 +739,16 @@ export const gameHandlers = {
         const v = String(clue?.value ?? "");
         const q = String(clue?.question ?? "").trim();
         const clueKey = `${boardKey}:${v}:${q}`;
+        const ddKeys = game.boardData?.dailyDoubleClueKeys?.[boardKey] || [];
+        const naturalDD = ddKeys.includes(clueKey) && !(game.usedDailyDoubles?.has?.(clueKey));
+        const snipedDD = Boolean(game.ddSnipeNext);
+
+        const isDailyDouble = naturalDD || snipedDD;
+
+        if (snipedDD) {
+            game.ddSnipeNext = false; // consume the snipe
+            ctx.broadcast(gameId, { type: "dd-snipe-consumed", clueKey });
+        }
 
         game.phase = "clue";
         game.clueState = {
@@ -892,18 +772,202 @@ export const gameHandlers = {
                 clue: game.selectedClue,
                 clearedClues: Array.from(game.clearedClues),
             });
+        };
 
+        if (isDailyDouble) {
+            if (!game.usedDailyDoubles) game.usedDailyDoubles = new Set();
+
+            const playerName = game.selectorName;
+            const playerKey = game.selectorKey;
+
+            const maxWager = ctx.computeDailyDoubleMaxWager(game, boardKey, playerName);
+
+            game.dailyDouble = {
+                clueKey,
+                boardKey,
+                playerName,
+                playerKey,
+                stage: "wager_listen",
+                wager: null,
+                maxWager,
+                attempts: 0,
+            };
+
+            const showModal = () => {
+                ctx.broadcast(gameId, {
+                    type: "daily-double-show-modal",
+                    playerName,
+                    maxWager
+                });
+            }
+
+            // IMPORTANT: do NOT start mic yet. Speak first.
+            await ctx.aiHostVoiceSequence(ctx, gameId, game, [
+                { slot: "daily_double", pad: 200, after: showModal },
+                { slot: playerName, pad: 200 },
+                { slot: "daily_double2", pad: 200 },
+                { slot: "single_wager", pad: 200 },
+            ]);
+
+            // Now start capture (this broadcasts capture-start + arms timeout reprompt)
+            ctx.startDdWagerCapture(gameId, game, ctx);
+
+            return; // IMPORTANT: do not unlock buzzers
         }
 
-        await ctx.aiHostVoiceSequence(ctx, gameId, game, [
-            {slot: game.selectedClue.category, pad},
-            {slot: game.selectedClue.value, pad: 50, after: broadcastClueSelected},
-            {assetId: ttsAssetId},
 
+        // Normal (non-DD) path:
+        await ctx.aiHostVoiceSequence(ctx, gameId, game, [
+            { slot: game.selectedClue.category, pad },
+            { slot: game.selectedClue.value, pad: 50, after: broadcastClueSelected },
+            { assetId: ttsAssetId },
         ]);
 
-        doUnlockBuzzerAuthoritative( gameId, game, ctx);
+        ctx.doUnlockBuzzerAuthoritative(gameId, game, ctx);
     },
+
+    "daily-double-wager-audio-blob": async ({ ws, data, ctx }) => {
+        const { gameId, ddWagerSessionId, mimeType, dataBase64 } = data || {};
+        const game = ctx.games?.[gameId];
+        if (!game) return;
+
+        // Must be in DD wager capture phase
+        if (game.phase !== "DD_WAGER_CAPTURE") {
+            ws.send(JSON.stringify({
+                type: "daily-double-error",
+                gameId,
+                ddWagerSessionId,
+                message: `Not accepting DD wagers right now (phase=${String(game.phase)})`,
+            }));
+            return;
+        }
+
+        // Session must match (stale protection)
+        if (!ddWagerSessionId || ddWagerSessionId !== game.ddWagerSessionId) {
+            ws.send(JSON.stringify({
+                type: "daily-double-error",
+                gameId,
+                ddWagerSessionId,
+                message: "Stale or invalid DD wager session.",
+            }));
+            return;
+        }
+
+        // Only the DD player may submit
+        const player = game.players?.find((p) => p.id === ws.id);
+        if (!player?.name || player.name !== game.dailyDouble?.playerName) {
+            ws.send(JSON.stringify({
+                type: "daily-double-error",
+                gameId,
+                ddWagerSessionId,
+                message: "You are not the Daily Double player.",
+            }));
+            return;
+        }
+
+        if (typeof dataBase64 !== "string" || !dataBase64.trim()) {
+            ws.send(JSON.stringify({
+                type: "daily-double-error",
+                gameId,
+                ddWagerSessionId,
+                message: "Missing audio data.",
+            }));
+            return;
+        }
+
+        // Decode base64
+        let buf;
+        try {
+            buf = Buffer.from(dataBase64, "base64");
+        } catch {
+            ws.send(JSON.stringify({
+                type: "daily-double-error",
+                gameId,
+                ddWagerSessionId,
+                message: "Invalid base64 audio.",
+            }));
+            return;
+        }
+
+        const MAX_BYTES = 2_000_000;
+        if (buf.length > MAX_BYTES) {
+            ws.send(JSON.stringify({
+                type: "daily-double-error",
+                gameId,
+                ddWagerSessionId,
+                message: "Audio too large.",
+            }));
+            return;
+        }
+        ctx.clearDdWagerTimer(ctx, gameId, game);
+        // --- STT (no expected answer context for wagering) ---
+        let transcript = "";
+        try {
+            const stt = await ctx.transcribeAnswerAudio(buf, mimeType, null);
+            transcript = String(stt || "").trim();
+        } catch (e) {
+            console.error("[dd-wager] STT failed:", e?.message || e);
+            ws.send(JSON.stringify({
+                type: "daily-double-error",
+                gameId,
+                ddWagerSessionId,
+                message: "STT failed",
+            }));
+            return;
+        }
+
+        const dd = game.dailyDouble;
+        const maxWager = Number(dd?.maxWager || 0);
+
+        const parsed = await ctx.parseDailyDoubleWager({
+            transcriptRaw: transcript,
+            maxWager,
+        });
+
+        const wager = parsed.wager;
+        const reason = parsed.reason;
+
+        ctx.broadcast(gameId, {
+            type: "daily-double-wager-heard",
+            gameId,
+            playerName: player.name,
+            transcript,
+            parsedWager: wager,
+            reason,
+            maxWager,
+        });
+
+        if (wager === null) {
+            await ctx.repromptDdWager(gameId, game, ctx, { reason: reason || "no-number" });
+            return;
+        }
+
+        // Lock wager + mark DD used
+        dd.wager = wager;
+        dd.stage = "clue";
+        if (!game.usedDailyDoubles) game.usedDailyDoubles = new Set();
+        game.usedDailyDoubles.add(dd.clueKey);
+
+        // Exit wager capture phase
+        game.phase = "clue";
+        game.ddWagerSessionId = null;
+        game.ddWagerDeadlineAt = null;
+
+        ctx.broadcast(gameId, {
+            type: "daily-double-wager-locked",
+            gameId,
+            playerName: player.name,
+            wager,
+        });
+
+        return await ctx.finalizeDailyDoubleWagerAndStartClue(gameId, game, ctx, {
+            playerName: player.name,
+            wager,
+            fallback: false,
+            reason: null,
+        });
+    },
+
     "reveal-answer": async ({ ws, data, ctx }) => {
         const { gameId } = data;
         const game = ctx.games[gameId];
@@ -970,8 +1034,6 @@ export const gameHandlers = {
             }));
             return;
         }
-
-        const trace = ctx.createTrace("tts-ensure", { gameId });
 
         try {
             const asset = await ctx.ensureTtsAsset(

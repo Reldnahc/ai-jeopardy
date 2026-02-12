@@ -26,4 +26,9 @@ export type BoardData = {
     ttsAssetIds?: string[];
     ttsByClueKey?: Record<string, string>;
     ttsByAnswerKey?: Record<string, string>;
+
+    dailyDoubleClueKeys?: {
+        firstBoard: string[];   // usually length 1
+        secondBoard: string[];  // usually length 2
+    };
 };

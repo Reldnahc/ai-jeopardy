@@ -3,6 +3,32 @@ function applyScore(game, playerName, delta) {
     game.scores[playerName] = (game.scores[playerName] || 0) + Number(delta || 0);
 }
 
+function getDailyDoubleWagerIfActive(game) {
+    const dd = game?.dailyDouble;
+    if (!dd) return null;
+
+    const currentClueKey = game?.clueState?.clueKey || null;
+    if (!currentClueKey) return null;
+
+    // Only active for the current clue
+    if (dd.clueKey !== currentClueKey) return null;
+
+    const w = Number(dd.wager);
+    if (!Number.isFinite(w)) return null;
+
+    return w;
+}
+
+function getActiveClueWorth(game) {
+    const wager = getDailyDoubleWagerIfActive(game);
+    if (wager !== null) return wager;
+    return parseClueValue(game?.selectedClue?.value);
+}
+
+function isDailyDoubleActiveForCurrentClue(game) {
+    return getDailyDoubleWagerIfActive(game) !== null;
+}
+
 function lockBoardSelection(ctx, gameId, game) {
     if (!game) return 0;
 
@@ -82,6 +108,8 @@ function finishClueAndReturnToBoard(ctx, gameId, game) {
         game.clearedClues.add(clueId);
 
         ctx.broadcast(gameId, { type: "clue-cleared", clueId });
+        ctx.broadcast(gameId, { type: "daily-double-hide-modal" });
+
 
         ctx.checkBoardTransition(game, gameId, ctx);
     }
@@ -98,14 +126,16 @@ export function parseClueValue(val) {
 export async function autoResolveAfterJudgement(ctx, gameId, game, playerName, verdict) {
     if (!game || !game.selectedClue) return;
 
-    const clueValue = parseClueValue(game.selectedClue?.value);
-    const delta = verdict === "correct" ? clueValue : verdict === "incorrect" ? -clueValue : 0;
+    const worth = getActiveClueWorth(game);
+    const delta = verdict === "correct" ? worth : verdict === "incorrect" ? -worth : 0;
 
     // Apply score immediately (authoritative)
     if (verdict === "correct" || verdict === "incorrect") {
         applyScore(game, playerName, delta);
         ctx.broadcast(gameId, { type: "update-scores", scores: game.scores });
     }
+
+    const ddActive = isDailyDoubleActiveForCurrentClue(game);
 
     if (verdict === "correct") {
         game.selectedClue.isAnswerRevealed = true;
@@ -122,14 +152,43 @@ export async function autoResolveAfterJudgement(ctx, gameId, game, playerName, v
         game.selectorKey = ctx.playerStableId(p || { name: playerName });
         game.selectorName = playerName;
 
-        await ctx.sleep(3000);
+        if (ddActive) {
+            game.dailyDouble = null;
+        }
 
+        await ctx.sleep(3000);
         finishClueAndReturnToBoard(ctx, gameId, game);
 
         return;
     }
 
     // verdict === "incorrect"
+
+    // NEW: Daily Double never re-opens buzzers.
+    if (ddActive) {
+        game.buzzerLocked = true;
+        ctx.broadcast(gameId, { type: "buzzer-locked" });
+
+        const revealAnswer = async () => {
+            game.selectedClue.isAnswerRevealed = true;
+            ctx.broadcast(gameId, { type: "answer-revealed", clue: game.selectedClue });
+        };
+
+        const clueKey = ctx.getClueKey(game, game.selectedClue);
+        const assetId = game.boardData?.ttsByAnswerKey?.[clueKey] || null;
+
+        await ctx.aiHostVoiceSequence(ctx, gameId, game, [
+            { slot: "incorrect", pad: 200 },
+            { slot: "answer_was", pad: 200, after: revealAnswer },
+            { assetId, pad: 200 },
+        ]);
+
+        // Clear DD state now that the clue is resolved
+        game.dailyDouble = null;
+
+        finishClueAndReturnToBoard(ctx, gameId, game);
+        return;
+    }
 
     // Lock them out from re-buzzing on this clue
     const p = (game.players || []).find(x => x?.name === playerName);

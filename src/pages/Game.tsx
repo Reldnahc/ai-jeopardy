@@ -73,6 +73,9 @@ export default function Game() {
         aiHostAsset,
         boardSelectionLocked,
         selectedFinalist,
+        ddWagerCapture,
+        ddWagerError,
+        showDdModal
     } = useGameSocketSync({ gameId, playerName: effectivePlayerName });
 
     // Persistent WebSocket connection
@@ -423,6 +426,13 @@ export default function Game() {
                     markAllCluesComplete={markAllCluesComplete}
                     onLeaveGame={leaveGame}
                     selectorName={selectorName}
+                    onToggleDailyDoubleSnipe={(enabled) => {
+                        sendJson({
+                            type: "dd-snipe-next",
+                            gameId,
+                            enabled,
+                        });
+                    }}
                 />
             )}
             {/* Jeopardy Board Section */}
@@ -458,6 +468,9 @@ export default function Game() {
                             effectivePlayerName={effectivePlayerName}
                             finalWagers={finalWagers}
                             selectedFinalist={selectedFinalist}
+                            ddWagerCapture={ddWagerCapture}
+                            ddWagerError={ddWagerError}
+                            showDdModal={showDdModal}
                         />
                     </>
                 )}

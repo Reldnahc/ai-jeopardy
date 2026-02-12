@@ -46,6 +46,39 @@ type AnswerErrorMsg = {
     message: string;
 };
 
+export type DailyDoubleShowModalMsg = {
+    type: "daily-double-show-modal";
+    showModal: boolean;
+    maxWager: number;
+    playerName: string;
+
+}
+export type DailyDoubleWagerCaptureStartMsg = {
+    type: "daily-double-wager-capture-start";
+    gameId: string;
+    playerName: string;
+    ddWagerSessionId: string;
+    durationMs: number;
+    deadlineAt: number;
+};
+
+type DailyDoubleWagerHeardMsg = {
+    type: "daily-double-wager-heard";
+    gameId: string;
+    playerName: string;
+    transcript: string;
+    parsedWager: number | null;
+    reason: string | null;
+    maxWager: number;
+};
+
+type DailyDoubleWagerLockedMsg = {
+    type: "daily-double-wager-locked";
+    gameId: string;
+    playerName: string;
+    wager: number;
+};
+
 type GameStateMessage = {
     type: "game-state";
     players: Player[];
@@ -129,7 +162,21 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
     const [aiHostText, setAiHostText] = useState<string | null>(null);
     const [aiHostAsset, setAiHostAsset] = useState<string | null>(null);
 
+    const [ddWagerCapture, setDdWagerCapture] = useState<DailyDoubleWagerCaptureStartMsg | null>(null);
+    const [ddWagerHeard, setDdWagerHeard] = useState<DailyDoubleWagerHeardMsg | null>(null);
+    const [ddWagerLocked, setDdWagerLocked] = useState<DailyDoubleWagerLockedMsg | null>(null);
+    const [ddWagerError, setDdWagerError] = useState<string | null>(null);
+    const [showDdModal, setShowDdModal] = useState<DailyDoubleShowModalMsg | null>(null);
+
+
     const aiHostSeqRef = useRef<number>(0);
+
+    const clearDdWagerUi = () => {
+        setDdWagerCapture(null);
+        setDdWagerHeard(null);
+        setDdWagerLocked(null);
+        setDdWagerError(null);
+    };
 
     const makeRequestId = () =>
         (globalThis.crypto && "randomUUID" in globalThis.crypto)
@@ -276,6 +323,10 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
                     resetLocalTimerState();
                 }
 
+                if (m.phase !== "DD_WAGER_CAPTURE") {
+                    clearDdWagerUi();
+                }
+
                 return;
             }
 
@@ -310,6 +361,53 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
             if (message.type === "answer-error") {
                 const m = message as unknown as AnswerErrorMsg;
                 setAnswerError(String(m.message || "Answer error"));
+                return;
+            }
+
+            if (message.type === "daily-double-show-modal") {
+                const m = message as unknown as DailyDoubleShowModalMsg;
+                setShowDdModal(m);
+
+                return;
+            }
+
+            if (message.type === "daily-double-hide-modal") {
+                setShowDdModal(null);
+                return;
+            }
+
+            if (message.type === "daily-double-wager-parse-failed") {
+                const m = message as { reason?: string; attempts?: number; maxAttempts?: number };
+                setDdWagerError(`Didn't catch that (${m.reason ?? "unknown"}). Try again.`);
+                return;
+            }
+
+            if (message.type === "daily-double-wager-capture-start") {
+                const m = message as unknown as DailyDoubleWagerCaptureStartMsg;
+                setDdWagerCapture(m);
+                setDdWagerHeard(null);
+                setDdWagerLocked(null);
+                setDdWagerError(null);
+                return;
+            }
+
+            if (message.type === "daily-double-wager-heard") {
+                const m = message as unknown as DailyDoubleWagerHeardMsg;
+                setDdWagerHeard(m);
+                return;
+            }
+
+            if (message.type === "daily-double-wager-locked") {
+                const m = message as unknown as DailyDoubleWagerLockedMsg;
+                setDdWagerLocked(m);
+                // once locked, we can clear the capture UI (or keep it if you want to show what was heard)
+                setDdWagerCapture(null);
+                return;
+            }
+
+            if (message.type === "daily-double-error") {
+                const m = message as unknown as { message?: string };
+                setDdWagerError(String(m.message || "Daily Double error"));
                 return;
             }
 
@@ -395,7 +493,7 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
 
             if (message.type === "buzzer-ui-reset") {
                 clearAnswerUi();
-                //resetLocalTimerState();
+                clearDdWagerUi();
                 return;
             }
 
@@ -484,6 +582,7 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
                 setAnswerResult(null);
                 setAnswerError(null);
                 setAiHostText(null);
+                clearDdWagerUi();
                 setBoardSelectionLocked(m.boardSelectionLocked ?? null);
                 resetLocalTimerState();
                 return;
@@ -614,5 +713,11 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
         aiHostText,
         aiHostAsset,
         boardSelectionLocked,
+
+        ddWagerCapture,
+        ddWagerHeard,
+        ddWagerLocked,
+        ddWagerError,
+        showDdModal,
     };
 }

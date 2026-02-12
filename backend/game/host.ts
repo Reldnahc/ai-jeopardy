@@ -21,8 +21,8 @@ const AI_HOST_VARIANTS: Record<string, string[]> = {
     rebuzz: [
         "Would anyone else like to answer?",
         "Anyone else?",
-        "Other players, buzz in if you know it.",
-        "Still open—anyone else want to try?",
+        "buzz in if you know it.",
+        "Still open—anyone else?",
     ],
     nobody: [
         "Looks like nobody got it.",
@@ -35,7 +35,7 @@ const AI_HOST_VARIANTS: Record<string, string[]> = {
     your_up: ["you're up.", "go ahead.", "pick the next clue."],
     daily_double: ["Daily Double!"],
     daily_double2: ["You've found the Daily Double."],
-    single_wager: ["What’s your wager?"],
+    single_wager: ["What’s your wager?", "Make your wager"],
     all_wager: ["Make your wagers."],
     present_clue: ["Here’s the clue."],
     double_jeopardy: ["That’s the end of the Jeopardy round.", "That’s the end of the first round."],
@@ -44,11 +44,13 @@ const AI_HOST_VARIANTS: Record<string, string[]> = {
     final_jeopardy2: ["It’s time for Final Jeopardy"],
     final_jeopardy_finale: ["Answers are in. Let's see our top contestants."],
     final_jeopardy_finale2: ["lets look at the answer from"],
-    final_jeopardy_end: ["That's the end of the game, "],
+    final_jeopardy_end: ["That's the end of the game "],
     final_jeopardy_end2: ["is today's Jeopardy champion."],
-    final_jeopardy_category: ["Here is the category."],
+    final_jeopardy_category: ["Here is the category.", "Here's today's category."],
     final_jeopardy_clue: ["Here is the Final Jeopardy clue."],
     answer_was: ["The answer was", "It was"],
+    i_didnt_catch_that: ["I didn't catch that.", "Sorry, I didn't catch that."],
+    say_wager_again: ["Please say your wager again", "Please repeat your wager"],
 
     placeholder: ["placeholder audio"]
 };

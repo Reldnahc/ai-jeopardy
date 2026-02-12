@@ -19,7 +19,6 @@ import { checkBoardTransition, isBoardFullyCleared } from "../game/stageTransiti
 import { getCOTD } from "../state/cotdStore.js";
 import { collectImageAssetIdsFromBoard } from "../services/imageAssetService.js";
 import { transcribeAnswerAudio } from "../services/sttService.js";
-
 import {
     applyNewGameState,
     broadcastPreloadBatch,
@@ -59,7 +58,15 @@ import {makeLimiter, plannedVisualSlots, populateCategoryVisuals} from "../servi
 import {Game} from "./context.types.js";
 import {Clue} from "../../shared/types/board.js";
 import {appConfig} from "../config/appConfig.js";
+import {parseDailyDoubleWager} from "../services/ai/judge/wagerParse.js";
+import {
+    computeDailyDoubleMaxWager,
+    startDdWagerCapture,
+    repromptDdWager,
+    clearDdWagerTimer,
+    finalizeDailyDoubleWagerAndStartClue
 
+} from "../game/dailyDouble.js"
 // Minimal type for now; we’ll tighten later as you TS-migrate more modules.
 
 export const createWsContext = (wss: any, repos: any) => {
@@ -182,6 +189,14 @@ export const createWsContext = (wss: any, repos: any) => {
 
         plannedVisualSlots,
         makeLimiter,
-        populateCategoryVisuals
+        populateCategoryVisuals,
+
+        //daily double
+        parseDailyDoubleWager,
+        computeDailyDoubleMaxWager,
+        startDdWagerCapture,
+        repromptDdWager,
+        clearDdWagerTimer,
+        finalizeDailyDoubleWagerAndStartClue,
     };
 };

@@ -417,7 +417,7 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                     <div className="mt-4 text-center">
                         <div className="text-lg font-bold">{answerCapture.playerName} is answering…</div>
                         {isAnsweringPlayer && (
-                            <div className="text-sm opacity-80 mt-1">Recording your mic now…</div>
+                            <div className="text-md text-red-500 font-extrabold mt-1">Recording your mic now…</div>
                         )}
                         {answerError && <div className="mt-2 text-sm text-red-200">{answerError}</div>}
                     </div>

@@ -5,7 +5,9 @@ import WagerInput from "./WagerInput.tsx"; // Import the wager input component
 import SelectedClueDisplay from "./SelectedClueDisplay.tsx";
 import {useWebSocket} from "../../contexts/WebSocketContext.tsx";
 import {Player} from "../../types/Lobby.ts";
-import {useAlert} from "../../contexts/AlertContext.tsx"; // Import the selected clue component
+import {useAlert} from "../../contexts/AlertContext.tsx";
+import DailyDoubleWagerOverlay from "./DailyDoubleWagerOverlay.tsx";
+import {DailyDoubleShowModalMsg, DailyDoubleWagerCaptureStartMsg} from "../../hooks/game/useGameSocketSync.ts"; // Import the selected clue component
 
 interface JeopardyBoardProps {
     boardData: Category[];
@@ -39,13 +41,18 @@ interface JeopardyBoardProps {
     effectivePlayerName: string | null;
     finalWagers: Record<string, number>;
     selectedFinalist: string;
+    ddWagerCapture: DailyDoubleWagerCaptureStartMsg | null
+
+    ddWagerError: string | null;
+    showDdModal: DailyDoubleShowModalMsg | null;
 }
 
 const JeopardyBoard: React.FC<JeopardyBoardProps> =
     ({ boardData, canSelectClue, onClueSelected, selectedClue, gameId, clearedClues, players, scores,
          currentPlayer, allWagersSubmitted, isFinalJeopardy, drawings,
            handleBuzz, buzzerLocked, buzzResult, buzzLockedOut, timerEndTime, timerDuration,
-          answerCapture, answerError, effectivePlayerName, finalWagers, selectedFinalist}) => {
+          answerCapture, answerError, effectivePlayerName, finalWagers, selectedFinalist, ddWagerCapture, ddWagerError,
+         showDdModal}) => {
     const [localSelectedClue, setLocalSelectedClue] = useState<Clue | null>(null);
     const [showClue, setShowClue] = useState(false);
     const [wagers, setWagers] = useState<Record<string, number>>({});
@@ -168,6 +175,18 @@ const JeopardyBoard: React.FC<JeopardyBoardProps> =
                             submitWager={submitWager}
                         />
                     </div>
+                )}
+
+                {showDdModal && !isFinalJeopardy && !showClue && (
+                    <DailyDoubleWagerOverlay
+                        gameId={gameId}
+                        effectivePlayerName={effectivePlayerName}
+                        ddWagerCapture={ddWagerCapture}
+                        showDdModal={showDdModal}
+                        ddWagerError={ddWagerError}
+                        timerEndTime={timerEndTime}
+                        timerDuration={timerDuration}
+                    />
                 )}
 
                 {/* Jeopardy Board */}

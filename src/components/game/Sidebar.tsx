@@ -19,6 +19,7 @@ interface SidebarProps {
     selectorName: string | null;
     audioVolume: number; // 0..1
     onChangeAudioVolume: (v: number) => void;
+    onToggleDailyDoubleSnipe: (enabled: boolean) => void;
 }
 
 function formatWithCommas(n: number) {
@@ -153,8 +154,10 @@ const Sidebar: React.FC<SidebarProps> = ({
                                              selectorName,
                                              audioVolume,
                                              onChangeAudioVolume,
+                                             onToggleDailyDoubleSnipe
                                          }) => {
     const { profile } = useProfile();
+    const [ddSnipeEnabled, setDdSnipeEnabled] = useState(false);
 
     return (
         <div className="flex-none w-full md:w-64 lg:w-96 flex flex-col items-start gap-5 p-5 overflow-hidden box-border relative">
@@ -321,15 +324,41 @@ const Sidebar: React.FC<SidebarProps> = ({
 
             {/* Fixed Bottom Section */}
             <div className="fixed bottom-0 left-0 w-full md:w-72 flex flex-col items-center gap-5 z-[100]">
+
                 {profile && profile.role === "admin" && activeBoard !== "finalJeopardy" && (
-                    <button
-                        onClick={markAllCluesComplete}
-                        className="px-10 py-5 bg-red-700 text-white text-xl font-bold border-none rounded-lg cursor-pointer min-w-72 hover:bg-red-800"
-                    >
-                        Mark All Questions Complete
-                    </button>
+                    <>
+                        {/* Daily Double Snipe Toggle */}
+                        <button
+                            onClick={() => {
+                                const next = !ddSnipeEnabled;
+                                setDdSnipeEnabled(next);
+                                onToggleDailyDoubleSnipe(next);
+                            }}
+                            className={`
+                    px-6 py-3
+                    text-white text-lg font-bold
+                    rounded-lg
+                    min-w-72
+                    transition
+                    ${ddSnipeEnabled
+                                ? "bg-purple-700 hover:bg-purple-800"
+                                : "bg-purple-500 hover:bg-purple-600"}
+                `}
+                        >
+                            {ddSnipeEnabled ? "DD Snipe: ON (Next Clue)" : "Enable DD Snipe (Next Clue)"}
+                        </button>
+
+                        {/* Existing Mark All */}
+                        <button
+                            onClick={markAllCluesComplete}
+                            className="px-10 py-5 bg-red-700 text-white text-xl font-bold border-none rounded-lg cursor-pointer min-w-72 hover:bg-red-800"
+                        >
+                            Mark All Questions Complete
+                        </button>
+                    </>
                 )}
             </div>
+
         </div>
     );
 };

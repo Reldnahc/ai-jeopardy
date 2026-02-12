@@ -18,6 +18,32 @@ type CreateBoardOptions = Partial<VisualSettings> & {
     trace?: { mark: (event: string, meta?: Record<string, unknown>) => void };
 };
 
+function buildClueKey(boardKey: "firstBoard" | "secondBoard", value: unknown, question: unknown) {
+    const v = String(value ?? "");
+    const q = String(question ?? "").trim();
+    return `${boardKey}:${v}:${q}`;
+}
+
+function pickRandomDistinct<T>(arr: T[], n: number): T[] {
+    const copy = arr.slice();
+    // Fisher–Yates partial shuffle
+    for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+    return copy.slice(0, Math.max(0, Math.min(n, copy.length)));
+}
+
+function collectClueKeys(boardKey: "firstBoard" | "secondBoard", board: { categories: Array<{ values: Array<{ value: unknown; question: unknown }> }> }) {
+    const out: string[] = [];
+    for (const cat of board?.categories ?? []) {
+        for (const clue of cat?.values ?? []) {
+            out.push(buildClueKey(boardKey, clue?.value, clue?.question));
+        }
+    }
+    return out;
+}
+
 async function saveBoardAsync(ctx: Ctx, host: string, board: Board) {
     try {
         const normalizedHost = String(host ?? "").toLowerCase().trim();
@@ -279,6 +305,14 @@ export async function createBoardData(
 
         void saveBoardAsync(ctx, host, boardRow);
 
+        const firstKeys = collectClueKeys("firstBoard", firstBoard);
+        const secondKeys = collectClueKeys("secondBoard", secondBoard);
+
+        const dailyDoubleClueKeys = {
+            firstBoard: pickRandomDistinct(firstKeys, 1),
+            secondBoard: pickRandomDistinct(secondKeys, 2),
+        };
+
         return {
             firstBoard,
             secondBoard,
@@ -286,6 +320,8 @@ export async function createBoardData(
             ttsAssetIds: Array.from(ttsState.ttsIds),
             ttsByClueKey: ttsState.ttsByClueKey,
             ttsByAnswerKey: ttsState.ttsByAnswerKey,
+
+            dailyDoubleClueKeys,
         };
     } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : String(e);
