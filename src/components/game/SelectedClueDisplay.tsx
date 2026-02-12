@@ -351,78 +351,88 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
     }, [localSelectedClue]);
 
     return (
-        <div className="absolute inset-0 h-[calc(100vh-5.5rem)] text-white flex flex-col justify-center items-center z-10 p-5">
-            <div className="absolute left-8 top-0 ">
+        <div className="absolute inset-0 h-[calc(100vh-5.5rem)] text-white z-10 p-5">
+            {/* Timer stays pinned */}
+            <div className="absolute left-8 top-0">
                 <Timer endTime={timerEndTime} duration={timerDuration} />
             </div>
 
+            {/* Keep buzz animation overlay-ish */}
             <BuzzAnimation playerName={buzzResult} />
 
-            <div className="text-center cursor-pointer w-full">
-                {imageAssetId ? (
-                    <div className="flex flex-col items-center gap-4 w-full">
-                        <img
-                            src={`/api/images/${imageAssetId}`}
-                            alt="Visual clue"
-                            className="max-h-[55vh] max-w-[85vw] object-contain rounded-lg shadow-2xl border border-white/20"
-                            loading="eager"
-                            decoding="async"
-                            draggable={false}
-                            onError={(e) => {
-                                (e.currentTarget as HTMLImageElement).style.display = "none";
-                            }}
-                        />
+            {/* Main layout: top padding for timer + scrollable center area */}
+            <div className="h-full pt-16 flex flex-col items-center">
+                {/* Scroll container so long clues never run off-screen */}
+                <div className="w-full flex-1 overflow-y-auto overscroll-contain flex justify-center">
+                    <div className="text-center cursor-pointer w-full max-w-[85vw] md:max-w-[65vw] py-2">
+                        {imageAssetId ? (
+                            <div className="flex flex-col items-center gap-4 w-full">
+                                <img
+                                    src={`/api/images/${imageAssetId}`}
+                                    alt="Visual clue"
+                                    className="max-h-[45vh] max-w-[85vw] object-contain rounded-lg shadow-2xl border border-white/20"
+                                    loading="eager"
+                                    decoding="async"
+                                    draggable={false}
+                                    onError={(e) => {
+                                        (e.currentTarget as HTMLImageElement).style.display = "none";
+                                    }}
+                                />
 
-                        <p
-                            style={{ fontSize: "clamp(0.9rem, 2vw, 2rem)" }}
-                            className="md:max-w-[65vw] mx-auto leading-snug"
-                        >
-                            {localSelectedClue.question}
-                        </p>
+                                <p
+                                    style={{ fontSize: "clamp(0.9rem, 1.8vw, 1.8rem)" }}
+                                    className="mx-auto leading-snug break-words"
+                                >
+                                    {localSelectedClue.question}
+                                </p>
+                            </div>
+                        ) : (
+                            <h1
+                                style={{ fontSize: "clamp(1rem, 2.6vw, 3.2rem)" }}
+                                className="mb-1 mx-auto leading-snug break-words"
+                            >
+                                {localSelectedClue.question}
+                            </h1>
+                        )}
+
+                        <div className="min-h-[70px] md:min-h-[100px] flex justify-center items-center">
+                            {showAnswer && (
+                                <p
+                                    style={{ fontSize: "clamp(1.2rem, 3.2vw, 2.6rem)" }}
+                                    className="mt-5 text-yellow-300 break-words"
+                                >
+                                    {localSelectedClue.answer}
+                                </p>
+                            )}
+                        </div>
+
+                        {isFinalJeopardy && (
+                            <FinalJeopardyPanel
+                                gameId={gameId}
+                                currentPlayer={currentPlayer}
+                                canvasRef={canvasRef}
+                                drawings={drawings}
+                                drawingSubmitted={drawingSubmitted}
+                                setDrawingSubmitted={setDrawingSubmitted}
+                                finalWagers={finalWagers}
+                                selectedFinalist={selectedFinalist}
+                                timerEndTime={timerEndTime}
+                            />
+                        )}
+
+                        {answerCapture && !showAnswer && (
+                            <div className="mt-4 text-center">
+                                <div className="text-lg font-bold">{answerCapture.playerName} is answering…</div>
+                                {isAnsweringPlayer && (
+                                    <div className="text-md text-red-500 font-extrabold mt-1">Recording your mic now…</div>
+                                )}
+                                {answerError && <div className="mt-2 text-sm text-red-200">{answerError}</div>}
+                            </div>
+                        )}
                     </div>
-                ) : (
-                    <h1
-                        style={{ fontSize: "clamp(0.75rem, 3vw, 4rem)" }}
-                        className="mb-1 md:max-w-[65vw] mx-auto"
-                    >
-                        {localSelectedClue.question}
-                    </h1>
-                )}
-
-                <div className="sm:min-h-[70px] md:min-h-[100px] flex justify-center items-center">
-                {showAnswer && (
-                    <p style={{ fontSize: "clamp(1.5rem, 4vw, 3rem)" }} className="mt-5 text-yellow-300">
-                        {localSelectedClue.answer}
-                    </p>
-                )}
                 </div>
 
-
-                {/* Final Jeopardy UI extracted */}
-                {isFinalJeopardy && (
-                    <FinalJeopardyPanel
-                        gameId={gameId}
-                        currentPlayer={currentPlayer}
-                        canvasRef={canvasRef}
-                        drawings={drawings}
-                        drawingSubmitted={drawingSubmitted}
-                        setDrawingSubmitted={setDrawingSubmitted}
-                        showAnswer={showAnswer}
-                        finalWagers={finalWagers}
-                        selectedFinalist={selectedFinalist}
-                    />
-                )}
-
-                {answerCapture && !showAnswer && (
-                    <div className="mt-4 text-center">
-                        <div className="text-lg font-bold">{answerCapture.playerName} is answering…</div>
-                        {isAnsweringPlayer && (
-                            <div className="text-md text-red-500 font-extrabold mt-1">Recording your mic now…</div>
-                        )}
-                        {answerError && <div className="mt-2 text-sm text-red-200">{answerError}</div>}
-                    </div>
-                )}
-
+                {/* Buzz button stays at the bottom */}
                 {!isFinalJeopardy && !showAnswer && (
                     <button
                         onClick={handleBuzz}
@@ -442,6 +452,7 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
             </div>
         </div>
     );
+
 };
 
 export default SelectedClueDisplay;

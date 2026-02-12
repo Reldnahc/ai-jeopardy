@@ -108,8 +108,8 @@ export async function createBoardData(
     progress.report();
 
     // Concurrency controls
-    const limitVisuals = settings.includeVisuals ? ctx.makeLimiter(2) : null;
-    const limitTts = settings.narrationEnabled ? ctx.makeLimiter(3) : null;
+    const limitVisuals = settings.includeVisuals ? ctx.makeLimiter(3) : null;
+    const limitTts = settings.narrationEnabled ? ctx.makeLimiter(10) : null;
 
     // TTS state
     const ttsState = createBoardTtsState();

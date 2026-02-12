@@ -205,7 +205,7 @@ export async function autoResolveAfterJudgement(ctx, gameId, game, playerName, v
 
     // Cancel timers tied to the answering window / old buzz window
     ctx.clearAnswerWindow(game);
-    ctx.clearGameTimer(game);
+    ctx.clearGameTimer(game, gameId, ctx);
 
     // Check if anyone remains eligible to buzz
     const players = game.players || [];
@@ -264,7 +264,7 @@ export function doUnlockBuzzerAuthoritative( gameId, game, ctx) {
 
     // Always restart the buzz timer window when we "unlock"
     // (prevents stale timers from instantly expiring after a rebuzz)
-    ctx.clearGameTimer(game);
+    ctx.clearGameTimer(game, gameId, ctx);
 
 
     if (!game.clueState) game.clueState = {};

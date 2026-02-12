@@ -7,7 +7,8 @@ import {useWebSocket} from "../../contexts/WebSocketContext.tsx";
 import {Player} from "../../types/Lobby.ts";
 import {useAlert} from "../../contexts/AlertContext.tsx";
 import DailyDoubleWagerOverlay from "./DailyDoubleWagerOverlay.tsx";
-import {DailyDoubleShowModalMsg, DailyDoubleWagerCaptureStartMsg} from "../../hooks/game/useGameSocketSync.ts"; // Import the selected clue component
+import {DailyDoubleShowModalMsg, DailyDoubleWagerCaptureStartMsg} from "../../hooks/game/useGameSocketSync.ts";
+import Timer from "./Timer.tsx"; // Import the selected clue component
 
 interface JeopardyBoardProps {
     boardData: Category[];
@@ -163,6 +164,10 @@ const JeopardyBoard: React.FC<JeopardyBoardProps> =
                     >
                         <h2 className="text-2xl">Final Jeopardy Category:</h2>
                         <h1 className="text-6xl">{boardData[0].category}</h1>
+
+                        <div className="mt-6">
+                            <Timer endTime={timerEndTime} duration={timerDuration} />
+                        </div>
 
                         <h2 className="text-2xl">Place Your Wager!</h2>
                         <WagerInput

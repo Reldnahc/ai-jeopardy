@@ -1,5 +1,5 @@
 // src/components/game/FinalJeopardyPanel.tsx
-import React from "react";
+import React, { useEffect } from "react";
 import { ReactSketchCanvas } from "react-sketch-canvas";
 import { useWebSocket } from "../../contexts/WebSocketContext.tsx";
 import { useDeviceContext } from "../../contexts/DeviceContext.tsx";
@@ -13,49 +13,76 @@ type FinalJeopardyPanelProps = {
     finalWagers: Record<string, number>;
     drawingSubmitted: Record<string, boolean>;
     setDrawingSubmitted: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
-    showAnswer: boolean;
     selectedFinalist: string;
+
+    timerEndTime: number | null;
 };
 
 const FinalJeopardyPanel: React.FC<FinalJeopardyPanelProps> = ({
-                                                                    gameId,
-                                                                    currentPlayer,
-                                                                    canvasRef,
-                                                                    drawings,
-                                                                    drawingSubmitted,
-                                                                    setDrawingSubmitted,
-                                                                    showAnswer,
-                                                                    finalWagers,
-                                                                    selectedFinalist,
+                                                                   gameId,
+                                                                   currentPlayer,
+                                                                   canvasRef,
+                                                                   drawings,
+                                                                   drawingSubmitted,
+                                                                   setDrawingSubmitted,
+                                                                   finalWagers,
+                                                                   selectedFinalist,
+                                                                   timerEndTime,
                                                                }) => {
-    const { sendJson } = useWebSocket();
+    const { sendJson, nowMs } = useWebSocket();
     const { deviceType } = useDeviceContext();
     const hasSubmitted = !!drawingSubmitted[currentPlayer];
-    
 
-
-    // Show other people's drawings once present (your existing behavior)
     const shouldShowDrawings = !!drawings && !Array.isArray(drawings);
+
+    const submitNow = async () => {
+        try {
+            const pngDataUrl = await canvasRef.current?.exportImage("png");
+            sendJson({
+                type: "submit-drawing",
+                gameId,
+                player: currentPlayer,
+                drawing: typeof pngDataUrl === "string" ? pngDataUrl : "",
+            });
+        } catch {
+            sendJson({
+                type: "submit-drawing",
+                gameId,
+                player: currentPlayer,
+                drawing: "",
+            });
+        } finally {
+            setDrawingSubmitted((prev) => ({ ...prev, [currentPlayer]: true }));
+        }
+    };
+
+    // ✅ Auto-submit whatever is currently drawn when timer expires
+    useEffect(() => {
+        if (hasSubmitted) return;
+        if (!timerEndTime) return;
+
+        const BUFFER_MS = 200;
+        const msUntil = Math.max(0, timerEndTime - nowMs() - BUFFER_MS);
+
+        const t = window.setTimeout(() => {
+            if (!hasSubmitted) {
+                void submitNow();
+            }
+        }, msUntil);
+
+        return () => window.clearTimeout(t);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [timerEndTime, hasSubmitted, currentPlayer]);
 
     return (
         <>
-            {/* Reserve space for the answer (Final Jeopardy uses a different layout in your file) */}
-            <div className="flex justify-center items-center">
-                {showAnswer && (
-                    <p style={{ fontSize: "clamp(1.5rem, 4vw, 3rem)" }} className="mt-5 text-yellow-300">
-                        {/* Answer text is rendered in parent to keep this panel purely "FJ mechanics" */}
-                    </p>
-                )}
-            </div>
 
-            {/* Waiting message once you've submitted and drawings haven't arrived yet */}
             {hasSubmitted && !drawings && (
                 <p style={{ fontSize: "clamp(1rem, 2vw, 1.5rem)" }}>
                     Answer Submitted, waiting for others...
                 </p>
             )}
 
-            {/* Drawing canvas if not submitted yet */}
             {!hasSubmitted && (
                 <div className="flex flex-col items-center justify-center w-full text-white p-5">
                     <h2 style={{ fontSize: "clamp(1.5rem, 3vw, 2.5rem)" }} className="mb-5">
@@ -92,21 +119,7 @@ const FinalJeopardyPanel: React.FC<FinalJeopardyPanelProps> = ({
                             </button>
 
                             <button
-                                onClick={() => {
-                                    canvasRef.current?.exportImage("png").then((pngDataUrl: string) => {
-                                        sendJson({
-                                            type: "submit-drawing",
-                                            gameId,
-                                            player: currentPlayer,
-                                            drawing: pngDataUrl,
-                                        });
-
-                                        setDrawingSubmitted((prev) => ({
-                                            ...prev,
-                                            [currentPlayer]: true,
-                                        }));
-                                    });
-                                }}
+                                onClick={() => void submitNow()}
                                 className="px-5 py-2 rounded-lg bg-blue-500 text-white cursor-pointer hover:bg-blue-600 transition-colors duration-200 shadow-lg"
                             >
                                 Submit
@@ -116,12 +129,10 @@ const FinalJeopardyPanel: React.FC<FinalJeopardyPanelProps> = ({
                 </div>
             )}
 
-            {/* Render drawings when they exist */}
             {shouldShowDrawings && (
                 <div className="flex flex-wrap gap-4">
-                    { drawings && (
+                    {drawings && (
                         <div className="flex flex-col items-center w-full">
-                            {/* Spotlight */}
                             {selectedFinalist && (
                                 <div className="w-full flex flex-col items-center">
                                     <h2
@@ -131,7 +142,6 @@ const FinalJeopardyPanel: React.FC<FinalJeopardyPanelProps> = ({
                                         {selectedFinalist}&apos;s answer:
                                     </h2>
 
-                                    {/* Wager under the answer */}
                                     <div className="mb-3 text-center text-white/90">
                                         Wager:{" "}
                                         <span className="font-semibold">
@@ -158,7 +168,6 @@ const FinalJeopardyPanel: React.FC<FinalJeopardyPanelProps> = ({
                             )}
                         </div>
                     )}
-
                 </div>
             )}
         </>

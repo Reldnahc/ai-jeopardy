@@ -1,5 +1,4 @@
 function getExpectedFinalists(game) {
-
     const players = Array.isArray(game?.players) ? game.players : [];
 
     return players.filter((p) => {
@@ -10,6 +9,9 @@ function getExpectedFinalists(game) {
 }
 
 function advanceToDrawingPhase(game, gameId, wagers, ctx) {
+    // ✅ stop wager timer once complete
+    ctx.clearGameTimer(game, gameId, ctx);
+
     game.finalJeopardyStage = "drawing";
 
     ctx.broadcast(gameId, { type: "all-wagers-submitted", wagers });
@@ -21,7 +23,7 @@ function advanceToDrawingPhase(game, gameId, wagers, ctx) {
         console.error("[FinalJeopardy] Missing final clue in boardData");
         return;
     }
-    // Ensure it matches your client Clue shape (needs `value`)
+
     game.selectedClue = {
         value: typeof fjClueRaw.value === "number" ? fjClueRaw.value : 0,
         question: String(fjClueRaw.question || ""),
@@ -32,7 +34,6 @@ function advanceToDrawingPhase(game, gameId, wagers, ctx) {
     };
 
     game.phase = "clue";
-    // Final Jeopardy shouldn't use the buzzer
     game.buzzerLocked = true;
     game.buzzed = null;
     game.buzzLockouts = {};
@@ -44,11 +45,38 @@ function advanceToDrawingPhase(game, gameId, wagers, ctx) {
         clearedClues: Array.from(game.clearedClues || []),
     });
 
+    // ✅ 30s drawing timer (server-authoritative)
+    const DRAW_SECONDS = 30;
+
+    ctx.startGameTimer(gameId, game, ctx, DRAW_SECONDS, "final-draw", () => {
+        if (!game?.isFinalJeopardy) return;
+        if (game.finalJeopardyStage !== "drawing") return;
+
+        const expected = getExpectedFinalists(game).map((p) => p.name);
+
+        if (!game.drawings) game.drawings = {};
+        if (!game.finalVerdicts) game.finalVerdicts = {};
+        if (!game.finalTranscripts) game.finalTranscripts = {};
+
+        // Anyone missing gets a blank (incorrect)
+        for (const name of expected) {
+            if (!Object.prototype.hasOwnProperty.call(game.drawings, name)) {
+                game.drawings[name] = "";
+                game.finalVerdicts[name] = "incorrect";
+                game.finalTranscripts[name] = "";
+            }
+        }
+
+        checkAllDrawingsSubmitted(game, gameId, ctx);
+    });
 }
 
 async function finishGame(game, gameId, drawings, ctx) {
+    // ✅ stop drawing timer once complete
+    ctx.clearGameTimer(game, gameId, ctx);
+
     game.finalJeopardyStage = "finale";
-    ctx.broadcast(gameId, {type: "all-drawings-submitted", drawings});
+    ctx.broadcast(gameId, { type: "all-drawings-submitted", drawings });
     const pad = 200;
 
     const wagers = game.wagers;
@@ -72,49 +100,44 @@ async function finishGame(game, gameId, drawings, ctx) {
         .sort((a, b) => b.score - a.score)
         .slice(0, 3);
 
-    let alive = await ctx.aiHostVoiceSequence(ctx, gameId, game, [{slot: "final_jeopardy_finale", pad}]);
+    let alive = await ctx.aiHostVoiceSequence(ctx, gameId, game, [{ slot: "final_jeopardy_finale", pad }]);
     if (!alive) return;
 
     for (let i = top.length - 1; i >= 0; i--) {
         const maybeRevealAnswer = () => {
             if (verdicts[top[i].name] === "correct" && !game.selectedClue.isAnswerRevealed) {
                 game.selectedClue.isAnswerRevealed = true;
-                ctx.broadcast(gameId, {type: "answer-revealed", clue: game.selectedClue});
+                ctx.broadcast(gameId, { type: "answer-revealed", clue: game.selectedClue });
             }
-        }
+        };
 
         const updateScore = async () => {
-            ctx.broadcast(gameId, {type: "update-score", player: top[i].name, score: top[i].score});
-            await ctx.sleep(5_000);//5 secs on each finalist score update
-        }
+            ctx.broadcast(gameId, { type: "update-score", player: top[i].name, score: top[i].score });
+            await ctx.sleep(5_000);
+        };
 
-        ctx.broadcast(gameId, {type: "display-finalist", finalist: top[i].name});
+        ctx.broadcast(gameId, { type: "display-finalist", finalist: top[i].name });
 
         alive = await ctx.aiHostVoiceSequence(ctx, gameId, game, [
-            {slot: "final_jeopardy_finale2", pad},
-            {slot: top[i].name, pad},
-            {slot: "fja" + top[i].name, pad, after: maybeRevealAnswer},
-            {slot: verdicts[top[i].name], pad, after: updateScore}, // correct or incorrect
-
+            { slot: "final_jeopardy_finale2", pad },
+            { slot: top[i].name, pad },
+            { slot: "fja" + top[i].name, pad, after: maybeRevealAnswer },
+            { slot: verdicts[top[i].name], pad, after: updateScore },
         ]);
         if (!alive) return;
     }
 
-    // all wrong :(
     if (!game.selectedClue.isAnswerRevealed) {
-        alive = await ctx.aiHostVoiceSequence(ctx, gameId, game, [
-            {slot: "nobody", pad},
-            //{slot: "", pad}, // say real answer
-        ]);
+        alive = await ctx.aiHostVoiceSequence(ctx, gameId, game, [{ slot: "nobody", pad }]);
         if (!alive) return;
         game.selectedClue.isAnswerRevealed = true;
-        ctx.broadcast(gameId, {type: "answer-revealed", clue: game.selectedClue});
+        ctx.broadcast(gameId, { type: "answer-revealed", clue: game.selectedClue });
     }
 
     alive = await ctx.aiHostVoiceSequence(ctx, gameId, game, [
-        {slot: "final_jeopardy_end", pad},
-        {slot: top[0].name, pad},
-        {slot: "final_jeopardy_end2", pad},
+        { slot: "final_jeopardy_end", pad },
+        { slot: top[0].name, pad },
+        { slot: "final_jeopardy_end2", pad },
     ]);
     if (!alive) return;
 
@@ -160,16 +183,14 @@ async function finishGame(game, gameId, drawings, ctx) {
         }
     }
 
-    // 4) Fire-and-forget: everyone finished
     for (const p of game.players) {
         const id = idByUsername.get(ctx.normalizeName(p.name));
         if (!id) continue;
         ctx.fireAndForget(ctx.repos.profiles.incrementGamesFinished(id), "incrementGamesFinished");
     }
 
-    //update all the scores.
-    ctx.broadcast(gameId, {type: "update-scores", scores: game.scores});
-    ctx.broadcast(gameId, {type: "final-score-screen"});
+    ctx.broadcast(gameId, { type: "update-scores", scores: game.scores });
+    ctx.broadcast(gameId, { type: "final-score-screen" });
 }
 
 export async function submitDrawing(game, gameId, player, drawing, ctx) {
@@ -186,7 +207,7 @@ export async function submitDrawing(game, gameId, player, drawing, ctx) {
         game.finalTranscripts = {};
     }
 
-    const {verdict, transcript} = await ctx.judgeImage(game.selectedClue?.answer, drawing);
+    const { verdict, transcript } = await ctx.judgeImage(game.selectedClue?.answer, drawing);
     game.finalVerdicts[player] = verdict;
     game.finalTranscripts[player] = transcript;
     void ctx.ensureFinalJeopardyAnswer(ctx, game, gameId, player, transcript);
@@ -210,14 +231,9 @@ export function checkAllWagersSubmitted(game, gameId, ctx) {
     const expected = getExpectedFinalists(game).map((p) => p.name);
     const wagers = game.wagers || {};
 
-    console.log(wagers);
-    console.log(expected);
-
     const allSubmitted =
         expected.length === 0 ||
-        expected.every((name) =>
-            Object.prototype.hasOwnProperty.call(wagers, name)
-        );
+        expected.every((name) => Object.prototype.hasOwnProperty.call(wagers, name));
 
     if (allSubmitted) {
         advanceToDrawingPhase(game, gameId, wagers, ctx);
@@ -233,9 +249,7 @@ export function checkAllDrawingsSubmitted(game, gameId, ctx) {
 
     const allSubmitted =
         expected.length === 0 ||
-        expected.every((name) =>
-            Object.prototype.hasOwnProperty.call(drawings, name)
-        );
+        expected.every((name) => Object.prototype.hasOwnProperty.call(drawings, name));
 
     if (allSubmitted) {
         void finishGame(game, gameId, drawings, ctx);

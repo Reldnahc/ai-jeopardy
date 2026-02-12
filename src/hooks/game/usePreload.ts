@@ -128,7 +128,7 @@ export function usePreload(boardData: BoardData | null | undefined, enabled: boo
         const controller = new AbortController();
         const { signal } = controller;
 
-        const CONCURRENCY = 5;
+        const CONCURRENCY = 10;
 
         const queue = ids
             .map((id) => imageUrl(id))
@@ -238,7 +238,7 @@ export function usePreloadAudioAssetIds(
             return;
         }
 
-        const CONCURRENCY = 5;
+        const CONCURRENCY = 10;
 
         while (enabled) {
             while (inFlightRef.current < CONCURRENCY && pendingRef.current.length > 0) {
@@ -366,7 +366,7 @@ export function usePreloadImageAssetIds(
             return;
         }
 
-        const CONCURRENCY = 5;
+        const CONCURRENCY = 10;
 
         while (enabled) {
             // Start more work if possible
