@@ -387,25 +387,25 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                                     style={{ fontSize: "clamp(0.9rem, 1.8vw, 1.8rem)" }}
                                     className="mx-auto leading-snug break-words"
                                 >
-                                    {localSelectedClue.question}
+                                    {localSelectedClue.question.toUpperCase()}
                                 </p>
                             </div>
                         ) : (
                             <h1
-                                style={{ fontSize: "clamp(1rem, 2.6vw, 3.2rem)" }}
-                                className="mb-1 mx-auto leading-snug break-words"
+                                style={{ fontSize: "clamp(2rem, 3vw, 4rem)" }}
+                                className="mb-1 mx-auto leading-snug break-words font-swiss911 text-shadow-jeopardy tracking-wider"
                             >
-                                {localSelectedClue.question}
+                                {localSelectedClue.question.toUpperCase()}
                             </h1>
                         )}
 
-                        <div className="min-h-[70px] md:min-h-[100px] flex justify-center items-center">
+                        <div className="min-h-[70px] md:min-h-[100px] flex justify-center items-center font-swiss911 text-shadow-jeopardy tracking-wider">
                             {showAnswer && (
                                 <p
                                     style={{ fontSize: "clamp(1.2rem, 3.2vw, 2.6rem)" }}
                                     className="mt-5 text-yellow-300 break-words"
                                 >
-                                    {localSelectedClue.answer}
+                                    {localSelectedClue.answer.toUpperCase()}
                                 </p>
                             )}
                         </div>

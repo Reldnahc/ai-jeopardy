@@ -4,7 +4,7 @@ module.exports = {
   theme: {
     extend: {
       textShadow: {
-        jeopardy: "0.07em 0.07em 0 rgba(0,0,0,0.9), 0.14em 0.14em 0 rgba(0,0,0,0.6)",
+        jeopardy: "0.04em 0.05em 0 rgba(0,0,0,0.9), 0.1em 0.1em 0 rgba(0,0,0,0.6)",
       },
       fontFamily: {
         swiss911: ['"swiss911"', 'sans-serif'],
