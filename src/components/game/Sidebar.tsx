@@ -222,8 +222,8 @@ const Sidebar: React.FC<SidebarProps> = ({
                 </div>
 
                 <div>
-                    <h2 className="text-2xl mt-3 font-extrabold bg-gradient-to-r from-[#1e88e5] via-[#3d5afe] to-[#5c6bc0] text-white px-5 py-5 rounded-lg text-center flex items-center gap-2.5 shadow-md mb-3">
-                        Players
+                    <h2 className="text-4xl  mt-3 font-extrabold font-swiss911 text-shadow-jeopardy tracking-widest bg-blue-700 text-white px-5 py-5 rounded-lg text-center flex items-center gap-2.5 shadow-md mb-3">
+                        Contestants
                     </h2>
                     <ul className="list-none p-0 m-0">
                         {players.map((player) => {
@@ -248,28 +248,27 @@ const Sidebar: React.FC<SidebarProps> = ({
                                         : selectorName === player.name
                                             ? "bg-blue-300 border-blue-500"
                                             : "bg-gray-100"}
-                                    `}
+                                              `}
                                 >
+                                    {/* LEFT: Avatar (fixed spot, vertically centered) */}
+                                    <div className="flex items-center justify-center shrink-0 pl-2">
+                                        <Avatar
+                                            name={player.name}
+                                            size="12"
+                                            color={player.color}
+                                            textColor={player.text_color}
+                                        />
+                                    </div>
 
+                                    {/* RIGHT: Name + Money (stacked) */}
+                                    <div className="flex flex-col justify-center flex-1 ml-3 leading-tight min-w-0">
+                                        <span className="font-extrabold text-xl lg:text-2xl ml-2 font-sans truncate">
+                                          {player.name}
+                                        </span>
 
-                                    <div className="flex flex-col flex-1 ml-2 leading-tight">
-                                        <div className="flex items-center gap-2 mt-1">
-                                            <Avatar
-                                                name={player.name}
-                                                size="9"
-                                                color={player.color}
-                                                textColor={player.text_color}
-
-                                            />
-
-                                            <span className="font-extrabold -mt-1 text-xl lg:text-2xl font-sans">
-                                                {player.name}
-                                            </span>
-                                        </div>
-                                        {/* ROLLER MONEY */}
                                         <RollerMoney
                                             value={score}
-                                            className={`mt-1 ml-2 font-extrabold text-2xl ${
+                                            className={`mt-1 font-extrabold font-swiss911 tracking-tighter text-shadow-jeopardy text-3xl ${
                                                 score < 0 ? "text-red-600" : "text-green-600"
                                             }`}
                                         />
@@ -277,19 +276,19 @@ const Sidebar: React.FC<SidebarProps> = ({
 
                                     {/* Admin controls */}
                                     {profile && profile.role === "admin" && (
-                                        <div className="flex flex-col gap-2 ml-3">
+                                        <div className="flex flex-col gap-2 ml-3 pr-2 shrink-0">
                                             <button
                                                 onClick={() => handleScoreUpdate(player.name, lastQuestionValue)}
                                                 className="
-                                                    w-6 h-6
-                                                    bg-green-500 text-white
-                                                    rounded-xl
-                                                    flex items-center justify-center
-                                                    text-lg font-black
-                                                    shadow-sm
-                                                    hover:bg-green-600
-                                                    active:scale-[0.98]
-                                                "
+                                                          w-6 h-6
+                                                          bg-green-500 text-white
+                                                          rounded-xl
+                                                          flex items-center justify-center
+                                                          text-lg font-black
+                                                          shadow-sm
+                                                          hover:bg-green-600
+                                                          active:scale-[0.98]
+                                                        "
                                                 aria-label={`Increase ${player.name} score`}
                                                 title={`+${lastQuestionValue}`}
                                             >
@@ -299,15 +298,15 @@ const Sidebar: React.FC<SidebarProps> = ({
                                             <button
                                                 onClick={() => handleScoreUpdate(player.name, -lastQuestionValue)}
                                                 className="
-                                                    w-6 h-6
-                                                    bg-red-500 text-white
-                                                    rounded-xl
-                                                    flex items-center justify-center
-                                                    text-lg font-black
-                                                    shadow-sm
-                                                    hover:bg-red-600
-                                                    active:scale-[0.98]
-                                                "
+                                                          w-6 h-6
+                                                          bg-red-500 text-white
+                                                          rounded-xl
+                                                          flex items-center justify-center
+                                                          text-lg font-black
+                                                          shadow-sm
+                                                          hover:bg-red-600
+                                                          active:scale-[0.98]
+                                                        "
                                                 aria-label={`Decrease ${player.name} score`}
                                                 title={`-${lastQuestionValue}`}
                                             >
@@ -316,6 +315,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                                         </div>
                                     )}
                                 </li>
+
                             );
                         })}
                     </ul>
@@ -335,15 +335,15 @@ const Sidebar: React.FC<SidebarProps> = ({
                                 onToggleDailyDoubleSnipe(next);
                             }}
                             className={`
-                    px-6 py-3
-                    text-white text-lg font-bold
-                    rounded-lg
-                    min-w-72
-                    transition
-                    ${ddSnipeEnabled
+                                px-6 py-3
+                                text-white text-lg font-bold
+                                rounded-lg
+                                min-w-72
+                                transition
+                                ${ddSnipeEnabled
                                 ? "bg-purple-700 hover:bg-purple-800"
                                 : "bg-purple-500 hover:bg-purple-600"}
-                `}
+                                `}
                         >
                             {ddSnipeEnabled ? "DD Snipe: ON (Next Clue)" : "Enable DD Snipe (Next Clue)"}
                         </button>
