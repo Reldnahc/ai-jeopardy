@@ -148,7 +148,9 @@ export default function SvgOutlinedText({
                 const totalTextH = (lines.length - 1) * currentLineGap + currentFont;
 
                 // scale factors to fit width + height (SAME FOR ALL CASES)
-                const sW = availW / maxLen * 2;
+                const base = availW / maxLen;
+
+                const sW = lines.length === 1 ? base * 2 : base;
                 const sH = targetBlockH / totalTextH;
                 const s = Math.min(sW, sH);
 
