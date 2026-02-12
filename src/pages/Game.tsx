@@ -395,7 +395,7 @@ export default function Game() {
 
     return (
         <div
-            className="flex h-screen w-screen overflow-hidden font-sans bg-gradient-to-r from-indigo-400 to-blue-700"
+            className="flex h-screen w-screen overflow-hidden font-sans bg-gradient-to-b from-[#183a75] via-[#2a5fb3] to-[#1c4a96]"
         >
             {/* Sidebar */}
             {deviceType === 'mobile' ? (

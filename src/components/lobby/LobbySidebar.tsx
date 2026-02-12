@@ -34,30 +34,66 @@ const LobbySidebar: React.FC<LobbySidebarProps> = ({
             {/* Game ID and Host Card */}
             <div
                 onClick={copyGameIdToClipboard}
-                className="bg-gradient-to-br from-[#6a11cb] to-[#2575fc] text-white rounded-xl p-5 shadow-lg transition-all duration-200 cursor-pointer hover:scale-105 hover:shadow-xl"
+                className="
+        bg-blue-700
+        text-white
+        rounded-lg
+        px-6
+        py-4
+        text-center
+        shadow-md
+        cursor-pointer
+        transition-all
+        duration-200
+        hover:scale-[1.02]
+        hover:shadow-lg
+        active:scale-[0.98]
+        select-none
+    "
             >
-                <p className="text-lg font-bold m-0">
-                    <strong>Lobby ID:</strong> {gameId}
-                </p>
-                <p className="text-sm text-center mt-2 -mb-3">
-                    (click to copy)
-                </p>
+                <div className="text-xs tracking-widest opacity-80">
+                    Lobby ID
+                </div>
+
+                <div className="font-swiss911 text-3xl tracking-[0.15em] text-shadow-jeopardy mt-1">
+                    {gameId}
+                </div>
+
+                <div className="text-xs mt-1 opacity-70">
+                    Click to copy
+                </div>
             </div>
 
-            <div className="relative">
+            <div className="relative w-full flex justify-center">
                 {copySuccess && (
-                    <div className="absolute -mt-2 px-3.5 py-2.5 left-3 bg-green-500 rounded-md text-white text-sm text-center shadow-md">
-                        Game ID copied to clipboard!
+                    <div
+                        className="
+                absolute
+                top-full
+                -mt-8
+                px-5
+                py-2
+                bg-green-600
+                text-white
+                font-semibold
+                tracking-wider
+                rounded-md
+                shadow-md
+                text-shadow-jeopardy
+            "
+                    >
+                        ✓ GAME ID COPIED
                     </div>
                 )}
             </div>
 
-            {/* Player List Section */}
-            <div className="flex flex-col gap-3 -mt-7">
-                <h2 className="text-2xl font-extrabold bg-gradient-to-r from-[#1e88e5] via-[#3d5afe] to-[#5c6bc0] text-white px-5 py-5 rounded-lg text-center shadow-md">
-                    Players
-                </h2>
 
+
+            {/* Player List Section */}
+            <div className="flex flex-col gap-1 -mt-10">
+                <h2 className="text-4xl  mt-3 font-extrabold font-swiss911 text-shadow-jeopardy tracking-wider bg-blue-700 text-white px-5 py-5 rounded-lg text-center w-full gap-2.5 shadow-md mb-3">
+                    CONTESTANTS
+                </h2>
                 {/* Responsive Player List */}
                 <ul
                     className="list-none p-0 m-0 flex flex-wrap lg:flex-col lg:w-full gap-4"

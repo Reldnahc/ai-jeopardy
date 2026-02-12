@@ -82,7 +82,7 @@ const CategoryBoard: React.FC<CategoryBoardProps> = ({
 
     return (
         <div className="min-w-0">
-            <h2 className="text-3xl mb-4 text-black font-bold">{title}</h2>
+            <h2 className="text-4xl mb-4 text-yellow-400 font-swiss911 text-shadow-jeopardy tracking-wider font-bold">{title}</h2>
 
             {categories.map((category, index) => (
                 <div key={index} className="flex items-center mb-3 gap-2.5 flex-nowrap">
