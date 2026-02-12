@@ -117,6 +117,7 @@ export default function SvgOutlinedText({
     }, []);
 
     // Fit text to container using actual computed text lengths
+// Fit text to container using actual computed text lengths
     useLayoutEffect(() => {
         const w = box.w;
         const h = box.h;
@@ -129,68 +130,59 @@ export default function SvgOutlinedText({
         const initialFont = Math.max(8, targetBlockH / (lines.length + 0.15));
 
         const raf = requestAnimationFrame(() => {
-            const measureAndFit = () => {
-                const els = textRefs.current;
-                if (els.length === 0) return;
+            const els = textRefs.current;
+            if (els.length === 0) return;
 
-                const currentFont = layout.fontSize || initialFont;
+            const currentFont = layout.fontSize || initialFont;
 
-                // widest line in px
-                let maxLen = 1;
-                for (const t of els) {
-                    if (!t) continue;
-                    const len = t.getComputedTextLength();
-                    if (Number.isFinite(len)) maxLen = Math.max(maxLen, len);
-                }
+            // widest line in px
+            let maxLen = 1;
+            for (const t of els) {
+                if (!t) continue;
+                const len = t.getComputedTextLength();
+                if (Number.isFinite(len)) maxLen = Math.max(maxLen, len);
+            }
 
-                // current line gap and total height
-                const currentLineGap = (layout.lineGap || currentFont) * lineHeight;
-                const totalTextH = (lines.length - 1) * currentLineGap + currentFont;
+            const currentLineGap = (layout.lineGap || currentFont) * lineHeight;
+            const totalTextH = (lines.length - 1) * currentLineGap + currentFont;
 
-                // scale factors to fit width + height (SAME FOR ALL CASES)
-                const base = availW / maxLen;
+            const sW = availW / maxLen;
+            const sH = targetBlockH / totalTextH;
+            const s = Math.min(sW, sH);
 
-                const sW = lines.length === 1 ? base * 2 : base;
-                const sH = targetBlockH / totalTextH;
-                const s = Math.min(sW, sH);
+            const nextFont = Math.max(8, currentFont * s);
+            const nextGap = nextFont * lineHeight;
 
-                const nextFont = Math.max(8, currentFont * s);
-                const nextGap = nextFont * lineHeight;
+            const computedStroke =
+                strokeWidth ?? Math.min(Math.max(2, nextFont * 0.10), 18);
 
-                const computedStroke =
-                    strokeWidth ??
-                    Math.min(Math.max(2, nextFont * 0.10), 18);
+            const changed =
+                Math.abs(nextFont - layout.fontSize) > 0.5 ||
+                Math.abs(nextGap - layout.lineGap) > 0.5 ||
+                Math.abs(computedStroke - layout.strokePx) > 0.5;
 
-                const changed =
-                    Math.abs(nextFont - layout.fontSize) > 0.5 ||
-                    Math.abs(nextGap - layout.lineGap) > 0.5 ||
-                    Math.abs(computedStroke - layout.strokePx) > 0.5;
-
-                if (changed) {
-                    setLayout({
-                        fontSize: nextFont,
-                        lineGap: nextGap,
-                        strokePx: computedStroke,
-                    });
-                }
-            };
-
-            if (Math.abs(layout.fontSize - initialFont) > initialFont * 0.35) {
-                setLayout((prev) => ({
-                    ...prev,
-                    fontSize: initialFont,
-                    lineGap: initialFont * lineHeight,
-                    strokePx: prev.strokePx || 3,
-                }));
-                requestAnimationFrame(measureAndFit);
-            } else {
-                measureAndFit();
+            if (changed) {
+                setLayout({
+                    fontSize: nextFont,
+                    lineGap: nextGap,
+                    strokePx: computedStroke,
+                });
             }
         });
 
         return () => cancelAnimationFrame(raf);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [box.w, box.h, lines.join("\n")]);
+    }, [
+        box.w,
+        box.h,
+        paddingPx,
+        heightFill,
+        lineHeight,
+        strokeWidth,
+        lines,                // <= important: not join()
+        layout.fontSize,      // <= THIS is the key
+        layout.lineGap,
+        layout.strokePx,
+    ]);
 
     const startY = box.h / 2 - ((lines.length - 1) * layout.lineGap) / 2;
 
