@@ -1,5 +1,6 @@
 import React from "react";
 import { Category, Clue } from "../../../shared/types/board.ts";
+import SvgOutlinedText from "../common/SvgOutlinedText.tsx";
 
 interface JeopardyGridProps {
     boardData: Category[];
@@ -26,31 +27,6 @@ const JEOPARDY_VALUE_STYLE: React.CSSProperties = {
 
 };
 
-const JEOPARDY_HEADER_BASE_STYLE: React.CSSProperties = {
-    fontWeight: 900,
-    letterSpacing: "0.06em",
-    lineHeight: 1.05,
-    textTransform: "uppercase",
-    fontFamily: '"swiss911", "Franklin Gothic Medium", "Arial Black", system-ui, sans-serif',
-    WebkitTextStroke: "0.06em rgba(0,0,0,0.75)", // scales with font
-    textShadow:
-        "0.07em 0.07em 0 rgba(0,0,0,0.9), 0.14em 0.14em 0 rgba(0,0,0,0.6)",
-
-
-};
-
-
-function getHeaderFontSizeClamp(text: string): string {
-    const len = (text ?? "").trim().length;
-
-    // Tune these buckets to taste. Short categories get noticeably bigger.
-    if (len <= 8)  return "clamp(1.1rem, 2.4vw, 3.0rem)";
-    if (len <= 14) return "clamp(1.0rem, 2.1vw, 2.6rem)";
-    if (len <= 20) return "clamp(0.95rem, 1.9vw, 2.3rem)";
-    if (len <= 28) return "clamp(0.9rem, 1.7vw, 2.0rem)";
-    return "clamp(0.8rem, 1.5vw, 1.8rem)";
-}
-
 const JeopardyGrid: React.FC<JeopardyGridProps> = ({
                                                        boardData,
                                                        isHost,
@@ -61,7 +37,7 @@ const JeopardyGrid: React.FC<JeopardyGridProps> = ({
     return (
         <div className="flex justify-center items-center h-full w-full">
             <div
-                className="grid w-[98%] h-[98%] my-2"
+                className="grid w-full h-full"
                 style={{
                     gridTemplateColumns: `repeat(${boardData.length}, 1fr)`,
                     gridTemplateRows: `repeat(6, 1fr)`,
@@ -72,24 +48,19 @@ const JeopardyGrid: React.FC<JeopardyGridProps> = ({
                     <div
                         key={colIndex}
                         className="flex justify-center items-center border-2 border-black border-b-[4px] text-center h-full bg-indigo-600 cursor-not-allowed px-2"
-                        style={{
-                            pointerEvents: "none",
-                            gridColumn: colIndex + 1,
-                        }}
+                        style={{ pointerEvents: "none", gridColumn: colIndex + 1 }}
                     >
-                        <span
-                            style={{
-                                ...JEOPARDY_HEADER_BASE_STYLE,
-                                fontSize: getHeaderFontSizeClamp(category.category),
-                                textAlign: "center",
-                                overflowWrap: "break-word",
-                                whiteSpace: "normal",
-                                wordBreak: "break-word",
-                            }}
-                            className="text-white"
-                        >
-                          {category.category}
-                        </span>
+                        <div className="w-full h-full flex items-center justify-center">
+                            <SvgOutlinedText
+                                text={category.category}
+                                className="w-full h-full"
+                                fill="#FFFFFF"
+                                singleLine={false}
+                                maxLines={4}
+                                wrapAtChars={12}
+                                uppercase
+                            />
+                        </div>
                     </div>
                 ))}
 

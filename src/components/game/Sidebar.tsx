@@ -160,69 +160,10 @@ const Sidebar: React.FC<SidebarProps> = ({
     const [ddSnipeEnabled, setDdSnipeEnabled] = useState(false);
 
     return (
-        <div className="flex-none w-full md:w-64 lg:w-96 flex flex-col items-start gap-5 p-5 overflow-hidden box-border relative">
-            <div className="flex flex-col gap-0 p-1 w-full" style={{ fontFamily: "'Poppins', sans-serif" }}>
-                {/* Top Controls (compact) */}
-                <div className="w-full mb-3">
-                    <div className="flex items-center justify-between gap-2">
-                        {/* Right: icon buttons */}
-                        <div className="flex items-center gap-2">
-                            {/* Leave game (icon only, subtle danger) */}
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    const ok = window.confirm(
-                                        "Leave the game?\n\nLeaving means you will quit this game and may not be able to rejoin."
-                                    );
-                                    if (ok) onLeaveGame();
-                                }}
-                                className="
-                                    group
-                                    inline-flex items-center justify-center
-                                    w-9 h-9
-                                    rounded-xl
-                                    border border-gray-200
-                                    bg-white
-                                    text-gray-500
-                                    shadow-sm
-                                    transition
-                                    hover:bg-red-50 hover:text-red-600 hover:border-red-200
-                                    active:scale-[0.98]
-                                    focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500
-                                "
-                                title="Leave game"
-                                aria-label="Leave game"
-                            >
-                                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                                    <path d="M10 17l1.41-1.41L8.83 13H20v-2H8.83l2.58-2.59L10 7l-5 5 5 5z" />
-                                </svg>
-                            </button>
-
-                            {/* Narration toggle */}
-                            {narrationEnabled && (
-                                <div className="flex items-center gap-3 ml-2 select-none">
-                                    <MutedIcon className={"-mr-3"} />
-
-                                    <input
-                                        type="range"
-                                        min={0}
-                                        max={200}
-                                        step={1}
-                                        value={Math.round(audioVolume * 100)}
-                                        onChange={(e) => onChangeAudioVolume(Number(e.target.value) / 100)}
-                                        className="w-32 accent-white cursor-pointer"
-                                        aria-label="Audio volume"
-                                    />
-
-                                    <LoudIcon className={"-ml-2"} />
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-
+        <div className="flex-none w-full md:w-64 lg:w-96 flex flex-col gap-5 p-3 overflow-hidden box-border relative h-full">
+            <div className="flex flex-col gap-0 w-full" style={{ fontFamily: "'Poppins', sans-serif" }}>
                 <div>
-                    <h2 className="text-4xl  mt-3 font-extrabold font-swiss911 text-shadow-jeopardy tracking-wider bg-blue-700 text-white px-5 py-5 rounded-lg text-center w-full gap-2.5 shadow-md mb-3">
+                    <h2 className="text-4xl font-extrabold font-swiss911 text-shadow-jeopardy tracking-wider bg-blue-700 text-white px-5 py-5 rounded-lg text-center w-full gap-2.5 shadow-md mb-3">
                         CONTESTANTS
                     </h2>
                     <ul className="list-none p-0 m-0">
@@ -323,7 +264,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             </div>
 
             {/* Fixed Bottom Section */}
-            <div className="fixed bottom-0 left-0 w-full md:w-72 flex flex-col items-center gap-5 z-[100]">
+            <div className="absolute bottom-0 left-0 right-0 w-full md:w-64 lg:w-96 flex flex-col items-center gap-5 z-[100]">
 
                 {profile && profile.role === "admin" && activeBoard !== "finalJeopardy" && (
                     <>
@@ -335,12 +276,12 @@ const Sidebar: React.FC<SidebarProps> = ({
                                 onToggleDailyDoubleSnipe(next);
                             }}
                             className={`
-                                px-6 py-3
-                                text-white text-lg font-bold
-                                rounded-lg
-                                min-w-72
-                                transition
-                                ${ddSnipeEnabled
+                              px-6 py-3
+                              text-white text-lg font-bold
+                              rounded-lg
+                              min-w-72
+                              transition
+                              ${ddSnipeEnabled
                                 ? "bg-purple-700 hover:bg-purple-800"
                                 : "bg-purple-500 hover:bg-purple-600"}
                                 `}
@@ -357,6 +298,62 @@ const Sidebar: React.FC<SidebarProps> = ({
                         </button>
                     </>
                 )}
+
+                {/* Bottom Controls Row */}
+                <div className="w-full mb-3 flex items-center justify-center relative">
+                    {/* Leave button (left side) */}
+                    <button
+                        type="button"
+                        onClick={() => {
+                            const ok = window.confirm(
+                                "Leave the game?\n\nLeaving means you will quit this game and may not be able to rejoin."
+                            );
+                            if (ok) onLeaveGame();
+                        }}
+                        className="
+                                  absolute left-4
+                                  group
+                                  inline-flex items-center justify-center
+                                  w-9 h-9
+                                  rounded-xl
+                                  border border-gray-200
+                                  bg-white
+                                  text-gray-500
+                                  shadow-sm
+                                  transition
+                                  hover:bg-red-50 hover:text-red-600 hover:border-red-200
+                                  active:scale-[0.98]
+                                  focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500
+                                "
+                        title="Leave game"
+                        aria-label="Leave game"
+                    >
+                        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                            <path d="M10 17l1.41-1.41L8.83 13H20v-2H8.83l2.58-2.59L10 7l-5 5 5 5z" />
+                        </svg>
+                    </button>
+
+                    {/* Volume (perfectly centered) */}
+                    {narrationEnabled && (
+                        <div className="flex sm:ml-11 lg:ml-0 items-center gap-3 select-none">
+                            <MutedIcon className={"-mr-3"} />
+
+                            <input
+                                type="range"
+                                min={0}
+                                max={200}
+                                step={1}
+                                value={Math.round(audioVolume * 100)}
+                                onChange={(e) => onChangeAudioVolume(Number(e.target.value) / 100)}
+                                className="w-32 accent-white cursor-pointer"
+                                aria-label="Audio volume"
+                            />
+
+                            <LoudIcon className={"-ml-2"} />
+                        </div>
+                    )}
+                </div>
+
             </div>
 
         </div>
