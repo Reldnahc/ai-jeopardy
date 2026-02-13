@@ -44,6 +44,10 @@ ACCEPTANCE RULES:
 - If expected is a TITLE: accept dropping leading articles (The/A/An) and minor title variants.
 - If expected is a NUMBER/DATE: accept common spoken variants (e.g., "nineteen sixty-nine" for "1969").
 - Do NOT accept answers that are merely related, adjacent, or "close".
+- If expected is a PLACE: accept omission of generic geographic feature words
+  when the remaining core name still refers to the same place
+  (e.g., "Mojave" for "Mojave Desert", "Sahara" for "Sahara Desert", "Amazon" for "Amazon River").
+  If the core name would reasonably match many different entities, mark incorrect.
 
 DISALLOW:
 - Do not accept generic responses like "it", "that", "a thing", "someone", etc.
