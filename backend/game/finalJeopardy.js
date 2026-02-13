@@ -10,13 +10,26 @@ function getExpectedFinalists(game) {
     });
 }
 
+/**
+ * Cache the finalist list for the whole Final Jeopardy run.
+ * This prevents inconsistencies if scores/online flags change mid-phase.
+ */
+function getFinalistNames(game) {
+    if (Array.isArray(game?.finalJeopardyFinalists)) return game.finalJeopardyFinalists;
+    const names = getExpectedFinalists(game).map((p) => p.name);
+    game.finalJeopardyFinalists = names;
+    return names;
+}
+
 async function advanceToDrawingPhase(game, gameId, wagers, ctx) {
     // ✅ stop wager timer once complete
     ctx.clearGameTimer(game, gameId, ctx);
 
     game.finalJeopardyStage = "drawing";
 
-    ctx.broadcast(gameId, {type: "all-wagers-submitted", wagers});
+    // ✅ include finalists so clients can hide drawing UI for non-finalists
+    const finalists = getFinalistNames(game);
+    ctx.broadcast(gameId, {type: "all-wagers-submitted", wagers, finalists});
 
     // Reveal the final clue immediately after wagers are locked in
     const fjCat = game.boardData?.finalJeopardy?.categories?.[0] || null;
@@ -47,29 +60,31 @@ async function advanceToDrawingPhase(game, gameId, wagers, ctx) {
             type: "clue-selected",
             clue: game.selectedClue,
             clearedClues: Array.from(game.clearedClues || []),
+            // ✅ include finalists here too (some clients show drawing UI on clue-selected)
+            finalists: getFinalistNames(game),
         });
-    }
+    };
 
     const pad = 200;
 
     const DRAW_SECONDS = appConfig.gameplay.drawSeconds;
 
-    const assetId = game.boardData?.ttsByClueKey?.[`finalJeopardy:?:${game.selectedClue.question?.trim()}`] || null;
+    const assetId =
+        game.boardData?.ttsByClueKey?.[`finalJeopardy:?:${game.selectedClue.question?.trim()}`] || null;
 
     const alive = await ctx.aiHostVoiceSequence(ctx, gameId, game, [
         {slot: "todays_clue", pad, after: selectClue},
         {assetId, pad},
         {slot: "you_have", pad},
-       //tODO TIME SUPPORT
+        // tODO TIME SUPPORT
     ]);
     if (!alive) return;
-
 
     ctx.startGameTimer(gameId, game, ctx, DRAW_SECONDS, "final-draw", () => {
         if (!game?.isFinalJeopardy) return;
         if (game.finalJeopardyStage !== "drawing") return;
 
-        const expected = getExpectedFinalists(game).map((p) => p.name);
+        const expected = getFinalistNames(game);
 
         if (!game.drawings) game.drawings = {};
         if (!game.finalVerdicts) game.finalVerdicts = {};
@@ -101,14 +116,11 @@ async function finishGame(game, gameId, drawings, ctx) {
 
     for (const player of game.players) {
         const name = player.name;
-        const verdict = verdicts[name];
 
-        if (verdict === "correct") {
-            scores[name] += wagers[name];
-            continue;
-        }
+        const score = Number(scores[name] ?? 0);
+        const wager = Number(wagers[name] ?? 0);
 
-        scores[name] -= wagers[name];
+        scores[name] = verdicts[name] === "correct" ? score + wager : score - wager;
     }
 
     const top = Object.entries(scores)
@@ -121,6 +133,8 @@ async function finishGame(game, gameId, drawings, ctx) {
 
     for (let i = top.length - 1; i >= 0; i--) {
         const playerName = top[i].name;
+        console.log(scores);
+        if (!scores[playerName] || scores[playerName] <= 0) continue;
 
         const maybeRevealAnswer = () => {
             if (verdicts[playerName] === "correct" && !game.selectedClue.isAnswerRevealed) {
@@ -131,7 +145,6 @@ async function finishGame(game, gameId, drawings, ctx) {
 
         const updateScore = async () => {
             ctx.broadcast(gameId, { type: "update-score", player: playerName, score: top[i].score });
-
         };
 
         const revealWager = async () => {
@@ -172,7 +185,7 @@ async function finishGame(game, gameId, drawings, ctx) {
 
     const finalScores = Object.fromEntries(game.players.map((p) => [p.name, 0]));
 
-    if (top[0]) finalScores[top[0].name] = top[0].score;
+    if (top[0]) finalScores[top[0].name] = top[0].score > 3000 ? top[0].score : 3000;
     if (top[1]) finalScores[top[1].name] = 3000;
     if (top[2]) finalScores[top[2].name] = 2000;
 
@@ -223,6 +236,10 @@ async function finishGame(game, gameId, drawings, ctx) {
 }
 
 export async function submitDrawing(game, gameId, player, drawing, ctx) {
+    // ✅ Ignore drawings from non-finalists (score <= 0, offline, etc.)
+    const expected = getFinalistNames(game);
+    if (!expected.includes(player)) return;
+
     if (!game.drawings) {
         game.drawings = {};
     }
@@ -245,6 +262,10 @@ export async function submitDrawing(game, gameId, player, drawing, ctx) {
 }
 
 export function submitWager(game, gameId, player, wager, ctx) {
+    // ✅ Ignore wagers from non-finalists
+    const expected = getFinalistNames(game);
+    if (!expected.includes(player)) return;
+
     if (!game.wagers) {
         game.wagers = {};
     }
@@ -258,7 +279,7 @@ export function checkAllWagersSubmitted(game, gameId, ctx) {
     if (!game?.isFinalJeopardy) return;
     if (game.finalJeopardyStage !== "wager") return;
 
-    const expected = getExpectedFinalists(game).map((p) => p.name);
+    const expected = getFinalistNames(game);
     const wagers = game.wagers || {};
 
     const allSubmitted =
@@ -274,7 +295,7 @@ export function checkAllDrawingsSubmitted(game, gameId, ctx) {
     if (!game?.isFinalJeopardy) return null;
     if (game.finalJeopardyStage !== "drawing") return null;
 
-    const expected = getExpectedFinalists(game).map((p) => p.name);
+    const expected = getFinalistNames(game);
     const drawings = game.drawings || {};
 
     const allSubmitted =

@@ -37,7 +37,7 @@ interface SelectedClueDisplayProps {
     selectedFinalist: string;
     showDdModal: DailyDoubleShowModalMsg | null;
     showWager: boolean;
-
+    finalists: string[];
 }
 
 const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
@@ -62,7 +62,8 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                                                                      finalWagers,
                                                                      selectedFinalist,
                                                                      showDdModal,
-                                                                     showWager
+                                                                     showWager,
+                                                                     finalists
                                                                  }) => {
     const { sendJson } = useWebSocket();
 
@@ -424,6 +425,7 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                                 selectedFinalist={selectedFinalist}
                                 timerEndTime={timerEndTime}
                                 showWager={showWager}
+                                finalists={finalists}
                             />
                         )}
 

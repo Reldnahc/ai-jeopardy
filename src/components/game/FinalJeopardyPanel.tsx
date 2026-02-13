@@ -16,6 +16,7 @@ type FinalJeopardyPanelProps = {
     selectedFinalist: string;
     showWager: boolean;
     timerEndTime: number | null;
+    finalists: string[];
 };
 
 const FinalJeopardyPanel: React.FC<FinalJeopardyPanelProps> = ({
@@ -29,6 +30,7 @@ const FinalJeopardyPanel: React.FC<FinalJeopardyPanelProps> = ({
                                                                    selectedFinalist,
                                                                    timerEndTime,
                                                                    showWager,
+                                                                   finalists
                                                                }) => {
     const { sendJson, nowMs } = useWebSocket();
     const { deviceType } = useDeviceContext();
@@ -75,6 +77,8 @@ const FinalJeopardyPanel: React.FC<FinalJeopardyPanelProps> = ({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [timerEndTime, hasSubmitted, currentPlayer]);
 
+    const isFinalist = finalists.includes(currentPlayer);
+
     return (
         <>
 
@@ -84,7 +88,7 @@ const FinalJeopardyPanel: React.FC<FinalJeopardyPanelProps> = ({
                 </p>
             )}
 
-            {!hasSubmitted && (
+            {!hasSubmitted && isFinalist && (
                 <div className="flex flex-col items-center justify-center w-full text-white p-5">
                     <h2 style={{ fontSize: "clamp(1.5rem, 3vw, 2.5rem)" }} className="mb-5">
                         Write Your Answer

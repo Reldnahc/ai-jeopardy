@@ -81,6 +81,17 @@ function getExpectedFinalists(game) {
     });
 }
 
+/**
+ * Cache the finalist list for the whole Final Jeopardy run.
+ * Prevents weirdness if scores/online flags change mid-phase.
+ */
+function getFinalistNames(game) {
+    if (Array.isArray(game?.finalJeopardyFinalists)) return game.finalJeopardyFinalists;
+    const names = getExpectedFinalists(game).map((p) => p.name);
+    game.finalJeopardyFinalists = names;
+    return names;
+}
+
 async function startFinalJeopardy(game, gameId, ctx) {
     game.activeBoard = "finalJeopardy";
     game.isFinalJeopardy = true;
@@ -89,11 +100,15 @@ async function startFinalJeopardy(game, gameId, ctx) {
     game.wagers = {};
     game.drawings = {};
 
+    // ✅ cache finalists for this FJ run
+    const finalists = getFinalistNames(game);
+
     const pad = 200;
 
     await ctx.aiHostVoiceSequence(ctx, gameId, game, [
         { slot: "final_jeopardy", pad },
-        { slot: "final_jeopardy2", pad, after: () => ctx.broadcast(gameId, { type: "final-jeopardy" }) },
+        // ✅ include finalists so clients can hide wager/draw UI for non-finalists
+        { slot: "final_jeopardy2", pad, after: () => ctx.broadcast(gameId, { type: "final-jeopardy", finalists }) },
         { slot: "all_wager", pad },
     ]);
 
@@ -104,7 +119,7 @@ async function startFinalJeopardy(game, gameId, ctx) {
         if (!game?.isFinalJeopardy) return;
         if (game.finalJeopardyStage !== "wager") return;
 
-        const expected = getExpectedFinalists(game).map((p) => p.name);
+        const expected = getFinalistNames(game);
         if (!game.wagers) game.wagers = {};
 
         // If player didn't submit, wager defaults to 0
@@ -114,19 +129,10 @@ async function startFinalJeopardy(game, gameId, ctx) {
             }
         }
 
-        // This will advance to drawing phase (and start the next timer there)
-        // (finalJeopardy.js handles the transition when all wagers exist)
-        // We can just broadcast the same message type your clients already handle:
-        ctx.broadcast(gameId, { type: "all-wagers-submitted", wagers: game.wagers });
+        // Broadcast what the clients already handle, but include finalists
+        ctx.broadcast(gameId, { type: "all-wagers-submitted", wagers: game.wagers, finalists: expected });
         game.finalJeopardyStage = "drawing";
 
-        // Let finalJeopardy.js do the clue-selected broadcast via its normal flow:
-        // Easiest: call the existing transition helper by reusing the same logic:
-        // We’ll simply trigger the normal check path by importing it elsewhere — but
-        // since this file is isolated, we rely on finalJeopardy.js’s own checks
-        // when submit-wager messages arrive normally.
-        //
-        // However, to keep behavior consistent, we’ll also set up the clue now:
         const fjCat = game.boardData?.finalJeopardy?.categories?.[0] || null;
         const fjClueRaw = fjCat?.values?.[0] || null;
 
@@ -155,6 +161,8 @@ async function startFinalJeopardy(game, gameId, ctx) {
             type: "clue-selected",
             clue: game.selectedClue,
             clearedClues: Array.from(game.clearedClues || []),
+            // ✅ include finalists here too (some clients key off clue-selected)
+            finalists: getFinalistNames(game),
         });
 
         // Start the 30s drawing timer now (same as finalJeopardy.js will do)
@@ -163,7 +171,7 @@ async function startFinalJeopardy(game, gameId, ctx) {
             if (!game?.isFinalJeopardy) return;
             if (game.finalJeopardyStage !== "drawing") return;
 
-            const expected2 = getExpectedFinalists(game).map((p) => p.name);
+            const expected2 = getFinalistNames(game);
             if (!game.drawings) game.drawings = {};
             if (!game.finalVerdicts) game.finalVerdicts = {};
             if (!game.finalTranscripts) game.finalTranscripts = {};

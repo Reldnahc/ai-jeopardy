@@ -142,6 +142,7 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
     const [wagers, setWagers] = useState<Record<string, number>>({});
     const [finalWagers, setFinalWagers] = useState<Record<string, number>>({});
     const [selectedFinalist, setSelectedFinalist] = useState("");
+    const [finalists, setFinalists] = useState<string[]>([""]);
 
 
     const [drawings, setDrawings] = useState<Record<string, string> | null>(null);
@@ -444,10 +445,11 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
             }
 
             if (message.type === "all-wagers-submitted") {
-                const m = message as unknown as { wagers: Record<string, number> };
+                const m = message as unknown as { wagers: Record<string, number>, finalists: string[] };
                 setAllWagersSubmitted(true);
                 setWagers(m.wagers);
                 setFinalWagers(m.wagers);
+                setFinalists(m.finalists);
                 return;
             }
 
@@ -725,5 +727,6 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
         ddWagerError,
         showDdModal,
         showWager,
+        finalists
     };
 }
