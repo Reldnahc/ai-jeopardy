@@ -7,7 +7,8 @@ import {appConfig} from "../../../config/appConfig.js";
 
 export async function judgeClueAnswerFast(
     expectedAnswer: string,
-    transcript: string
+    transcript: string,
+    question: string
 ): Promise<JudgeTextResult> {
     const transcriptRaw = String(transcript || "");
     const expectedRaw = String(expectedAnswer || "");
@@ -32,6 +33,7 @@ export async function judgeClueAnswerFast(
     const prompt = buildJudgePrompt({
         transcriptRaw,
         expectedRaw,
+        question,
         normT,
         normA,
         answerType,

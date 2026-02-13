@@ -592,7 +592,7 @@ export const gameHandlers = {
 
         try {
             const expectedAnswer = String(game.selectedClue?.answer || "");
-            verdict = (await ctx.judgeClueAnswerFast(expectedAnswer, transcript)).verdict;
+            verdict = (await ctx.judgeClueAnswerFast(expectedAnswer, transcript, game.selectedClue.question)).verdict;
 
         } catch (e) {
             console.error("[answer-audio-blob] judge failed:", e?.message || e);
