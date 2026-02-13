@@ -29,6 +29,7 @@ export const env = Object.freeze({
     OPENAI_API_KEY: requireEnv("OPENAI_API_KEY"),
     JWT_SECRET: requireEnv("JWT_SECRET"),
     PIPER_URL: requireEnv("PIPER_URL"),
+    KOKORO_URL: requireEnv("KOKORO_URL"),
     NODE_ENV: requireEnv("NODE_ENV"),
 
     BRAVE_API_KEY: optionalEnv("BRAVE_API_KEY", ""),

@@ -46,6 +46,7 @@ export type Game = {
     boardData?: any;
     aiHostTts?: AiHostTtsBank | null;
     activeBoard?: ActiveBoard;
+    ttsProvider?: string | null;
 };
 export type Ctx = ReturnType<typeof createWsContext>;
 

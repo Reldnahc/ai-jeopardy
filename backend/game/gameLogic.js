@@ -89,7 +89,7 @@ function returnToBoard(game, gameId, ctx){
     ctx.broadcast(gameId, { type: "returned-to-board", selectedClue: null, boardSelectionLocked: game.boardSelectionLocked });
 
     (async () => {
-        const pad = 100;
+        const pad = 50;
 
         await ctx.aiHostVoiceSequence(ctx, gameId, game, [
             {slot: selectorName, pad},

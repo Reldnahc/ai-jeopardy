@@ -58,5 +58,23 @@ services:
     ports:
       - "8000:8000"
 
+  kokoro-api:
+    image: ghcr.io/reldnahc/ai-jeopardy-kokoro-api:latest
+    environment:
+      KOKORO_LANG_CODE: "a"
+      KOKORO_VOICE: "af_heart"
+      KOKORO_SAMPLE_RATE: "16000"
+      MAX_INFLIGHT_PER_WORKER: "16"
+
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    ports:
+      - "8001:8000"
+
 volumes:
   pgdata:

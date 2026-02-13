@@ -24,8 +24,11 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      piper:
+        condition: service_started
+      kokoro:
+        condition: service_started
     environment:
-      # IMPORTANT: use the docker service name "db" as hostname
       DATABASE_URL: postgres://ai_jeopardy:${DATABASE_PASSWORD}@db:5432/ai_jeopardy
       JWT_SECRET: ${JWT_SECRET}
 
@@ -36,6 +39,7 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
 
       PIPER_URL: http://piper:8000
+      KOKORO_URL: http://kokoro:8000
 
       NODE_ENV: production
     ports:
@@ -56,3 +60,20 @@ services:
               capabilities: [ gpu ]
     ports:
       - "8000:8000"
+
+  kokoro:
+    image: ghcr.io/reldnahc/ai-jeopardy-kokoro-api:latest
+    environment:
+      KOKORO_LANG_CODE: "a"
+      KOKORO_VOICE: "af_heart"
+      KOKORO_SAMPLE_RATE: "24000"
+      MAX_INFLIGHT_PER_WORKER: "16"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [ gpu ]
+    ports:
+      - "8001:8000"

@@ -761,7 +761,7 @@ export const gameHandlers = {
         game.buzzerLocked = true;
         game.buzzLockouts = {};
 
-        const pad = 100;
+        const pad = 50;
         const ttsAssetId = game.boardData?.ttsByClueKey?.[clueKey] || null;
 
         const broadcastClueSelected = () => {

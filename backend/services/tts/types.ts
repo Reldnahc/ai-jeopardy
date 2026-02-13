@@ -1,6 +1,6 @@
 // backend/services/tts/board.ts
 
-export type TtsProviderName = "piper" | "openai";
+export type TtsProviderName = "piper" | "openai" | "kokoro";
 
 export type TtsTextType = "text" | "ssml";
 

@@ -158,11 +158,7 @@ export async function ensureAiHostValueTts(opts: {
                 const asset = await ctx.ensureTtsAsset(
                     {
                         text: `For ${v} dollars.`,
-                        textType: "text",
-                        voiceId: "amy",
-                        engine: "standard",
-                        outputFormat: "mp3",
-                        provider: "piper"
+                        voiceId: game.ttsProvider ?? "kokoro:af_heart",
                     },
                     ctx.repos
                 );
@@ -189,11 +185,7 @@ export async function ensureFinalJeopardyAnswer(ctx: Ctx, game: Game, gameId: st
     const asset = await ctx.ensureTtsAsset(
         {
             text,
-            textType: "text",
-            voiceId: "amy",
-            engine: "standard",
-            outputFormat: "wav",
-            provider: "piper"
+            voiceId: game.ttsProvider ?? "kokoro:af_heart",
         },
         ctx.repos
     );
@@ -209,11 +201,7 @@ export async function ensureFinalJeopardyWager(ctx: Ctx, game: Game, gameId: str
     const asset = await ctx.ensureTtsAsset(
         {
             text: ctx.numberToWords(wager),
-            textType: "text",
-            voiceId: "amy",
-            engine: "standard",
-            outputFormat: "wav",
-            provider: "piper"
+            voiceId: game.ttsProvider ?? "kokoro:af_heart",
         },
         ctx.repos
     );
@@ -277,11 +265,7 @@ export async function ensureAiHostTtsBank(opts: {
                     const asset = await ctx.ensureTtsAsset(
                         {
                             text,
-                            textType: "text",
-                            voiceId: "amy",
-                            engine: "standard",
-                            outputFormat: "mp3",
-                            provider: "piper"
+                            voiceId: game.ttsProvider ?? "kokoro:af_heart",
                         },
                         ctx.repos
                     );
@@ -304,11 +288,7 @@ export async function ensureAiHostTtsBank(opts: {
                 const asset = await ctx.ensureTtsAsset(
                     {
                         text: nameCalloutText(name),
-                        textType: "text",
-                        voiceId: "amy",
-                        engine: "standard",
-                        outputFormat: "mp3",
-                        provider: "piper"
+                        voiceId: game.ttsProvider ?? "kokoro:af_heart",
                     },
                     ctx.repos
                 );
@@ -334,11 +314,7 @@ export async function ensureAiHostTtsBank(opts: {
                 const asset = await ctx.ensureTtsAsset(
                     {
                         text: categoryName,
-                        textType: "text",
-                        voiceId: "amy",
-                        engine: "standard",
-                        outputFormat: "mp3",
-                        provider: "piper"
+                        voiceId: game.ttsProvider ?? "kokoro:af_heart",
                     },
                     ctx.repos
                 );

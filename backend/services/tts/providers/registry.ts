@@ -1,7 +1,7 @@
-// backend/services/tts/providers/registry.ts
 import type { TtsProvider, TtsProviderName } from "../types.js";
 import { piperProvider } from "./piperProvider.js";
 import { openaiProvider } from "./openaiProvider.js";
+import { kokoroProvider } from "./kokoroProvider.js";
 
 let _providers: Map<TtsProviderName, TtsProvider> | null = null;
 
@@ -10,6 +10,7 @@ export function getProviders(): Map<TtsProviderName, TtsProvider> {
 
     _providers = new Map<TtsProviderName, TtsProvider>([
         [piperProvider.name, piperProvider],
+        [kokoroProvider.name, kokoroProvider],
         [openaiProvider.name, openaiProvider],
     ]);
 

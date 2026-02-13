@@ -1,20 +1,34 @@
-// backend/services/tts/providerSelector.ts
 import type { TtsProvider, TtsRequest, TtsProviderName } from "./types.js";
 import { getProviders } from "./providers/registry.js";
 
-function stripPrefixVoice(voiceId: string): { provider: TtsProviderName | null; voiceId: string } {
-    const v = String(voiceId ?? "");
-    if (v.startsWith("piper:")) return { provider: "piper", voiceId: v.slice("piper:".length) };
-    if (v.startsWith("openai:")) return { provider: "openai", voiceId: v.slice("openai:".length) };
-    return { provider: null, voiceId: v };
+function splitVoicePrefix(voiceId: string): { provider: TtsProviderName | null; voiceId: string } {
+    const raw = String(voiceId ?? "").trim();
+
+    // allow "piper:amy", "kokoro:af_heart", "openai:alloy"
+    const m = raw.match(/^([a-z0-9_-]+):(.+)$/i);
+    if (!m) return { provider: null, voiceId: raw };
+
+    const prov = m[1].toLowerCase() as TtsProviderName;
+    const voice = String(m[2] ?? "").trim();
+
+    // Only treat it as a prefix if it matches a registered provider name
+    const providers = getProviders();
+    if (!providers.has(prov)) return { provider: null, voiceId: raw };
+
+    return { provider: prov, voiceId: voice };
 }
 
 export function selectProvider(req: TtsRequest): { provider: TtsProvider; effectiveReq: TtsRequest } {
     const providers = getProviders();
 
-    // Voice prefix can implicitly set provider, and we also clean the prefix off voiceId.
-    const { provider: prefProvider, voiceId: cleanedVoice } = stripPrefixVoice(req.voiceId);
-    const effectiveReq: TtsRequest = { ...req, voiceId: cleanedVoice, provider: req.provider ?? prefProvider };
+    // Prefix can set provider and also strips it from voiceId.
+    const { provider: prefProvider, voiceId: cleanedVoice } = splitVoicePrefix(req.voiceId);
+
+    const effectiveReq: TtsRequest = {
+        ...req,
+        voiceId: cleanedVoice,
+        provider: req.provider ?? prefProvider,
+    };
 
     if (effectiveReq.provider) {
         const p = providers.get(effectiveReq.provider);
@@ -23,8 +37,8 @@ export function selectProvider(req: TtsRequest): { provider: TtsProvider; effect
         return { provider: p, effectiveReq };
     }
 
-    // Default routing: Piper first
-    const order: TtsProviderName[] = ["piper", "openai"];
+    // Default routing (keep your preference order)
+    const order: TtsProviderName[] = ["kokoro", "piper", "openai"];
     for (const name of order) {
         const p = providers.get(name);
         if (p && p.supports(effectiveReq)) return { provider: p, effectiveReq };

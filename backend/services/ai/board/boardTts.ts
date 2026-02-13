@@ -36,15 +36,13 @@ function enqueueOneTts(args: EnqueueCommon & { key: string; text: string; into: 
     const trimmed = text.trim();
     if (!trimmed) return;
 
+    const ttsProvider = "kokoro:af_heart"; //TODO map from settings
+
     const p = limitTts(async () => {
         const asset = await ctx.ensureTtsAsset(
             {
                 text: trimmed,
-                textType: "text",
-                voiceId: "amy",
-                engine: "standard",
-                outputFormat: "mp3",
-                provider: "piper",
+                voiceId: ttsProvider ?? "kokoro:af_heart",
             },
             ctx.repos
         );

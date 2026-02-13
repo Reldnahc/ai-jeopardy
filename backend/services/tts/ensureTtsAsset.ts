@@ -15,7 +15,7 @@ export async function ensureTtsAsset(
         textType: input.textType ?? "text",
         voiceId: input.voiceId ?? "default",
         engine: input.engine ?? "default",
-        outputFormat: input.outputFormat ?? "mp3",
+        outputFormat: input.outputFormat ?? "wav",
         languageCode: input.languageCode ?? null,
         provider: input.provider ?? null,
     };
