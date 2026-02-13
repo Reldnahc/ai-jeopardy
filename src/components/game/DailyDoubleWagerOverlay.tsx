@@ -80,8 +80,8 @@ export default function DailyDoubleWagerOverlay({
                 const rec = new MediaRecorder(
                     stream,
                     mime
-                        ? { mimeType: mime, audioBitsPerSecond: 8000, bitsPerSecond: 8000 }
-                        : { audioBitsPerSecond: 8000, bitsPerSecond: 8000 }
+                        ? { mimeType: mime, audioBitsPerSecond: 16000, bitsPerSecond: 16000 }
+                        : { audioBitsPerSecond: 16000, bitsPerSecond: 16000 }
                 );
 
                 recorderRef.current = rec;

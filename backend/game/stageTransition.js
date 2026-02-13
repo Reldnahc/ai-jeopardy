@@ -36,7 +36,7 @@ async function startDoubleJeopardy(game, gameId, ctx) {
 
     game.activeBoard = "secondBoard";
 
-    const pad = 100;
+    const pad = 25;
     const players = game.players ?? [];
     const pick =
         players.length === 0
@@ -103,7 +103,7 @@ async function startFinalJeopardy(game, gameId, ctx) {
     // ✅ cache finalists for this FJ run
     const finalists = getFinalistNames(game);
 
-    const pad = 100;
+    const pad = 25;
 
     await ctx.aiHostVoiceSequence(ctx, gameId, game, [
         { slot: "final_jeopardy", pad },

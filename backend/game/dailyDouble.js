@@ -81,8 +81,8 @@ export async function repromptDdWager(gameId, game, ctx, args) {
 
     // Voice reprompt (keep it short)
     await ctx.aiHostVoiceSequence(ctx, gameId, game, [
-        { slot: "i_didnt_catch_that", pad: 150 },
-        { slot: "say_wager_again", pad: 150 },
+        { slot: "i_didnt_catch_that", pad: 25 },
+        { slot: "say_wager_again", pad: 25 },
     ]);
 
     // Restart capture with a new session id (prevents stale audio blobs)
@@ -198,8 +198,8 @@ export async function finalizeDailyDoubleWagerAndStartClue(
     const ttsAssetId = game.boardData?.ttsByClueKey?.[clueKey] || null;
 
     await ctx.aiHostVoiceSequence(ctx, gameId, game, [
-        { slot: `for ${dd.wager}`, pad: 150 },
-        { assetId: ttsAssetId, pad: 150 },
+        { slot: `for ${dd.wager}`, pad: 25 },
+        { assetId: ttsAssetId, pad: 25 },
     ]);
 
     // Start server-authoritative answer capture session (same as your current DD flow)

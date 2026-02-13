@@ -274,7 +274,7 @@ export const lobbyHandlers = {
             });
 
             void (async () => {
-                const pad = 100;
+                const pad = 25;
 
                 await ctx.aiHostVoiceSequence(ctx, gameId, game, [
                     {slot: "welcome_intro", pad},

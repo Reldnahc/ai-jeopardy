@@ -761,7 +761,7 @@ export const gameHandlers = {
         game.buzzerLocked = true;
         game.buzzLockouts = {};
 
-        const pad = 50;
+        const pad = 25;
         const ttsAssetId = game.boardData?.ttsByClueKey?.[clueKey] || null;
 
         const broadcastClueSelected = () => {
@@ -803,10 +803,10 @@ export const gameHandlers = {
 
             // IMPORTANT: do NOT start mic yet. Speak first.
             await ctx.aiHostVoiceSequence(ctx, gameId, game, [
-                { slot: "daily_double", pad: 200, after: showModal },
-                { slot: playerName, pad: 200 },
-                { slot: "daily_double2", pad: 200 },
-                { slot: "single_wager", pad: 200 },
+                { slot: "daily_double", pad: 25, after: showModal },
+                { slot: playerName, pad: 25 },
+                { slot: "daily_double2", pad: 25 },
+                { slot: "single_wager", pad: 25 },
             ]);
 
             // Now start capture (this broadcasts capture-start + arms timeout reprompt)
@@ -819,7 +819,7 @@ export const gameHandlers = {
         // Normal (non-DD) path:
         await ctx.aiHostVoiceSequence(ctx, gameId, game, [
             { slot: game.selectedClue.category, pad },
-            { slot: game.selectedClue.value, pad: 50, after: broadcastClueSelected },
+            { slot: game.selectedClue.value, pad: 25, after: broadcastClueSelected },
             { assetId: ttsAssetId },
         ]);
 

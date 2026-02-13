@@ -65,7 +65,7 @@ async function advanceToDrawingPhase(game, gameId, wagers, ctx) {
         });
     };
 
-    const pad = 100;
+    const pad = 25;
 
     const DRAW_SECONDS = appConfig.gameplay.drawSeconds;
 
@@ -108,7 +108,7 @@ async function finishGame(game, gameId, drawings, ctx) {
 
     game.finalJeopardyStage = "finale";
     ctx.broadcast(gameId, { type: "all-drawings-submitted", drawings });
-    const pad = 100;
+    const pad = 25;
 
     const wagers = game.wagers;
     const verdicts = game.finalVerdicts;
