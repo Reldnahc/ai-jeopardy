@@ -21,16 +21,20 @@ function pickMimeType(): string {
     return "";
 }
 
-async function blobToBase64(blob: Blob): Promise<string> {
-    const ab = await blob.arrayBuffer();
-    const bytes = new Uint8Array(ab);
-    let binary = "";
-    const chunkSize = 0x8000;
-    for (let i = 0; i < bytes.length; i += chunkSize) {
-        binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
-    }
-    return btoa(binary);
+function blobToBase64(blob: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(reader.error);
+        reader.onloadend = () => {
+            const result = String(reader.result || "");
+            // "data:audio/webm;codecs=opus;base64,AAAA..."
+            const base64 = result.split(",")[1] || "";
+            resolve(base64);
+        };
+        reader.readAsDataURL(blob);
+    });
 }
+
 
 export default function DailyDoubleWagerOverlay({
                                                     gameId,
@@ -68,6 +72,8 @@ export default function DailyDoubleWagerOverlay({
             try {
                 stream = await navigator.mediaDevices.getUserMedia({
                     audio: {
+                        channelCount: 1,
+                        sampleRate: 16000,
                         echoCancellation: true,
                         noiseSuppression: true,
                         autoGainControl: true,
@@ -80,8 +86,8 @@ export default function DailyDoubleWagerOverlay({
                 const rec = new MediaRecorder(
                     stream,
                     mime
-                        ? { mimeType: mime, audioBitsPerSecond: 16000, bitsPerSecond: 16000 }
-                        : { audioBitsPerSecond: 16000, bitsPerSecond: 16000 }
+                        ? { mimeType: mime, audioBitsPerSecond: 24000, bitsPerSecond: 24000 }
+                        : { audioBitsPerSecond: 24000, bitsPerSecond: 24000 }
                 );
 
                 recorderRef.current = rec;
