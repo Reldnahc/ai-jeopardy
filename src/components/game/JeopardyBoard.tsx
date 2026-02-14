@@ -7,7 +7,11 @@ import {useWebSocket} from "../../contexts/WebSocketContext.tsx";
 import {Player} from "../../types/Lobby.ts";
 import {useAlert} from "../../contexts/AlertContext.tsx";
 import DailyDoubleWagerOverlay from "./DailyDoubleWagerOverlay.tsx";
-import {DailyDoubleShowModalMsg, DailyDoubleWagerCaptureStartMsg} from "../../hooks/game/useGameSocketSync.ts";
+import {
+    AnswerProcessingMsg,
+    DailyDoubleShowModalMsg,
+    DailyDoubleWagerCaptureStartMsg
+} from "../../hooks/game/useGameSocketSync.ts";
 import Timer from "./Timer.tsx"; // Import the selected clue component
 
 interface JeopardyBoardProps {
@@ -48,6 +52,7 @@ interface JeopardyBoardProps {
     showDdModal: DailyDoubleShowModalMsg | null;
     showWager: boolean;
     finalists: string[];
+    answerProcessing: AnswerProcessingMsg | null;
 }
 
 const JeopardyBoard: React.FC<JeopardyBoardProps> =
@@ -55,7 +60,7 @@ const JeopardyBoard: React.FC<JeopardyBoardProps> =
          currentPlayer, allWagersSubmitted, isFinalJeopardy, drawings,
            handleBuzz, buzzerLocked, buzzResult, buzzLockedOut, timerEndTime, timerDuration,
           answerCapture, answerError, effectivePlayerName, finalWagers, selectedFinalist, ddWagerCapture, ddWagerError,
-         showDdModal, showWager, finalists}) => {
+         showDdModal, showWager, finalists, answerProcessing}) => {
     const [localSelectedClue, setLocalSelectedClue] = useState<Clue | null>(null);
     const [showClue, setShowClue] = useState(false);
     const [wagers, setWagers] = useState<Record<string, number>>({});
@@ -233,6 +238,7 @@ const JeopardyBoard: React.FC<JeopardyBoardProps> =
                         showDdModal={showDdModal}
                         showWager={showWager}
                         finalists={finalists}
+                        answerProcessing={answerProcessing}
                     />
                 )}
             </div>

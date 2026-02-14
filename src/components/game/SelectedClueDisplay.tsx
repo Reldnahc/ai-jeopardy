@@ -4,7 +4,7 @@ import { useWebSocket } from "../../contexts/WebSocketContext.tsx";
 import BuzzAnimation from "./BuzzAnimation.tsx";
 import Timer from "./Timer.tsx";
 import FinalJeopardyPanel from "./FinalJeopardyPanel.tsx";
-import {DailyDoubleShowModalMsg} from "../../hooks/game/useGameSocketSync.ts";
+import {AnswerProcessingMsg, DailyDoubleShowModalMsg} from "../../hooks/game/useGameSocketSync.ts";
 
 interface SelectedClueDisplayProps {
     localSelectedClue: Clue;
@@ -38,6 +38,7 @@ interface SelectedClueDisplayProps {
     showDdModal: DailyDoubleShowModalMsg | null;
     showWager: boolean;
     finalists: string[];
+    answerProcessing: AnswerProcessingMsg | null;
 }
 
 const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
@@ -63,7 +64,8 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                                                                      selectedFinalist,
                                                                      showDdModal,
                                                                      showWager,
-                                                                     finalists
+                                                                     finalists,
+                                                                     answerProcessing
                                                                  }) => {
     const { sendJson } = useWebSocket();
 
@@ -427,6 +429,13 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                                 showWager={showWager}
                                 finalists={finalists}
                             />
+                        )}
+                        {answerProcessing && !showAnswer && (
+                            <div className="mt-3 flex justify-center">
+                                <div className="text-md text-red-500 font-extrabold mt-1">
+                                    Server is thinking…
+                                </div>
+                            </div>
                         )}
 
                         {answerCapture && !showAnswer && (

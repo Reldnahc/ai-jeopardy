@@ -513,6 +513,14 @@ export const gameHandlers = {
         // Move to judging phase
         game.phase = "JUDGING";
 
+        ctx.broadcast(gameId, {
+            type: "answer-processing",
+            gameId,
+            answerSessionId,
+            playerName: player.name,
+            stage: "transcribing",
+        });
+
         // --- STT ---
         let transcript = "";
         try {

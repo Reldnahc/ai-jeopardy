@@ -9,6 +9,14 @@ type ActiveBoard = "firstBoard" | "secondBoard" | "finalJeopardy";
 
 type SelectedClueFromServer = Clue & { isAnswerRevealed?: boolean };
 
+export type AnswerProcessingMsg = {
+    type: "answer-processing";
+    gameId: string;
+    answerSessionId: string;
+    playerName: string;
+    stage?: "transcribing" | "judging" | string;
+};
+
 type AnswerCaptureStartMsg = {
     type: "answer-capture-start";
     gameId: string;
@@ -170,6 +178,7 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
     const [showDdModal, setShowDdModal] = useState<DailyDoubleShowModalMsg | null>(null);
     const [showWager, setShowWager] = useState<boolean>(false);
 
+    const [answerProcessing, setAnswerProcessing] = useState<AnswerProcessingMsg | null>(null);
 
     const aiHostSeqRef = useRef<number>(0);
 
@@ -338,6 +347,12 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
                 return;
             }
 
+            if (message.type === "answer-processing") {
+                const m = message as unknown as AnswerProcessingMsg;
+                setAnswerProcessing(m);
+                return;
+            }
+
             if (message.type === "answer-capture-start") {
                 const m = message as unknown as AnswerCaptureStartMsg;
                 setAnswerCapture(m);
@@ -349,19 +364,21 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
 
             if (message.type === "answer-transcript") {
                 const m = message as unknown as AnswerTranscriptMsg;
+                setAnswerProcessing(null);
                 setAnswerTranscript(m);
                 return;
             }
 
             if (message.type === "answer-result") {
                 const m = message as unknown as AnswerResultMsg;
+                setAnswerProcessing(null);
                 setAnswerResult(m);
-                // keep answerCapture so UI can still show who answered; you can clear later on return-to-board
                 return;
             }
 
             if (message.type === "answer-error") {
                 const m = message as unknown as AnswerErrorMsg;
+                setAnswerProcessing(null);
                 setAnswerError(String(m.message || "Answer error"));
                 return;
             }
@@ -727,6 +744,7 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
         ddWagerError,
         showDdModal,
         showWager,
-        finalists
+        finalists,
+        answerProcessing
     };
 }
