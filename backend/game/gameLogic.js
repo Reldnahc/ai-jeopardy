@@ -142,7 +142,7 @@ export async function autoResolveAfterJudgement(ctx, gameId, game, playerName, v
 
 
         const alive = await ctx.aiHostVoiceSequence(ctx, gameId, game, [
-            {slot: "correct", pad: 25, after: () => ctx.broadcast(gameId, { type: "answer-revealed", clue: game.selectedClue })},
+            {slot: "correct", after: () => ctx.broadcast(gameId, { type: "answer-revealed", clue: game.selectedClue })},
         ]);
         console.log(alive);
         if (!alive) return;
@@ -178,9 +178,9 @@ export async function autoResolveAfterJudgement(ctx, gameId, game, playerName, v
         const assetId = game.boardData?.ttsByAnswerKey?.[clueKey] || null;
 
         await ctx.aiHostVoiceSequence(ctx, gameId, game, [
-            { slot: "incorrect", pad: 25 },
-            { slot: "answer_was", pad: 25, after: revealAnswer },
-            { assetId, pad: 25 },
+            { slot: "incorrect", },
+            { slot: "answer_was", after: revealAnswer },
+            { assetId },
         ]);
 
         // Clear DD state now that the clue is resolved
@@ -226,9 +226,9 @@ export async function autoResolveAfterJudgement(ctx, gameId, game, playerName, v
         const assetId = game.boardData?.ttsByAnswerKey?.[clueKey] || null;
 
         await ctx.aiHostVoiceSequence(ctx, gameId, game, [
-            {slot: "incorrect", pad: 25},
-            {slot: "answer_was", pad: 25, after: revealAnswer},
-            {assetId, pad: 25},
+            {slot: "incorrect"},
+            {slot: "answer_was", after: revealAnswer},
+            {assetId},
         ]);
 
 
@@ -303,16 +303,16 @@ export function doUnlockBuzzerAuthoritative( gameId, game, ctx) {
                 }
 
                 const finish = async () => {
-                    await ctx.sleepAndCheckGame(3000, gameId);
+                    await ctx.sleepAndCheckGame(1000, gameId);
                     finishClueAndReturnToBoard(ctx, gameId, game);
                 }
 
                 const clueKey =  ctx.getClueKey(game,game.selectedClue);
                 const assetId = game.boardData?.ttsByAnswerKey?.[clueKey] || null;
                 await ctx.aiHostVoiceSequence(ctx, gameId, game, [
-                    {slot: "nobody", pad: 25, after: revealAnswer},
-                    {slot: "answer_was", pad: 25},
-                    {assetId, pad: 25, after: finish},
+                    {slot: "nobody", after: revealAnswer},
+                    {slot: "answer_was"},
+                    {assetId, after: finish},
                 ]);
 
             })();

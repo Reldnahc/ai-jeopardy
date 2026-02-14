@@ -29,21 +29,20 @@ type EnqueueCommon = {
     state: BoardTtsState;
 };
 
-function enqueueOneTts(args: EnqueueCommon & { key: string; text: string; into: "clue" | "answer" }) {
+function enqueueOneTts(
+    args: EnqueueCommon & { key: string; text: string; into: "clue" | "answer" }
+): boolean {
     const { ctx, narrationEnabled, limitTts, onTtsReady, state, key, text, into } = args;
-    if (!narrationEnabled || !limitTts) return;
+    if (!narrationEnabled || !limitTts) return false;
 
     const trimmed = text.trim();
-    if (!trimmed) return;
+    if (!trimmed) return false;
 
-    const ttsProvider = "kokoro:af_heart"; //TODO map from settings
+    const ttsProvider = "kokoro:af_heart";
 
     const p = limitTts(async () => {
         const asset = await ctx.ensureTtsAsset(
-            {
-                text: trimmed,
-                voiceId: ttsProvider ?? "kokoro:af_heart",
-            },
+            { text: trimmed, voiceId: ttsProvider ?? "kokoro:af_heart" },
             ctx.repos
         );
 
@@ -59,33 +58,38 @@ function enqueueOneTts(args: EnqueueCommon & { key: string; text: string; into: 
     });
 
     state.ttsPromises.push(p);
+    return true;
 }
 
 export function enqueueCategoryTts(
-    args: EnqueueCommon & {
-        boardType: "firstBoard" | "secondBoard";
-        json: AiCategoryJson;
-    }
-) {
+    args: EnqueueCommon & { boardType: "firstBoard" | "secondBoard"; json: AiCategoryJson }
+): number {
     const { boardType, json } = args;
 
+    let queued = 0;
     for (const clue of json.values) {
         const key = clueKeyFor(boardType, clue);
         if (!key) continue;
 
-        enqueueOneTts({ ...args, key, text: clue.question, into: "clue" });
-        enqueueOneTts({ ...args, key, text: clue.answer, into: "answer" });
+        if (enqueueOneTts({ ...args, key, text: clue.question, into: "clue" })) queued++;
+        if (enqueueOneTts({ ...args, key, text: clue.answer, into: "answer" })) queued++;
     }
+    return queued;
 }
 
-export function enqueueFinalTts(args: EnqueueCommon & { json: AiFinalCategoryJson }) {
+export function enqueueFinalTts(
+    args: EnqueueCommon & { json: AiFinalCategoryJson }
+): number {
     const { json } = args;
 
+    let queued = 0;
     for (const clue of json.values) {
         const key = clueKeyFor("finalJeopardy", { question: clue.question });
         if (!key) continue;
 
-        enqueueOneTts({ ...args, key, text: clue.question, into: "clue" });
-        enqueueOneTts({ ...args, key, text: clue.answer, into: "answer" });
+        if (enqueueOneTts({ ...args, key, text: clue.question, into: "clue" })) queued++;
+        if (enqueueOneTts({ ...args, key, text: clue.answer, into: "answer" })) queued++;
     }
+    return queued;
 }
+

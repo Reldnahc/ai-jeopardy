@@ -276,7 +276,10 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                     // Mark sent now so we never duplicate
                     sentSessionRef.current = answerCapture.answerSessionId;
 
+                    const t0 = performance.now();
                     const dataBase64 = await blobToBase64(blob);
+                    const t1 = performance.now();
+                    console.log("base64 time:", (t1 - t0), "ms");
 
                     console.log("[mic] sending", {
                         bytes: blob.size,
