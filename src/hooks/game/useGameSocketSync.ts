@@ -89,27 +89,53 @@ type DailyDoubleWagerLockedMsg = {
 
 type GameStateMessage = {
     type: "game-state";
+    gameId?: string;
+
     players: Player[];
     host: string;
-    buzzerLocked?: boolean;
+
     buzzResult?: string | null;
+    buzzerLocked?: boolean;
+
+    playerBuzzLockoutUntil?: number;
+
     boardData: BoardData;
     scores?: Record<string, number>;
     clearedClues?: string[];
+
     selectedClue?: SelectedClueFromServer;
     activeBoard?: ActiveBoard;
+
+    // FJ
     isFinalJeopardy?: boolean;
     finalJeopardyStage?: string | null;
     wagers?: Record<string, number>;
+    finalists?: string[] | null;
+    drawings?: Record<string, string> | null;
+
+    // timers
     timerEndTime?: number | null;
     timerDuration?: number | null;
     timerVersion?: number;
+
     lobbySettings?: LobbySettings | null;
+
+    // phase / selector
     phase?: string | null;
     selectorKey?: string | null;
     selectorName?: string | null;
+
+    // DD
+    dailyDouble?: any | null; // ideally type this
+    ddWagerSessionId?: string | null;
+    ddWagerDeadlineAt?: number | null;
+    ddShowModal?: { playerName: string; maxWager: number } | null;
+
     boardSelectionLocked?: boolean | null;
+    boardSelectionLockReason?: string | null;
+    boardSelectionLockVersion?: number;
 };
+
 
 type UseGameSocketSyncArgs = {
     gameId?: string;
@@ -289,7 +315,9 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
             // snapshot hydration
             if (message.type === "game-state") {
                 const m = message as GameStateMessage;
-
+                if (typeof m.playerBuzzLockoutUntil === "number") {
+                    applyLockoutUntil(m.playerBuzzLockoutUntil);
+                }
                 setPlayers(m.players);
                 setHost(m.host);
                 setBuzzResult(m.buzzResult ?? null);
@@ -312,12 +340,58 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
                 setIsFinalJeopardy(Boolean(fj));
 
                 if (fj) {
-                    setWagers(m.wagers ?? {});
-                    setAllWagersSubmitted(m.finalJeopardyStage !== "wager");
-                    if (allWagersSubmitted) setFinalWagers(wagers);
+                    const snapWagers = m.wagers ?? {};
+                    setWagers(snapWagers);
+
+                    const stage = m.finalJeopardyStage ?? null;
+                    const submitted = stage !== "wager" && stage != null;
+                    setAllWagersSubmitted(submitted);
+
+                    setFinalists(Array.isArray(m.finalists) ? m.finalists : [""]);
+
+                    if (submitted) setFinalWagers(snapWagers);
+
+                    setDrawings(m.drawings ?? null);
+                } else {
+                    setAllWagersSubmitted(false);
+                    setWagers({});
+                    setFinalWagers({});
+                    setFinalists([""]);
+                    setDrawings(null);
                 }
 
-                if (m.selectedClue) {
+                if (m.phase === "DD_WAGER_CAPTURE" && m.dailyDouble) {
+                    // Re-show the modal (your UI expects a DailyDoubleShowModalMsg-ish object)
+                    if (m.ddShowModal) {
+                        setShowDdModal({
+                            type: "daily-double-show-modal",
+                            showModal: true,
+                            playerName: m.ddShowModal.playerName,
+                            maxWager: m.ddShowModal.maxWager,
+                        });
+                    }
+
+                    if (m.ddWagerSessionId && typeof m.ddWagerDeadlineAt === "number") {
+                        const durationMs = Math.max(0, m.ddWagerDeadlineAt - nowMs());
+                        setDdWagerCapture({
+                            type: "daily-double-wager-capture-start",
+                            gameId: gameId ?? "",
+                            playerName: m.dailyDouble.playerName,
+                            ddWagerSessionId: m.ddWagerSessionId,
+                            durationMs,
+                            deadlineAt: m.ddWagerDeadlineAt,
+                        });
+                        setDdWagerHeard(null);
+                        setDdWagerLocked(null);
+                        setDdWagerError(null);
+                    }
+                } else {
+                    setShowDdModal(null);
+                    clearDdWagerUi();
+                }
+
+
+                if (m.selectedClue && m.phase !== "DD_WAGER_CAPTURE" ) {
                     setSelectedClue({ ...(m.selectedClue as Clue), showAnswer: Boolean(m.selectedClue.isAnswerRevealed) });
                 } else {
                     setSelectedClue(null);

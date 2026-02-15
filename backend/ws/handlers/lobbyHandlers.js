@@ -24,7 +24,7 @@ export const lobbyHandlers = {
         const game = ctx.getGameOrFail({ ws, ctx, gameId });
         if (!game) return;
 
-        // Host-only (prevents spoofing)
+        // Host-only
         if (!ctx.ensureHostOrFail({ ws, ctx, gameId, game })) return;
 
         const s = ctx.ensureLobbySettings(game, ctx.appConfig);

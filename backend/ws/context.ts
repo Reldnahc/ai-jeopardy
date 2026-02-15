@@ -68,6 +68,7 @@ import {
 
 } from "../game/dailyDouble.js"
 import {numberToWords} from "../services/numberToWords.js";
+import {ensureBoardNarrationTtsForBoardData} from "../services/ai/board/boardTts.js";
 // Minimal type for now; we’ll tighten later as you TS-migrate more modules.
 
 export const createWsContext = (wss: any, repos: any) => {
@@ -162,6 +163,7 @@ export const createWsContext = (wss: any, repos: any) => {
         applyNewGameState,
         getBoardDataOrFail,
         ensureTtsAsset,
+        ensureBoardNarrationTtsForBoardData,
 
         createTrace,
         createBoardData,

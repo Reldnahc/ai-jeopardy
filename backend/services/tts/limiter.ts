@@ -60,9 +60,6 @@ function makeLimiter(concurrency: number, minDelayMs: number): Limiter {
     };
 }
 
-// You can tune with env vars:
-// TTS_PIPER_CONCURRENCY, TTS_PIPER_MIN_DELAY_MS
-// TTS_OPENAI_CONCURRENCY, TTS_OPENAI_MIN_DELAY_MS
 const _limiters: Partial<Record<TtsProviderName, Limiter>> = {};
 
 export function getLimiter(provider: TtsProviderName): Limiter {
@@ -70,15 +67,23 @@ export function getLimiter(provider: TtsProviderName): Limiter {
 
     if (provider === "piper") {
         _limiters[provider] = makeLimiter(
-            envNum("TTS_PIPER_CONCURRENCY", 4),
+            envNum("TTS_PIPER_CONCURRENCY", 5),
             envNum("TTS_PIPER_MIN_DELAY_MS", 0)
+        );
+        return _limiters[provider]!;
+    }
+
+    if (provider === "kokoro") {
+        _limiters[provider] = makeLimiter(
+            envNum("TTS_KOKORO_CONCURRENCY", 5),
+            envNum("TTS_KOKORO_MIN_DELAY_MS", 0)
         );
         return _limiters[provider]!;
     }
 
     // openai
     _limiters[provider] = makeLimiter(
-        envNum("TTS_OPENAI_CONCURRENCY", 2),
+        envNum("TTS_OPENAI_CONCURRENCY", 10),
         envNum("TTS_OPENAI_MIN_DELAY_MS", 0)
     );
     return _limiters[provider]!;

@@ -361,6 +361,7 @@ export async function getBoardDataOrFail({
                                              trace,
                                          }) {
     const usingImportedBoard = Boolean(boardJson && boardJson.trim());
+    const ttsBatcher = makePreloadTtsBatcher({ ctx, gameId, game, trace });
 
     try {
         if (usingImportedBoard) {
@@ -371,13 +372,41 @@ export async function getBoardDataOrFail({
                 game.isGenerating = false;
                 return null;
             }
+
+            await ctx.ensureBoardNarrationTtsForBoardData({
+                ctx,
+                game,
+                boardData: imported,
+                narrationEnabled: Boolean(game?.lobbySettings?.narrationEnabled),
+                onTtsReady: (id) => ttsBatcher.push(id),
+                trace,
+            });
+
+            await ctx.ensureAiHostTtsBank({
+                ctx,
+                game,
+                trace
+            });
+
+            const ids = Array.isArray(game?.aiHostTts?.allAssetIds) ? game.aiHostTts.allAssetIds : [];
+
+            ctx.broadcastPreloadBatch({
+                ctx,
+                gameId,
+                game,
+                imageAssetIds: [],
+                ttsAssetIds: ids,
+                final: false,
+                trace,
+                reason: "ai-host-bank",
+            });
+
+            ttsBatcher.flush();
             return imported;
         }
 
         game.isGenerating = true;
         trace?.mark?.("createBoardData_start");
-
-        const ttsBatcher = makePreloadTtsBatcher({ ctx, gameId, game, trace });
 
         const boardData = await ctx.createBoardData(ctx, categories, selectedModel, host, {
             includeVisuals: effectiveIncludeVisuals,

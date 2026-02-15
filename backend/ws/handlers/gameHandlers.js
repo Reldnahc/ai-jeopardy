@@ -55,46 +55,76 @@ export const gameHandlers = {
         const myName = me?.name;
         const myLockoutUntil = myName ? (game.buzzLockouts?.[myName] || 0) : 0;
 
-        // 2. Hydrate Client State
-        // Send EVERYTHING needed to sync the client to right now
+        // ---- derive DD rehydrate info
+        const dd = game.dailyDouble || null;
+        const ddShowModal =
+            dd && (game.phase === "DD_WAGER_CAPTURE" || dd.stage === "wager_listen")
+                ? { playerName: dd.playerName, maxWager: dd.maxWager }
+                : null;
+
+        const finalists =
+            Array.isArray(game.finalJeopardyFinalists) ? game.finalJeopardyFinalists : null;
+
+        const fjDrawings =
+            game.isFinalJeopardy && game.finalJeopardyStage === "finale"
+                ? (game.drawings || {})
+                : null;
+
         ws.send(JSON.stringify({
             type: "game-state",
             gameId,
-            players: ctx.games[gameId].players.map(p => ({
+
+            players: game.players.map(p => ({
                 name: p.name,
                 color: p.color,
-                text_color: p.text_color
+                text_color: p.text_color,
+                online: p?.online !== false,
             })),
-            host: ctx.games[gameId].host,
-            buzzResult: ctx.games[gameId].buzzed,
+
+            host: game.host,
+            buzzResult: game.buzzed,
             playerBuzzLockoutUntil: myLockoutUntil,
-            clearedClues: Array.from(ctx.games[gameId].clearedClues || new Set()),
-            boardData: ctx.games[gameId].boardData,
-            selectedClue: ctx.games[gameId].selectedClue || null,
-            buzzerLocked: ctx.games[gameId].buzzerLocked,
-            scores: ctx.games[gameId].scores,
-            // Sync timers
-            timerEndTime: ctx.games[gameId].timerEndTime,
-            timerDuration: ctx.games[gameId].timerDuration,
-            timerVersion: ctx.games[gameId].timerVersion || 0,
-            activeBoard: ctx.games[gameId].activeBoard || "firstBoard",
-            isFinalJeopardy: Boolean(ctx.games[gameId].isFinalJeopardy),
-            finalJeopardyStage: ctx.games[gameId].finalJeopardyStage || null,
-            wagers: ctx.games[gameId].wagers || {},
-            lobbySettings: ctx.games[gameId].lobbySettings || null,
+
+            clearedClues: Array.from(game.clearedClues || new Set()),
+            boardData: game.boardData,
+            selectedClue: game.selectedClue || null,
+            buzzerLocked: game.buzzerLocked,
+            scores: game.scores,
+
+            timerEndTime: game.timerEndTime,
+            timerDuration: game.timerDuration,
+            timerVersion: game.timerVersion || 0,
+
+            activeBoard: game.activeBoard || "firstBoard",
+
+            // ---- Final Jeopardy rehydrate
+            isFinalJeopardy: Boolean(game.isFinalJeopardy),
+            finalJeopardyStage: game.finalJeopardyStage || null,
+            wagers: game.wagers || {},
+            finalists,
+            drawings: fjDrawings,
+
+            // ---- DD rehydrate
+            dailyDouble: dd,
+            ddWagerSessionId: game.ddWagerSessionId || null,
+            ddWagerDeadlineAt: game.ddWagerDeadlineAt || null,
+            ddShowModal,
+            lobbySettings: game.lobbySettings || null,
             phase: game.phase || null,
             selectorKey: game.selectorKey || null,
             selectorName: game.selectorName || null,
+
+            boardSelectionLocked: Boolean(game.boardSelectionLocked),
+            boardSelectionLockReason: game.boardSelectionLockReason || null,
+            boardSelectionLockVersion: game.boardSelectionLockVersion || 0,
+
             welcomeTtsAssetId: game.welcomeTtsAssetId || null,
             welcomeEndsAt: typeof game.welcomeEndsAt === "number" ? game.welcomeEndsAt : null,
+
             answeringPlayer: game.answeringPlayerKey || null,
             answerSessionId: game.answerSessionId || null,
             answerDeadlineAt: game.answerDeadlineAt || null,
             answerClueKey: game.answerClueKey || null,
-            boardSelectionLocked: Boolean(game.boardSelectionLocked),
-            boardSelectionLockReason: game.boardSelectionLockReason || null,
-            boardSelectionLockVersion: game.boardSelectionLockVersion || 0,
-            dailyDouble: game.dailyDouble || null,
         }));
 
         // Notify others
