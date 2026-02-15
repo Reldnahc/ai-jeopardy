@@ -60,7 +60,7 @@ export const attachWebSocketServer = (wss, repos) => {
                 ws.isAlive = false;
                 ws.ping();
             });
-        }, 25_000);
+        }, 20_000);
 
         ws.on("close", () => handleSocketClose(ws, ctx, interval));
     });
