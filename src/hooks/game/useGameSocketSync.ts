@@ -546,7 +546,7 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
 
             if (message.type === "player-list-update") {
                 const m = message as unknown as { players: Player[]; host: string };
-                const sorted = [...m.players].sort((a, b) => (a.name === m.host ? -1 : b.name === m.host ? 1 : 0));
+                const sorted = [...m.players].sort((a, b) => (a.displayname === m.host ? -1 : b.displayname === m.host ? 1 : 0));
                 setPlayers(sorted);
                 setHost(m.host);
                 return;

@@ -1,13 +1,12 @@
+// frontend/contexts/AuthContext.tsx
 import React, { createContext, useContext, useEffect, useState, ReactNode } from "react";
 
-type AppUser = {
+export type AppUser = {
     id: string;
     email?: string | null;
     username: string;
     role: string;
     displayname?: string | null;
-    color?: string | null;
-    text_color?: string | null;
 };
 
 type AuthContextType = {
@@ -25,14 +24,10 @@ const AuthContext = createContext<AuthContextType | null>(null);
 const TOKEN_KEY = "aiJeopardy.jwt";
 
 function getApiBase() {
-    // In dev, allow explicit override
-    if (import.meta.env.DEV) {
-        return import.meta.env.VITE_API_BASE || "http://localhost:3002";
-    }
-
-    // In prod, use same-origin
+    if (import.meta.env.DEV) return import.meta.env.VITE_API_BASE || "http://localhost:3002";
     return "";
 }
+
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<AppUser | null>(null);
     const [token, setToken] = useState<string | null>(localStorage.getItem(TOKEN_KEY));
@@ -47,7 +42,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             headers: { Authorization: `Bearer ${t}` },
         });
 
-        // Try to parse JSON error bodies (most APIs do)
         const text = await res.text();
         let payload: any = null;
         try { payload = text ? JSON.parse(text) : null; } catch {}
@@ -64,15 +58,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return data.user as AppUser;
     }
 
-
-
     useEffect(() => {
         let cancelled = false;
 
         const boot = async () => {
             const t = localStorage.getItem(TOKEN_KEY);
-
-            // If state says "token" but storage doesn't, keep them consistent.
             if (!t) {
                 if (!cancelled) {
                     setToken(null);
@@ -88,7 +78,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 const me = await fetchMe(t);
                 if (!cancelled) {
                     setUser(me);
-                    // ensure state token matches storage token
                     setToken(t);
                 }
             } catch (e: any) {
@@ -107,7 +96,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                         setToken(null);
                         setUser(null);
                     }
-                    // If it was a network/server hiccup, keep token and just show logged-out UI until it recovers.
                 }
             } finally {
                 if (!cancelled) setLoading(false);
@@ -117,8 +105,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         void boot();
         return () => { cancelled = true; };
     }, []);
-
-
 
     const login: AuthContextType["login"] = async ({ username, password }) => {
         const res = await fetch(`${getApiBase()}/api/auth/login`, {

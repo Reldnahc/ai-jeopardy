@@ -1,20 +1,24 @@
+// frontend/hooks/usePlayerIdentity.ts
 import { useMemo } from "react";
 import { useGameSession } from "./useGameSession";
 import { useProfile } from "../contexts/ProfileContext";
 
 type UsePlayerIdentityArgs = {
     gameId?: string;
-    locationStatePlayerName?: string;
-    /**
-     * If true, will fall back to profile.displayname when no name is provided.
-     * For pages where the user must be logged in, this is useful.
-     */
+    locationState?: {
+        username?: string | null;
+        displayname?: string | null;
+    } | null;
     allowProfileFallback?: boolean;
 };
 
+function makeGuestDisplayname() {
+    return `Guest${Math.floor(1000 + Math.random() * 9000)}`;
+}
+
 export function usePlayerIdentity({
                                       gameId,
-                                      locationStatePlayerName,
+                                      locationState,
                                       allowProfileFallback = true,
                                   }: UsePlayerIdentityArgs) {
     const { session } = useGameSession();
@@ -36,15 +40,25 @@ export function usePlayerIdentity({
         return created;
     }, [gameId]);
 
-    const effectivePlayerName = useMemo(() => {
-        if (locationStatePlayerName && locationStatePlayerName.trim()) return locationStatePlayerName.trim();
+    const identity = useMemo(() => {
+        // 1) route state
+        const lsU = locationState?.username ?? null;
+        const lsD = (locationState?.displayname ?? "").trim();
+        if (lsD) return { username: lsU, displayname: lsD };
 
-        if (session?.gameId === gameId && session?.playerName?.trim()) return session.playerName.trim();
+        // 2) session
+        if (session?.gameId === gameId && session?.displayname?.trim()) {
+            return { username: session.username ?? null, displayname: session.displayname.trim() };
+        }
 
-        if (allowProfileFallback && profile?.displayname?.trim()) return profile.displayname.trim();
+        // 3) logged-in profile
+        if (allowProfileFallback && profile?.displayname?.trim()) {
+            return { username: profile.username, displayname: profile.displayname.trim() };
+        }
 
-        return null;
-    }, [locationStatePlayerName, session, gameId, profile, allowProfileFallback]);
+        // 4) guest fallback
+        return { username: null, displayname: makeGuestDisplayname() };
+    }, [locationState, session, gameId, profile, allowProfileFallback]);
 
-    return { playerKey, effectivePlayerName };
+    return { playerKey, username: identity.username, displayname: identity.displayname };
 }

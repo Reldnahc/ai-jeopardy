@@ -1,5 +1,5 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {useLocation, useNavigate, useParams} from "react-router-dom";
+import { useNavigate, useParams} from "react-router-dom";
 import { useWebSocket } from "../contexts/WebSocketContext.tsx";
 import LobbySidebar from "../components/lobby/LobbySidebar.tsx";
 import LoadingScreen from "../components/common/LoadingScreen.tsx";
@@ -15,20 +15,18 @@ import {usePlayerIdentity} from "../hooks/usePlayerIdentity.ts";
 import { usePreloadAudioAssetIds, usePreloadImageAssetIds } from "../hooks/game/usePreload.ts";
 
 const Lobby: React.FC = () => {
-    const location = useLocation();
     const { gameId } = useParams<{ gameId: string }>();
     const [copySuccess, setCopySuccess] = useState(false);
     const [boardJsonError, setBoardJsonError] = useState<string | null>(null);
 
     const { sendJson } = useWebSocket();
     const navigate = useNavigate();
-    const { profile } = useProfile();
+    const { profile, fetchPublicProfiles } = useProfile();
     const { showAlert } = useAlert();
     const { session, saveSession } = useGameSession();
 
-    const { playerKey, effectivePlayerName } = usePlayerIdentity({
+    const { playerKey, username, displayname } = usePlayerIdentity({
         gameId,
-        locationStatePlayerName: location.state?.playerName,
     });
 
     const {
@@ -57,11 +55,8 @@ const Lobby: React.FC = () => {
     } = useLobbySocketSync({
         gameId,
         playerKey,
-        effectivePlayerName,
-        cosmetics: {
-            color: profile?.color ?? null,
-            text_color: profile?.text_color ?? null,
-        },
+        username,
+        displayname,
         showAlert,
     });
 
@@ -73,17 +68,36 @@ const Lobby: React.FC = () => {
     }, [lobbyInvalid, navigate]);
 
     useEffect(() => {
-        if (!gameId || !effectivePlayerName) return;
+        const set = new Set<string>();
+
+        const h = String(host ?? "").trim().toLowerCase();
+        if (h) set.add(h);
+
+        for (const p of players ?? []) {
+            const u = String((p as any)?.username ?? "").trim().toLowerCase();
+            if (u) set.add(u);
+        }
+
+        const usernames = Array.from(set);
+        if (usernames.length === 0) return;
+
+        // fire and forget; context will only fetch missing ones
+        void fetchPublicProfiles(usernames).catch(() => {});
+    }, [players, host, fetchPublicProfiles]);
+
+
+    useEffect(() => {
+        if (!gameId || !username) return;
 
         const shouldUpdate =
             session?.gameId !== gameId ||
-            session?.playerName !== effectivePlayerName ||
+            session?.username !== username ||
             session?.isHost !== Boolean(isHost);
 
         if (!shouldUpdate) return;
 
-        saveSession(gameId, effectivePlayerName, Boolean(isHost));
-    }, [gameId, effectivePlayerName, isHost, session?.gameId, session?.playerName, session?.isHost, saveSession]);
+        saveSession({gameId, playerKey: playerKey ?? "", username, displayname, isHost:Boolean(isHost) });
+    }, [gameId, username, isHost, session?.gameId, session?.username, session?.isHost, saveSession, playerKey, displayname]);
 
     useEffect(() => {
         if (!allowLeave) return;
@@ -92,12 +106,13 @@ const Lobby: React.FC = () => {
 
         navigate(`/game/${gameId}`, {
             state: {
-                playerName: effectivePlayerName,
+                username,
+                displayname,
                 isHost,
                 host,
             },
         });
-    }, [allowLeave, isSocketReady, gameId, isHost, host, navigate, effectivePlayerName]);
+    }, [allowLeave, isSocketReady, gameId, isHost, host, navigate, username, displayname]);
 
     const tryValidateBoardJson = (raw: string): string | null => {
         if (!raw.trim()) return null; // empty means "use AI"
@@ -149,7 +164,7 @@ const Lobby: React.FC = () => {
         sendJson({
             type: "preload-done",
             gameId,
-            playerName: effectivePlayerName,
+            username,
             playerKey,
             token: preloadFinalToken, // IMPORTANT: send token
         });
@@ -164,7 +179,7 @@ const Lobby: React.FC = () => {
         audioDone,
         sendJson,
         gameId,
-        effectivePlayerName,
+        username,
         playerKey,
     ]);
 

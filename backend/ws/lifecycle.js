@@ -27,10 +27,9 @@ export function handleSocketClose(ws, ctx, interval) {
         ctx.broadcast(gameId, {
             type: "player-list-update",
             players: game.players.map((p) => ({
-                name: p.name,
-                color: p.color,
-                text_color: p.text_color,
-                online: p.online !== false,
+                username: p.username,
+                displayname: p.displayname,
+                online: p?.online,
             })),
             host: game.host,
         });

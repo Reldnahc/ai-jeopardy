@@ -5,12 +5,15 @@ import Avatar from "./Avatar.tsx";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAlert } from "../../contexts/AlertContext.tsx";
 import { useAuth } from "../../contexts/AuthContext.tsx";
+import {useProfile} from "../../contexts/ProfileContext.tsx";
+import {getProfilePresentation} from "../../utils/profilePresentation.ts";
 
 const Header: React.FC = () => {
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const [menuOpen, setMenuOpen] = useState(false);
 
     const { user, logout } = useAuth();
+    const { profile } = useProfile();
 
     const dropdownRef = useRef<HTMLDivElement>(null);
     const menuRef = useRef<HTMLDivElement>(null);
@@ -75,12 +78,11 @@ const Header: React.FC = () => {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    // Prefer displayname, fallback to username
-    const displayName = user?.displayname || user?.username || "";
-
-    // Colors now live on the user (profiles table)
-    const avatarColor = user?.color || "#3b82f6";
-    const avatarTextColor = user?.text_color || "#ffffff";
+    const pres = getProfilePresentation({
+        profile,
+        fallbackName: user?.displayname || user?.username || "",
+        defaultNameColor: "#ffffff",
+    });
 
     return (
         <header className="bg-gradient-to-r from-indigo-400 to-blue-700 text-white w-full h-[5.5rem] shadow-md">
@@ -109,9 +111,16 @@ const Header: React.FC = () => {
                                 onClick={toggleDropdown}
                                 className="flex items-center text-xl px-4 py-2 rounded hover:bg-blue-400 focus:outline-none"
                             >
-                                <Avatar name={displayName} size="10" color={avatarColor} textColor={avatarTextColor} />
-                                <span className="ml-3">{displayName}</span>
-
+                                <Avatar
+                                    name={pres.avatar.nameForLetter}
+                                    size="10"
+                                    color={pres.avatar.bgColor}
+                                    textColor={pres.avatar.fgColor}
+                                    icon={pres.avatar.icon}
+                                />
+                                <span className={`ml-3 ${pres.nameClassName}`} style={pres.nameStyle}>
+                                  {pres.displayName}
+                                </span>
                                 <svg
                                     xmlns="http://www.w3.org/2000/svg"
                                     className="h-4 w-4 ml-2"
@@ -152,8 +161,8 @@ const Header: React.FC = () => {
                                             onClick={handleLogout}
                                             className="block px-4 py-2 text-red-600 hover:bg-gray-200 cursor-pointer"
                                         >
-                      Log out
-                    </span>
+                                          Log out
+                                        </span>
                                     </motion.div>
                                 )}
                             </AnimatePresence>
@@ -170,7 +179,13 @@ const Header: React.FC = () => {
                     >
                         {user && (
                             <div className="mr-2">
-                                <Avatar name={displayName} size="10" color={avatarColor} textColor={avatarTextColor} />
+                                <Avatar
+                                    name={pres.avatar.nameForLetter}
+                                    size="10"
+                                    color={pres.avatar.bgColor}
+                                    textColor={pres.avatar.fgColor}
+                                    icon={pres.avatar.icon}
+                                />
                             </div>
                         )}
                         <svg

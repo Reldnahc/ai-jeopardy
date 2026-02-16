@@ -50,9 +50,9 @@ export const userHandlers = {
             type: "player-list-update",
             gameId,
             players: ctx.games[gameId].players.map((p) => ({
-                name: p.name,
-                color: p.color,
-                text_color: p.text_color,
+                username: p.username,
+                displayname: p.displayname,
+                online: p?.online,
             })),
             host: ctx.games[gameId].host,
         }));

@@ -22,12 +22,12 @@ export default function RouteWatchRoot() {
         const lobbyId = match?.[1];
         if (!lobbyId) return;
 
-        const playerName = session?.playerName;
+        const playerName = session?.username;
         if (!playerName) return;
         if (!isSocketReady) return;
 
         sendJson({ type: "leave-lobby", gameId: lobbyId, playerId: playerName });
-    }, [location.pathname, isSocketReady, sendJson, session?.playerName]);
+    }, [location.pathname, isSocketReady, sendJson, session?.username]);
 
 
     return <Outlet />;

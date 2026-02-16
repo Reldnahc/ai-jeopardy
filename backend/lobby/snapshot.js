@@ -11,9 +11,8 @@ export const buildLobbyState = (gameId, ws) => {
         type: "lobby-state",
         gameId,
         players: game.players.map((p) => ({
-            name: p.name,
-            color: p.color,
-            text_color: p.text_color,
+            username: p.username,
+            displayname: p.displayname,
             online: p?.online !== false,
         })),
         host: game.host,

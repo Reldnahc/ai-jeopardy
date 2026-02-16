@@ -16,21 +16,41 @@ export interface PublicUserRow {
     username: string;
     role: string;
     displayname: string;
+
+    // customization (minimal for UI)
     color: string;
     text_color: string;
+    name_color: string;
+    border: string;
+    font: string | null;
 }
 
 export interface LoginRow extends PublicUserRow {
     password_hash: string;
 }
 
+export type CustomizationPatch = Partial<{
+    bio: string | null;
+    color: string;
+    text_color: string;
+    name_color: string;
+    border: string;
+    font: string | null;
+    icon: string | null;
+}>;
+
 export interface MeProfileRow extends PublicUserRow {
     tokens: number;
+
     bio: string | null;
+    icon: string | null;
+
+    // legacy stats still returned (subset)
     games_finished: number;
     games_won: number;
     boards_generated: number;
     money_won: number;
+
     created_at: string; // pg returns string unless you configure parsers
     updated_at: string;
 }
@@ -39,29 +59,55 @@ export interface PublicProfileRow {
     id: string;
     username: string;
     displayname: string;
+    role: string;
+
     bio: string | null;
     color: string;
     text_color: string;
+    name_color: string;
+    border: string;
+    font: string | null;
+    icon: string | null;
+
+    // legacy stats still returned (subset)
     games_finished: number;
     games_won: number;
     boards_generated: number;
     money_won: number;
+
     created_at: string;
+    updated_at: string;
 }
 
 export interface SearchProfileRow {
     username: string;
     displayname: string;
+
     color: string;
     text_color: string;
+    name_color: string;
+    border: string;
+    font: string | null;
 }
 
 type IncrementableStat =
-| "tokens"
-| "boards_generated"
-| "games_finished"
-| "games_won"
-| "money_won";
+    | "tokens"
+    | "boards_generated"
+    | "games_finished"
+    | "games_won"
+    | "money_won"
+    | "games_played"
+    | "daily_double_found"
+    | "daily_double_correct"
+    | "final_jeopardy_participations"
+    | "final_jeopardy_corrects"
+    | "clues_selected"
+    | "times_buzzed"
+    | "total_buzzes"
+    | "correct_answers"
+    | "wrong_answers"
+    | "clues_skipped"
+    | "true_daily_doubles";
 
 export type StatDeltas = Partial<Record<IncrementableStat, number>>;
 
@@ -72,8 +118,8 @@ export function createProfileRepository(pool: Pool) {
         if (!userId) return null;
 
         const { rows } = await pool.query<{ role: string }>(
-            "select role from profiles where id = $1 limit 1",
-                [userId]
+            "select role from public.profiles where id = $1 limit 1",
+            [userId]
         );
 
         return rows?.[0]?.role ?? null;
@@ -89,10 +135,28 @@ export function createProfileRepository(pool: Pool) {
         const emailNorm = normalizeEmail(email);
 
         const { rows } = await pool.query<PublicUserRow>(
-            `insert into profiles (email, username, displayname, password_hash)
-       values ($1, $2, $3, $4)
-       returning id, email, username, displayname, role, color, text_color`,
-                [emailNorm, username, displayname, passwordHash]
+            `
+                with p as (
+                    insert into public.profiles (email, username, displayname, password_hash)
+                        values ($1, $2, $3, $4)
+                        returning id, email, username, displayname, role
+                )
+                select
+                    p.id,
+                    p.email,
+                    p.username,
+                    p.role,
+                    p.displayname,
+
+                    c.color,
+                    c.text_color,
+                    c.name_color,
+                    c.border,
+                    c.font
+                from p
+                         left join public.profile_customization c on c.profile_id = p.id
+            `,
+            [emailNorm, username, displayname, passwordHash]
         );
 
         return rows?.[0] ?? null;
@@ -103,11 +167,27 @@ export function createProfileRepository(pool: Pool) {
         if (!username) return null;
 
         const { rows } = await pool.query<LoginRow>(
-            `select id, email, username, role, displayname, color, text_color, password_hash
-       from profiles
-       where username = $1
-       limit 1`,
-                [username]
+            `
+                select
+                    p.id,
+                    p.email,
+                    p.username,
+                    p.role,
+                    p.displayname,
+
+                    c.color,
+                    c.text_color,
+                    c.name_color,
+                    c.border,
+                    c.font,
+
+                    p.password_hash
+                from public.profiles p
+                         left join public.profile_customization c on c.profile_id = p.id
+                where p.username = $1
+                limit 1
+            `,
+            [username]
         );
 
         return rows?.[0] ?? null;
@@ -117,11 +197,25 @@ export function createProfileRepository(pool: Pool) {
         if (!userId) return null;
 
         const { rows } = await pool.query<PublicUserRow>(
-            `select id, email, username, role, displayname, color, text_color
-       from profiles
-       where id = $1
-       limit 1`,
-                [userId]
+            `
+                select
+                    p.id,
+                    p.email,
+                    p.username,
+                    p.role,
+                    p.displayname,
+
+                    c.color,
+                    c.text_color,
+                    c.name_color,
+                    c.border,
+                    c.font
+                from public.profiles p
+                         left join public.profile_customization c on c.profile_id = p.id
+                where p.id = $1
+                limit 1
+            `,
+            [userId]
         );
 
         return rows?.[0] ?? null;
@@ -131,62 +225,74 @@ export function createProfileRepository(pool: Pool) {
         if (!userId) return null;
 
         const { rows } = await pool.query<MeProfileRow>(
-            `select
-        id,
-        email,
-        username,
-        displayname,
-        role,
-        tokens,
-        bio,
-        color,
-        text_color,
-        games_finished,
-        games_won,
-        boards_generated,
-        money_won,
-        created_at,
-        updated_at
-       from profiles
-       where id = $1
-       limit 1`,
-                [userId]
+            `
+                select
+                    p.id,
+                    p.email,
+                    p.username,
+                    p.role,
+                    p.displayname,
+                    p.tokens,
+
+                    c.bio,
+                    c.color,
+                    c.text_color,
+                    c.name_color,
+                    c.border,
+                    c.font,
+                    c.icon,
+
+                    s.games_finished,
+                    s.games_won,
+                    s.boards_generated,
+                    s.money_won,
+
+                    p.created_at,
+                    p.updated_at
+                from public.profiles p
+                         left join public.profile_customization c on c.profile_id = p.id
+                         left join public.profile_statistics s on s.profile_id = p.id
+                where p.id = $1
+                limit 1
+            `,
+            [userId]
         );
 
         return rows?.[0] ?? null;
     }
 
-    async function searchProfiles(
-        q: unknown,
-        limit: number = 5
-    ): Promise<SearchProfileRow[]> {
+    async function searchProfiles(q: unknown, limit: number = 5): Promise<SearchProfileRow[]> {
         const query = String(q ?? "").trim();
         if (!query || query.length < 2) return [];
 
-        const safeLimit = Number.isFinite(Number(limit))
-            ? Math.min(Math.max(Number(limit), 1), 20)
-            : 5;
-
+        const safeLimit = Number.isFinite(Number(limit)) ? Math.min(Math.max(Number(limit), 1), 20) : 5;
         const like = `%${query}%`;
 
         const { rows } = await pool.query<SearchProfileRow>(
-            `select
-          username,
-          displayname,
-          color,
-          text_color
-       from profiles
-       where username ilike $1
-          or displayname ilike $1
-       order by
-          case
-            when username ilike $2 then 0
-            when username ilike $1 then 1
-            else 2
-          end,
-          username asc
-       limit $3`,
-                [like, `${query}%`, safeLimit]
+            `
+                select
+                    p.username,
+                    p.displayname,
+
+                    c.color,
+                    c.text_color,
+                    c.name_color,
+                    c.border,
+                    c.font
+                from public.profiles p
+                         left join public.profile_customization c on c.profile_id = p.id
+                where p.username ilike $1
+                   or p.displayname ilike $1
+                order by
+                    case
+                        when p.username ilike $2 then 0
+                        when p.username ilike $1 then 1
+                        else 2
+                        end,
+                    p.username asc
+                limit $3
+            `,
+            [like, `${query}%`, safeLimit]
         );
 
         return rows ?? [];
@@ -197,22 +303,35 @@ export function createProfileRepository(pool: Pool) {
         if (!username) return null;
 
         const { rows } = await pool.query<PublicProfileRow>(
-            `select
-         id,
-         username,
-         displayname,
-         bio,
-         color,
-         text_color,
-         games_finished,
-         games_won,
-         boards_generated,
-         money_won,
-         created_at
-       from profiles
-       where username = $1
-       limit 1`,
-                [username]
+            `
+                select
+                    p.id,
+                    p.username,
+                    p.displayname,
+                    p.role,
+
+                    c.bio,
+                    c.color,
+                    c.text_color,
+                    c.name_color,
+                    c.border,
+                    c.font,
+                    c.icon,
+
+                    s.games_finished,
+                    s.games_won,
+                    s.boards_generated,
+                    s.money_won,
+
+                    p.created_at,
+                    p.updated_at
+                from public.profiles p
+                         left join public.profile_customization c on c.profile_id = p.id
+                         left join public.profile_statistics s on s.profile_id = p.id
+                where p.username = $1
+                limit 1
+            `,
+            [username]
         );
 
         return rows?.[0] ?? null;
@@ -224,16 +343,15 @@ export function createProfileRepository(pool: Pool) {
 
         const { rows } = await pool.query<{ id: string }>(
             `select id from public.profiles where username = $1 limit 1`,
-                [username]
+            [username]
         );
 
         return rows?.[0]?.id ?? null;
     }
 
-    async function updateCosmetics(
+    async function updateCustomization(
         userId: string | null | undefined,
-        color: string | undefined,
-        text_color: string | undefined
+        patch: CustomizationPatch
     ): Promise<MeProfileRow | null> {
         if (!userId) return null;
 
@@ -241,14 +359,36 @@ export function createProfileRepository(pool: Pool) {
         const values: unknown[] = [];
         let i = 1;
 
-        if (color !== undefined) {
-            updates.push(`color = $${i++}`);
-            values.push(color);
+        // allow null to clear bio/font/icon
+        if ("bio" in patch) {
+            updates.push(`bio = $${i++}`);
+            values.push(patch.bio ?? null);
         }
 
-        if (text_color !== undefined) {
+        if (patch.color !== undefined) {
+            updates.push(`color = $${i++}`);
+            values.push(patch.color);
+        }
+        if (patch.text_color !== undefined) {
             updates.push(`text_color = $${i++}`);
-            values.push(text_color);
+            values.push(patch.text_color);
+        }
+        if (patch.name_color !== undefined) {
+            updates.push(`name_color = $${i++}`);
+            values.push(patch.name_color);
+        }
+        if (patch.border !== undefined) {
+            updates.push(`border = $${i++}`);
+            values.push(patch.border);
+        }
+
+        if ("font" in patch) {
+            updates.push(`font = $${i++}`);
+            values.push(patch.font ?? null);
+        }
+        if ("icon" in patch) {
+            updates.push(`icon = $${i++}`);
+            values.push(patch.icon ?? null);
         }
 
         if (updates.length === 0) return null;
@@ -256,83 +396,261 @@ export function createProfileRepository(pool: Pool) {
         values.push(userId);
 
         const { rows } = await pool.query<MeProfileRow>(
-            `update profiles
-       set ${updates.join(", ")}, updated_at = now()
-       where id = $${i}
-       returning id, email, username, displayname, role, tokens, bio, color, text_color,
-                 games_finished, games_won, boards_generated, money_won, created_at, updated_at`,
-                values
+            `
+                with upd_c as (
+                    update public.profile_customization
+                        set ${updates.join(", ")}, updated_at = now()
+                        where profile_id = $${i}
+          returning profile_id
+        ),
+        upd_p as (
+          update public.profiles
+          set updated_at = now()
+          where id = (select profile_id from upd_c)
+          returning id
+        )
+        select
+          p.id,
+          p.email,
+          p.username,
+          p.role,
+          p.displayname,
+          p.tokens,
+
+          c.bio,
+          c.color,
+          c.text_color,
+          c.name_color,
+          c.border,
+          c.font,
+          c.icon,
+
+          s.games_finished,
+          s.games_won,
+          s.boards_generated,
+          s.money_won,
+
+          p.created_at,
+          p.updated_at
+        from public.profiles p
+        left join public.profile_customization c on c.profile_id = p.id
+        left join public.profile_statistics s on s.profile_id = p.id
+        where p.id = (select id from upd_p)
+        limit 1
+      `,
+            values
         );
 
         return rows?.[0] ?? null;
     }
 
-    async function incrementStats(
-        userId: string | null | undefined,
-        deltas: StatDeltas
-    ): Promise<MeProfileRow | null> {
+    async function incrementStats(userId: string | null | undefined, deltas: StatDeltas): Promise<MeProfileRow | null> {
         if (!userId) return null;
 
-        const allowed = new Set<IncrementableStat>([
-            "tokens",
+        const tokenAllowed = new Set<IncrementableStat>(["tokens"]);
+        const statAllowed = new Set<IncrementableStat>([
             "boards_generated",
             "games_finished",
-            "games_won",
+            "games_played",
             "money_won",
+            "games_won",
+            "daily_double_found",
+            "daily_double_correct",
+            "final_jeopardy_participations",
+            "final_jeopardy_corrects",
+            "clues_selected",
+            "times_buzzed",
+            "total_buzzes",
+            "correct_answers",
+            "wrong_answers",
+            "clues_skipped",
+            "true_daily_doubles",
         ]);
 
         const entries = Object.entries(deltas ?? {}).filter(([k, v]) => {
-            if (!allowed.has(k as IncrementableStat)) return false;
             const n = Number(v);
-            return Number.isFinite(n) && n !== 0;
+            if (!Number.isFinite(n) || n === 0) return false;
+            return tokenAllowed.has(k as IncrementableStat) || statAllowed.has(k as IncrementableStat);
         }) as Array<[IncrementableStat, number]>;
 
         if (entries.length === 0) return null;
 
-        const sets: string[] = [];
+        const tokenEntries = entries.filter(([k]) => tokenAllowed.has(k));
+        const statEntries = entries.filter(([k]) => statAllowed.has(k));
+
+        const ctes: string[] = [];
         const values: unknown[] = [];
         let i = 1;
 
-        for (const [k, v] of entries) {
-            sets.push(`${k} = ${k} + $${i++}`);
-            values.push(Number(v));
+        if (tokenEntries.length > 0) {
+            const sets: string[] = [];
+            for (const [k, v] of tokenEntries) {
+                sets.push(`${k} = ${k} + $${i++}`);
+                values.push(Number(v));
+            }
+            values.push(userId);
+            ctes.push(`
+        up_tokens as (
+          update public.profiles
+          set ${sets.join(", ")}, updated_at = now()
+          where id = $${i++}
+          returning id
+        )
+      `);
         }
 
-        values.push(userId);
+        if (statEntries.length > 0) {
+            const sets: string[] = [];
+            for (const [k, v] of statEntries) {
+                sets.push(`${k} = ${k} + $${i++}`);
+                values.push(Number(v));
+            }
+            values.push(userId);
+            ctes.push(`
+        up_stats as (
+          update public.profile_statistics
+          set ${sets.join(", ")}, updated_at = now()
+          where profile_id = $${i++}
+          returning profile_id
+        )
+      `);
+        }
+
+        ctes.push(`
+      up_profile_clock as (
+        update public.profiles
+        set updated_at = now()
+        where id = coalesce(
+          ${tokenEntries.length > 0 ? "(select id from up_tokens)" : "null"},
+          ${statEntries.length > 0 ? "(select profile_id from up_stats)" : "null"}
+        )
+        returning id
+      )
+    `);
 
         const { rows } = await pool.query<MeProfileRow>(
-            `update profiles
-         set ${sets.join(", ")}, updated_at = now()
-         where id = $${i}
-         returning
-           id, email, username, displayname, role,
-           tokens, bio, color, text_color,
-           games_finished, games_won, boards_generated, money_won,
-           created_at, updated_at`,
-                values
+            `
+        with
+        ${ctes.join(",\n")}
+        select
+          p.id,
+          p.email,
+          p.username,
+          p.role,
+          p.displayname,
+          p.tokens,
+
+          c.bio,
+          c.color,
+          c.text_color,
+          c.name_color,
+          c.border,
+          c.font,
+          c.icon,
+
+          s.games_finished,
+          s.games_won,
+          s.boards_generated,
+          s.money_won,
+
+          p.created_at,
+          p.updated_at
+        from public.profiles p
+        left join public.profile_customization c on c.profile_id = p.id
+        left join public.profile_statistics s on s.profile_id = p.id
+        where p.id = (select id from up_profile_clock)
+        limit 1
+      `,
+            values
         );
 
         return rows?.[0] ?? null;
+    }
+
+    async function getPublicProfilesByUsernames(
+        usernamesRaw: Array<string | null | undefined>,
+        opts?: { limit?: number }
+    ): Promise<PublicProfileRow[]> {
+        const limit = Math.min(Math.max(opts?.limit ?? 100, 1), 500);
+
+        // normalize + preserve order (unique)
+        const ordered: string[] = [];
+        const seen = new Set<string>();
+
+        for (const u of usernamesRaw ?? []) {
+            const n = normalizeUsername(u);
+            if (!n) continue;
+            if (seen.has(n)) continue;
+            seen.add(n);
+            ordered.push(n);
+            if (ordered.length >= limit) break;
+        }
+
+        if (ordered.length === 0) return [];
+
+        const { rows } = await pool.query<PublicProfileRow>(
+            `
+      select
+        p.id,
+        p.username,
+        p.displayname,
+        p.role,
+
+        c.bio,
+        c.color,
+        c.text_color,
+        c.name_color,
+        c.border,
+        c.font,
+        c.icon,
+
+        s.games_finished,
+        s.games_won,
+        s.boards_generated,
+        s.money_won,
+
+        p.created_at,
+        p.updated_at
+      from public.profiles p
+      left join public.profile_customization c on c.profile_id = p.id
+      left join public.profile_statistics s on s.profile_id = p.id
+      where p.username = any($1::text[])
+    `,
+            [ordered]
+        );
+
+        // preserve caller order (DB won't guarantee order with ANY)
+        const byUsername = new Map<string, PublicProfileRow>();
+        for (const r of rows ?? []) {
+            byUsername.set(normalizeUsername(r.username), r);
+        }
+
+        const out: PublicProfileRow[] = [];
+        for (const u of ordered) {
+            const r = byUsername.get(u);
+            if (r) out.push(r);
+        }
+
+        return out;
     }
 
     async function addTokens(userId: string, amount: number) {
         return incrementStats(userId, { tokens: amount });
     }
-
     async function incrementBoardsGenerated(userId: string, n: number = 1) {
         return incrementStats(userId, { boards_generated: n });
     }
-
     async function incrementGamesFinished(userId: string, n: number = 1) {
         return incrementStats(userId, { games_finished: n });
     }
-
     async function incrementGamesWon(userId: string, n: number = 1) {
         return incrementStats(userId, { games_won: n });
     }
-
     async function addMoneyWon(userId: string, amount: number) {
         return incrementStats(userId, { money_won: amount });
+    }
+    async function incrementGamesPlayed(userId: string, n: number = 1) {
+        return incrementStats(userId, { games_played: n });
     }
 
     return {
@@ -341,14 +659,17 @@ export function createProfileRepository(pool: Pool) {
         getLoginRowByUsername,
         getPublicUserById,
         getMeProfile,
+        getPublicProfilesByUsernames,
         searchProfiles,
         getPublicProfileByUsername,
         getIdByUsername,
-        updateCosmetics,
+        updateCustomization,
         addTokens,
         incrementBoardsGenerated,
         incrementGamesFinished,
         incrementGamesWon,
         addMoneyWon,
+        incrementGamesPlayed,
+        incrementStats,
     };
 }

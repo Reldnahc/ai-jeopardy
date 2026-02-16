@@ -79,7 +79,7 @@ const MobileSidebar: React.FC<MobileSidebarProps> = ({
                                                     buzzResult === player.name ? "border-l-4 border-red-400" : ""
                                             }`}
                                         >
-                                            <Avatar name={player.name} size="6" color={player.color} textColor={player.text_color} />
+                                            <Avatar displayname={player.name} username={player.name} size="6"  />
                                             <div className="flex flex-col ml-2 flex-1">
                                                 <span className="font-bold text-blue-500">{player.name}</span>
                                                 {host === player.name && players.length > 1 ? (

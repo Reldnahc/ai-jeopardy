@@ -24,13 +24,12 @@ export type LobbySettings = {
 type UseLobbySocketSyncArgs = {
     gameId?: string;
     playerKey: string | null;
-    effectivePlayerName: string | null;
-    cosmetics?: { color?: string | null; text_color?: string | null };
-
+    username: string | null;
+    displayname: string | null;
     showAlert: (node: React.ReactNode, actions: AlertButton[]) => Promise<string>;
 };
 
-export function useLobbySocketSync({ gameId, playerKey, effectivePlayerName, cosmetics, showAlert }: UseLobbySocketSyncArgs) {
+export function useLobbySocketSync({ gameId, playerKey, username, displayname, showAlert }: UseLobbySocketSyncArgs) {
 
     const { isSocketReady, sendJson, subscribe } = useWebSocket();
     const [lobbyInvalid, setLobbyInvalid] = useState(false);
@@ -81,9 +80,9 @@ export function useLobbySocketSync({ gameId, playerKey, effectivePlayerName, cos
     }, []);
 
     const onPromoteHost = useCallback(
-        (playerName: string) => {
+        (targetUsername: string) => {
             if (!isSocketReady || !gameId) return;
-            sendJson({ type: "promote-host", gameId, targetPlayerName: playerName });
+            sendJson({ type: "promote-host", gameId, targetUsername });
         },
         [isSocketReady, gameId, sendJson]
     );
@@ -134,9 +133,9 @@ export function useLobbySocketSync({ gameId, playerKey, effectivePlayerName, cos
     useEffect(() => {
         if (!isSocketReady) return;
         if (!gameId) return;
-        if (!effectivePlayerName) return;
+        if (!username) return;
 
-        const joinIdentity = `${gameId}|${effectivePlayerName}|${playerKey}`;
+        const joinIdentity = `${gameId}|${username}|${playerKey}`;
 
         if (lastJoinKeyRef.current === joinIdentity) {
             return; // don't re-join just because cosmetics changed
@@ -147,19 +146,18 @@ export function useLobbySocketSync({ gameId, playerKey, effectivePlayerName, cos
         sendJson({
             type: "join-lobby",
             gameId,
-            playerName: effectivePlayerName,
+            displayname,
+            username,
             playerKey,
-            color: cosmetics?.color ?? undefined,
-            text_color: cosmetics?.text_color ?? undefined,
+
         });
         requestLobbyState();
     }, [
         isSocketReady,
         gameId,
-        effectivePlayerName,
+        username,
+        displayname,
         playerKey,
-        cosmetics?.color,
-        cosmetics?.text_color,
         sendJson,
         requestLobbyState,
     ]);
@@ -178,18 +176,22 @@ export function useLobbySocketSync({ gameId, playerKey, effectivePlayerName, cos
                 case "player-list-update": {
                     const m = message as unknown as { players: Player[]; host: string };
 
-                    const sortedPlayers = [...m.players].sort((a, b) => {
-                        if (a.name === m.host) return -1;
-                        if (b.name === m.host) return 1;
+                    const hostUsername = String(m.host ?? "").trim().toLowerCase();
+
+                    // sort host to top by USERNAME, not displayname
+                    const sortedPlayers = [...(m.players ?? [])].sort((a, b) => {
+                        const au = String(a.username ?? "").trim().toLowerCase();
+                        const bu = String(b.username ?? "").trim().toLowerCase();
+                        if (au === hostUsername) return -1;
+                        if (bu === hostUsername) return 1;
                         return 0;
                     });
 
                     setPlayers(sortedPlayers);
-                    setHost(m.host);
+                    setHost(hostUsername || null);
 
-                    const hostName = (m.host ?? "").trim();
-                    const youName = (effectivePlayerName ?? "").trim();
-                    setIsHostServer(hostName.length > 0 && youName.length > 0 && hostName === youName);
+                    const youU = String(username ?? "").trim().toLowerCase();
+                    setIsHostServer(Boolean(hostUsername) && Boolean(youU) && hostUsername === youU);
                     return;
                 }
 
@@ -210,9 +212,10 @@ export function useLobbySocketSync({ gameId, playerKey, effectivePlayerName, cos
                     setPlayers(Array.isArray(m.players) ? m.players : []);
                     setHost(m.host ?? null);
 
-                    const hostName = (m.host ?? "").trim();
-                    const youName = (m.you?.playerName ?? "").trim();
-                    setIsHostServer(Boolean(m.you?.isHost) || (hostName.length > 0 && youName.length > 0 && hostName === youName));
+                    const hostUsername = String(m.host ?? "").trim().toLowerCase();
+                    const youUsername = String(username ?? "").trim().toLowerCase();
+
+                    setIsHostServer(Boolean(m.you?.isHost) || (!!hostUsername && !!youUsername && hostUsername === youUsername));
 
                     if (Array.isArray(m.categories)) {
                         setCategories(unflattenBySections(m.categories));
@@ -390,7 +393,7 @@ export function useLobbySocketSync({ gameId, playerKey, effectivePlayerName, cos
                     if (!m.isValid) {
                         // Lobby no longer exists or already started.
                         // If we have an identity, we should enter the game page and let game rehydrate from server.
-                        if (effectivePlayerName) {
+                        if (username) {
                             setIsLoading(true);
                             setLoadingMessage("Game already started. Joining game...");
                             setAllowLeave(true);
@@ -427,7 +430,7 @@ export function useLobbySocketSync({ gameId, playerKey, effectivePlayerName, cos
         gameId,
         subscribe,
         sendJson,
-        effectivePlayerName,
+        username,
         showAlert,
         requestLobbyState,
     ]);

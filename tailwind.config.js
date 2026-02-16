@@ -8,6 +8,17 @@ module.exports = {
       },
       fontFamily: {
         swiss911: ['"swiss911"', 'sans-serif'],
+        outfit: ["Outfit", "sans-serif"],
+        dmsans: ["DM Sans", "sans-serif"],
+        jetbrains: ["JetBrains Mono", "monospace"],
+        orbitron: ["Orbitron", "sans-serif"],
+        audiowide: ["Audiowide", "sans-serif"],
+        fredoka: ["Fredoka", "sans-serif"],
+        baloo: ["Baloo 2", "sans-serif"],
+        comfortaa: ["Comfortaa", "sans-serif"],
+        pacifico: ["Pacifico", "cursive"],
+        cherry: ["Cherry Bomb One", "cursive"],
+        gloria: ["Gloria Hallelujah", "cursive"]
       },
       keyframes: {
         jump: {

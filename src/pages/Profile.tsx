@@ -1,129 +1,194 @@
-import React, { useEffect, useMemo, useState } from "react";
+// frontend/pages/Profile.tsx
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Board } from "../types/Board";
 import ProfileGameCard from "../components/profile/ProfileGameCard";
 import Avatar from "../components/common/Avatar";
 import { useAuth } from "../contexts/AuthContext";
 import LoadingScreen from "../components/common/LoadingScreen";
-
-interface ProfileData {
-    id: string;
-    username: string;
-    displayname: string;
-    role?: string | null;
-    bio?: string | null;
-
-    // stored as hex in your local db schema
-    color?: string | null;
-    text_color?: string | null;
-
-    boards_generated?: number | null;
-    games_won?: number | null;
-    games_finished?: number | null;
-    money_won?: number | null;
-}
+import { Profile as P, useProfile } from "../contexts/ProfileContext";
+import ProfileIcon from "../components/common/ProfileIcon";
+import {
+    getProfilePresentation,
+    PROFILE_COLOR_OPTIONS,
+    PROFILE_FONT_OPTIONS,
+    PROFILE_ICON_OPTIONS
+} from "../utils/profilePresentation.ts";
 
 interface RouteParams extends Record<string, string | undefined> {
     username: string;
 }
 
 function getApiBase() {
-    // In dev, allow explicit override
-    if (import.meta.env.DEV) {
-        return import.meta.env.VITE_API_BASE || "http://localhost:3002";
-    }
-
-    // In prod, use same-origin
+    if (import.meta.env.DEV) return import.meta.env.VITE_API_BASE || "http://localhost:3002";
     return "";
+}
+
+type CustomField = "color" | "text_color" | "name_color" | "bio" | "font" | "icon" | "border";
+type CustomPatch = Partial<Pick<P, CustomField>>;
+
+type PatchMeResponse = {
+    profile?: P;
+    error?: string;
+};
+
+function normalizeUsername(u: unknown) {
+    return String(u ?? "").trim().toLowerCase();
+}
+function toErrorMessage(e: unknown) {
+    if (e instanceof Error) return e.message;
+    return String(e);
 }
 
 const Profile: React.FC = () => {
     const { username } = useParams<RouteParams>();
-    const { user, token, updateUser} = useAuth();
+    const { user, token } = useAuth();
 
-    const [profile, setProfile] = useState<ProfileData | null>(null);
+    // IMPORTANT:
+    // `profile` here should remain "me" (authenticated user's profile)
+    const {
+        profile: me,
+        loading,
+        error,
+        applyProfilePatch,
+        refetchProfile,
+        fetchPublicProfile,
+        patchProfileByUsername,
+    } = useProfile();
+
     const [boards, setBoards] = useState<Board[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const [boardsLoading, setBoardsLoading] = useState(true);
+    const [localError, setLocalError] = useState<string | null>(null);
 
-    const [selectedColor, setSelectedColor] = useState<string | null>(null);
-    const [selectedTextColor, setSelectedTextColor] = useState<string | null>(null);
+    const [bioDraft, setBioDraft] = useState<string>("");
+    const [savingBio, setSavingBio] = useState(false);
 
+    const [routeProfile, setRouteProfile] = useState<P | null>(null);
+    const [routeLoading, setRouteLoading] = useState(true);
+    const [routeError, setRouteError] = useState<string | null>(null);
+
+    // Viewing "my" profile if the route profile id matches the logged-in user id
     const isOwnProfile = useMemo(() => {
-        return Boolean(user?.id && profile?.id && user.id === profile.id);
-    }, [user?.id, profile?.id]);
+        return Boolean(user?.id && routeProfile?.id && user.id === routeProfile.id);
+    }, [user?.id, routeProfile?.id]);
 
+    const fetchSeq = useRef(0);
+
+    /**
+     * Pending customization overlay to prevent UI "snap back"
+     * when backend briefly returns stale profile values.
+     */
+    const pendingOverlayRef = useRef<CustomPatch>({});
+    const pendingSinceRef = useRef<number>(0);
+
+    function applyOverlay(p: P | null): P | null {
+        if (!p) return p;
+        const overlay = pendingOverlayRef.current;
+        if (!overlay || Object.keys(overlay).length === 0) return p;
+        // Overlay ALWAYS wins locally
+        return { ...p, ...overlay };
+    }
+
+    function addOverlay(patch: CustomPatch) {
+        pendingOverlayRef.current = { ...pendingOverlayRef.current, ...patch };
+        pendingSinceRef.current = Date.now();
+    }
+
+    function maybeClearOverlayIfServerMatches(serverProfile: P, patch: CustomPatch) {
+        // If the server returned the same value we asked for, clear that key from overlay.
+        const next = { ...pendingOverlayRef.current };
+        let changed = false;
+
+        for (const k of Object.keys(patch) as CustomField[]) {
+            if (serverProfile[k] === patch[k]) {
+                delete next[k];
+                changed = true;
+            }
+        }
+
+        if (changed) pendingOverlayRef.current = next;
+    }
+
+    // Load the profile for the route (/profile/:username)
+    useEffect(() => {
+        const u = normalizeUsername(username);
+        if (!u) return;
+
+        const mySeq = ++fetchSeq.current;
+
+        void (async () => {
+            setRouteLoading(true);
+            setRouteError(null);
+            try {
+                const p = await fetchPublicProfile(u);
+
+                if (mySeq !== fetchSeq.current) return;
+
+                // ALWAYS re-apply local overlay to avoid snapback.
+                setRouteProfile(applyOverlay(p));
+            } catch (e: unknown) {
+                if (mySeq === fetchSeq.current) {
+                    setRouteProfile(null);
+                    setRouteError(toErrorMessage(e));
+                }
+            } finally {
+                if (mySeq === fetchSeq.current) {
+                    setRouteLoading(false);
+                }
+            }
+        })();
+    }, [username, fetchPublicProfile]);
+
+    // Keep bioDraft in sync with the DISPLAYED profile (routeProfile), not "me"
+    useEffect(() => {
+        setBioDraft(routeProfile?.bio ?? "");
+    }, [routeProfile?.bio, routeProfile?.id]);
+
+    // Fetch boards when username changes
     useEffect(() => {
         const run = async () => {
             try {
-                setLoading(true);
-                setError(null);
+                setBoardsLoading(true);
+                setLocalError(null);
 
-                const u = String(username || "").trim().toLowerCase();
+                const u = normalizeUsername(username);
                 if (!u) {
-                    setProfile(null);
                     setBoards([]);
-                    setError("Missing username");
+                    setLocalError("Missing username");
                     return;
                 }
 
                 const api = getApiBase();
+                const res = await fetch(`${api}/api/profile/${encodeURIComponent(u)}/boards?limit=5`);
+                const data = await res.json();
+                if (!res.ok) throw new Error(data?.error || "Failed to load boards");
 
-                // 1) profile
-                {
-                    // Inside your useEffect run function:
-                    const res = await fetch(`${api}/api/profile/${encodeURIComponent(u)}`);
-
-// Check if the response is actually JSON before parsing
-                    const contentType = res.headers.get("content-type");
-                    if (!contentType || !contentType.includes("application/json")) {
-                        const fallbackText = await res.text();
-                        console.error("DEBUG: Server returned HTML instead of JSON. Check your API route.");
-                        console.log("Response starts with:", fallbackText.substring(0, 100)); // Will likely show <!DOCTYPE html>
-                        throw new Error("API Route not found or returning HTML");
-                    }
-
-                    const data = await res.json();
-// Now 'data' is guaranteed to be an object
-                    console.log("DEBUG: Received data:", data);
-
-                    if (!res.ok) throw new Error(data?.error || "Failed to load profile");
-
-                    setProfile(data.profile);
-
-                    // initialize colors from profile
-                    setSelectedColor(data.profile?.color ?? null);
-                    setSelectedTextColor(data.profile?.text_color ?? null);
-                }
-
-                // 2) recent boards
-                {
-                    const res = await fetch(
-                        `${api}/api/profile/${encodeURIComponent(u)}/boards?limit=5`
-                    );
-                    const data = await res.json();
-                    if (!res.ok) throw new Error(data?.error || "Failed to load boards");
-
-                    setBoards((data.boards ?? []) as Board[]);
-                }
-            } catch (e: any) {
-                setError(String(e?.message || e));
-                setProfile(null);
+                setBoards((data.boards ?? []) as Board[]);
+            } catch (e: unknown) {
+                setLocalError(toErrorMessage(e));
                 setBoards([]);
             } finally {
-                setLoading(false);
+                setBoardsLoading(false);
             }
         };
 
         void run();
     }, [username]);
 
-    const saveSelectedColor = async (value: string, field: "color" | "text_color") => {
+    const saveCustomization = async (patch: CustomPatch) => {
         if (!token) return;
 
-        // optimistic
-        if (field === "color") setSelectedColor(value);
-        else setSelectedTextColor(value);
+        // Track overlay FIRST so any incoming fetch/response cannot snap us back.
+        addOverlay(patch);
+
+        // Optimistic UI update: overlay onto existing local profile
+        setRouteProfile((prev) => (prev ? applyOverlay({ ...prev, ...patch }) : prev));
+
+        // Update caches too (avatar/header etc.)
+        applyProfilePatch(patch);
+        if (routeProfile?.username) {
+            patchProfileByUsername(routeProfile.username, patch);
+        }
 
         try {
             const api = getApiBase();
@@ -133,52 +198,71 @@ const Profile: React.FC = () => {
                     "Content-Type": "application/json",
                     Authorization: `Bearer ${token}`,
                 },
-                body: JSON.stringify({ [field]: value }),
+                body: JSON.stringify(patch),
             });
 
-            const data = await res.json();
+            const data = (await res.json()) as PatchMeResponse;
             if (!res.ok) throw new Error(data?.error || "Failed to update profile");
 
-            updateUser({
-                color: data.profile?.color ?? (field === "color" ? value : user?.color),
-                text_color: data.profile?.text_color ?? (field === "text_color" ? value : user?.text_color),
-            });
+            if (data.profile) {
+                const serverProfile = data.profile as P;
 
-        } catch (e: any) {
-            setError(String(e?.message || e));
+                // If server matches keys we set, clear those keys from overlay.
+                maybeClearOverlayIfServerMatches(serverProfile, patch);
+
+                // Apply overlay on top of server truth to prevent snapback.
+                const merged = applyOverlay(serverProfile)!;
+
+                applyProfilePatch(merged);
+                patchProfileByUsername(serverProfile.username, merged);
+                setRouteProfile((prev) => (prev ? { ...prev, ...merged } : merged));
+
+                // Safety: if backend is eventually consistent, auto-expire overlay after a bit.
+                // (Prevents an overlay sticking forever if server never echoes.)
+                const now = Date.now();
+                if (Object.keys(pendingOverlayRef.current).length > 0 && now - pendingSinceRef.current > 3000) {
+                    pendingOverlayRef.current = {};
+                }
+            }
+        } catch (e: unknown) {
+            setLocalError(toErrorMessage(e));
+
+            // On failure: clear overlay and revert to real data
+            pendingOverlayRef.current = {};
+
+            await refetchProfile();
+
+            try {
+                const u = normalizeUsername(username);
+                if (u) {
+                    const p = await fetchPublicProfile(u);
+                    setRouteProfile(p);
+                }
+            } catch {
+                // ignore
+            }
         }
     };
 
-    // Hex palettes (match your DB + trigger validation)
-    const colors = [
-        "#3b82f6", "#6366f1", "#06b6d4", "#0ea5e9",
-        "#22c55e", "#10b981", "#14b8a6", "#84cc16",
-        "#eab308", "#f59e0b", "#f97316", "#ef4444",
-        "#f43f5e", "#ec4899", "#d946ef", "#a855f7",
-        "#8b5cf6", "#6b7280", "#78716c", "#64748b",
-        "#71717a", "#000000", "#ffffff",
-    ];
-
-    const textColors = [
-        "#3b82f6", "#6366f1", "#06b6d4", "#0ea5e9",
-        "#22c55e", "#10b981", "#14b8a6", "#84cc16",
-        "#eab308", "#f59e0b", "#f97316", "#ef4444",
-        "#f43f5e", "#ec4899", "#d946ef", "#a855f7",
-        "#8b5cf6", "#6b7280", "#78716c", "#64748b",
-        "#71717a", "#000000", "#ffffff",
-    ];
-
-    if (loading) {
+    if (routeLoading || loading) {
         return <LoadingScreen message="Loading profile" progress={-1} />;
     }
 
-    if (error || !profile) {
+    if (routeError || !routeProfile) {
         return (
             <div className="flex items-center justify-center h-screen">
-                <p className="text-xl text-red-600">{error ? error : "Profile not found."}</p>
+                <p className="text-xl text-red-600">{routeError ? routeError : "Profile not found."}</p>
             </div>
         );
     }
+
+
+    const pres = getProfilePresentation({
+        profile: routeProfile,
+        // for safety if routeProfile is ever partial / nullish, still show something
+        fallbackName: routeProfile?.displayname || routeProfile?.username || "",
+        defaultNameColor: "#3b82f6", // profile page name default
+    });
 
     return (
         <div className="min-h-screen bg-gradient-to-r from-indigo-400 to-blue-700 flex items-center justify-center p-6">
@@ -188,24 +272,72 @@ const Profile: React.FC = () => {
                     <div className="flex items-center space-x-4">
                         <div className="w-16 h-16 flex-shrink-0">
                             <Avatar
-                                name={username || "A"}
+                                name={pres.avatar.nameForLetter}
+                                color={pres.avatar.bgColor}
+                                textColor={pres.avatar.fgColor}
+                                icon={pres.avatar.icon}
                                 size="16"
-                                color={selectedColor}
-                                textColor={selectedTextColor}
                             />
                         </div>
                         <div>
-                            <h1 className="text-2xl font-bold text-blue-500">{profile.displayname}</h1>
+                            <h1
+                                className={`text-2xl font-bold ${pres.nameClassName}`}
+                                style={pres.nameStyle ?? { color: "#3b82f6" }} // in case name_color isn't hex yet
+                            >
+                                {pres.displayName}
+                            </h1>
 
-                            {profile.role === "admin" && (
-                                <h3 className="text-sm mt-1 text-red-600">
-                                    {profile.role.charAt(0).toUpperCase() +
-                                        profile.role.slice(1).toLowerCase()}
-                                </h3>
+                            {isOwnProfile && me?.role === "admin" && (
+                                <h3 className="text-sm mt-1 text-red-600">Admin</h3>
                             )}
-
-                            {profile.bio && <p className="mt-1 text-gray-600">{profile.bio}</p>}
                         </div>
+                    </div>
+
+                    {(localError || boardsLoading) && (
+                        <div className="text-sm text-red-600">
+                            {localError ? localError : null}
+                        </div>
+                    )}
+
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                        <h3 className="text-lg font-semibold text-gray-800 mb-2">Bio</h3>
+
+                        {isOwnProfile && token ? (
+                            <div className="space-y-2">
+                                <textarea
+                                    value={bioDraft}
+                                    onChange={(e) => setBioDraft(e.target.value)}
+                                    rows={3}
+                                    className="w-full rounded-md border border-gray-300 p-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                    placeholder="Write something about yourself…"
+                                    maxLength={280}
+                                />
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs text-gray-500">{bioDraft.length}/280</span>
+                                    <button
+                                        type="button"
+                                        disabled={savingBio}
+                                        onClick={async () => {
+                                            setSavingBio(true);
+                                            try {
+                                                await saveCustomization({ bio: bioDraft.trim().length ? bioDraft.trim() : null });
+                                            } finally {
+                                                setSavingBio(false);
+                                            }
+                                        }}
+                                        className="px-3 py-2 rounded-md bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-60"
+                                    >
+                                        Save Bio
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <p className="text-gray-700 whitespace-pre-wrap">
+                                {routeProfile.bio?.trim()?.length ? routeProfile.bio : (
+                                    <span className="italic text-gray-500">No bio yet.</span>
+                                )}
+                            </p>
+                        )}
                     </div>
 
                     {/* User Settings (only for self) */}
@@ -217,41 +349,123 @@ const Profile: React.FC = () => {
                                 <p className="text-gray-600">Log in to edit your profile colors.</p>
                             ) : (
                                 <div className="space-y-6">
-                                    {/* Background Color */}
                                     <div>
                                         <h3 className="text-xl font-semibold mb-2 text-gray-800">
-                                            Background Color
+                                            Icon Background Color
                                         </h3>
                                         <div className="flex flex-wrap gap-2">
-                                            {colors.map((c) => (
+                                            {PROFILE_COLOR_OPTIONS.map((c) => (
                                                 <button
                                                     key={c}
                                                     type="button"
                                                     className={`w-8 h-8 rounded-full border border-gray-300 cursor-pointer ${
-                                                        selectedColor === c ? "ring-4 ring-blue-400" : ""
+                                                        routeProfile.color === c ? "ring-4 ring-blue-400" : ""
                                                     }`}
                                                     style={{ backgroundColor: c }}
-                                                    onClick={() => saveSelectedColor(c, "color")}
+                                                    onClick={() => saveCustomization({ color: c })}
                                                     aria-label={`Set background color ${c}`}
                                                 />
                                             ))}
                                         </div>
                                     </div>
 
-                                    {/* Icon Color */}
                                     <div>
                                         <h3 className="text-xl font-semibold mb-2 text-gray-800">Icon Color</h3>
                                         <div className="flex flex-wrap gap-2">
-                                            {textColors.map((c) => (
+                                            {PROFILE_COLOR_OPTIONS.map((c) => (
                                                 <button
                                                     key={c}
                                                     type="button"
                                                     className={`w-8 h-8 rounded-full border border-gray-300 cursor-pointer ${
-                                                        selectedTextColor === c ? "ring-4 ring-blue-400" : ""
+                                                        routeProfile.text_color === c ? "ring-4 ring-blue-400" : ""
                                                     }`}
                                                     style={{ backgroundColor: c }}
-                                                    onClick={() => saveSelectedColor(c, "text_color")}
+                                                    onClick={() => saveCustomization({ text_color: c })}
                                                     aria-label={`Set icon color ${c}`}
+                                                />
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Icon Picker */}
+                                    <div>
+                                        <h3 className="text-xl font-semibold mb-2 text-gray-800">Icon</h3>
+
+                                        <div className="flex flex-wrap gap-2">
+                                            {PROFILE_ICON_OPTIONS.map((icon) => {
+                                                const selected = (routeProfile.icon ?? "letter") === icon;
+
+                                                return (
+                                                    <button
+                                                        key={icon}
+                                                        type="button"
+                                                        className={[
+                                                            "w-11 h-11 rounded-lg border border-gray-300",
+                                                            "flex items-center justify-center",
+                                                            "bg-white hover:bg-gray-50",
+                                                            selected ? "ring-4 ring-blue-400" : "",
+                                                        ].join(" ")}
+                                                        onClick={() => saveCustomization({ icon })}
+                                                        aria-label={`Set icon ${icon}`}
+                                                        title={icon}
+                                                    >
+                                                        {icon === "letter" ? (
+                                                            <span className={pres.iconColorClass} style={pres.iconColorStyle}>
+                                                              {pres.displayName?.charAt(0).toUpperCase()}
+                                                            </span>
+                                                        ) : (
+                                                            <ProfileIcon
+                                                                name={icon}
+                                                                className={["w-6 h-6", pres.iconColorClass].join(" ").trim()}
+                                                                style={pres.iconColorStyle}
+                                                                title={icon}
+                                                            />
+                                                        )}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
+
+
+                                    {/* Font Picker */}
+                                    <div>
+                                        <h3 className="text-xl font-semibold mb-2 text-gray-800">Font</h3>
+                                        <div className="flex flex-wrap gap-2">
+                                            {PROFILE_FONT_OPTIONS.map((f) => (
+                                                <button
+                                                    key={f.id}
+                                                    type="button"
+                                                    className={[
+                                                        "px-3 py-2 rounded-lg border border-gray-300",
+                                                        "bg-white text-gray-900 hover:bg-gray-50",
+                                                        "text-sm font-semibold",
+                                                        routeProfile.font === f.id ? "ring-4 ring-blue-400" : "",
+                                                        f.css,
+                                                    ].join(" ")}
+                                                    onClick={() => saveCustomization({ font: f.id })}
+                                                >
+                                                    {f.label}
+                                                </button>
+
+                                            ))}
+                                        </div>
+                                    </div>
+                                    {/* Font Color */}
+                                    <div>
+                                        <h3 className="text-xl font-semibold mb-2 text-gray-800">Name Color</h3>
+                                        <div className="flex flex-wrap gap-2">
+                                            {PROFILE_COLOR_OPTIONS.map((c) => (
+                                                <button
+                                                    key={c}
+                                                    type="button"
+                                                    className={`w-8 h-8 rounded-full border border-gray-300 cursor-pointer ${
+                                                        (routeProfile.name_color ?? "#3b82f6") === c ? "ring-4 ring-blue-400" : ""
+                                                    }`}
+                                                    style={{ backgroundColor: c }}
+                                                    onClick={() => saveCustomization({ name_color: c })}
+                                                    aria-label={`Set name color ${c}`}
                                                 />
                                             ))}
                                         </div>
@@ -268,25 +482,25 @@ const Profile: React.FC = () => {
                             <div className="bg-gray-100 p-4 rounded-lg shadow">
                                 <p className="text-gray-800">Boards Generated</p>
                                 <p className="text-lg font-semibold text-gray-900">
-                                    {profile.boards_generated ?? 0}
+                                    {routeProfile.boards_generated ?? 0}
                                 </p>
                             </div>
                             <div className="bg-gray-100 p-4 rounded-lg shadow">
                                 <p className="text-gray-800">Games Finished</p>
                                 <p className="text-lg font-semibold text-gray-900">
-                                    {profile.games_finished ?? 0}
+                                    {routeProfile.games_finished ?? 0}
                                 </p>
                             </div>
                             <div className="bg-gray-100 p-4 rounded-lg shadow">
                                 <p className="text-gray-800">Games Won</p>
                                 <p className="text-lg font-semibold text-gray-900">
-                                    {profile.games_won ?? 0}
+                                    {routeProfile.games_won ?? 0}
                                 </p>
                             </div>
                             <div className="bg-gray-100 p-4 rounded-lg shadow">
                                 <p className="text-gray-800">Money Won</p>
                                 <p className="text-lg font-semibold text-gray-900">
-                                    ${profile.money_won?.toLocaleString() ?? 0}
+                                    ${routeProfile.money_won?.toLocaleString() ?? 0}
                                 </p>
                             </div>
                         </div>
@@ -298,7 +512,7 @@ const Profile: React.FC = () => {
                             <h2 className="text-2xl font-semibold text-gray-800">Recently Generated Boards</h2>
 
                             <Link
-                                to={`/profile/${profile.username}/history`}
+                                to={`/profile/${routeProfile.username}/history`}
                                 className="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors"
                             >
                                 View full history
@@ -306,13 +520,21 @@ const Profile: React.FC = () => {
                         </div>
 
                         <div className="space-y-4">
-                            {boards.length > 0 ? (
+                            {boardsLoading ? (
+                                <p className="text-gray-600 italic">Loading boards…</p>
+                            ) : boards.length > 0 ? (
                                 boards.map((board, idx) => <ProfileGameCard key={idx} game={board} />)
                             ) : (
                                 <p className="text-gray-600 italic">No boards generated yet.</p>
                             )}
                         </div>
                     </div>
+
+                    {error && (
+                        <div className="text-xs text-gray-500">
+                            Session profile warning: {error}
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

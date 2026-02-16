@@ -27,7 +27,7 @@ export interface ProfileRepository {
     getMeProfile: (userId: string) => Promise<PublicProfile | null>;
     searchProfiles: (q: string, limit: number) => Promise<PublicUser[]>;
     getPublicProfileByUsername: (username: string) => Promise<PublicProfile | null>;
-    updateCosmetics: (
+    updateCustomization: (
         userId: string,
         color: string | undefined,
         text_color: string | undefined,

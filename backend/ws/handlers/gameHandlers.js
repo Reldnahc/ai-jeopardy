@@ -131,9 +131,9 @@ export const gameHandlers = {
         ctx.broadcast(gameId, {
             type: "player-list-update",
             players: ctx.games[gameId].players.map(p => ({
-                name: p.name,
-                color: p.color,
-                text_color: p.text_color
+                username: p.username,
+                displayname: p.displayname,
+                online: p?.online,
             })),
             host: ctx.games[gameId].host,
         });
@@ -179,10 +179,9 @@ export const gameHandlers = {
         ctx.broadcast(gameId, {
             type: "player-list-update",
             players: game.players.map(p => ({
-                name: p.name,
-                color: p.color,
-                text_color: p.text_color,
-                online: p.online !== false,
+                username: p.username,
+                displayname: p.displayname,
+                online: p?.online,
             })),
             host: game.host,
         });

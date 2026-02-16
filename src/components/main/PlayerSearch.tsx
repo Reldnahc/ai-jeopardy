@@ -151,9 +151,8 @@ const PlayerSearch: React.FC = () => {
                         >
                             <Avatar
                                 size={"8"}
-                                name={user.username}
-                                color={user.color ?? undefined}
-                                textColor={user.text_color ?? undefined}
+                                displayname={user.displayname}
+                                username={user.username}
                             />
                             <span className="whitespace-nowrap">{user.displayname}</span>
                             <span className="ml-auto text-xs text-gray-500">@{user.username}</span>

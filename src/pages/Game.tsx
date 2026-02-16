@@ -324,7 +324,7 @@ export default function Game() {
         // Only write if different
         if (
             session?.gameId === gameId &&
-            session?.playerName === effectivePlayerName &&
+            session?.username === effectivePlayerName &&
             session?.isHost === isHost
         ) {
             return;

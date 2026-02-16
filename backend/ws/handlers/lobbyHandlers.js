@@ -180,11 +180,11 @@ export const lobbyHandlers = {
     },
 
     "preload-done": async ({ ws, data, ctx }) => {
-        const { gameId, playerKey, playerName, token } = data ?? {};
+        const { gameId, playerKey, username, token } = data ?? {};
         if (!gameId || !ctx.games?.[gameId]) return;
 
         const game = ctx.games[gameId];
-        const stable = playerKey?.trim() || String(playerName ?? "").trim();
+        const stable = playerKey?.trim() || String(username ?? "").trim();
 
         const tok = Number(token);
         const finalTok = Number(game?.preload?.finalToken) || 0;
@@ -322,25 +322,26 @@ export const lobbyHandlers = {
 
         const sendTimed = (type, payloadObj) => {
             const t0 = Date.now();
-            try {
-                ws.send(JSON.stringify(payloadObj));
-            } catch (e) {
+            try { ws.send(JSON.stringify(payloadObj)); } catch (e) {
                 console.error(`[create-lobby][${reqId}] ws.send failed (${type})`, e);
                 return;
             }
             const dt = Date.now() - t0;
-            if (dt > 50) {
-                console.warn(`[create-lobby][${reqId}] ws.send slow (${type})`, { ms: dt });
-            }
+            if (dt > 50) console.warn(`[create-lobby][${reqId}] ws.send slow (${type})`, { ms: dt });
         };
 
-        const {
-            host,
-            categories,
-            playerKey,
-            color: clientColor,
-            text_color: clientTextColor,
-        } = data ?? {};
+        const { username, displayname, playerKey, categories } = data ?? {};
+
+        const u = String(username ?? "").trim().toLowerCase();
+        if (!u) {
+            ws.send(JSON.stringify({ type: "error", message: "Invalid username." }));
+            return;
+        }
+
+        const dnRaw = String(displayname ?? "").trim();
+        const dn = dnRaw.length ? dnRaw : u;
+
+        const stableKey = typeof playerKey === "string" && playerKey.trim() ? playerKey.trim() : null;
 
         // game id generation
         let newGameId;
@@ -350,14 +351,15 @@ export const lobbyHandlers = {
 
         ws.gameId = newGameId;
 
-        const color = normalizeBgColor(clientColor, "bg-blue-500");
-        const text_color = normalizeTextColor(clientTextColor, "text-white");
-
-        const stableKey = typeof playerKey === "string" && playerKey.trim() ? playerKey.trim() : null;
-
         ctx.games[newGameId] = {
-            host,
-            players: [{ id: ws.id, name: host, color, text_color, playerKey: stableKey, online: true }],
+            host: u, // IMPORTANT: host should be username
+            players: [{
+                id: ws.id,
+                username: u,
+                displayname: dn,
+                playerKey: stableKey,
+                online: true,
+            }],
             inLobby: true,
             createdAt: Date.now(),
             categories: ctx.normalizeCategories11(categories),
@@ -366,7 +368,7 @@ export const lobbyHandlers = {
                 timeToAnswer: 10,
                 selectedModel: ctx.appConfig.ai.defaultModel,
                 reasoningEffort: "off",
-                visualMode: "off", // "off" | "commons" | "brave"
+                visualMode: "off",
                 narrationEnabled: true,
                 boardJson: "",
             },
@@ -382,186 +384,150 @@ export const lobbyHandlers = {
             cleanupTimer: null,
         };
 
-        // send responses
+        // IMPORTANT: include players because your client expects it in lobby-created
         sendTimed("lobby-created", {
             type: "lobby-created",
             gameId: newGameId,
-            categories: ctx.normalizeCategories11(categories),
-            players: [{ id: ws.id, name: host, color, text_color }],
+            categories: ctx.games[newGameId].categories,
+            players: ctx.games[newGameId].players.map((p) => ({
+                username: p.username,
+                displayname: p.displayname,
+                online: Boolean(p.online),
+            })),
+            host: u,
         });
 
         sendTimed("lobby-state", ctx.buildLobbyState(newGameId, ws));
 
         const total = Date.now() - startedAt;
-
-        if (total > 1000) {
-            console.warn(`[create-lobby][${reqId}] TOTAL SLOW`, { totalMs: total, gameId: newGameId });
-        }
+        if (total > 1000) console.warn(`[create-lobby][${reqId}] TOTAL SLOW`, { totalMs: total, gameId: newGameId });
     },
 
-    "join-lobby": async ({ ws, data, ctx }) => {
-        const {
-            gameId,
-            playerName,
-            playerKey,
-            color: clientColor,
-            text_color: clientTextColor,
-        } = data ?? {};
 
-        if (!ctx.games?.[gameId]) {
+    "join-lobby": async ({ ws, data, ctx }) => {
+        const { gameId, username, displayname, playerKey } = data ?? {};
+
+        if (!gameId || !ctx.games?.[gameId]) {
             ws.send(JSON.stringify({ type: "error", message: "Lobby does not exist!" }));
             return;
         }
 
-        const actualName = (playerName ?? "").trim();
-        if (!actualName) {
-            ws.send(JSON.stringify({ type: "error", message: "Invalid name." }));
+        const u = String(username ?? "").trim().toLowerCase();
+        if (!u) {
+            ws.send(JSON.stringify({ type: "error", message: "Invalid username." }));
             return;
         }
+
+        const dnRaw = String(displayname ?? "").trim();
+        const dn = dnRaw.length ? dnRaw : u;
 
         const game = ctx.games[gameId];
         ctx.cancelLobbyCleanup(game);
 
-        // Prefer stable identity (playerKey) for dedupe/reconnect.
         const stableKey =
             typeof playerKey === "string" && playerKey.trim() ? playerKey.trim() : null;
 
-        // Only treat cosmetics as "provided" if they are non-empty strings
-        const hasClientColor =
-            clientColor !== undefined &&
-            clientColor !== null &&
-            String(clientColor).trim().length > 0;
-
-        const hasClientTextColor =
-            clientTextColor !== undefined &&
-            clientTextColor !== null &&
-            String(clientTextColor).trim().length > 0;
-
-        // For NEW PLAYER only: fall back to defaults
-        const defaultColor = normalizeBgColor(clientColor, "bg-blue-500");
-        const defaultTextColor = normalizeTextColor(clientTextColor, "text-white");
-
-        // 1) Reconnect by playerKey when available.
+        // 1) Reconnect by playerKey when available
         const existingByKey = stableKey
             ? game.players.find((p) => p.playerKey && p.playerKey === stableKey)
             : null;
 
-        // 2) Fallback: reconnect by name (legacy clients).
-        const existingByName = game.players.find((p) => p.name === actualName);
+        // 2) Fallback reconnect by username
+        const existingByUsername = game.players.find(
+            (p) => String(p.username ?? "").trim().toLowerCase() === u
+        );
 
-        const applyReconnectCosmetics = (player) => {
-            // Preserve what the lobby already has unless the client explicitly sent cosmetics
-            const prevColor = player.color ?? "bg-blue-500";
-            const prevText = player.text_color ?? "text-white";
-
-            if (hasClientColor) player.color = normalizeBgColor(clientColor, prevColor);
-            else player.color = prevColor;
-
-            if (hasClientTextColor) player.text_color = normalizeTextColor(clientTextColor, prevText);
-            else player.text_color = prevText;
+        const attachSocket = (player) => {
+            player.id = ws.id;
+            player.online = true;
+            player.username = u;      // server-authoritative identity
+            player.displayname = dn;  // presentation
+            if (stableKey && !player.playerKey) player.playerKey = stableKey;
+            ws.gameId = gameId;
         };
 
         if (existingByKey) {
-            console.log(`[Server] PlayerKey reconnect for ${actualName} -> Lobby ${gameId}`);
-            existingByKey.id = ws.id;
-            existingByKey.name = actualName; // allow display name changes
-            existingByKey.online = true;
-
-            applyReconnectCosmetics(existingByKey);
-
-            ws.gameId = gameId;
-        } else if (existingByName) {
-            console.log(`[Server] Player ${actualName} reconnected to Lobby ${gameId}`);
-            existingByName.id = ws.id;
-            existingByName.online = true;
-            if (stableKey && !existingByName.playerKey) existingByName.playerKey = stableKey;
-
-            applyReconnectCosmetics(existingByName);
-
-            ws.gameId = gameId;
+            console.log(`[Server] PlayerKey reconnect for ${u} -> Lobby ${gameId}`);
+            attachSocket(existingByKey);
+        } else if (existingByUsername) {
+            console.log(`[Server] Username reconnect for ${u} -> Lobby ${gameId}`);
+            attachSocket(existingByUsername);
         } else {
-            // NEW PLAYER: Add them to the list
-            const raceConditionCheck =
-                game.players.find((p) => p.name === actualName) ||
-                (stableKey ? game.players.find((p) => p.playerKey === stableKey) : null);
+            // NEW PLAYER (but still protect against race)
+            const race = stableKey
+                ? game.players.find((p) => p.playerKey === stableKey)
+                : game.players.find((p) => String(p.username ?? "").trim().toLowerCase() === u);
 
-            if (raceConditionCheck) {
-                // Treat it as a reconnect/update instead of a new push
-                raceConditionCheck.id = ws.id;
-                raceConditionCheck.online = true;
-                if (stableKey && !raceConditionCheck.playerKey) raceConditionCheck.playerKey = stableKey;
-
-                applyReconnectCosmetics(raceConditionCheck);
-
-                ws.gameId = gameId;
+            if (race) {
+                attachSocket(race);
             } else {
-                // Safe to push new player
-                ctx.cancelLobbyCleanup(game);
-
                 game.players.push({
                     id: ws.id,
-                    name: actualName,
-                    color: defaultColor,
-                    text_color: defaultTextColor,
+                    username: u,
+                    displayname: dn,
                     playerKey: stableKey,
                     online: true,
                 });
 
                 ws.gameId = gameId;
-                ctx.scheduleLobbyCleanupIfEmpty(gameId); // this will cancel if anyone is online
+                ctx.scheduleLobbyCleanupIfEmpty(gameId);
             }
         }
 
-        // Always send authoritative snapshot (includes "you")
+        // Send authoritative snapshot to the joining socket
         ws.send(JSON.stringify(ctx.buildLobbyState(gameId, ws)));
 
+        // Broadcast a minimal list (UI will fetch cosmetics by username)
         ctx.broadcast(gameId, {
             type: "player-list-update",
             players: game.players.map((p) => ({
-                name: p.name,
-                color: p.color,
-                text_color: p.text_color,
+                username: p.username,
+                displayname: p.displayname,
+                online: Boolean(p.online),
             })),
-            host: game.host,
+            host: game.host, // IMPORTANT: host should be a username going forward
         });
     },
 
     "leave-lobby": async ({ ws, data, ctx }) => {
-        const { gameId, playerId, playerName } = data;
-        const name = String(playerId ?? playerName ?? "").trim();
+        const { gameId, playerKey, username } = data ?? {};
 
         const effectiveGameId =
-            (gameId && ctx.games[gameId] ? gameId : null) ??
-            (ws.gameId && ctx.games[ws.gameId] ? ws.gameId : null);
+            (gameId && ctx.games?.[gameId] ? gameId : null) ??
+            (ws.gameId && ctx.games?.[ws.gameId] ? ws.gameId : null);
 
-        if (!effectiveGameId || !ctx.games[effectiveGameId] || !name) return;
+        if (!effectiveGameId || !ctx.games[effectiveGameId]) return;
 
         const game = ctx.games[effectiveGameId];
-
-        // Only do hard-removal in the lobby
         if (!game.inLobby) return;
 
+        const stable = String(playerKey ?? "").trim() || String(username ?? "").trim().toLowerCase();
+        if (!stable) return;
+
         const before = game.players.length;
-        game.players = game.players.filter((p) => p.name !== name);
 
-        if (game.players.length === before) return; // nothing to do
+        game.players = game.players.filter((p) => {
+            const pid = ctx.playerStableId(p); // must match your stable-id logic
+            return pid !== stable;
+        });
 
-        // If host left, reassign host (or delete lobby if empty)
-        if (game.host === name) {
+        if (game.players.length === before) return;
+
+        // If host left, reassign host (or cleanup if empty)
+        if (String(game.host ?? "").trim().toLowerCase() === String(username ?? "").trim().toLowerCase()) {
             if (game.players.length === 0) {
                 ctx.scheduleLobbyCleanupIfEmpty(effectiveGameId);
                 return;
             }
-
-            game.host = game.players[0].name;
+            game.host = String(game.players[0].username ?? "").trim().toLowerCase();
         }
 
         ctx.broadcast(effectiveGameId, {
             type: "player-list-update",
             players: game.players.map((p) => ({
-                name: p.name,
-                color: p.color,
-                text_color: p.text_color,
+                username: p.username,
+                displayname: p.displayname,
+                online: Boolean(p.online),
             })),
             host: game.host,
         });
@@ -655,34 +621,29 @@ export const lobbyHandlers = {
     },
 
     "promote-host": async ({ ws, data, ctx }) => {
-        const { gameId, targetPlayerName } = data;
-        const game = ctx.games[gameId];
-        if (!game) return;
-
-        // Only allow in-lobby host promotion
-        if (!game.inLobby) return;
-
-        // Only current host socket can promote
+        const { gameId, targetUsername } = data ?? {};
+        const game = ctx.games?.[gameId];
+        if (!game || !game.inLobby) return;
         if (!ctx.requireHost(game, ws)) return;
 
-        const target = String(targetPlayerName ?? "").trim();
-        if (!target) return;
+        const targetU = String(targetUsername ?? "").trim().toLowerCase();
+        if (!targetU) return;
 
-        const targetPlayer = (game.players || []).find((p) => p.name === target);
+        const targetPlayer = (game.players || []).find(
+            (p) => String(p.username ?? "").trim().toLowerCase() === targetU
+        );
         if (!targetPlayer) return;
 
-        // No-op if already host
-        if (game.host === target) return;
+        if (game.host === targetU) return;
 
-        game.host = target;
+        game.host = targetU;
 
         ctx.broadcast(gameId, {
             type: "player-list-update",
             players: game.players.map((p) => ({
-                name: p.name,
-                color: p.color,
-                text_color: p.text_color,
-                online: p?.online !== false,
+                username: p.username,
+                displayname: p.displayname,
+                online: Boolean(p.online),
             })),
             host: game.host,
         });

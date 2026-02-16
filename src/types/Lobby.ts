@@ -1,6 +1,5 @@
 export type Player = {
-    name: string;
-    color: string;
-    text_color: string;
+    username: string;
+    displayname: string;
     online?: boolean;
-}
+};
