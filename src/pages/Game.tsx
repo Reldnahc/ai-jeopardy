@@ -5,8 +5,6 @@ import JeopardyBoard from "../components/game/JeopardyBoard.tsx";
 import Sidebar from "../components/game/Sidebar.tsx";
 import FinalScoreScreen from "../components/game/FinalScoreScreen.tsx";
 import { useWebSocket } from "../contexts/WebSocketContext.tsx";
-import { useDeviceContext } from "../contexts/DeviceContext.tsx";
-import MobileSidebar from "../components/game/MobileSidebar.tsx";
 import { useGameSession } from "../hooks/useGameSession.ts";
 import { useGameSocketSync } from "../hooks/game/useGameSocketSync.ts";
 import { usePlayerIdentity } from "../hooks/usePlayerIdentity.ts";
@@ -14,6 +12,7 @@ import { usePreload } from "../hooks/game/usePreload.ts";
 import { useEarlyMicPermission } from "../hooks/earlyMicPermission.ts";
 import { Clue } from "../../shared/types/board.ts";
 import { getCachedAudioBlobUrl } from "../audio/audioCache.ts";
+import {BuzzPayload} from "../types/Game.ts";
 
 function getApiBase() {
     if (import.meta.env.DEV) return import.meta.env.VITE_API_BASE || "http://localhost:3002";
@@ -88,7 +87,6 @@ export default function Game() {
 
     // Persistent WebSocket connection
     const { sendJson, nowFromPerfMs, perfNowMs, lastSyncAgeMs } = useWebSocket();
-    const { deviceType } = useDeviceContext();
 
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const audioCtxRef = useRef<AudioContext | null>(null);
@@ -121,21 +119,6 @@ export default function Game() {
             // ignore
         }
     }, [audioVolume]);
-
-    const toggleAudioMuted = useCallback(() => {
-        setAudioVolume((prev) => {
-            if (prev > 0) return 0;
-
-            try {
-                const raw = localStorage.getItem(AUDIO_LAST_NONZERO_KEY);
-                const v = raw == null ? 1 : Number(raw);
-                if (Number.isFinite(v) && v > 0) return Math.min(1, Math.max(0, v));
-            } catch {
-                // ignore
-            }
-            return 1;
-        });
-    }, []);
 
     const isSelectorOnBoard = Boolean(
         phase === "board" &&
@@ -374,7 +357,7 @@ export default function Game() {
 
         const syncAge = lastSyncAgeMs?.() ?? Number.POSITIVE_INFINITY;
 
-        const payload: any = {
+        const payload: BuzzPayload  = {
             type: "buzz",
             gameId,
             clientBuzzPerfMs,
@@ -408,39 +391,23 @@ export default function Game() {
 
     return (
         <div className="flex h-screen w-screen overflow-hidden font-sans bg-gradient-to-b from-[#183a75] via-[#2a5fb3] to-[#1c4a96]">
-            {deviceType === "mobile" ? (
-                <MobileSidebar
-                    isHost={isHost}
-                    host={host}
-                    players={players}
-                    scores={scores}
-                    buzzResult={buzzResult}
-                    narrationEnabled={narrationEnabled}
-                    audioMuted={audioMuted}
-                    onToggleAudioMuted={toggleAudioMuted}
-                    lastQuestionValue={lastQuestionValue}
-                    handleScoreUpdate={handleScoreUpdate}
-                    onLeaveGame={leaveGame}
-                />
-            ) : (
-                <Sidebar
-                    players={players}
-                    scores={scores}
-                    buzzResult={buzzResult}
-                    narrationEnabled={narrationEnabled}
-                    audioVolume={audioVolume}
-                    onChangeAudioVolume={setAudioVolume}
-                    lastQuestionValue={lastQuestionValue}
-                    activeBoard={safeActiveBoard}
-                    handleScoreUpdate={handleScoreUpdate}
-                    markAllCluesComplete={markAllCluesComplete}
-                    onLeaveGame={leaveGame}
-                    selectorName={selectorName}
-                    onToggleDailyDoubleSnipe={(enabled) => {
-                        sendJson({ type: "dd-snipe-next", gameId, enabled });
-                    }}
-                />
-            )}
+            <Sidebar
+                players={players}
+                scores={scores}
+                buzzResult={buzzResult}
+                narrationEnabled={narrationEnabled}
+                audioVolume={audioVolume}
+                onChangeAudioVolume={setAudioVolume}
+                lastQuestionValue={lastQuestionValue}
+                activeBoard={safeActiveBoard}
+                handleScoreUpdate={handleScoreUpdate}
+                markAllCluesComplete={markAllCluesComplete}
+                onLeaveGame={leaveGame}
+                selectorName={selectorName}
+                onToggleDailyDoubleSnipe={(enabled) => {
+                    sendJson({ type: "dd-snipe-next", gameId, enabled });
+                }}
+            />
 
             <div className="flex flex-1 justify-center items-center overflow-hidden p-0">
                 {isGameOver ? (
