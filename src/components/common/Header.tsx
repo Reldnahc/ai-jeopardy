@@ -98,6 +98,7 @@ const Header: React.FC = () => {
         return [
             { key: "profile", label: "Profile", to: `/profile/${u}`, kind: "link" },
             { key: "history", label: "History", to: `/profile/${u}/history`, kind: "link" },
+            { key: "stats", label: "Stats", to: `/profile/${u}/stats`, kind: "link" },
             { key: "logout", label: "Log out", kind: "action", danger: true, onClick: handleLogout },
         ];
     }, [user?.username, location.pathname]);

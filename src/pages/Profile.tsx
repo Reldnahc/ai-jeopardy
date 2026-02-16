@@ -474,10 +474,19 @@ const Profile: React.FC = () => {
                             )}
                         </div>
                     )}
-
                     {/* Player Stats */}
                     <div>
-                        <h2 className="text-2xl font-semibold mb-4 text-gray-800">Player Stats</h2>
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-2xl font-semibold text-gray-800">Player Stats</h2>
+
+                            <Link
+                                to={`/profile/${routeProfile.username}/stats`}
+                                className="px-4 py-1 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors"
+                            >
+                                View full stats
+                            </Link>
+                        </div>
+
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                             <div className="bg-gray-100 p-4 rounded-lg shadow">
                                 <p className="text-gray-800">Boards Generated</p>
@@ -513,7 +522,7 @@ const Profile: React.FC = () => {
 
                             <Link
                                 to={`/profile/${routeProfile.username}/history`}
-                                className="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors"
+                                className="px-4 py-1 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors"
                             >
                                 View full history
                             </Link>
