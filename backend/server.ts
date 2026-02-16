@@ -18,6 +18,7 @@ import { registerBoardRoutes } from "./http/boardRoutes.js";
 import { pool } from "./config/pg.js";
 import { createRepos } from "./repositories/index.js";
 import {appConfig} from "./config/appConfig.js";
+import {registerLeaderboardRoutes} from "./http/leaderboardRoutes.js";
 
 
 const app = express();
@@ -43,6 +44,7 @@ const repos = createRepos(pool);
 registerAuthRoutes(app, repos);
 registerProfileRoutes(app, repos);
 registerBoardRoutes(app, repos);
+registerLeaderboardRoutes(app, repos);
 
 // --- 2. SERVE STATIC ASSETS ---
 app.use(express.static(distPath));

@@ -17,6 +17,7 @@ import Layout from "./components/common/Layout.tsx";
 import RouteWatchRoot from "./components/common/RouteWatchRoot.tsx";
 import "./fonts";
 import './index.css';
+import Leaderboard from "./pages/Leaderboard.tsx";
 
 // Define the router configuration
 const router = createBrowserRouter([
@@ -55,10 +56,22 @@ const router = createBrowserRouter([
                         <Layout><UserHistory/></Layout>
                 )
             },
+            // {
+            //     path: "/profile/:username/stats",
+            //     element: (
+            //             <Layout><UserStats/></Layout>
+            //     )
+            // },
             {
                 path: "/recent-boards",
                 element: (
                         <Layout><RecentBoards/></Layout>
+                )
+            },
+            {
+                path: "/leaderboards",
+                element: (
+                        <Layout><Leaderboard/></Layout>
                 )
             },
             {

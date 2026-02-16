@@ -13,17 +13,37 @@ function getApiBase() {
     return "";
 }
 
-async function fetchJson<T>(url: string): Promise<T> {
-    const res = await fetch(url);
-    const text = await res.text();
-    let payload: any = null;
+function safeJsonParse(text: string): unknown {
+    if (!text) return null;
     try {
-        payload = text ? JSON.parse(text) : null;
-    } catch {}
+        return JSON.parse(text) as unknown;
+    } catch {
+        return null;
+    }
+}
+
+function getErrorMessage(payload: unknown, fallback: string) {
+    if (payload && typeof payload === "object" && "error" in payload) {
+        const e = (payload as Record<string, unknown>).error;
+        if (typeof e === "string" && e.trim()) return e;
+    }
+    return fallback;
+}
+
+export async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
+    const res = await fetch(url, init);
+    const text = await res.text();
+
+    const payload = safeJsonParse(text);
 
     if (!res.ok) {
-        const msg = payload?.error || text || `HTTP ${res.status}`;
-        throw new Error(msg);
+        const fallback = text?.trim() || `HTTP ${res.status}`;
+        throw new Error(getErrorMessage(payload, fallback));
+    }
+
+    // If the server returns empty body on 204 etc
+    if (payload === null) {
+        return null as unknown as T;
     }
 
     return payload as T;
@@ -92,8 +112,8 @@ const RecentBoards = () => {
         <div className="min-h-screen bg-gradient-to-r from-indigo-400 to-blue-700 flex flex-col items-center p-6">
             <div className="bg-white rounded-xl shadow-2xl overflow-hidden w-full max-w-6xl">
                 <div className="p-10">
-                    <h1 className="text-4xl font-bold text-gray-900 mb-8 text-center">
-                        Recent Boards
+                    <h1 className="text-6xl font-swiss911 tracking-wider text-shadow-jeopardy text-yellow-400 mb-8 text-center">
+                        <div> Recent Boards</div>
                     </h1>
 
                     <div className="flex flex-wrap gap-4 justify-center mb-6">

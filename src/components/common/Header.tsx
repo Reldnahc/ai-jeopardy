@@ -1,12 +1,16 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import LoginForm from "./LoginForm.tsx";
 import Avatar from "./Avatar.tsx";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAlert } from "../../contexts/AlertContext.tsx";
 import { useAuth } from "../../contexts/AuthContext.tsx";
-import {useProfile} from "../../contexts/ProfileContext.tsx";
-import {getProfilePresentation} from "../../utils/profilePresentation.ts";
+import { useProfile } from "../../contexts/ProfileContext.tsx";
+import { getProfilePresentation } from "../../utils/profilePresentation.ts";
+
+type NavItem =
+    | { key: string; label: string; to: string; kind: "link" }
+    | { key: string; label: string; kind: "action"; danger?: boolean; onClick: () => void };
 
 const Header: React.FC = () => {
     const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -23,18 +27,21 @@ const Header: React.FC = () => {
     const navigate = useNavigate();
     const { showAlert } = useAlert();
 
-    const toggleDropdown = () => setDropdownOpen((v) => !v);
+    const closeAllMenus = () => {
+        setDropdownOpen(false);
+        setMenuOpen(false);
+    };
 
     const handleLogout = () => {
         const prevent = location.pathname.includes("/game/") || location.pathname.includes("/lobby/");
         if (prevent) {
             showAlert(
                 <span>
-          <span className="text-red-500 font-bold text-xl">
-            You cannot log out in a game or lobby.
-          </span>
-          <br />
-        </span>,
+                    <span className="text-red-500 font-bold text-xl">
+                        You cannot log out in a game or lobby.
+                    </span>
+                    <br />
+                </span>,
                 [
                     {
                         label: "Okay",
@@ -46,16 +53,8 @@ const Header: React.FC = () => {
             return;
         }
 
-        // Clear JWT + user in AuthContext
         logout();
-
-        // Close menus so UI doesn't feel stuck
-        setDropdownOpen(false);
-        setMenuOpen(false);
-    };
-
-    const handleNavigate = (to: string) => {
-        navigate(to);
+        closeAllMenus();
     };
 
     // Close dropdown or mobile menu when clicking outside
@@ -84,22 +83,47 @@ const Header: React.FC = () => {
         defaultNameColor: "#ffffff",
     });
 
+    // Desktop top nav ONLY
+    const topLinks = useMemo<Extract<NavItem, { kind: "link" }>[]>(() => {
+        return [
+            { key: "recent", label: "Recent Boards", to: "/recent-boards", kind: "link" },
+            { key: "leaderboards", label: "Leaderboards", to: "/leaderboards", kind: "link" },
+        ];
+    }, []);
+
+    // Account menu items (desktop dropdown + mobile hamburger). Only if logged in.
+    const accountItems = useMemo<NavItem[]>(() => {
+        if (!user) return [];
+        const u = user.username;
+        return [
+            { key: "profile", label: "Profile", to: `/profile/${u}`, kind: "link" },
+            { key: "history", label: "History", to: `/profile/${u}/history`, kind: "link" },
+            { key: "logout", label: "Log out", kind: "action", danger: true, onClick: handleLogout },
+        ];
+    }, [user?.username, location.pathname]);
+
     return (
         <header className="bg-gradient-to-r from-indigo-400 to-blue-700 text-white w-full h-[5.5rem] shadow-md">
             <div className="container mx-auto flex items-center py-4 px-6 justify-between h-full">
-                {/* Left: Logo */}
+                {/* Left: Logo + Desktop nav */}
                 <div className="flex items-center space-x-6">
                     <Link
                         to="/"
-                        className="text-4xl md:text-5xl text-shadow-jeopardy font-swiss911 tracking-wider font-bold hover:underline text-white hover:text-blue-600"
+                        className="text-3xl lg:text-5xl text-shadow-jeopardy font-swiss911 tracking-wider font-bold hover:underline text-white hover:text-blue-600"
                     >
                         AI-Jeopardy.com
                     </Link>
 
-                    <nav className="hidden md:flex items-center space-x-3">
-                        <Link to="/recent-boards" className="px-4 text-xl py-2 hover:underline rounded">
-                            Recent Boards
-                        </Link>
+                    <nav className="hidden md:flex items-center space-x-3 mt-2">
+                        {topLinks.map((item) => (
+                            <Link
+                                key={item.key}
+                                to={item.to}
+                                className="px-4 lg:text-2xl py-2 font-bold hover:underline hover:text-blue-600 rounded"
+                            >
+                                {item.label}
+                            </Link>
+                        ))}
                     </nav>
                 </div>
 
@@ -108,7 +132,7 @@ const Header: React.FC = () => {
                     {user ? (
                         <div className="hidden relative md:block" ref={dropdownRef}>
                             <button
-                                onClick={toggleDropdown}
+                                onClick={() => setDropdownOpen((v) => !v)}
                                 className="flex items-center text-xl px-4 py-2 rounded hover:bg-blue-400 focus:outline-none"
                             >
                                 <Avatar
@@ -119,7 +143,7 @@ const Header: React.FC = () => {
                                     icon={pres.avatar.icon}
                                 />
                                 <span className={`ml-3 ${pres.nameClassName}`} style={pres.nameStyle}>
-                                  {pres.displayName}
+                                    {pres.displayName}
                                 </span>
                                 <svg
                                     xmlns="http://www.w3.org/2000/svg"
@@ -141,28 +165,31 @@ const Header: React.FC = () => {
                                         exit={{ opacity: 0, scale: 0.9 }}
                                         transition={{ duration: 0.3 }}
                                     >
-                                        <Link
-                                            to={`/profile/${user.username}`}
-                                            onClick={() => setDropdownOpen(false)}
-                                            className="block px-4 py-2 text-blue-600 hover:bg-gray-200"
-                                        >
-                                            Profile
-                                        </Link>
-
-                                        <Link
-                                            to={`/profile/${user.username}/history`}
-                                            onClick={() => setDropdownOpen(false)}
-                                            className="block px-4 py-2 text-blue-600 hover:bg-gray-200 text-left w-full"
-                                        >
-                                            History
-                                        </Link>
-
-                                        <span
-                                            onClick={handleLogout}
-                                            className="block px-4 py-2 text-red-600 hover:bg-gray-200 cursor-pointer"
-                                        >
-                                          Log out
-                                        </span>
+                                        {accountItems.map((item) => {
+                                            if (item.kind === "link") {
+                                                return (
+                                                    <Link
+                                                        key={item.key}
+                                                        to={item.to}
+                                                        onClick={() => setDropdownOpen(false)}
+                                                        className="block px-4 py-2 text-blue-600 hover:bg-gray-200"
+                                                    >
+                                                        {item.label}
+                                                    </Link>
+                                                );
+                                            }
+                                            return (
+                                                <span
+                                                    key={item.key}
+                                                    onClick={item.onClick}
+                                                    className={`block px-4 py-2 hover:bg-gray-200 cursor-pointer ${
+                                                        item.danger ? "text-red-600" : "text-blue-600"
+                                                    }`}
+                                                >
+                                                    {item.label}
+                                                </span>
+                                            );
+                                        })}
                                     </motion.div>
                                 )}
                             </AnimatePresence>
@@ -201,7 +228,7 @@ const Header: React.FC = () => {
                 </div>
             </div>
 
-            {/* Mobile dropdown */}
+            {/* Mobile menu: topLinks + accountItems (if logged in) */}
             <AnimatePresence>
                 {menuOpen && (
                     <motion.div
@@ -213,63 +240,23 @@ const Header: React.FC = () => {
                         transition={{ duration: 0.4, ease: "easeInOut" }}
                         ref={menuRef}
                     >
-                        <motion.div
-                            className="flex flex-col"
-                            initial="hidden"
-                            animate="visible"
-                            exit="hidden"
-                            variants={{
-                                hidden: { opacity: 0, transition: { staggerChildren: 0.1, staggerDirection: -1 } },
-                                visible: { opacity: 1, transition: { staggerChildren: 0.1 } },
-                            }}
-                        >
-                            <motion.button
-                                className="block px-4 py-2 hover:bg-blue-500 cursor-pointer"
-                                onClick={() => {
-                                    handleNavigate("/recent-boards");
-                                    setMenuOpen(false);
-                                }}
-                                variants={{ hidden: { opacity: 0, y: -10 }, visible: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -10 } }}
-                            >
-                                Recent Boards
-                            </motion.button>
-
-                            {user && (
-                                <>
-                                    <motion.button
-                                        className="block px-4 py-2 hover:bg-blue-500 cursor-pointer"
-                                        variants={{ hidden: { opacity: 0, y: -10 }, visible: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -10 } }}
-                                        onClick={() => {
-                                            handleNavigate(`/profile/${user.username}`);
-                                            setMenuOpen(false);
-                                        }}
-                                    >
-                                        Profile
-                                    </motion.button>
-
-                                    <motion.button
-                                        className="block px-4 py-2 hover:bg-blue-500 cursor-pointer"
-                                        variants={{ hidden: { opacity: 0, y: -10 }, visible: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -10 } }}
-                                        onClick={() => {
-                                            handleNavigate(`/profile/${user.username}/history`);
-                                            setMenuOpen(false);
-                                        }}
-                                    >
-                                        History
-                                    </motion.button>
-
-                                    <motion.button
-                                        className="block px-4 py-2 text-red-600 hover:bg-blue-500 cursor-pointer"
-                                        variants={{ hidden: { opacity: 0, y: -10 }, visible: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -10 } }}
-                                        onClick={() => {
-                                            handleLogout();
-                                            setMenuOpen(false);
-                                        }}
-                                    >
-                                        Log out
-                                    </motion.button>
-                                </>
-                            )}
+                        <motion.div className="flex flex-col">
+                            {[...topLinks, ...(user ? accountItems : [])].map((item) => (
+                                <motion.button
+                                    key={item.key}
+                                    className={`block px-4 py-2 hover:bg-blue-500 cursor-pointer ${
+                                        item.kind === "action" && item.danger ? "text-red-600" : ""
+                                    }`}
+                                    onClick={() => {
+                                        if (item.kind === "link") navigate(item.to);
+                                        else item.onClick();
+                                        setMenuOpen(false);
+                                    }}
+                                    variants={{ hidden: { opacity: 0, y: -10 }, visible: { opacity: 1, y: 0 } }}
+                                >
+                                    {item.label}
+                                </motion.button>
+                            ))}
                         </motion.div>
                     </motion.div>
                 )}

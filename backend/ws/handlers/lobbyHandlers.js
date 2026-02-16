@@ -281,12 +281,16 @@ export const lobbyHandlers = {
         game.gameReady.done = true;
 
         // NOW fire welcome logic (moved from preload-done)
-        const narrationEnabled = Boolean(game?.lobbySettings?.narrationEnabled);
         const selectorName = String(game.selectorName ?? "").trim();
 
         console.log(selectorName);
 
-        if (narrationEnabled && selectorName) {
+        if (selectorName) {
+
+            for (const player of game.players){
+                ctx.fireAndForget(ctx.repos.profiles.incrementGamesPlayed(player.username),"update games played");
+            }
+
             game.phase = "welcome";
             game.welcomeEndsAt = null;
 

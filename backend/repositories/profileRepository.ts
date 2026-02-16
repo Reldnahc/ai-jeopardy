@@ -10,6 +10,32 @@ function normalizeEmail(email: unknown): string | null {
     return v.length ? v : null;
 }
 
+export type LeaderboardStatKey =
+    | "money_won"
+    | "games_won"
+    | "games_finished"
+    | "correct_answers"
+    | "true_daily_doubles"
+    | "times_buzzed"
+    | "final_jeopardy_corrects"
+    | "daily_double_found"
+    | "daily_double_correct"
+    | "clues_selected";
+
+
+export interface LeaderboardRow {
+    username: string;
+    displayname: string;
+    value: number;
+
+    color: string;
+    text_color: string;
+    name_color: string;
+    border: string;
+    font: string | null;
+    icon: string | null;
+}
+
 export interface PublicUserRow {
     id: string;
     email: string | null;
@@ -444,6 +470,66 @@ export function createProfileRepository(pool: Pool) {
         return rows?.[0] ?? null;
     }
 
+    async function listLeaderboard(
+        statRaw: unknown,
+        limitRaw: unknown,
+        offsetRaw: unknown
+    ): Promise<LeaderboardRow[]> {
+        const stat = String(statRaw ?? "").trim() as LeaderboardStatKey;
+
+        const allowed = new Set<LeaderboardStatKey>([
+            "money_won",
+            "games_won",
+            "games_finished",
+            "correct_answers",
+            "true_daily_doubles",
+            "times_buzzed",
+            "final_jeopardy_corrects",
+            "daily_double_found",
+            "daily_double_correct",
+            "clues_selected",
+        ]);
+
+
+        const safeStat: LeaderboardStatKey = allowed.has(stat) ? stat : "money_won";
+
+        const limitNum = Number(limitRaw ?? 25);
+        const offsetNum = Number(offsetRaw ?? 0);
+
+        const limit = Number.isFinite(limitNum) ? Math.min(Math.max(limitNum, 1), 100) : 25;
+        const offset = Number.isFinite(offsetNum) ? Math.max(offsetNum, 0) : 0;
+
+        const { rows } = await pool.query<LeaderboardRow>(
+            `
+        select
+            p.username,
+            p.displayname,
+            coalesce(s.${safeStat}, 0)::float8 as value,
+
+            coalesce(c.color, '#3b82f6') as color,
+            coalesce(c.text_color, '#ffffff') as text_color,
+            coalesce(c.name_color, '#111827') as name_color,
+            coalesce(c.border, '') as border,
+            c.font,
+            c.icon
+        from public.profile_statistics s
+        join public.profiles p on p.id = s.profile_id
+        left join public.profile_customization c on c.profile_id = p.id
+        where coalesce(s.${safeStat}, 0) > 0
+        order by coalesce(s.${safeStat}, 0) desc, p.username asc
+        limit $1 offset $2
+        `,
+            [limit, offset]
+        );
+
+        return (rows ?? []).map((r) => ({
+            ...r,
+            username: String(r.username ?? "").trim().toLowerCase(),
+            displayname: String(r.displayname ?? r.username ?? "").trim(),
+            value: Number(r.value ?? 0),
+        }));
+    }
+
     async function incrementStats(userId: string | null | undefined, deltas: StatDeltas): Promise<MeProfileRow | null> {
         if (!userId) return null;
 
@@ -714,6 +800,7 @@ export function createProfileRepository(pool: Pool) {
         getPublicProfileByUsername,
         getIdByUsername,
         updateCustomization,
+        listLeaderboard,
 
         addTokens,
         incrementBoardsGenerated,
@@ -721,17 +808,22 @@ export function createProfileRepository(pool: Pool) {
         incrementGamesWon,
         addMoneyWon,
         incrementGamesPlayed,
+
         incrementDailyDoubleFound,
         incrementDailyDoubleCorrect,
+        incrementTrueDailyDoubles,
+
         incrementFinalJeopardyParticipations,
         incrementFinalJeopardyCorrects,
+
         incrementCluesSelected,
         incrementTimesBuzzed,
         incrementTotalBuzzes,
+
         incrementCorrectAnswers,
         incrementWrongAnswers,
+
         incrementCluesSkipped,
-        incrementTrueDailyDoubles,
 
         incrementStats,
     };
