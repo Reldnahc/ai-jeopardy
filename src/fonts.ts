@@ -27,3 +27,19 @@ import "@fontsource/comfortaa/600.css";
 
 import "@fontsource/baloo-2/400.css";
 import "@fontsource/baloo-2/600.css";
+
+import "@fontsource/bungee/400.css";
+
+import "@fontsource/rubik-glitch/400.css";
+
+import "@fontsource/creepster/400.css";
+
+import "@fontsource/press-start-2p/400.css";
+
+import "@fontsource/major-mono-display/400.css";
+
+import "@fontsource/luckiest-guy/400.css";
+
+import "@fontsource/chewy/400.css";
+
+import "@fontsource/metal-mania/400.css";

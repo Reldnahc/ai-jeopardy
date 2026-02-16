@@ -17,21 +17,43 @@ export const PROFILE_COLOR_OPTIONS = [
 
 
 export const PROFILE_FONT_OPTIONS = [
+    // System / Base
     { id: "inter", label: "Inter", css: "font-inter" },
     { id: "serif", label: "Serif", css: "font-serif" },
     { id: "mono", label: "Mono", css: "font-mono" },
+
+    // Clean
     { id: "outfit", label: "Outfit", css: "font-outfit" },
     { id: "dmsans", label: "DM Sans", css: "font-dmsans" },
     { id: "jetbrains", label: "JetBrains Mono", css: "font-jetbrains" },
+
+    // Tech / Futuristic
     { id: "orbitron", label: "Orbitron", css: "font-orbitron" },
     { id: "audiowide", label: "Audiowide", css: "font-audiowide" },
+    { id: "majormono", label: "Major Mono Display", css: "font-majormono" },
+    { id: "pressstart", label: "Press Start 2P", css: "font-pressstart" },
+
+    // Cute / Rounded
     { id: "fredoka", label: "Fredoka", css: "font-fredoka" },
     { id: "baloo", label: "Baloo 2", css: "font-baloo" },
     { id: "comfortaa", label: "Comfortaa", css: "font-comfortaa" },
+    { id: "chewy", label: "Chewy", css: "font-chewy" },
+
+    // Script / Handwritten
     { id: "pacifico", label: "Pacifico", css: "font-pacifico" },
     { id: "cherry", label: "Cherry Bomb One", css: "font-cherry" },
     { id: "gloria", label: "Gloria Hallelujah", css: "font-gloria" },
+
+    // Loud / Display
+    { id: "bungee", label: "Bungee", css: "font-bungee" },
+    { id: "luckiest", label: "Luckiest Guy", css: "font-luckiest" },
+
+    // Chaos Tier
+    { id: "rubikglitch", label: "Rubik Glitch", css: "font-rubikglitch" },
+    { id: "creepster", label: "Creepster", css: "font-creepster" },
+    { id: "metalmania", label: "Metal Mania", css: "font-metalmania" },
 ] as const;
+
 
 const FONT_CLASS_MAP: Record<string, string> =
     Object.fromEntries(

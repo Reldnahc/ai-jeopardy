@@ -40,6 +40,21 @@ function toErrorMessage(e: unknown) {
     return String(e);
 }
 
+type ColorTarget = "color" | "text_color" | "name_color";
+
+const COLOR_TARGETS: Array<{ key: ColorTarget; label: string; defaultHex: string }> = [
+    { key: "color", label: "Icon Background", defaultHex: "#3b82f6" },
+    { key: "text_color", label: "Icon Color", defaultHex: "#ffffff" },
+    { key: "name_color", label: "Name Color", defaultHex: "#3b82f6" },
+];
+
+function normalizeHex(input: string, fallback: string) {
+    const s = String(input ?? "").trim();
+    if (!s) return fallback;
+    if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(s)) return s.toLowerCase();
+    return fallback;
+}
+
 const Profile: React.FC = () => {
     const { username } = useParams<RouteParams>();
     const { user, token } = useAuth();
@@ -67,6 +82,11 @@ const Profile: React.FC = () => {
     const [routeLoading, setRouteLoading] = useState(true);
     const [routeError, setRouteError] = useState<string | null>(null);
 
+    const [settingsOpen, setSettingsOpen] = useState(false);
+
+    const [colorTarget, setColorTarget] = useState<ColorTarget>("color");
+    const [hexDraft, setHexDraft] = useState<string>("#3b82f6");
+
     // Viewing "my" profile if the route profile id matches the logged-in user id
     const isOwnProfile = useMemo(() => {
         return Boolean(user?.id && routeProfile?.id && user.id === routeProfile.id);
@@ -80,6 +100,16 @@ const Profile: React.FC = () => {
      */
     const pendingOverlayRef = useRef<CustomPatch>({});
     const pendingSinceRef = useRef<number>(0);
+    const getSavedHexForTarget = (p: P, target: ColorTarget) => {
+        const meta = COLOR_TARGETS.find((t) => t.key === target)!;
+        const current = (p[target] ?? meta.defaultHex) as string;
+        return normalizeHex(current, meta.defaultHex);
+    };
+
+    const cancelHexDraft = () => {
+        if (!routeProfile) return;
+        setHexDraft(getSavedHexForTarget(routeProfile, colorTarget));
+    };
 
     function applyOverlay(p: P | null): P | null {
         if (!p) return p;
@@ -143,6 +173,15 @@ const Profile: React.FC = () => {
     useEffect(() => {
         setBioDraft(routeProfile?.bio ?? "");
     }, [routeProfile?.bio, routeProfile?.id]);
+
+    // Keep unified color picker hexDraft in sync with routeProfile and selected target
+    useEffect(() => {
+        if (!routeProfile) return;
+        const meta = COLOR_TARGETS.find((t) => t.key === colorTarget)!;
+        const current = (routeProfile[colorTarget] ?? meta.defaultHex) as string;
+        setHexDraft(normalizeHex(current, meta.defaultHex));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [routeProfile?.id, routeProfile?.color, routeProfile?.text_color, routeProfile?.name_color, colorTarget]);
 
     // Fetch boards when username changes
     useEffect(() => {
@@ -244,6 +283,22 @@ const Profile: React.FC = () => {
         }
     };
 
+    const commitHexDraft = async () => {
+        const meta = COLOR_TARGETS.find((t) => t.key === colorTarget)!;
+        const next = normalizeHex(hexDraft, meta.defaultHex);
+        setHexDraft(next);
+
+        // Build a typed patch without `any`
+        const patch: CustomPatch =
+            colorTarget === "color"
+                ? { color: next }
+                : colorTarget === "text_color"
+                    ? { text_color: next }
+                    : { name_color: next };
+
+        await saveCustomization(patch);
+    };
+
     if (routeLoading || loading) {
         return <LoadingScreen message="Loading profile" progress={-1} />;
     }
@@ -256,13 +311,19 @@ const Profile: React.FC = () => {
         );
     }
 
-
     const pres = getProfilePresentation({
         profile: routeProfile,
         // for safety if routeProfile is ever partial / nullish, still show something
         fallbackName: routeProfile?.displayname || routeProfile?.username || "",
         defaultNameColor: "#3b82f6", // profile page name default
     });
+
+    const nameColorMeta = COLOR_TARGETS.find((t) => t.key === "name_color")!;
+    const nameHexForFontPreview = normalizeHex(
+        String(routeProfile.name_color ?? nameColorMeta.defaultHex),
+        nameColorMeta.defaultHex
+    );
+
 
     return (
         <div className="min-h-screen bg-gradient-to-r from-indigo-400 to-blue-700 flex items-center justify-center p-6">
@@ -294,9 +355,7 @@ const Profile: React.FC = () => {
                     </div>
 
                     {(localError || boardsLoading) && (
-                        <div className="text-sm text-red-600">
-                            {localError ? localError : null}
-                        </div>
+                        <div className="text-sm text-red-600">{localError ? localError : null}</div>
                     )}
 
                     <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
@@ -320,7 +379,9 @@ const Profile: React.FC = () => {
                                         onClick={async () => {
                                             setSavingBio(true);
                                             try {
-                                                await saveCustomization({ bio: bioDraft.trim().length ? bioDraft.trim() : null });
+                                                await saveCustomization({
+                                                    bio: bioDraft.trim().length ? bioDraft.trim() : null,
+                                                });
                                             } finally {
                                                 setSavingBio(false);
                                             }
@@ -333,7 +394,9 @@ const Profile: React.FC = () => {
                             </div>
                         ) : (
                             <p className="text-gray-700 whitespace-pre-wrap">
-                                {routeProfile.bio?.trim()?.length ? routeProfile.bio : (
+                                {routeProfile.bio?.trim()?.length ? (
+                                    routeProfile.bio
+                                ) : (
                                     <span className="italic text-gray-500">No bio yet.</span>
                                 )}
                             </p>
@@ -342,138 +405,201 @@ const Profile: React.FC = () => {
 
                     {/* User Settings (only for self) */}
                     {isOwnProfile && (
-                        <div>
-                            <h2 className="text-2xl font-semibold mb-4 text-gray-800">User Settings</h2>
+                        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h2 className="text-2xl font-semibold text-gray-800">User Settings</h2>
+                                    <p className="text-sm text-gray-600 mt-1">Colors, icon, and font</p>
+                                </div>
 
-                            {!token ? (
-                                <p className="text-gray-600">Log in to edit your profile colors.</p>
-                            ) : (
-                                <div className="space-y-6">
-                                    <div>
-                                        <h3 className="text-xl font-semibold mb-2 text-gray-800">
-                                            Icon Background Color
-                                        </h3>
-                                        <div className="flex flex-wrap gap-2">
-                                            {PROFILE_COLOR_OPTIONS.map((c) => (
-                                                <button
-                                                    key={c}
-                                                    type="button"
-                                                    className={`w-8 h-8 rounded-full border border-gray-300 cursor-pointer ${
-                                                        routeProfile.color === c ? "ring-4 ring-blue-400" : ""
-                                                    }`}
-                                                    style={{ backgroundColor: c }}
-                                                    onClick={() => saveCustomization({ color: c })}
-                                                    aria-label={`Set background color ${c}`}
-                                                />
-                                            ))}
-                                        </div>
-                                    </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setSettingsOpen((prev) => !prev)}
+                                    className="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors"
+                                >
+                                    {settingsOpen ? "Hide" : "Edit"}
+                                </button>
+                            </div>
 
-                                    <div>
-                                        <h3 className="text-xl font-semibold mb-2 text-gray-800">Icon Color</h3>
-                                        <div className="flex flex-wrap gap-2">
-                                            {PROFILE_COLOR_OPTIONS.map((c) => (
-                                                <button
-                                                    key={c}
-                                                    type="button"
-                                                    className={`w-8 h-8 rounded-full border border-gray-300 cursor-pointer ${
-                                                        routeProfile.text_color === c ? "ring-4 ring-blue-400" : ""
-                                                    }`}
-                                                    style={{ backgroundColor: c }}
-                                                    onClick={() => saveCustomization({ text_color: c })}
-                                                    aria-label={`Set icon color ${c}`}
-                                                />
-                                            ))}
-                                        </div>
-                                    </div>
+                            {settingsOpen && (
+                                <div className="mt-4">
+                                    {!token ? (
+                                        <p className="text-gray-600">Log in to edit your profile colors.</p>
+                                    ) : (
+                                        <div className="space-y-6">
+                                            {/* Unified Color Picker */}
+                                            <div>
+                                                <h3 className="text-xl font-semibold mb-2 text-gray-800">Colors</h3>
 
-                                    {/* Icon Picker */}
-                                    <div>
-                                        <h3 className="text-xl font-semibold mb-2 text-gray-800">Icon</h3>
+                                                <div className="flex flex-wrap gap-2 mb-3">
+                                                    {COLOR_TARGETS.map((t) => {
+                                                        const active = colorTarget === t.key;
+                                                        return (
+                                                            <button
+                                                                key={t.key}
+                                                                type="button"
+                                                                onClick={() => setColorTarget(t.key)}
+                                                                className={[
+                                                                    "px-3 py-2 rounded-lg border",
+                                                                    "text-sm font-semibold transition-colors",
+                                                                    active
+                                                                        ? "bg-blue-600 text-white border-blue-600"
+                                                                        : "bg-white text-gray-900 border-gray-300 hover:bg-gray-50",
+                                                                ].join(" ")}
+                                                            >
+                                                                {t.label}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
 
-                                        <div className="flex flex-wrap gap-2">
-                                            {PROFILE_ICON_OPTIONS.map((icon) => {
-                                                const selected = (routeProfile.icon ?? "letter") === icon;
+                                                <div className="grid grid-cols-1 md:grid-cols-[auto,auto,1fr,auto] items-center gap-3 mb-3">
+                                                    {/* Color picker */}
+                                                    <input
+                                                        type="color"
+                                                        value={normalizeHex(hexDraft, "#3b82f6")}
+                                                        onChange={(e) => {
+                                                            const meta = COLOR_TARGETS.find((t) => t.key === colorTarget)!;
+                                                            const next = normalizeHex(e.target.value, meta.defaultHex);
+                                                            setHexDraft(next);
+                                                        }}
+                                                        className="w-12 h-10 p-1 rounded-md border border-gray-300 bg-white cursor-pointer"
+                                                        aria-label="Pick color"
+                                                        title="Pick color"
+                                                    />
 
-                                                return (
-                                                    <button
-                                                        key={icon}
-                                                        type="button"
-                                                        className={[
-                                                            "w-11 h-11 rounded-lg border border-gray-300",
-                                                            "flex items-center justify-center",
-                                                            "bg-white hover:bg-gray-50",
-                                                            selected ? "ring-4 ring-blue-400" : "",
-                                                        ].join(" ")}
-                                                        onClick={() => saveCustomization({ icon })}
-                                                        aria-label={`Set icon ${icon}`}
-                                                        title={icon}
-                                                    >
-                                                        {icon === "letter" ? (
-                                                            <span className={pres.iconColorClass} style={pres.iconColorStyle}>
-                                                              {pres.displayName?.charAt(0).toUpperCase()}
-                                                            </span>
-                                                        ) : (
-                                                            <ProfileIcon
-                                                                name={icon}
-                                                                className={["w-6 h-6", pres.iconColorClass].join(" ").trim()}
-                                                                style={pres.iconColorStyle}
-                                                                title={icon}
+                                                    {/* Hex input */}
+                                                    <input
+                                                        value={hexDraft}
+                                                        onChange={(e) => setHexDraft(e.target.value)}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === "Enter") void commitHexDraft();
+                                                            if (e.key === "Escape") cancelHexDraft();
+                                                        }}
+                                                        className="w-36 rounded-md border border-gray-300 p-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                                        placeholder="#3b82f6"
+                                                        aria-label="Hex color"
+                                                    />
+
+
+                                                    {/* Buttons live in a fixed rail */}
+                                                    <div className="flex items-center justify-end gap-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={cancelHexDraft}
+                                                            className="px-3 py-2 rounded-md border border-gray-300 bg-white text-gray-900 font-semibold hover:bg-gray-50"
+                                                        >
+                                                            Cancel
+                                                        </button>
+
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => void commitHexDraft()}
+                                                            className="px-3 py-2 rounded-md bg-blue-600 text-white font-semibold hover:bg-blue-700"
+                                                        >
+                                                            Apply
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex flex-wrap gap-2">
+                                                    {PROFILE_COLOR_OPTIONS.map((c) => {
+                                                        const meta = COLOR_TARGETS.find((t) => t.key === colorTarget)!;
+                                                        const normalized = normalizeHex(c, meta.defaultHex);
+                                                        const selected = normalizeHex(hexDraft, meta.defaultHex) === normalized;
+
+                                                        return (
+                                                            <button
+                                                                key={`${colorTarget}-${c}`}
+                                                                type="button"
+                                                                className={[
+                                                                    "w-8 h-8 rounded-full border border-gray-300 cursor-pointer",
+                                                                    selected ? "ring-4 ring-blue-400" : "",
+                                                                ].join(" ")}
+                                                                style={{ backgroundColor: normalized }}
+                                                                onClick={() => {
+                                                                    setHexDraft(normalized);
+                                                                }}
+                                                                aria-label={`Set ${colorTarget} to ${normalized}`}
+                                                                title={normalized}
                                                             />
-                                                        )}
-                                                    </button>
-                                                );
-                                            })}
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+
+                                            {/* Icon Picker */}
+                                            <div>
+                                                <h3 className="text-xl font-semibold mb-2 text-gray-800">Icon</h3>
+
+                                                <div className="flex flex-wrap gap-2">
+                                                    {PROFILE_ICON_OPTIONS.map((icon) => {
+                                                        const selected = (routeProfile.icon ?? "letter") === icon;
+
+                                                        return (
+                                                            <button
+                                                                key={icon}
+                                                                type="button"
+                                                                className={[
+                                                                    "w-11 h-11 rounded-lg border border-gray-300",
+                                                                    "flex items-center justify-center",
+                                                                    "bg-white hover:bg-gray-50",
+                                                                    selected ? "ring-4 ring-blue-400" : "",
+                                                                ].join(" ")}
+                                                                onClick={() => saveCustomization({ icon })}
+                                                                aria-label={`Set icon ${icon}`}
+                                                                title={icon}
+                                                            >
+                                                                {icon === "letter" ? (
+                                                                    <span className={pres.iconColorClass} style={pres.iconColorStyle}>
+                                                    {pres.displayName?.charAt(0).toUpperCase()}
+                                                </span>
+                                                                ) : (
+                                                                    <ProfileIcon
+                                                                        name={icon}
+                                                                        className={["w-6 h-6", pres.iconColorClass].join(" ").trim()}
+                                                                        style={pres.iconColorStyle}
+                                                                        title={icon}
+                                                                    />
+                                                                )}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+
+                                            {/* Font Picker */}
+                                            <div>
+                                                <h3 className="text-xl font-semibold mb-2 text-gray-800">Font</h3>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {PROFILE_FONT_OPTIONS.map((f) => (
+                                                        <button
+                                                            key={f.id}
+                                                            type="button"
+                                                            className={[
+                                                                "px-3 py-2 rounded-lg border border-gray-300",
+                                                                "bg-white hover:bg-gray-50",
+                                                                "text-sm font-semibold",
+                                                                routeProfile.font === f.id ? "ring-4 ring-blue-400" : "",
+                                                            ].join(" ")}
+                                                            onClick={() => saveCustomization({ font: f.id })}
+                                                        >
+                                                        <span className={f.css} style={{ color: nameHexForFontPreview }}>
+                                                            {f.label}
+                                                        </span>
+                                                        </button>
+                                                    ))}
+
+                                                </div>
+                                            </div>
                                         </div>
-                                    </div>
-
-
-
-                                    {/* Font Picker */}
-                                    <div>
-                                        <h3 className="text-xl font-semibold mb-2 text-gray-800">Font</h3>
-                                        <div className="flex flex-wrap gap-2">
-                                            {PROFILE_FONT_OPTIONS.map((f) => (
-                                                <button
-                                                    key={f.id}
-                                                    type="button"
-                                                    className={[
-                                                        "px-3 py-2 rounded-lg border border-gray-300",
-                                                        "bg-white text-gray-900 hover:bg-gray-50",
-                                                        "text-sm font-semibold",
-                                                        routeProfile.font === f.id ? "ring-4 ring-blue-400" : "",
-                                                        f.css,
-                                                    ].join(" ")}
-                                                    onClick={() => saveCustomization({ font: f.id })}
-                                                >
-                                                    {f.label}
-                                                </button>
-
-                                            ))}
-                                        </div>
-                                    </div>
-                                    {/* Font Color */}
-                                    <div>
-                                        <h3 className="text-xl font-semibold mb-2 text-gray-800">Name Color</h3>
-                                        <div className="flex flex-wrap gap-2">
-                                            {PROFILE_COLOR_OPTIONS.map((c) => (
-                                                <button
-                                                    key={c}
-                                                    type="button"
-                                                    className={`w-8 h-8 rounded-full border border-gray-300 cursor-pointer ${
-                                                        (routeProfile.name_color ?? "#3b82f6") === c ? "ring-4 ring-blue-400" : ""
-                                                    }`}
-                                                    style={{ backgroundColor: c }}
-                                                    onClick={() => saveCustomization({ name_color: c })}
-                                                    aria-label={`Set name color ${c}`}
-                                                />
-                                            ))}
-                                        </div>
-                                    </div>
+                                    )}
                                 </div>
                             )}
                         </div>
                     )}
+
+
                     {/* Player Stats */}
                     <div>
                         <div className="flex items-center justify-between mb-4">
@@ -481,7 +607,7 @@ const Profile: React.FC = () => {
 
                             <Link
                                 to={`/profile/${routeProfile.username}/stats`}
-                                className="px-4 py-1 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors"
+                                className="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors"
                             >
                                 View full stats
                             </Link>
@@ -522,7 +648,7 @@ const Profile: React.FC = () => {
 
                             <Link
                                 to={`/profile/${routeProfile.username}/history`}
-                                className="px-4 py-1 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors"
+                                className="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors"
                             >
                                 View full history
                             </Link>
@@ -540,9 +666,7 @@ const Profile: React.FC = () => {
                     </div>
 
                     {error && (
-                        <div className="text-xs text-gray-500">
-                            Session profile warning: {error}
-                        </div>
+                        <div className="text-xs text-gray-500">Session profile warning: {error}</div>
                     )}
                 </div>
             </div>

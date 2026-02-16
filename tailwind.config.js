@@ -8,17 +8,37 @@ module.exports = {
       },
       fontFamily: {
         swiss911: ['"swiss911"', 'sans-serif'],
+
+        // Clean
         outfit: ["Outfit", "sans-serif"],
         dmsans: ["DM Sans", "sans-serif"],
         jetbrains: ["JetBrains Mono", "monospace"],
+
+        // Tech / Futuristic
         orbitron: ["Orbitron", "sans-serif"],
         audiowide: ["Audiowide", "sans-serif"],
+        majormono: ["Major Mono Display", "monospace"],
+        pressstart: ["Press Start 2P", "monospace"],
+
+        // Cute / Rounded
         fredoka: ["Fredoka", "sans-serif"],
         baloo: ["Baloo 2", "sans-serif"],
         comfortaa: ["Comfortaa", "sans-serif"],
+        chewy: ["Chewy", "cursive"],
+
+        // Script / Handwritten
         pacifico: ["Pacifico", "cursive"],
         cherry: ["Cherry Bomb One", "cursive"],
-        gloria: ["Gloria Hallelujah", "cursive"]
+        gloria: ["Gloria Hallelujah", "cursive"],
+
+        // Loud / Display
+        bungee: ["Bungee", "cursive"],
+        luckiest: ["Luckiest Guy", "cursive"],
+
+        // Chaos Tier
+        rubikglitch: ["Rubik Glitch", "cursive"],
+        creepster: ["Creepster", "cursive"],
+        metalmania: ["Metal Mania", "cursive"],
       },
       keyframes: {
         jump: {
