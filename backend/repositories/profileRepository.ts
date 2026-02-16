@@ -637,21 +637,71 @@ export function createProfileRepository(pool: Pool) {
     async function addTokens(userId: string, amount: number) {
         return incrementStats(userId, { tokens: amount });
     }
+
     async function incrementBoardsGenerated(userId: string, n: number = 1) {
         return incrementStats(userId, { boards_generated: n });
     }
+
     async function incrementGamesFinished(userId: string, n: number = 1) {
         return incrementStats(userId, { games_finished: n });
     }
+
     async function incrementGamesWon(userId: string, n: number = 1) {
         return incrementStats(userId, { games_won: n });
     }
+
     async function addMoneyWon(userId: string, amount: number) {
         return incrementStats(userId, { money_won: amount });
     }
+
     async function incrementGamesPlayed(userId: string, n: number = 1) {
         return incrementStats(userId, { games_played: n });
     }
+
+    async function incrementDailyDoubleFound(userId: string, n: number = 1) {
+        return incrementStats(userId, { daily_double_found: n });
+    }
+
+    async function incrementDailyDoubleCorrect(userId: string, n: number = 1) {
+        return incrementStats(userId, { daily_double_correct: n });
+    }
+
+    async function incrementFinalJeopardyParticipations(userId: string, n: number = 1) {
+        return incrementStats(userId, { final_jeopardy_participations: n });
+    }
+
+    async function incrementFinalJeopardyCorrects(userId: string, n: number = 1) {
+        return incrementStats(userId, { final_jeopardy_corrects: n });
+    }
+
+    async function incrementCluesSelected(userId: string, n: number = 1) {
+        return incrementStats(userId, { clues_selected: n });
+    }
+
+    async function incrementTimesBuzzed(userId: string, n: number = 1) {
+        return incrementStats(userId, { times_buzzed: n });
+    }
+
+    async function incrementTotalBuzzes(userId: string, n: number = 1) {
+        return incrementStats(userId, { total_buzzes: n });
+    }
+
+    async function incrementCorrectAnswers(userId: string, n: number = 1) {
+        return incrementStats(userId, { correct_answers: n });
+    }
+
+    async function incrementWrongAnswers(userId: string, n: number = 1) {
+        return incrementStats(userId, { wrong_answers: n });
+    }
+
+    async function incrementCluesSkipped(userId: string, n: number = 1) {
+        return incrementStats(userId, { clues_skipped: n });
+    }
+
+    async function incrementTrueDailyDoubles(userId: string, n: number = 1) {
+        return incrementStats(userId, { true_daily_doubles: n });
+    }
+
 
     return {
         getRoleById,
@@ -664,12 +714,25 @@ export function createProfileRepository(pool: Pool) {
         getPublicProfileByUsername,
         getIdByUsername,
         updateCustomization,
+
         addTokens,
         incrementBoardsGenerated,
         incrementGamesFinished,
         incrementGamesWon,
         addMoneyWon,
         incrementGamesPlayed,
+        incrementDailyDoubleFound,
+        incrementDailyDoubleCorrect,
+        incrementFinalJeopardyParticipations,
+        incrementFinalJeopardyCorrects,
+        incrementCluesSelected,
+        incrementTimesBuzzed,
+        incrementTotalBuzzes,
+        incrementCorrectAnswers,
+        incrementWrongAnswers,
+        incrementCluesSkipped,
+        incrementTrueDailyDoubles,
+
         incrementStats,
     };
 }
