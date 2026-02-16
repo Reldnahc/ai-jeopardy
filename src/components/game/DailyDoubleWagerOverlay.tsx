@@ -6,7 +6,7 @@ import {DailyDoubleShowModalMsg, DailyDoubleWagerCaptureStartMsg} from "../../ho
 
 type Props = {
     gameId: string;
-    effectivePlayerName: string | null;
+    myUsername: string | null;
     ddWagerCapture: DailyDoubleWagerCaptureStartMsg | null;
     showDdModal: DailyDoubleShowModalMsg | null;
     ddWagerError: string | null;
@@ -38,7 +38,7 @@ function blobToBase64(blob: Blob): Promise<string> {
 
 export default function DailyDoubleWagerOverlay({
                                                     gameId,
-                                                    effectivePlayerName,
+                                                    myUsername,
                                                     ddWagerCapture,
                                                     ddWagerError,
                                                     timerEndTime,
@@ -52,7 +52,7 @@ export default function DailyDoubleWagerOverlay({
     const sentDdSessionRef = useRef<string | null>(null);
     const [isRecording, setIsRecording] = useState(false);
     const isDdWagerPlayer =
-        !!effectivePlayerName && ddWagerCapture?.playerName === effectivePlayerName;
+        !!myUsername && ddWagerCapture?.username === myUsername;
 
     useEffect(() => {
         if (!isDdWagerPlayer) return;
@@ -220,7 +220,7 @@ export default function DailyDoubleWagerOverlay({
 
                 <div className="mt-6 text-2xl">
                 <span className="font-bold">
-                    {showDdModal?.playerName}
+                    {showDdModal?.displayname}
                 </span>{" "}
                     must wager (max{" "}
                     <span className="font-bold">

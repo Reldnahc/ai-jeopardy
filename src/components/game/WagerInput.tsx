@@ -24,15 +24,15 @@ const WagerInput: React.FC<WagerInputProps> = ({
         <div>
             {  (
                 players
-                    .filter((player) => player.name === currentPlayer) // Only show box for the current player
+                    .filter((player) => player.username === currentPlayer) // Only show box for the current player
                     .map((player) => {
                         return (
                             <div
-                                key={player.name}
+                                key={player.username}
                                 className="flex flex-row items-center mb-2"
                             >
-                                <span className="mr-2">{player.name}:</span>
-                                {scores[player.name] <= 0 ? (
+                                <span className="mr-2">{player.displayname}:</span>
+                                {scores[player.username] <= 0 ? (
                                     <span className="text-red-500">
                                         Wager Automatically Set to $0
                                     </span>
@@ -41,19 +41,19 @@ const WagerInput: React.FC<WagerInputProps> = ({
                                         <input
                                             type="number"
                                             min={0}
-                                            max={scores[player.name] || 0}
-                                            value={wagers[player.name] ?? ""}
+                                            max={scores[player.username] || 0}
+                                            value={wagers[player.username] ?? ""}
                                             onChange={(e) => {
                                                 const v = e.target.value;
                                                 const n = v === "" ? 0 : Number(v);
-                                                handleWagerChange(player.name, Number.isNaN(n) ? 0 : n);
+                                                handleWagerChange(player.username, Number.isNaN(n) ? 0 : n);
                                             }}
-                                            disabled={wagerSubmitted.includes(player.name)}
+                                            disabled={wagerSubmitted.includes(player.username)}
                                             className="w-[100px] p-1 mr-2 border text-black border-gray-300 rounded"
                                         />
-                                        {!wagerSubmitted.includes(player.name) ? (
+                                        {!wagerSubmitted.includes(player.username) ? (
                                             <button
-                                                onClick={() => submitWager(player.name)}
+                                                onClick={() => submitWager(player.username)}
                                                 className="px-3 py-1 bg-green-600 text-white rounded cursor-pointer"
                                             >
                                                 Submit Wager

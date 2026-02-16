@@ -1,6 +1,6 @@
 import type React from "react";
 import type { Profile as P } from "../contexts/ProfileContext";
-import type { ProfileIconName } from "../components/common/ProfileIcon";
+import { type ProfileIconName } from "../components/common/profileIcons";
 
 function isHexColor(s: unknown): s is string {
     return typeof s === "string" && /^#([0-9a-fA-F]{6})$/.test(s);
@@ -15,17 +15,6 @@ export const PROFILE_COLOR_OPTIONS = [
     "#71717a", "#000000", "#ffffff",
 ] as const;
 
-export const PROFILE_ICON_OPTIONS: ProfileIconName[] = [
-    "letter",
-    "star",
-    "bolt",
-    "crown",
-    "skull",
-    "rocket",
-    "brain",
-    "trophy",
-    "sparkles",
-];
 
 export const PROFILE_FONT_OPTIONS = [
     { id: "inter", label: "Inter", css: "font-inter" },

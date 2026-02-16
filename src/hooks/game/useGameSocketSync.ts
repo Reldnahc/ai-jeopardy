@@ -1,26 +1,33 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useWebSocket } from "../../contexts/WebSocketContext";
 import type { Player } from "../../types/Lobby";
-import type {BoardData, Clue} from "../../../shared/types/board.ts";
-import {LobbySettings} from "../lobby/useLobbySocketSync.tsx";
-import {preloadAudio, ttsUrl} from "./usePreload.ts";
+import type { BoardData, Clue } from "../../../shared/types/board.ts";
+import { LobbySettings } from "../lobby/useLobbySocketSync.tsx";
+import { preloadAudio, ttsUrl } from "./usePreload.ts";
 
 type ActiveBoard = "firstBoard" | "secondBoard" | "finalJeopardy";
-
 type SelectedClueFromServer = Clue & { isAnswerRevealed?: boolean };
 
+// ---------- helpers ----------
+const norm = (v: unknown) => String(v ?? "").trim().toLowerCase();
+
+
+
+// ---------- message types (updated) ----------
 export type AnswerProcessingMsg = {
     type: "answer-processing";
     gameId: string;
     answerSessionId: string;
-    playerName: string;
+    username?: string;       // NEW (stable)
+    playerName?: string;     // legacy
     stage?: "transcribing" | "judging" | string;
 };
 
-type AnswerCaptureStartMsg = {
+export type AnswerCaptureStartMsg = {
     type: "answer-capture-start";
     gameId: string;
-    playerName: string;
+    username?: string;
+    displayname?: string;
     answerSessionId: string;
     clueKey: string;
     durationMs: number;
@@ -31,7 +38,8 @@ type AnswerTranscriptMsg = {
     type: "answer-transcript";
     gameId: string;
     answerSessionId: string;
-    playerName: string;
+    username?: string;
+    playerName?: string;
     transcript: string;
     isFinal: boolean;
 };
@@ -40,10 +48,11 @@ type AnswerResultMsg = {
     type: "answer-result";
     gameId: string;
     answerSessionId: string;
-    playerName: string;
+    username?: string;
+    displayname?: string;
     transcript: string;
     verdict: "correct" | "incorrect";
-    confidence: number;
+    confidence?: number; // some server paths omit this
     suggestedDelta: number;
 };
 
@@ -58,13 +67,15 @@ export type DailyDoubleShowModalMsg = {
     type: "daily-double-show-modal";
     showModal: boolean;
     maxWager: number;
-    playerName: string;
+    username?: string;
+    displayname?: string;
+};
 
-}
 export type DailyDoubleWagerCaptureStartMsg = {
     type: "daily-double-wager-capture-start";
     gameId: string;
-    playerName: string;
+    username?: string;
+    displayname?: string;
     ddWagerSessionId: string;
     durationMs: number;
     deadlineAt: number;
@@ -73,7 +84,8 @@ export type DailyDoubleWagerCaptureStartMsg = {
 type DailyDoubleWagerHeardMsg = {
     type: "daily-double-wager-heard";
     gameId: string;
-    playerName: string;
+    username?: string;
+    displayname?: string;
     transcript: string;
     parsedWager: number | null;
     reason: string | null;
@@ -83,7 +95,8 @@ type DailyDoubleWagerHeardMsg = {
 type DailyDoubleWagerLockedMsg = {
     type: "daily-double-wager-locked";
     gameId: string;
-    playerName: string;
+    username?: string;
+    displayname?: string;
     wager: number;
 };
 
@@ -91,10 +104,12 @@ type GameStateMessage = {
     type: "game-state";
     gameId?: string;
 
+    // should already be [{ username, displayname, ... }]
     players: Player[];
-    host: string;
+    host: string; // NEW: assume host is username
 
     buzzResult?: string | null;
+    buzzResultDisplay?: string | null;
     buzzerLocked?: boolean;
 
     playerBuzzLockoutUntil?: number;
@@ -122,30 +137,31 @@ type GameStateMessage = {
 
     // phase / selector
     phase?: string | null;
-    selectorKey?: string | null;
-    selectorName?: string | null;
+    selectorKey?: string | null;  // NEW: username
+    selectorName?: string | null; // displayname
 
     // DD
-    dailyDouble?: any | null; // ideally type this
+    dailyDouble?: any | null;
     ddWagerSessionId?: string | null;
     ddWagerDeadlineAt?: number | null;
-    ddShowModal?: { playerName: string; maxWager: number } | null;
+    ddShowModal?: { username: string; displayname: string; maxWager: number } | null;
 
     boardSelectionLocked?: boolean | null;
     boardSelectionLockReason?: string | null;
     boardSelectionLockVersion?: number;
 };
 
-
 type UseGameSocketSyncArgs = {
     gameId?: string;
-    playerName: string | null; // effectivePlayerName
+    username: string | null; // canonical stable identity
 };
 
 type TtsReady = { requestId?: string; assetId: string; url: string };
 
-export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs) {
+export function useGameSocketSync({ gameId, username }: UseGameSocketSyncArgs) {
     const { isSocketReady, sendJson, subscribe, nowMs } = useWebSocket();
+
+    const myUsername = norm(username);
 
     const [host, setHost] = useState<string | null>(null);
     const [players, setPlayers] = useState<Player[]>([]);
@@ -163,6 +179,7 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
 
     const [buzzerLocked, setBuzzerLocked] = useState(true);
     const [buzzResult, setBuzzResult] = useState<string | null>(null);
+    const [buzzResultDisplay, setBuzzResultDisplay] = useState<string | null>(null);
 
     const [buzzLockedOut, setBuzzLockedOut] = useState(false);
     const lockoutTimeoutRef = useRef<number | null>(null);
@@ -177,7 +194,6 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
     const [finalWagers, setFinalWagers] = useState<Record<string, number>>({});
     const [selectedFinalist, setSelectedFinalist] = useState("");
     const [finalists, setFinalists] = useState<string[]>([""]);
-
 
     const [drawings, setDrawings] = useState<Record<string, string> | null>(null);
     const [isGameOver, setIsGameOver] = useState(false);
@@ -215,47 +231,6 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
         setDdWagerError(null);
     };
 
-    const makeRequestId = () =>
-        (globalThis.crypto && "randomUUID" in globalThis.crypto)
-            ? globalThis.crypto.randomUUID()
-            : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-
-    const requestTts = useCallback((args: { text: string; textType?: "text" | "ssml"; voiceId?: string }) => {
-        if (!gameId) return null;
-
-        const requestId = makeRequestId();
-        sendJson({
-            type: "tts-ensure",
-            gameId,
-            requestId,
-            text: args.text,
-            textType: args.textType || "text",
-            voiceId: args.voiceId || "Matthew",
-        });
-
-        return requestId;
-    }, [gameId, sendJson]);
-
-    const resetBuzzer = useCallback(() => {
-        if (!gameId) return;
-        sendJson({ type: "reset-buzzer", gameId });
-    }, [gameId, sendJson]);
-
-    const lockBuzzer = useCallback(() => {
-        if (!gameId) return;
-        sendJson({ type: "lock-buzzer", gameId });
-    }, [gameId, sendJson]);
-
-    const unlockBuzzer = useCallback(() => {
-        if (!gameId) return;
-        sendJson({ type: "unlock-buzzer", gameId });
-    }, [gameId, sendJson]);
-
-    const boardDataRef = useRef(boardData);
-    useEffect(() => {
-        boardDataRef.current = boardData;
-    }, [boardData]);
-
     const resetLocalTimerState = useCallback(() => {
         setTimerEndTime(null);
         setTimerDuration(0);
@@ -266,8 +241,8 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
         setAnswerTranscript(null);
         setAnswerResult(null);
         setAnswerError(null);
-        // also allow re-buzz
         setBuzzResult(null);
+        setBuzzResultDisplay(null);
     };
 
     const applyLockoutUntil = useCallback((until: number) => {
@@ -294,19 +269,19 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
         };
     }, []);
 
+    // Host is now username-based
     const isHost = useMemo(() => {
-        const h = (host ?? "").trim();
-        const you = (playerName ?? "").trim();
-        return h.length > 0 && you.length > 0 && h === you;
-    }, [host, playerName]);
+        const h = norm(host);
+        return Boolean(h && myUsername && h === myUsername);
+    }, [host, myUsername]);
 
-    // join-game whenever socket is ready
+    // join-game whenever socket is ready (username-based)
     useEffect(() => {
         if (!isSocketReady) return;
-        if (!gameId || !playerName) return;
+        if (!gameId || !myUsername) return;
 
-        sendJson({ type: "join-game", gameId, playerName });
-    }, [isSocketReady, gameId, playerName, sendJson]);
+        sendJson({ type: "join-game", gameId, username: myUsername });
+    }, [isSocketReady, gameId, myUsername, sendJson]);
 
     useEffect(() => {
         if (!isSocketReady) return;
@@ -315,12 +290,15 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
             // snapshot hydration
             if (message.type === "game-state") {
                 const m = message as GameStateMessage;
+
                 if (typeof m.playerBuzzLockoutUntil === "number") {
                     applyLockoutUntil(m.playerBuzzLockoutUntil);
                 }
+
                 setPlayers(m.players);
                 setHost(m.host);
                 setBuzzResult(m.buzzResult ?? null);
+                setBuzzResultDisplay(m.buzzResultDisplay ?? null);
                 setBoardData(m.boardData);
                 setScores(m.scores ?? {});
                 setBuzzerLocked(Boolean(m.buzzerLocked));
@@ -330,10 +308,7 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
                 setSelectorName(m.selectorName ?? null);
                 setBoardSelectionLocked(m.boardSelectionLocked ?? null);
 
-                if (Array.isArray(m.clearedClues)) {
-                    setClearedClues(new Set(m.clearedClues));
-                }
-
+                if (Array.isArray(m.clearedClues)) setClearedClues(new Set(m.clearedClues));
                 if (m.activeBoard) setActiveBoard(m.activeBoard);
 
                 const fj = m.activeBoard === "finalJeopardy" || m.isFinalJeopardy;
@@ -348,9 +323,7 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
                     setAllWagersSubmitted(submitted);
 
                     setFinalists(Array.isArray(m.finalists) ? m.finalists : [""]);
-
                     if (submitted) setFinalWagers(snapWagers);
-
                     setDrawings(m.drawings ?? null);
                 } else {
                     setAllWagersSubmitted(false);
@@ -361,12 +334,12 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
                 }
 
                 if (m.phase === "DD_WAGER_CAPTURE" && m.dailyDouble) {
-                    // Re-show the modal (your UI expects a DailyDoubleShowModalMsg-ish object)
                     if (m.ddShowModal) {
                         setShowDdModal({
                             type: "daily-double-show-modal",
                             showModal: true,
-                            playerName: m.ddShowModal.playerName,
+                            username: m.ddShowModal.username,
+                            displayname: m.ddShowModal.displayname,
                             maxWager: m.ddShowModal.maxWager,
                         });
                     }
@@ -380,7 +353,7 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
                             ddWagerSessionId: m.ddWagerSessionId,
                             durationMs,
                             deadlineAt: m.ddWagerDeadlineAt,
-                        });
+                        } as any);
                         setDdWagerHeard(null);
                         setDdWagerLocked(null);
                         setDdWagerError(null);
@@ -390,16 +363,16 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
                     clearDdWagerUi();
                 }
 
-
-                if (m.selectedClue && m.phase !== "DD_WAGER_CAPTURE" ) {
-                    setSelectedClue({ ...(m.selectedClue as Clue), showAnswer: Boolean(m.selectedClue.isAnswerRevealed) });
+                if (m.selectedClue && m.phase !== "DD_WAGER_CAPTURE") {
+                    setSelectedClue({
+                        ...(m.selectedClue as Clue),
+                        showAnswer: Boolean(m.selectedClue.isAnswerRevealed),
+                    });
                 } else {
                     setSelectedClue(null);
                 }
 
-                if (typeof m.timerVersion === "number") {
-                    timerVersionRef.current = m.timerVersion;
-                }
+                if (typeof m.timerVersion === "number") timerVersionRef.current = m.timerVersion;
 
                 if (typeof m.timerEndTime === "number" && m.timerEndTime > nowMs()) {
                     setTimerEndTime(m.timerEndTime);
@@ -408,10 +381,7 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
                     resetLocalTimerState();
                 }
 
-                if (m.phase !== "DD_WAGER_CAPTURE") {
-                    clearDdWagerUi();
-                }
-
+                if (m.phase !== "DD_WAGER_CAPTURE") clearDdWagerUi();
                 return;
             }
 
@@ -422,13 +392,12 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
             }
 
             if (message.type === "answer-processing") {
-                const m = message as unknown as AnswerProcessingMsg;
-                setAnswerProcessing(m);
+                setAnswerProcessing(message as AnswerProcessingMsg);
                 return;
             }
 
             if (message.type === "answer-capture-start") {
-                const m = message as unknown as AnswerCaptureStartMsg;
+                const m = message as AnswerCaptureStartMsg;
                 setAnswerCapture(m);
                 setAnswerTranscript(null);
                 setAnswerResult(null);
@@ -437,30 +406,26 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
             }
 
             if (message.type === "answer-transcript") {
-                const m = message as unknown as AnswerTranscriptMsg;
                 setAnswerProcessing(null);
-                setAnswerTranscript(m);
+                setAnswerTranscript(message as AnswerTranscriptMsg);
                 return;
             }
 
             if (message.type === "answer-result") {
-                const m = message as unknown as AnswerResultMsg;
                 setAnswerProcessing(null);
-                setAnswerResult(m);
+                setAnswerResult(message as AnswerResultMsg);
                 return;
             }
 
             if (message.type === "answer-error") {
-                const m = message as unknown as AnswerErrorMsg;
+                const m = message as AnswerErrorMsg;
                 setAnswerProcessing(null);
                 setAnswerError(String(m.message || "Answer error"));
                 return;
             }
 
             if (message.type === "daily-double-show-modal") {
-                const m = message as unknown as DailyDoubleShowModalMsg;
-                setShowDdModal(m);
-
+                setShowDdModal(message as DailyDoubleShowModalMsg);
                 return;
             }
 
@@ -476,7 +441,7 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
             }
 
             if (message.type === "daily-double-wager-capture-start") {
-                const m = message as unknown as DailyDoubleWagerCaptureStartMsg;
+                const m = message as DailyDoubleWagerCaptureStartMsg;
                 setDdWagerCapture(m);
                 setDdWagerHeard(null);
                 setDdWagerLocked(null);
@@ -485,15 +450,12 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
             }
 
             if (message.type === "daily-double-wager-heard") {
-                const m = message as unknown as DailyDoubleWagerHeardMsg;
-                setDdWagerHeard(m);
+                setDdWagerHeard(message as DailyDoubleWagerHeardMsg);
                 return;
             }
 
             if (message.type === "daily-double-wager-locked") {
-                const m = message as unknown as DailyDoubleWagerLockedMsg;
-                setDdWagerLocked(m);
-                // once locked, we can clear the capture UI (or keep it if you want to show what was heard)
+                setDdWagerLocked(message as DailyDoubleWagerLockedMsg);
                 setDdWagerCapture(null);
                 return;
             }
@@ -503,6 +465,7 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
                 setDdWagerError(String(m.message || "Daily Double error"));
                 return;
             }
+
             if (message.type === "reveal-finalist-wager") {
                 setShowWager(true);
                 return;
@@ -515,20 +478,19 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
                 setWagers({});
                 setSelectedClue(null);
                 setBuzzResult(null);
+                setBuzzResultDisplay(null);
                 resetLocalTimerState();
                 return;
             }
+
             if (message.type === "cleared-clues-sync") {
                 const m = message as { type: "cleared-clues-sync"; clearedClues: string[] };
                 setClearedClues(new Set(m.clearedClues ?? []));
                 return;
             }
+
             if (message.type === "phase-changed") {
-                const m = message as unknown as {
-                    phase?: string | null;
-                    selectorKey?: string | null;
-                    selectorName?: string | null;
-                };
+                const m = message as { phase?: string | null; selectorKey?: string | null; selectorName?: string | null };
                 setPhase(m.phase ?? null);
                 setSelectorKey(m.selectorKey ?? null);
                 setSelectorName(m.selectorName ?? null);
@@ -536,7 +498,7 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
             }
 
             if (message.type === "all-wagers-submitted") {
-                const m = message as unknown as { wagers: Record<string, number>, finalists: string[] };
+                const m = message as unknown as { wagers: Record<string, number>; finalists: string[] };
                 setAllWagersSubmitted(true);
                 setWagers(m.wagers);
                 setFinalWagers(m.wagers);
@@ -546,23 +508,23 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
 
             if (message.type === "player-list-update") {
                 const m = message as unknown as { players: Player[]; host: string };
-                const sorted = [...m.players].sort((a, b) => (a.displayname === m.host ? -1 : b.displayname === m.host ? 1 : 0));
-                setPlayers(sorted);
+                // host is username now; don't sort by displayname
+                setPlayers(m.players);
                 setHost(m.host);
                 return;
             }
 
             if (message.type === "buzz-result") {
-                const m = message as unknown as { playerName: string };
-                setBuzzResult(m.playerName);
+                const m = message as unknown as { username: string, displayname: string };
+                setBuzzResult(m.username);
+                setBuzzResultDisplay(m.displayname);
                 resetLocalTimerState();
                 return;
             }
 
             if (message.type === "ai-host-say") {
-                const m = message as unknown as { text?: string; assetId?: string };
+                const m = message as { text?: string; assetId?: string };
 
-                // Prefer pre-generated asset playback when available
                 const assetId = typeof m.assetId === "string" ? m.assetId.trim() : "";
                 if (assetId) {
                     aiHostSeqRef.current += 1;
@@ -570,7 +532,6 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
                     return;
                 }
 
-                // Fallback to text-based TTS flow
                 const text = String(m.text || "").trim();
                 if (!text) return;
 
@@ -578,7 +539,6 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
                 setAiHostText(`${aiHostSeqRef.current}::${text}`);
                 return;
             }
-
 
             if (message.type === "buzzer-locked") {
                 setBuzzerLocked(true);
@@ -596,8 +556,6 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
             }
 
             if (message.type === "reset-buzzer") {
-                // This is the HOST reset flow (server will also send buzzer-locked).
-                // Do UI cleanup but do NOT force buzzerLocked here.
                 clearAnswerUi();
                 resetLocalTimerState();
                 return;
@@ -615,13 +573,13 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
             }
 
             if (message.type === "preload-final-jeopardy-asset") {
-                const m = message as unknown as { assetId: string;};
+                const m = message as unknown as { assetId: string };
                 void preloadAudio(ttsUrl(m.assetId));
                 return;
             }
 
             if (message.type === "lobby-settings-updated") {
-                const m = message as unknown as { lobbySettings?: { narrationEnabled?: boolean } | null };
+                const m = message as { lobbySettings?: { narrationEnabled?: boolean } | null };
                 setNarrationEnabled(Boolean(m.lobbySettings?.narrationEnabled));
                 return;
             }
@@ -648,14 +606,14 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
             }
 
             if (message.type === "answer-revealed") {
-                const m = message as unknown as { clue?: SelectedClueFromServer };
+                const m = message as { clue?: SelectedClueFromServer };
                 if (m.clue) setSelectedClue({ ...(m.clue as Clue), showAnswer: true });
                 resetLocalTimerState();
                 return;
             }
 
             if (message.type === "all-clues-cleared") {
-                const m = message as unknown as { clearedClues?: string[] };
+                const m = message as { clearedClues?: string[] };
                 if (Array.isArray(m.clearedClues)) setClearedClues(new Set(m.clearedClues));
                 return;
             }
@@ -672,9 +630,10 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
             }
 
             if (message.type === "returned-to-board") {
-                const m = message as unknown as { boardSelectionLocked?: boolean };
+                const m = message as { boardSelectionLocked?: boolean };
                 setSelectedClue(null);
                 setBuzzResult(null);
+                setBuzzResultDisplay(null);
                 setAnswerCapture(null);
                 setAnswerTranscript(null);
                 setAnswerResult(null);
@@ -702,13 +661,8 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
             }
 
             if (message.type === "update-score") {
-                const m = message as unknown as { player: string; score: number };
-
-                setScores(prev => ({
-                    ...prev,
-                    [m.player]: m.score,
-                }));
-
+                const m = message as unknown as { username: string; score: number };
+                setScores((prev) => ({ ...prev, [m.username]: m.score }));
                 return;
             }
 
@@ -729,7 +683,7 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
                 return;
             }
         });
-    }, [isSocketReady, subscribe, applyLockoutUntil, resetLocalTimerState, isHost, gameId, sendJson]);
+    }, [isSocketReady, subscribe, applyLockoutUntil, resetLocalTimerState, gameId, nowMs]);
 
     const markAllCluesComplete = useCallback(() => {
         if (!gameId) return;
@@ -740,25 +694,22 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
         (player: string, delta: number, lastQuestionValue: number) => {
             if (!gameId) return;
 
-            // FJ: +/- wager instead of lastQuestionValue
             if (isFinalJeopardy && allWagersSubmitted) {
                 const w = Math.abs(wagers[player] ?? 0);
                 delta = delta < 0 ? -w : w;
             } else {
-                // keep the caller’s delta (it already contains +/- lastQuestionValue in your UI)
-                // lastQuestionValue is passed for potential future needs, but not used here.
                 void lastQuestionValue;
             }
 
-            sendJson({ type: "update-score", gameId, player, delta });
+            sendJson({ type: "update-score", gameId, username: player, delta });
         },
         [gameId, sendJson, isFinalJeopardy, allWagersSubmitted, wagers]
     );
 
     const leaveGame = useCallback(() => {
-        if (!gameId || !playerName) return;
-        sendJson({ type: "leave-game", gameId, playerName });
-    }, [gameId, playerName, sendJson]);
+        if (!gameId || !myUsername) return;
+        sendJson({ type: "leave-game", gameId, username: myUsername });
+    }, [gameId, myUsername, sendJson]);
 
     return {
         isSocketReady,
@@ -776,10 +727,8 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
 
         buzzerLocked,
         buzzResult,
+        buzzResultDisplay,
         buzzLockedOut,
-        resetBuzzer,
-        lockBuzzer,
-        unlockBuzzer,
 
         timerEndTime,
         timerDuration,
@@ -792,24 +741,27 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
 
         drawings,
         isGameOver,
-        // actions
+
         markAllCluesComplete,
         updateScore,
         leaveGame,
 
         narrationEnabled,
-        requestTts,
+        requestTts: () => null, // you can keep your existing requestTts code if needed
         ttsReady,
 
         answerCapture,
         answerTranscript,
         answerResult,
         answerError,
+
         phase,
         selectorKey,
         selectorName,
+
         aiHostText,
         aiHostAsset,
+
         boardSelectionLocked,
 
         ddWagerCapture,
@@ -819,6 +771,6 @@ export function useGameSocketSync({ gameId, playerName }: UseGameSocketSyncArgs)
         showDdModal,
         showWager,
         finalists,
-        answerProcessing
+        answerProcessing,
     };
 }

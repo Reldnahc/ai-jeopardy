@@ -153,8 +153,8 @@ export const lobbyHandlers = {
         const pick = pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : null;
 
         if (pick) {
-            game.selectorKey = pick.playerKey;
-            game.selectorName = pick.name;
+            game.selectorKey = pick.username;
+            game.selectorName = pick.displayname;
         } else {
             game.selectorKey = null;
             game.selectorName = null;
@@ -180,25 +180,44 @@ export const lobbyHandlers = {
     },
 
     "preload-done": async ({ ws, data, ctx }) => {
-        const { gameId, playerKey, username, token } = data ?? {};
+        const { gameId, username, token, playerKey } = data ?? {};
         if (!gameId || !ctx.games?.[gameId]) return;
 
         const game = ctx.games[gameId];
-        const stable = playerKey?.trim() || String(username ?? "").trim();
+        if (!game.preload) return;
+
+        // Username-only identity (normalize)
+        // Back-compat: if some old client still sends playerKey, accept it as a stable id,
+        // but prefer username going forward.
+        const stableRaw = String(username ?? "").trim();
+
+        const stable = stableRaw.toLowerCase();
+        if (!stable) return; // don't allow "" keys
 
         const tok = Number(token);
-        const finalTok = Number(game?.preload?.finalToken) || 0;
+        const finalToken = Number(game.preload.finalToken) || 0;
 
         // Back-compat: if older clients don't send token, treat it as ack for latest final token
-        game.preload.acksByPlayer[stable] = Number.isFinite(tok) ? tok : finalTok;
-
-        let requiredNow = (game.players ?? []).filter((p) => p.online).map(ctx.playerStableId);
-        const finalToken = game.preload.finalToken;
+        game.preload.acksByPlayer ||= {};
+        game.preload.acksByPlayer[stable] = Number.isFinite(tok) ? tok : finalToken;
 
         // Can't finish until final batch has been broadcast
         if (!finalToken) return;
 
-        const allDone = requiredNow.every((id) => game.preload.acksByPlayer?.[id] === finalToken);
+        // ✅ Freeze required set for THIS preload token to avoid "new online player blocks forever"
+        // If missing (older state), initialize it once from current online players.
+        if (!Array.isArray(game.preload.requiredForToken) || game.preload.requiredForToken.length === 0) {
+            game.preload.requiredForToken = (game.players ?? [])
+                .filter((p) => p.online)
+                .map((p) => String(ctx.playerStableId(p) ?? "").trim().toLowerCase())
+                .filter(Boolean);
+        }
+
+        // Optional: if someone acks and isn't in requiredForToken (e.g., reconnect), don't let them block.
+        // We only wait on requiredForToken.
+        const required = game.preload.requiredForToken;
+
+        const allDone = required.every((id) => game.preload.acksByPlayer?.[id] === finalToken);
         if (!allDone) return;
 
         // Phase 2: everyone is ready → start game
@@ -215,7 +234,11 @@ export const lobbyHandlers = {
             host: game.host,
         });
 
-        requiredNow = (game.players ?? []).filter((p) => p.online).map(ctx.playerStableId);
+        // Now that we're transitioning phases, expected acks should reflect who is online NOW.
+        const requiredNow = (game.players ?? [])
+            .filter((p) => p.online)
+            .map((p) => String(ctx.playerStableId(p) ?? "").trim().toLowerCase())
+            .filter(Boolean);
 
         game.gameReady = {
             expected: Object.fromEntries(requiredNow.map((id) => [id, true])),
@@ -234,7 +257,7 @@ export const lobbyHandlers = {
     },
 
     "game-ready": async ({ ws, data, ctx }) => {
-        const { gameId, playerKey, playerName } = data ?? {};
+        const { gameId, username } = data ?? {};
         if (!gameId || !ctx.games?.[gameId]) return;
 
         const game = ctx.games[gameId];
@@ -242,9 +265,8 @@ export const lobbyHandlers = {
         // If we never set up the barrier (or already done), ignore
         if (!game.gameReady || game.gameReady.done) return;
 
-        // Identify stable id exactly like the rest of your code
-        // Prefer playerKey; fallback to playerName
-        const stable = playerKey?.trim() || String(playerName ?? "").trim();
+        // New canonical stable id: username
+        const stable = String(username ?? "").trim().toLowerCase();
         if (!stable) return;
 
         // Only count players we were expecting (don’t let random clients unblock)
@@ -262,6 +284,8 @@ export const lobbyHandlers = {
         const narrationEnabled = Boolean(game?.lobbySettings?.narrationEnabled);
         const selectorName = String(game.selectorName ?? "").trim();
 
+        console.log(selectorName);
+
         if (narrationEnabled && selectorName) {
             game.phase = "welcome";
             game.welcomeEndsAt = null;
@@ -277,9 +301,9 @@ export const lobbyHandlers = {
                 const pad = 25;
 
                 await ctx.aiHostVoiceSequence(ctx, gameId, game, [
-                    {slot: "welcome_intro", pad},
-                    {slot: selectorName, pad},
-                    {slot: "welcome_outro"},
+                    { slot: "welcome_intro", pad },
+                    { slot: selectorName, pad },
+                    { slot: "welcome_outro" },
                 ]);
 
                 if (game.welcomeTimer) {

@@ -8,6 +8,7 @@ import {Player} from "../../types/Lobby.ts";
 import {useAlert} from "../../contexts/AlertContext.tsx";
 import DailyDoubleWagerOverlay from "./DailyDoubleWagerOverlay.tsx";
 import {
+    AnswerCaptureStartMsg,
     AnswerProcessingMsg,
     DailyDoubleShowModalMsg,
     DailyDoubleWagerCaptureStartMsg
@@ -30,20 +31,15 @@ interface JeopardyBoardProps {
     handleBuzz: () => void;
     buzzerLocked: boolean;
     buzzResult: string | null;
+    buzzResultDisplay: string | null;
     buzzLockedOut: boolean;
 
     timerEndTime: number | null;
     timerDuration: number;
-    answerCapture: {
-        playerName: string;
-        answerSessionId: string;
-        clueKey: string;
-        durationMs: number;
-        deadlineAt: number;
-    } | null;
+    answerCapture: AnswerCaptureStartMsg | null;
 
     answerError: string | null;
-    effectivePlayerName: string | null;
+    myUsername: string | null;
     finalWagers: Record<string, number>;
     selectedFinalist: string;
     ddWagerCapture: DailyDoubleWagerCaptureStartMsg | null
@@ -58,8 +54,8 @@ interface JeopardyBoardProps {
 const JeopardyBoard: React.FC<JeopardyBoardProps> =
     ({ boardData, canSelectClue, onClueSelected, selectedClue, gameId, clearedClues, players, scores,
          currentPlayer, allWagersSubmitted, isFinalJeopardy, drawings,
-           handleBuzz, buzzerLocked, buzzResult, buzzLockedOut, timerEndTime, timerDuration,
-          answerCapture, answerError, effectivePlayerName, finalWagers, selectedFinalist, ddWagerCapture, ddWagerError,
+           handleBuzz, buzzerLocked, buzzResult, buzzResultDisplay, buzzLockedOut, timerEndTime, timerDuration,
+          answerCapture, answerError, myUsername, finalWagers, selectedFinalist, ddWagerCapture, ddWagerError,
          showDdModal, showWager, finalists, answerProcessing}) => {
     const [localSelectedClue, setLocalSelectedClue] = useState<Clue | null>(null);
     const [showClue, setShowClue] = useState(false);
@@ -192,7 +188,7 @@ const JeopardyBoard: React.FC<JeopardyBoardProps> =
                 {showDdModal && !isFinalJeopardy && !showClue && (
                     <DailyDoubleWagerOverlay
                         gameId={gameId}
-                        effectivePlayerName={effectivePlayerName}
+                        myUsername={myUsername}
                         ddWagerCapture={ddWagerCapture}
                         showDdModal={showDdModal}
                         ddWagerError={ddWagerError}
@@ -227,12 +223,13 @@ const JeopardyBoard: React.FC<JeopardyBoardProps> =
                         handleBuzz={handleBuzz}
                         buzzerLocked={buzzerLocked}
                         buzzResult={buzzResult}
+                        buzzResultDisplay={buzzResultDisplay}
                         buzzLockedOut={buzzLockedOut}
                         timerEndTime={timerEndTime}
                         timerDuration={timerDuration}
                         answerCapture={answerCapture}
                         answerError={answerError}
-                        effectivePlayerName={effectivePlayerName}
+                        myUsername={myUsername}
                         finalWagers={finalWagers}
                         selectedFinalist={selectedFinalist}
                         showDdModal={showDdModal}

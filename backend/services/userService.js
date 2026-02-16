@@ -28,7 +28,9 @@ export function getBearerToken(req) {
 }
 
 export function playerStableId(p) {
-    if (typeof p?.playerKey === "string" && p.playerKey.trim()) return p.playerKey.trim();
-    if (typeof p?.id === "string" && p.id.trim()) return p.id.trim(); // ws.id fallback
-    return String(p?.name ?? "").trim();
+    const u = String(p?.username ?? "").trim().toLowerCase();
+    if (!u) return ""; // or throw/log loudly
+    return u;
 }
+
+

@@ -28,7 +28,10 @@ export type AiHostTtsBank = {
     allAssetIds: string[];
 };
 
-export type Player = { name?: string | null };
+export type Player = {
+    username?: string | null;
+    displayname?: string | null;
+};
 
 export type Category =
     | string

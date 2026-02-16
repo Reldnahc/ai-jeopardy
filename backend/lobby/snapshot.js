@@ -27,11 +27,14 @@ export const buildLobbyState = (gameId, ws) => {
         generationTotal: typeof game.generationTotal === "number" ? game.generationTotal : null,
         you: you
             ? {
-                playerName: you.name,
-                playerKey: you.playerKey || null,
-                isHost: you.name === game.host,
+                username: you.username,
+                displayname: you.displayname,
+                isHost:
+                    String(you.username ?? "").trim().toLowerCase() ===
+                    String(game.host ?? "").trim().toLowerCase(),
             }
             : null,
+
     };
 };
 

@@ -1,26 +1,22 @@
-import {useCallback, useEffect, useRef, useState} from 'react';
-import {useLocation, useNavigate, useParams} from 'react-router-dom';
-import JeopardyBoard from '../components/game/JeopardyBoard.tsx';
+// frontend/pages/Game.tsx
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
+import JeopardyBoard from "../components/game/JeopardyBoard.tsx";
 import Sidebar from "../components/game/Sidebar.tsx";
 import FinalScoreScreen from "../components/game/FinalScoreScreen.tsx";
-import {useWebSocket} from "../contexts/WebSocketContext.tsx";
-import {useDeviceContext} from "../contexts/DeviceContext.tsx";
+import { useWebSocket } from "../contexts/WebSocketContext.tsx";
+import { useDeviceContext } from "../contexts/DeviceContext.tsx";
 import MobileSidebar from "../components/game/MobileSidebar.tsx";
-import {useGameSession} from "../hooks/useGameSession.ts";
-import {useGameSocketSync} from "../hooks/game/useGameSocketSync.ts";
-import {usePlayerIdentity} from "../hooks/usePlayerIdentity.ts";
-import {usePreload} from "../hooks/game/usePreload.ts";
-import {useEarlyMicPermission} from "../hooks/earlyMicPermission.ts";
-import {Clue} from "../../shared/types/board.ts";
-import {getCachedAudioBlobUrl} from "../audio/audioCache.ts";
+import { useGameSession } from "../hooks/useGameSession.ts";
+import { useGameSocketSync } from "../hooks/game/useGameSocketSync.ts";
+import { usePlayerIdentity } from "../hooks/usePlayerIdentity.ts";
+import { usePreload } from "../hooks/game/usePreload.ts";
+import { useEarlyMicPermission } from "../hooks/earlyMicPermission.ts";
+import { Clue } from "../../shared/types/board.ts";
+import { getCachedAudioBlobUrl } from "../audio/audioCache.ts";
 
 function getApiBase() {
-    // In dev, allow explicit override
-    if (import.meta.env.DEV) {
-        return import.meta.env.VITE_API_BASE || "http://localhost:3002";
-    }
-
-    // In prod, use same-origin
+    if (import.meta.env.DEV) return import.meta.env.VITE_API_BASE || "http://localhost:3002";
     return "";
 }
 
@@ -28,19 +24,27 @@ function ttsUrl(id: string) {
     return `${getApiBase()}/api/tts/${encodeURIComponent(id)}`;
 }
 
+function norm(v: unknown) {
+    return String(v ?? "").trim().toLowerCase();
+}
+
 export default function Game() {
-    const {gameId} = useParams<{ gameId: string }>();
+    const { gameId } = useParams<{ gameId: string }>();
     const location = useLocation();
     const navigate = useNavigate();
-    const { session, saveSession, clearSession  } = useGameSession();
-    const playerName = location.state?.playerName || '';
+    const { session, saveSession, clearSession } = useGameSession();
+
     const [lastQuestionValue, setLastQuestionValue] = useState<number>(100);
 
-    const { effectivePlayerName, playerKey } = usePlayerIdentity({
+    // NOTE: your hook expects `locationState`, not `locationStatePlayerName`
+    const { username, displayname, playerKey } = usePlayerIdentity({
         gameId,
-        locationStatePlayerName: location.state?.playerName,
+        locationState: location.state ?? null,
         allowProfileFallback: true,
     });
+
+    const myUsername = norm(username);
+    const myDisplayname = String(displayname ?? "").trim();
 
     const {
         isSocketReady,
@@ -54,6 +58,7 @@ export default function Game() {
         clearedClues,
         buzzerLocked,
         buzzResult,
+        buzzResultDisplay,
         buzzLockedOut,
         timerEndTime,
         timerDuration,
@@ -78,12 +83,13 @@ export default function Game() {
         showDdModal,
         showWager,
         finalists,
-        answerProcessing
-    } = useGameSocketSync({ gameId, playerName: effectivePlayerName });
+        answerProcessing,
+    } = useGameSocketSync({ gameId, username: myUsername });
 
     // Persistent WebSocket connection
-    const { sendJson } = useWebSocket();
+    const { sendJson, nowFromPerfMs, perfNowMs, lastSyncAgeMs } = useWebSocket();
     const { deviceType } = useDeviceContext();
+
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const audioCtxRef = useRef<AudioContext | null>(null);
     const gainNodeRef = useRef<GainNode | null>(null);
@@ -110,14 +116,11 @@ export default function Game() {
     useEffect(() => {
         try {
             localStorage.setItem(AUDIO_VOLUME_KEY, String(audioVolume));
-            if (audioVolume > 0) {
-                localStorage.setItem(AUDIO_LAST_NONZERO_KEY, String(audioVolume));
-            }
+            if (audioVolume > 0) localStorage.setItem(AUDIO_LAST_NONZERO_KEY, String(audioVolume));
         } catch {
             // ignore
         }
     }, [audioVolume]);
-
 
     const toggleAudioMuted = useCallback(() => {
         setAudioVolume((prev) => {
@@ -134,39 +137,38 @@ export default function Game() {
         });
     }, []);
 
-
     const isSelectorOnBoard = Boolean(
         phase === "board" &&
-        selectorName &&
-        playerKey &&
-        selectorKey === playerKey
+        myUsername &&
+        selectorKey &&
+        norm(selectorKey) === myUsername
     );
 
     const canSelectClue = Boolean(isSelectorOnBoard && !boardSelectionLocked);
-
 
     const narratedKeysRef = useRef<Set<string>>(new Set());
     const lastRequestedKeyRef = useRef<string | null>(null);
     const prevSocketReadyRef = useRef<boolean>(false);
 
-
     const boardDataRef = useRef(boardData);
 
-    const handleScoreUpdate = (player: string, delta: number) => {
+    const handleScoreUpdate = (playerUsername: string, delta: number) => {
         if (!gameId) return;
+
+        const u = norm(playerUsername);
+        if (!u) return;
 
         // Final Jeopardy: host buttons mean +wager / -wager, not +/- lastQuestionValue.
         if (isFinalJeopardy && allWagersSubmitted) {
-            const w = Math.abs(wagers[player] ?? 0);
+            const w = Math.abs(wagers[u] ?? 0);
             delta = delta < 0 ? -w : w;
         }
 
-        // Server-authoritative:
-        sendJson({ type: "update-score", gameId, player, delta });
+        sendJson({ type: "update-score", gameId, username: u, delta });
     };
 
     const leaveGame = useCallback(() => {
-        if (!gameId || !effectivePlayerName) {
+        if (!gameId) {
             clearSession();
             navigate("/");
             return;
@@ -176,54 +178,55 @@ export default function Game() {
             sendJson({
                 type: "leave-game",
                 gameId,
-                playerName: effectivePlayerName,
+                username: myUsername || null,
             });
         }
 
         clearSession();
         navigate("/");
-    }, [gameId, effectivePlayerName, isSocketReady, sendJson, clearSession, navigate]);
+    }, [gameId, myUsername, isSocketReady, sendJson, clearSession, navigate]);
 
-    const playAudioUrl = useCallback((httpUrl: string) => {
-        const a = audioRef.current;
-        if (!a) return;
 
-        try {
-            a.pause();
+    const playAudioUrl = useCallback(
+        (httpUrl: string) => {
+            const a = audioRef.current;
+            if (!a) return;
 
-            // Volume-based “mute”
-            a.muted = false;
-            const gain = gainNodeRef.current;
-            if (gain) gain.gain.value = audioVolume;
+            try {
+                a.pause();
 
-            a.currentTime = 0;
+                // Volume-based “mute”
+                a.muted = false;
+                const gain = gainNodeRef.current;
+                if (gain) gain.gain.value = audioVolume;
 
-            // ✅ If we preloaded this URL, use the blob URL so there is NO network on play.
-            const blobUrl = getCachedAudioBlobUrl(httpUrl);
-            a.src = blobUrl || httpUrl;
+                a.currentTime = 0;
 
-            if (audioVolume <= 0) return;
+                // If we preloaded this URL, use the blob URL so there is NO network on play.
+                const blobUrl = getCachedAudioBlobUrl(httpUrl);
+                a.src = blobUrl || httpUrl;
 
-            void a.play();
-        } catch (e) {
-            console.debug("TTS play blocked:", e);
-        }
-    }, [audioVolume]);
-
+                if (audioVolume <= 0) return;
+                void a.play();
+            } catch (e) {
+                console.debug("TTS play blocked:", e);
+            }
+        },
+        [audioVolume]
+    );
 
     const lastAiHostAssetPlayedRef = useRef<string | null>(null);
-
     const gameReadySentRef = useRef(false);
 
     useEffect(() => {
         if (gameReadySentRef.current) return;
         if (!isSocketReady) return;
         if (!gameId) return;
-        if (!playerKey) return;
-        if (!effectivePlayerName) return;
 
-        // Important: wait until we've received at least one game-state
-        // so we know the game page hook is hydrated + subscribed.
+        // IMPORTANT: identity is username now
+        if (!myUsername) return;
+
+        // Wait until we’ve received at least one game-state
         if (!host) return;
 
         gameReadySentRef.current = true;
@@ -231,14 +234,12 @@ export default function Game() {
         sendJson({
             type: "game-ready",
             gameId,
-            playerKey,
-            playerName: effectivePlayerName,
+            username: myUsername,
         });
-    }, [isSocketReady, gameId, playerKey, effectivePlayerName, host, sendJson]);
+    }, [isSocketReady, gameId, myUsername, host, sendJson]);
 
     useEffect(() => {
         if (!aiHostAsset) return;
-
         if (lastAiHostAssetPlayedRef.current === aiHostAsset) return;
         lastAiHostAssetPlayedRef.current = aiHostAsset;
 
@@ -246,14 +247,11 @@ export default function Game() {
         const assetId = (idx >= 0 ? aiHostAsset.slice(idx + 2) : aiHostAsset).trim();
         if (!assetId) return;
 
-        // Page owns audio policy
         if (!narrationEnabled) return;
         if (audioMuted) return;
 
-        // Direct stream from your backend (already implemented)
         playAudioUrl(ttsUrl(assetId));
-        }, [aiHostAsset, narrationEnabled, audioMuted, playAudioUrl]);
-
+    }, [aiHostAsset, narrationEnabled, audioMuted, playAudioUrl]);
 
     useEffect(() => {
         const audio = new Audio();
@@ -266,7 +264,6 @@ export default function Game() {
         const gain = ctx.createGain();
         const compressor = ctx.createDynamicsCompressor();
 
-        // Gentle loudness boost without distortion
         compressor.threshold.value = -18;
         compressor.knee.value = 12;
         compressor.ratio.value = 3;
@@ -302,7 +299,6 @@ export default function Game() {
     useEffect(() => {
         const gain = gainNodeRef.current;
         if (!gain) return;
-
         gain.gain.value = audioVolume;
     }, [audioVolume]);
 
@@ -312,41 +308,56 @@ export default function Game() {
         prevSocketReadyRef.current = nowReady;
 
         if (!wasReady && nowReady) {
-            // Treat this as a (re)hydration moment.
             lastRequestedKeyRef.current = null;
             narratedKeysRef.current.clear();
         }
     }, [isSocketReady]);
 
+    // Persist session as username + displayname
     useEffect(() => {
-        if (!gameId || !effectivePlayerName) return;
+        if (!gameId) return;
+
+        // You at least need a displayname (guests have one)
+        if (!myDisplayname) return;
 
         // Only write if different
-        if (
+        const same =
             session?.gameId === gameId &&
-            session?.username === effectivePlayerName &&
-            session?.isHost === isHost
-        ) {
-            return;
-        }
+            String(session?.playerKey ?? "") === String(playerKey ?? "") &&
+            (session?.username ?? null) === (username ?? null) &&
+            String(session?.displayname ?? "") === myDisplayname &&
+            session?.isHost === isHost;
 
-        saveSession(gameId, effectivePlayerName, isHost);
-    }, [gameId, effectivePlayerName, isHost, saveSession, session]);
+        if (same) return;
+
+        saveSession({
+            gameId,
+            playerKey: String(playerKey ?? ""),
+            username: username ?? null,
+            displayname: myDisplayname,
+            isHost: Boolean(isHost),
+        });
+    }, [gameId, playerKey, username, myDisplayname, isHost, saveSession, session]);
 
 
+    // Join game (username identity)
     useEffect(() => {
         if (!isSocketReady) return;
-        if (!gameId || !effectivePlayerName) return;
+        if (!gameId) return;
 
-        // Whether it's a fresh join or a reconnect, we send "join-game".
-        // The server now handles the difference.
+        // If user is not logged in (username null), you need a guest username strategy.
+        // For now, only join when username exists.
+        if (!myUsername) return;
+
         sendJson({
             type: "join-game",
             gameId,
-            playerName: effectivePlayerName,
+            username: myUsername,
+            displayname: myDisplayname || null,
+            // keep temporarily if server still expects it somewhere (but should be removed soon)
+            playerKey,
         });
-
-    }, [gameId, effectivePlayerName, sendJson, isSocketReady]);
+    }, [gameId, myUsername, myDisplayname, playerKey, sendJson, isSocketReady]);
 
     useEffect(() => {
         boardDataRef.current = boardData;
@@ -354,13 +365,9 @@ export default function Game() {
 
     usePreload(boardData, Boolean(boardData));
 
-    const { nowFromPerfMs, perfNowMs, lastSyncAgeMs } = useWebSocket();
-
     const handleBuzz = () => {
         if (!gameId) return;
         if (buzzResult || buzzLockedOut) return;
-
-        // if sync is stale, either force a sync or fall back (I’d still send, server can decide)
 
         const clientBuzzPerfMs = perfNowMs();
         const clientSeq = ++buzzSeqRef.current;
@@ -382,26 +389,26 @@ export default function Game() {
         sendJson(payload);
     };
 
-
-
-    const onClueSelected = useCallback((clue: Clue) => {
-        if (canSelectClue  && clue) {
+    const onClueSelected = useCallback(
+        (clue: Clue) => {
+            if (!canSelectClue || !clue) return;
             if (!gameId) return;
+
             sendJson({ type: "clue-selected", gameId, clue });
-            if (clue.value !== undefined) {
-                setLastQuestionValue(clue.value); // Set last question value based on clue's value
-            }
-        }
-    },[canSelectClue, gameId, sendJson]);
+
+            if (clue.value !== undefined) setLastQuestionValue(clue.value);
+        },
+        [canSelectClue, gameId, sendJson]
+    );
 
     useEarlyMicPermission();
 
+    const safeActiveBoard = activeBoard || "firstBoard";
+    const safeCategories = boardData?.[safeActiveBoard]?.categories;
+
     return (
-        <div
-            className="flex h-screen w-screen overflow-hidden font-sans bg-gradient-to-b from-[#183a75] via-[#2a5fb3] to-[#1c4a96]"
-        >
-            {/* Sidebar */}
-            {deviceType === 'mobile' ? (
+        <div className="flex h-screen w-screen overflow-hidden font-sans bg-gradient-to-b from-[#183a75] via-[#2a5fb3] to-[#1c4a96]">
+            {deviceType === "mobile" ? (
                 <MobileSidebar
                     isHost={isHost}
                     host={host}
@@ -424,51 +431,45 @@ export default function Game() {
                     audioVolume={audioVolume}
                     onChangeAudioVolume={setAudioVolume}
                     lastQuestionValue={lastQuestionValue}
-                    activeBoard={activeBoard}
+                    activeBoard={safeActiveBoard}
                     handleScoreUpdate={handleScoreUpdate}
                     markAllCluesComplete={markAllCluesComplete}
                     onLeaveGame={leaveGame}
                     selectorName={selectorName}
                     onToggleDailyDoubleSnipe={(enabled) => {
-                        sendJson({
-                            type: "dd-snipe-next",
-                            gameId,
-                            enabled,
-                        });
+                        sendJson({ type: "dd-snipe-next", gameId, enabled });
                     }}
                 />
             )}
-            {/* Jeopardy Board Section */}
-            <div
-                className="flex flex-1 justify-center items-center overflow-hidden p-0"
-            >
+
+            <div className="flex flex-1 justify-center items-center overflow-hidden p-0">
                 {isGameOver ? (
                     <FinalScoreScreen scores={scores} />
                 ) : (
                     <>
-                        {/* Jeopardy Board */}
                         <JeopardyBoard
-                            boardData={boardData[activeBoard].categories}
+                            boardData={safeCategories || []}
                             canSelectClue={canSelectClue}
                             onClueSelected={onClueSelected}
                             selectedClue={selectedClue || null}
-                            gameId={gameId || ''}
+                            gameId={gameId || ""}
                             clearedClues={clearedClues}
                             players={players}
                             scores={scores}
-                            currentPlayer={playerName}
+                            currentPlayer={myUsername}
                             allWagersSubmitted={allWagersSubmitted}
                             isFinalJeopardy={isFinalJeopardy}
                             drawings={drawings}
                             handleBuzz={handleBuzz}
                             buzzerLocked={buzzerLocked}
                             buzzResult={buzzResult}
+                            buzzResultDisplay={buzzResultDisplay}
                             buzzLockedOut={buzzLockedOut}
                             timerEndTime={timerEndTime}
                             timerDuration={timerDuration}
                             answerCapture={answerCapture}
                             answerError={answerError}
-                            effectivePlayerName={effectivePlayerName}
+                            myUsername={myUsername}
                             finalWagers={finalWagers}
                             selectedFinalist={selectedFinalist}
                             ddWagerCapture={ddWagerCapture}

@@ -1,6 +1,25 @@
-function applyScore(game, playerName, delta) {
+function normUsername(u) {
+    return String(u ?? "").trim().toLowerCase();
+}
+
+function findPlayerByUsername(game, username) {
+    const u = normUsername(username);
+    if (!u) return null;
+    return (game?.players || []).find((p) => normUsername(p?.username) === u) || null;
+}
+
+function displaynameFor(game, username) {
+    const p = findPlayerByUsername(game, username);
+    const d = String(p?.displayname ?? "").trim();
+    return d || String(username ?? "").trim(); // fallback
+}
+
+function applyScore(game, username, delta) {
+    const u = normUsername(username);
+    if (!u) return;
+
     if (!game.scores) game.scores = {};
-    game.scores[playerName] = (game.scores[playerName] || 0) + Number(delta || 0);
+    game.scores[u] = (game.scores[u] || 0) + Number(delta || 0);
 }
 
 function getDailyDoubleWagerIfActive(game) {
@@ -123,34 +142,37 @@ export function parseClueValue(val) {
     return Number.isFinite(n) ? n : 0;
 }
 
-export async function autoResolveAfterJudgement(ctx, gameId, game, playerName, verdict) {
+export async function autoResolveAfterJudgement(ctx, gameId, game, username, verdict) {
     if (!game || !game.selectedClue) return;
+
+    const u = normUsername(username);
+    if (!u) return;
 
     const worth = getActiveClueWorth(game);
     const delta = verdict === "correct" ? worth : verdict === "incorrect" ? -worth : 0;
 
     // Apply score immediately (authoritative)
     if (verdict === "correct" || verdict === "incorrect") {
-        applyScore(game, playerName, delta);
+        applyScore(game, u, delta);
         ctx.broadcast(gameId, { type: "update-scores", scores: game.scores });
     }
 
     const ddActive = isDailyDoubleActiveForCurrentClue(game);
 
+    // Resolve displayname for VO / UI
+    const disp = displaynameFor(game, u);
+
     if (verdict === "correct") {
         game.selectedClue.isAnswerRevealed = true;
 
-
         const alive = await ctx.aiHostVoiceSequence(ctx, gameId, game, [
-            {slot: "correct", after: () => ctx.broadcast(gameId, { type: "answer-revealed", clue: game.selectedClue })},
+            { slot: "correct", after: () => ctx.broadcast(gameId, { type: "answer-revealed", clue: game.selectedClue }) },
         ]);
-        console.log(alive);
         if (!alive) return;
 
         // Correct player becomes selector
-        const p = (game.players || []).find(x => x?.name === playerName);
-        game.selectorKey = ctx.playerStableId(p || { name: playerName });
-        game.selectorName = playerName;
+        game.selectorKey = u;     // ✅ username identity
+        game.selectorName = disp; // ✅ displayname presentation
 
         if (ddActive) {
             game.dailyDouble = null;
@@ -158,7 +180,6 @@ export async function autoResolveAfterJudgement(ctx, gameId, game, playerName, v
 
         await ctx.sleep(3000);
         finishClueAndReturnToBoard(ctx, gameId, game);
-
         return;
     }
 
@@ -178,22 +199,19 @@ export async function autoResolveAfterJudgement(ctx, gameId, game, playerName, v
         const assetId = game.boardData?.ttsByAnswerKey?.[clueKey] || null;
 
         await ctx.aiHostVoiceSequence(ctx, gameId, game, [
-            { slot: "incorrect", },
+            { slot: "incorrect" },
             { slot: "answer_was", after: revealAnswer },
             { assetId },
         ]);
 
-        // Clear DD state now that the clue is resolved
         game.dailyDouble = null;
 
         finishClueAndReturnToBoard(ctx, gameId, game);
         return;
     }
 
-    // Lock them out from re-buzzing on this clue
-    const p = (game.players || []).find(x => x?.name === playerName);
-    const stable = ctx.playerStableId(p || { name: playerName });
-    if (game.clueState?.lockedOut) game.clueState.lockedOut[stable] = true;
+    // Lock them out from re-buzzing on this clue (keyed by username)
+    if (game.clueState?.lockedOut) game.clueState.lockedOut[u] = true;
 
     // Clear any answer state so clue can continue
     game.buzzed = null;
@@ -207,30 +225,31 @@ export async function autoResolveAfterJudgement(ctx, gameId, game, playerName, v
     ctx.clearAnswerWindow(game);
     ctx.clearGameTimer(game, gameId, ctx);
 
-    // Check if anyone remains eligible to buzz
+    // Check if anyone remains eligible to buzz (username-keyed)
     const players = game.players || [];
-    const anyoneLeft = players.some(pp => !game.clueState?.lockedOut?.[ctx.playerStableId(pp)]);
+    const anyoneLeft = players.some((pp) => {
+        const id = normUsername(pp?.username);
+        if (!id) return false;
+        return !game.clueState?.lockedOut?.[id];
+    });
 
     if (!anyoneLeft) {
-        // Everyone buzzed and missed. Do NOT play the "nobody" line and do NOT reopen buzzers.
-        // Keep things locked, optionally play the normal incorrect line, then reveal and return.
         game.buzzerLocked = true;
         ctx.broadcast(gameId, { type: "buzzer-locked" });
 
         const revealAnswer = async () => {
             game.selectedClue.isAnswerRevealed = true;
-            ctx.broadcast(gameId, {type: "answer-revealed", clue: game.selectedClue});
-        }
+            ctx.broadcast(gameId, { type: "answer-revealed", clue: game.selectedClue });
+        };
 
-        const clueKey =  ctx.getClueKey(game,game.selectedClue);
+        const clueKey = ctx.getClueKey(game, game.selectedClue);
         const assetId = game.boardData?.ttsByAnswerKey?.[clueKey] || null;
 
         await ctx.aiHostVoiceSequence(ctx, gameId, game, [
-            {slot: "incorrect"},
-            {slot: "answer_was", after: revealAnswer},
-            {assetId},
+            { slot: "incorrect" },
+            { slot: "answer_was", after: revealAnswer },
+            { assetId },
         ]);
-
 
         finishClueAndReturnToBoard(ctx, gameId, game);
         return;
@@ -240,13 +259,15 @@ export async function autoResolveAfterJudgement(ctx, gameId, game, playerName, v
     game.buzzerLocked = true;
     ctx.broadcast(gameId, { type: "buzzer-locked" });
 
-
     await ctx.aiHostVoiceSequence(ctx, gameId, game, [
-        {slot: "incorrect", pad: 1000},
-        {slot: "rebuzz", pad: 700, after: () => {
+        { slot: "incorrect", pad: 1000 },
+        {
+            slot: "rebuzz",
+            pad: 700,
+            after: () => {
                 ctx.broadcast(gameId, { type: "buzzer-ui-reset" });
                 ctx.doUnlockBuzzerAuthoritative(gameId, game, ctx);
-            }
+            },
         },
     ]);
 }

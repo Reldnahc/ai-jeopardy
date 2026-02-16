@@ -4,7 +4,11 @@ import { useWebSocket } from "../../contexts/WebSocketContext.tsx";
 import BuzzAnimation from "./BuzzAnimation.tsx";
 import Timer from "./Timer.tsx";
 import FinalJeopardyPanel from "./FinalJeopardyPanel.tsx";
-import {AnswerProcessingMsg, DailyDoubleShowModalMsg} from "../../hooks/game/useGameSocketSync.ts";
+import {
+    AnswerCaptureStartMsg,
+    AnswerProcessingMsg,
+    DailyDoubleShowModalMsg
+} from "../../hooks/game/useGameSocketSync.ts";
 
 interface SelectedClueDisplayProps {
     localSelectedClue: Clue;
@@ -20,19 +24,14 @@ interface SelectedClueDisplayProps {
     handleBuzz: () => void;
     buzzerLocked: boolean;
     buzzResult: string | null;
+    buzzResultDisplay: string | null;
     buzzLockedOut: boolean;
     timerEndTime: number | null;
     timerDuration: number;
-    answerCapture: {
-        playerName: string;
-        answerSessionId: string;
-        clueKey: string;
-        durationMs: number;
-        deadlineAt: number;
-    } | null;
+    answerCapture: AnswerCaptureStartMsg | null;
 
     answerError: string | null;
-    effectivePlayerName: string | null;
+    myUsername: string | null;
     finalWagers: Record<string, number>;
     selectedFinalist: string;
     showDdModal: DailyDoubleShowModalMsg | null;
@@ -54,12 +53,13 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                                                                      handleBuzz,
                                                                      buzzerLocked,
                                                                      buzzResult,
+                                                                     buzzResultDisplay,
                                                                      buzzLockedOut,
                                                                      timerEndTime,
                                                                      timerDuration,
                                                                      answerCapture,
                                                                      answerError,
-                                                                     effectivePlayerName,
+                                                                     myUsername,
                                                                      finalWagers,
                                                                      selectedFinalist,
                                                                      showDdModal,
@@ -101,8 +101,8 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
 
     const isAnsweringPlayer =
         !!answerCapture &&
-        !!effectivePlayerName &&
-        answerCapture.playerName === effectivePlayerName;
+        !!myUsername &&
+        answerCapture.username === myUsername;
 
     useEffect(() => {
         // Only the selected player records
@@ -375,7 +375,7 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
             </div>
 
             {/* Keep buzz animation overlay-ish */}
-            <BuzzAnimation playerName={buzzResult} />
+            <BuzzAnimation playerName={buzzResultDisplay} />
 
             {/* Main layout: top padding for timer + scrollable center area */}
             <div className="h-full pt-16 flex flex-col items-center">
@@ -441,14 +441,14 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                         {answerProcessing && !showAnswer && (
                             <div className="mt-3 flex justify-center">
                                 <div className="text-md text-red-500 font-extrabold mt-1">
-                                    Server is thinking…
+                                    Host is thinking…
                                 </div>
                             </div>
                         )}
 
                         {answerCapture && !showAnswer && (
                             <div className="mt-4 text-center">
-                                <div className="text-lg font-bold">{answerCapture.playerName} is answering…</div>
+                                <div className="text-lg font-bold">{answerCapture.displayname} is answering…</div>
                                 {isAnsweringPlayer && (
                                     <div className="text-md text-red-500 font-extrabold mt-1">Recording your mic now…</div>
                                 )}

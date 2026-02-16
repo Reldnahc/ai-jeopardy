@@ -12,8 +12,8 @@ import {
     getProfilePresentation,
     PROFILE_COLOR_OPTIONS,
     PROFILE_FONT_OPTIONS,
-    PROFILE_ICON_OPTIONS
 } from "../utils/profilePresentation.ts";
+import { PROFILE_ICON_OPTIONS } from "../components/common/profileIcons";
 
 interface RouteParams extends Record<string, string | undefined> {
     username: string;

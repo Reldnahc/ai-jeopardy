@@ -55,14 +55,14 @@ export async function repromptDdWager(gameId, game, ctx, args) {
         ctx.broadcast(gameId, {
             type: "daily-double-wager-locked",
             gameId,
-            playerName: dd.playerName,
+            username: dd.playerUsername,
+            displayname: dd.playerDisplayname,
             wager: fallbackWager,
             fallback: true,
             reason: args?.reason || "parse-failed",
         });
 
         return await finalizeDailyDoubleWagerAndStartClue(gameId, game, ctx, {
-            playerName: dd.playerName,
             fallbackWager,
             fallback: false,
             reason: null,
@@ -73,7 +73,8 @@ export async function repromptDdWager(gameId, game, ctx, args) {
     ctx.broadcast(gameId, {
         type: "daily-double-wager-parse-failed",
         gameId,
-        playerName: dd.playerName,
+        username: dd.playerUsername,
+        displayname: dd.playerDisplayname,
         reason: args?.reason || "no-number",
         attempts: dd.attempts,
         maxAttempts,
@@ -115,7 +116,8 @@ export function startDdWagerCapture(gameId, game, ctx, opts = {}) {
         type: "daily-double-wager-capture-start",
         gameId,
         ddWagerSessionId,
-        playerName: dd.playerName,
+        username: dd.playerUsername,
+        displayname: dd.playerDisplayname,
         durationMs,
         deadlineAt,
         attempts: dd.attempts,
@@ -154,7 +156,7 @@ export async function finalizeDailyDoubleWagerAndStartClue(
     ctx,
     args
 ) {
-    const { playerName, wager, fallback = false, reason = null } = args || {};
+    const { wager, fallback = false, reason = null } = args || {};
 
     const dd = game.dailyDouble;
     if (!dd) return;
@@ -178,7 +180,8 @@ export async function finalizeDailyDoubleWagerAndStartClue(
     ctx.broadcast(gameId, {
         type: "daily-double-wager-locked",
         gameId,
-        playerName: playerName || dd.playerName,
+        username: dd.playerUsername,
+        displayname: dd.playerDisplayname,
         wager: dd.wager,
         fallback: Boolean(fallback),
         reason: reason || null,
@@ -212,7 +215,7 @@ export async function finalizeDailyDoubleWagerAndStartClue(
     const deadlineAt = Date.now() + RECORD_MS;
 
     game.phase = "ANSWER_CAPTURE";
-    game.answeringPlayerKey = playerName || dd.playerName;
+    game.answeringPlayerUsername= dd.playerUsername;
     game.answerClueKey = clueKey;
     game.answerSessionId = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
     game.answerTranscript = null;
@@ -224,7 +227,8 @@ export async function finalizeDailyDoubleWagerAndStartClue(
     ctx.broadcast(gameId, {
         type: "answer-capture-start",
         gameId,
-        playerName: game.answeringPlayerKey,
+        username: dd.playerUsername,
+        displayname: dd.playerDisplayname,
         answerSessionId: game.answerSessionId,
         clueKey,
         durationMs: RECORD_MS,
@@ -262,7 +266,8 @@ export async function finalizeDailyDoubleWagerAndStartClue(
             type: "answer-result",
             gameId,
             answerSessionId: g.answerSessionId,
-            playerName: game.answeringPlayerKey,
+            username: dd.playerUsername,
+            displayname: dd.playerDisplayname,
             transcript: "",
             verdict: "incorrect",
             confidence: 0.0,

@@ -77,6 +77,7 @@ const FinalJeopardyPanel: React.FC<FinalJeopardyPanelProps> = ({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [timerEndTime, hasSubmitted, currentPlayer]);
 
+
     const isFinalist = finalists.includes(currentPlayer);
 
     return (

@@ -280,7 +280,7 @@ export async function ensureAiHostTtsBank(opts: {
     // 2) Ensure player name callouts
     const players = Array.isArray(game.players) ? game.players : [];
     for (const p of players) {
-        const name = String(p?.name || "").trim();
+        const name = String(p?.displayname || "").trim();
         if (!name) continue;
 
         slotJobs.push(

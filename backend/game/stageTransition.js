@@ -49,8 +49,8 @@ async function startDoubleJeopardy(game, gameId, ctx) {
             });
 
     if (pick) {
-        game.selectorKey = pick.playerKey;
-        game.selectorName = pick.name;
+        game.selectorKey = pick.username;
+        game.selectorName = pick.displayname;
     } else {
         game.selectorKey = null;
         game.selectorName = null;
@@ -75,7 +75,7 @@ async function startDoubleJeopardy(game, gameId, ctx) {
 function getExpectedFinalists(game) {
     const players = Array.isArray(game?.players) ? game.players : [];
     return players.filter((p) => {
-        const score = Number(game.scores?.[p.name] ?? 0);
+        const score = Number(game.scores?.[p.username] ?? 0);
         const online = p?.online !== false; // default true
         return score > 0 && online;
     });
@@ -87,7 +87,7 @@ function getExpectedFinalists(game) {
  */
 function getFinalistNames(game) {
     if (Array.isArray(game?.finalJeopardyFinalists)) return game.finalJeopardyFinalists;
-    const names = getExpectedFinalists(game).map((p) => p.name);
+    const names = getExpectedFinalists(game).map((p) => p.username);
     game.finalJeopardyFinalists = names;
     return names;
 }
