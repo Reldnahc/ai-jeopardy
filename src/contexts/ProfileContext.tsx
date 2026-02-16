@@ -10,7 +10,7 @@ import React, {
     ReactNode,
 } from "react";
 import { useAuth } from "./AuthContext";
-import {ProfileIconName} from "../components/common/ProfileIcon.tsx";
+import {ProfileIconName} from "../components/common/profileIcons.tsx";
 
 export interface ProfileStats {
     boards_generated?: number | null;

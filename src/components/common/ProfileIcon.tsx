@@ -1,6 +1,6 @@
 // src/components/common/ProfileIcon.tsx
 import * as React from "react";
-import { getIconRenderer, type ProfileIconName } from "./profileIcons";
+import { getIconDef, type ProfileIconName } from "./profileIcons";
 
 type Props = {
     name: ProfileIconName;
@@ -25,23 +25,19 @@ export default function ProfileIcon({ name, className = "", title, style }: Prop
         role: title ? "img" : "presentation",
     } as const;
 
-    const Renderer = getIconRenderer(name);
+    const def = getIconDef(name);
 
-    // stroke vs fill per-icon: simplest is a small set check
-    const strokeIcons = new Set(["crown", "skull", "rocket", "brain", "trophy", "sparkles", "lock"] as const);
-    const isStroke = strokeIcons.has(name as any);
-
-    if (isStroke) {
+    if (def.kind === "stroke") {
         return (
             <svg {...common} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <Renderer title={title} />
+                <def.Renderer title={title} />
             </svg>
         );
     }
 
     return (
         <svg {...common} fill="currentColor">
-            <Renderer title={title} />
+            <def.Renderer title={title} />
         </svg>
     );
 }
