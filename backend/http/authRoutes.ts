@@ -3,6 +3,7 @@ import type { Application, Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import { signJwt, verifyJwt } from "../auth/jwt.js";
 import type { Repos } from "../repositories/index.js";
+import { containsProfanity } from "../services/profanityService.js";
 
 type JwtPayload = {
   sub?: string;
@@ -38,6 +39,13 @@ export function registerAuthRoutes(app: Application, repos: AuthRepos) {
 
       const usernameRaw = String(body.username ?? "");
       const username = normalizeUsername(usernameRaw);
+
+      // Profanity checks
+      if (containsProfanity(usernameRaw) || containsProfanity(username)) {
+        return res.status(400).json({ error: "name contains prohibited language." });
+      }
+
+
 
       const displayname =
           String(body.displayname ?? "").trim() ||

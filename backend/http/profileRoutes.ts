@@ -3,6 +3,7 @@ import type { Application, Request, Response } from "express";
 import { requireAuth } from "./requireAuth.js";
 import type { Repos } from "../repositories/index.js";
 import type { CustomizationPatch } from "../repositories/profileRepository.js";
+import {containsProfanity} from "../services/profanityService.js";
 
 type ProfileRepos = Pick<Repos, "profiles" | "boards">;
 
@@ -89,8 +90,15 @@ export function registerProfileRoutes(app: Application, repos: ProfileRepos) {
 
       const patch: CustomizationPatch = {};
 
-      // allow null for bio/font/icon
-      if ("bio" in body) patch.bio = body.bio === null ? null : asTrimmedString(body.bio);
+      if ("bio" in body) {
+        patch.bio = body.bio === null ? null : asTrimmedString(body.bio);
+
+        if (typeof patch.bio === "string" && patch.bio.length > 0) {
+          if (containsProfanity(patch.bio)) {
+            return res.status(400).json({ error: "Bio contains prohibited language." });
+          }
+        }
+      }
       if ("font" in body) patch.font = body.font === null ? null : asTrimmedString(body.font);
       if ("icon" in body) patch.icon = body.icon === null ? null : asTrimmedString(body.icon);
 
