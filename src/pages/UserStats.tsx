@@ -37,6 +37,12 @@ function fmtMoney(n: unknown) {
     return `$${Math.trunc(v).toLocaleString()}`;
 }
 
+const pct = (num?: number | null, den?: number | null) => {
+    if (!den || den <= 0) return "—";
+    return `${((num ?? 0) / den * 100).toFixed(1)}%`;
+};
+
+
 type StatCard = {
     label: string;
     value: string;
@@ -107,35 +113,59 @@ export default function UserStats() {
         const p = routeProfile;
 
         const gameplay: StatCard[] = [
-            { label: "Games Played", value: fmtInt(p?.games_played) },
-            { label: "Games Finished", value: fmtInt(p?.games_finished) },
-            { label: "Games Won", value: fmtInt(p?.games_won) },
-            { label: "Boards Generated", value: fmtInt(p?.boards_generated) },
-            { label: "Clues Selected", value: fmtInt(p?.clues_selected) },
-            { label: "Clues Skipped", value: fmtInt(p?.clues_skipped) },
-            { label: "Money Won", value: fmtMoney(p?.money_won) },
+            { label: "Games Played", value: fmtInt(p?.games_played), hint: "Total games joined." },
+            { label: "Games Finished", value: fmtInt(p?.games_finished), hint: "Games completed to the end." },
+            { label: "Games Won", value: fmtInt(p?.games_won), hint: "Games finished in 1st place." },
+            { label: "Boards Generated", value: fmtInt(p?.boards_generated), hint: "Jeopardy boards created." },
+            { label: "Clues Selected", value: fmtInt(p?.clues_selected), hint: "Clues you chose." },
+            { label: "Clues Skipped", value: fmtInt(p?.clues_skipped), hint: "Clues revealed without answering." },
+            { label: "Money Won", value: fmtMoney(p?.money_won), hint: "Total in-game winnings." },
         ];
 
         const accuracy: StatCard[] = [
-            { label: "Correct Answers", value: fmtInt(p?.correct_answers) },
-            { label: "Wrong Answers", value: fmtInt(p?.wrong_answers) },
+            { label: "Correct Answers", value: fmtInt(p?.correct_answers), hint: "Clues answered correctly." },
+            { label: "Wrong Answers", value: fmtInt(p?.wrong_answers), hint: "Clues answered incorrectly." },
+            {
+                label: "Answer Accuracy",
+                value: pct(
+                    p?.correct_answers,
+                    (p?.correct_answers ?? 0) + (p?.wrong_answers ?? 0)
+                ),
+                hint: "Correct ÷ total answers.",
+            },
         ];
 
         const buzzing: StatCard[] = [
-            { label: "Times Buzzed", value: fmtInt(p?.times_buzzed) },
-            { label: "Total Buzzes", value: fmtInt(p?.total_buzzes) },
+            { label: "Times Buzz Won", value: fmtInt(p?.times_buzzed), hint: "Times you buzzed in first." },
+            { label: "Total Buzzes", value: fmtInt(p?.total_buzzes), hint: "Total buzzer presses." },
+            {
+                label: "Buzz Win Rate",
+                value: pct(p?.times_buzzed, p?.total_buzzes),
+                hint: "Won buzzes ÷ total buzzes.",
+            },
         ];
 
         const dailyDouble: StatCard[] = [
-            { label: "Daily Doubles Found", value: fmtInt(p?.daily_double_found) },
-            { label: "Daily Doubles Correct", value: fmtInt(p?.daily_double_correct) },
-            { label: "True Daily Doubles", value: fmtInt(p?.true_daily_doubles), hint: "Daily Double found + correct (your tracking field)" },
+            { label: "Daily Doubles Found", value: fmtInt(p?.daily_double_found), hint: "Daily Doubles you uncovered." },
+            { label: "Daily Doubles Correct", value: fmtInt(p?.daily_double_correct), hint: "Daily Doubles answered correctly." },
+            { label: "True Daily Doubles", value: fmtInt(p?.true_daily_doubles), hint: "Max-wager Daily Doubles." },
+            {
+                label: "Daily Double Accuracy",
+                value: pct(p?.daily_double_correct, p?.daily_double_found),
+                hint: "Correct Daily Doubles ÷ found.",
+            },
         ];
 
         const finalJeopardy: StatCard[] = [
-            { label: "Final Jeopardy Participations", value: fmtInt(p?.final_jeopardy_participations) },
-            { label: "Final Jeopardy Correct", value: fmtInt(p?.final_jeopardy_corrects) },
+            { label: "FJ Participations", value: fmtInt(p?.final_jeopardy_participations), hint: "Final Jeopardy appearances." },
+            { label: "FJ Correct", value: fmtInt(p?.final_jeopardy_corrects), hint: "Final Jeopardy correct responses." },
+            {
+                label: "FJ Accuracy",
+                value: pct(p?.final_jeopardy_corrects, p?.final_jeopardy_participations),
+                hint: "Correct FJ ÷ participations.",
+            },
         ];
+
 
         return [
             { title: "Gameplay", items: gameplay },
@@ -214,10 +244,6 @@ export default function UserStats() {
                         ))}
                     </div>
 
-                    {/* Footer note */}
-                    <div className="mt-8 text-xs text-gray-500">
-                        Note: Some stats may show as 0 if you haven’t played modes that track them yet.
-                    </div>
                 </div>
             </div>
         </div>
