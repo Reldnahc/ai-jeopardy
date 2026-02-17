@@ -87,6 +87,7 @@ const FONT_CLASS_MAP: Record<string, string> =
 
 export type ProfilePresentation = {
     displayName: string;
+    username: string;
 
     nameClassName: string;              // font class
     nameStyle?: React.CSSProperties;    // name color
@@ -111,6 +112,7 @@ export function getProfilePresentation(args: {
     const { profile, fallbackName = "", defaultNameColor } = args;
 
     const displayName = profile?.displayname || profile?.username || fallbackName || "";
+    const username = profile?.username || fallbackName || "";
 
     const fontId = profile?.font ?? "";
     const nameClassName = FONT_CLASS_MAP[fontId] ?? "font-sans";
@@ -126,6 +128,7 @@ export function getProfilePresentation(args: {
 
     return {
         displayName,
+        username,
         nameClassName,
         nameStyle,
 

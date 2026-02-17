@@ -396,6 +396,16 @@ const Profile: React.FC = () => {
         nameColorMeta.defaultHex
     );
 
+    const role = routeProfile?.role?.toLowerCase() ?? null;
+
+    const roleMeta: Record<string, { label: string; className: string }> = {
+        admin: { label: "Admin", className: "text-red-600" },
+        moderator: { label: "Moderator", className: "text-blue-600" },
+        creator: { label: "Creator", className: "text-purple-600" },
+    };
+
+    const roleInfo = role ? roleMeta[role] : null;
+
     return (
         <div className="min-h-screen bg-gradient-to-r from-indigo-400 to-blue-700 flex items-center justify-center p-6">
             <div className="max-w-3xl w-full bg-white rounded-xl shadow-2xl overflow-hidden p-6">
@@ -418,10 +428,19 @@ const Profile: React.FC = () => {
                             >
                                 {pres.displayName}
                             </h1>
+                            <h3 className="text-black -mt-2 text-sm">
+                                @{pres.username}
+                                {roleInfo && (
+                                    <>
+                                        {" "}
+                                        -{" "}
+                                        <span className={`font-semibold ${roleInfo.className}`}>
+                                            {roleInfo.label}
+                                        </span>
+                                    </>
+                                )}
+                            </h3>
 
-                            {routeProfile?.role === "admin" ||  (
-                                <h3 className="text-sm -mt-2 text-red-600">Admin</h3>
-                            )}
 
                         </div>
                     </div>
