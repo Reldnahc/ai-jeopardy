@@ -95,15 +95,33 @@ export interface PublicProfileRow {
     font: string | null;
     icon: string | null;
 
-    // legacy stats still returned (subset)
+    // stats
+    games_played: number;
     games_finished: number;
     games_won: number;
     boards_generated: number;
     money_won: number;
 
+    daily_double_found: number;
+    daily_double_correct: number;
+    true_daily_doubles: number;
+
+    final_jeopardy_participations: number;
+    final_jeopardy_corrects: number;
+
+    clues_selected: number;
+    clues_skipped: number;
+
+    times_buzzed: number;
+    total_buzzes: number;
+
+    correct_answers: number;
+    wrong_answers: number;
+
     created_at: string;
     updated_at: string;
 }
+
 
 export interface SearchProfileRow {
     username: string;
@@ -344,10 +362,27 @@ export function createProfileRepository(pool: Pool) {
                     c.font,
                     c.icon,
 
-                    s.games_finished,
-                    s.games_won,
-                    s.boards_generated,
-                    s.money_won,
+                    coalesce(s.games_played, 0) as games_played,
+                    coalesce(s.games_finished, 0) as games_finished,
+                    coalesce(s.games_won, 0) as games_won,
+                    coalesce(s.boards_generated, 0) as boards_generated,
+                    coalesce(s.money_won, 0) as money_won,
+
+                    coalesce(s.daily_double_found, 0) as daily_double_found,
+                    coalesce(s.daily_double_correct, 0) as daily_double_correct,
+                    coalesce(s.true_daily_doubles, 0) as true_daily_doubles,
+
+                    coalesce(s.final_jeopardy_participations, 0) as final_jeopardy_participations,
+                    coalesce(s.final_jeopardy_corrects, 0) as final_jeopardy_corrects,
+
+                    coalesce(s.clues_selected, 0) as clues_selected,
+                    coalesce(s.clues_skipped, 0) as clues_skipped,
+
+                    coalesce(s.times_buzzed, 0) as times_buzzed,
+                    coalesce(s.total_buzzes, 0) as total_buzzes,
+
+                    coalesce(s.correct_answers, 0) as correct_answers,
+                    coalesce(s.wrong_answers, 0) as wrong_answers,
 
                     p.created_at,
                     p.updated_at
@@ -359,6 +394,7 @@ export function createProfileRepository(pool: Pool) {
             `,
             [username]
         );
+
 
         return rows?.[0] ?? null;
     }
@@ -373,6 +409,26 @@ export function createProfileRepository(pool: Pool) {
         );
 
         return rows?.[0]?.id ?? null;
+    }
+
+    const usernameToIdCache = new Map<string, string>();
+
+    async function getIdByUsernameCached(usernameRaw: unknown): Promise<string | null> {
+        const username = normalizeUsername(usernameRaw);
+        if (!username) return null;
+
+        const hit = usernameToIdCache.get(username);
+        if (hit) return hit;
+
+        const id = await getIdByUsername(username);
+        if (id) usernameToIdCache.set(username, id);
+        return id;
+    }
+
+    async function incrementStats(usernameRaw: string | null | undefined, deltas: StatDeltas): Promise<MeProfileRow | null> {
+        const id = await getIdByUsernameCached(usernameRaw);
+        if (!id) return null;
+        return incrementStatsById(id, deltas);
     }
 
     async function updateCustomization(
@@ -530,7 +586,7 @@ export function createProfileRepository(pool: Pool) {
         }));
     }
 
-    async function incrementStats(userId: string | null | undefined, deltas: StatDeltas): Promise<MeProfileRow | null> {
+    async function incrementStatsById(userId: string | null | undefined, deltas: StatDeltas): Promise<MeProfileRow | null> {
         if (!userId) return null;
 
         const tokenAllowed = new Set<IncrementableStat>(["tokens"]);
@@ -676,32 +732,50 @@ export function createProfileRepository(pool: Pool) {
 
         const { rows } = await pool.query<PublicProfileRow>(
             `
-      select
-        p.id,
-        p.username,
-        p.displayname,
-        p.role,
+                select
+                    p.id,
+                    p.username,
+                    p.displayname,
+                    p.role,
 
-        c.bio,
-        c.color,
-        c.text_color,
-        c.name_color,
-        c.border,
-        c.font,
-        c.icon,
+                    c.bio,
+                    c.color,
+                    c.text_color,
+                    c.name_color,
+                    c.border,
+                    c.font,
+                    c.icon,
 
-        s.games_finished,
-        s.games_won,
-        s.boards_generated,
-        s.money_won,
+                    -- stats (coalesce to 0 so frontend doesn't see null/undefined)
+                    coalesce(s.games_played, 0) as games_played,
+                    coalesce(s.games_finished, 0) as games_finished,
+                    coalesce(s.games_won, 0) as games_won,
+                    coalesce(s.boards_generated, 0) as boards_generated,
+                    coalesce(s.money_won, 0) as money_won,
 
-        p.created_at,
-        p.updated_at
-      from public.profiles p
-      left join public.profile_customization c on c.profile_id = p.id
-      left join public.profile_statistics s on s.profile_id = p.id
-      where p.username = any($1::text[])
-    `,
+                    coalesce(s.daily_double_found, 0) as daily_double_found,
+                    coalesce(s.daily_double_correct, 0) as daily_double_correct,
+                    coalesce(s.true_daily_doubles, 0) as true_daily_doubles,
+
+                    coalesce(s.final_jeopardy_participations, 0) as final_jeopardy_participations,
+                    coalesce(s.final_jeopardy_corrects, 0) as final_jeopardy_corrects,
+
+                    coalesce(s.clues_selected, 0) as clues_selected,
+                    coalesce(s.clues_skipped, 0) as clues_skipped,
+
+                    coalesce(s.times_buzzed, 0) as times_buzzed,
+                    coalesce(s.total_buzzes, 0) as total_buzzes,
+
+                    coalesce(s.correct_answers, 0) as correct_answers,
+                    coalesce(s.wrong_answers, 0) as wrong_answers,
+
+                    p.created_at,
+                    p.updated_at
+                from public.profiles p
+                         left join public.profile_customization c on c.profile_id = p.id
+                         left join public.profile_statistics s on s.profile_id = p.id
+                where p.username = any($1::text[])
+            `,
             [ordered]
         );
 
@@ -720,73 +794,74 @@ export function createProfileRepository(pool: Pool) {
         return out;
     }
 
-    async function addTokens(userId: string, amount: number) {
-        return incrementStats(userId, { tokens: amount });
+    async function addTokens(username: string, amount: number) {
+        return incrementStats(username, { tokens: amount });
     }
 
-    async function incrementBoardsGenerated(userId: string, n: number = 1) {
-        return incrementStats(userId, { boards_generated: n });
+    async function incrementBoardsGenerated(username: string, n: number = 1) {
+        return incrementStats(username, { boards_generated: n });
     }
 
-    async function incrementGamesFinished(userId: string, n: number = 1) {
-        return incrementStats(userId, { games_finished: n });
+    async function incrementGamesFinished(username: string, n: number = 1) {
+        return incrementStats(username, { games_finished: n });
     }
 
-    async function incrementGamesWon(userId: string, n: number = 1) {
-        return incrementStats(userId, { games_won: n });
+    async function incrementGamesWon(username: string, n: number = 1) {
+        return incrementStats(username, { games_won: n });
     }
 
-    async function addMoneyWon(userId: string, amount: number) {
-        return incrementStats(userId, { money_won: amount });
+    async function addMoneyWon(username: string, amount: number) {
+        return incrementStats(username, { money_won: amount });
     }
 
-    async function incrementGamesPlayed(userId: string, n: number = 1) {
-        return incrementStats(userId, { games_played: n });
+    async function incrementGamesPlayed(username: string, n: number = 1) {
+        return incrementStats(username, { games_played: n });
     }
 
-    async function incrementDailyDoubleFound(userId: string, n: number = 1) {
-        return incrementStats(userId, { daily_double_found: n });
+    async function incrementDailyDoubleFound(username: string, n: number = 1) {
+        return incrementStats(username, { daily_double_found: n });
     }
 
-    async function incrementDailyDoubleCorrect(userId: string, n: number = 1) {
-        return incrementStats(userId, { daily_double_correct: n });
+    async function incrementDailyDoubleCorrect(username: string, n: number = 1) {
+        return incrementStats(username, { daily_double_correct: n });
     }
 
-    async function incrementFinalJeopardyParticipations(userId: string, n: number = 1) {
-        return incrementStats(userId, { final_jeopardy_participations: n });
+    async function incrementFinalJeopardyParticipations(username: string, n: number = 1) {
+        return incrementStats(username, { final_jeopardy_participations: n });
     }
 
-    async function incrementFinalJeopardyCorrects(userId: string, n: number = 1) {
-        return incrementStats(userId, { final_jeopardy_corrects: n });
+    async function incrementFinalJeopardyCorrects(username: string, n: number = 1) {
+        return incrementStats(username, { final_jeopardy_corrects: n });
     }
 
-    async function incrementCluesSelected(userId: string, n: number = 1) {
-        return incrementStats(userId, { clues_selected: n });
+    async function incrementCluesSelected(username: string, n: number = 1) {
+        return incrementStats(username, { clues_selected: n });
     }
 
-    async function incrementTimesBuzzed(userId: string, n: number = 1) {
-        return incrementStats(userId, { times_buzzed: n });
+    async function incrementTimesBuzzed(username: string, n: number = 1) {
+        return incrementStats(username, { times_buzzed: n });
     }
 
-    async function incrementTotalBuzzes(userId: string, n: number = 1) {
-        return incrementStats(userId, { total_buzzes: n });
+    async function incrementTotalBuzzes(username: string, n: number = 1) {
+        return incrementStats(username, { total_buzzes: n });
     }
 
-    async function incrementCorrectAnswers(userId: string, n: number = 1) {
-        return incrementStats(userId, { correct_answers: n });
+    async function incrementCorrectAnswers(username: string, n: number = 1) {
+        return incrementStats(username, { correct_answers: n });
     }
 
-    async function incrementWrongAnswers(userId: string, n: number = 1) {
-        return incrementStats(userId, { wrong_answers: n });
+    async function incrementWrongAnswers(username: string, n: number = 1) {
+        return incrementStats(username, { wrong_answers: n });
     }
 
-    async function incrementCluesSkipped(userId: string, n: number = 1) {
-        return incrementStats(userId, { clues_skipped: n });
+    async function incrementCluesSkipped(username: string, n: number = 1) {
+        return incrementStats(username, { clues_skipped: n });
     }
 
-    async function incrementTrueDailyDoubles(userId: string, n: number = 1) {
-        return incrementStats(userId, { true_daily_doubles: n });
+    async function incrementTrueDailyDoubles(username: string, n: number = 1) {
+        return incrementStats(username, { true_daily_doubles: n });
     }
+
 
 
     return {
@@ -826,5 +901,6 @@ export function createProfileRepository(pool: Pool) {
         incrementCluesSkipped,
 
         incrementStats,
+        incrementStatsById,
     };
 }
