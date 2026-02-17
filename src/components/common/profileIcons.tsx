@@ -187,6 +187,131 @@ const ICONS = {
             <path d="M20 15.5A8.5 8.5 0 1 1 10.5 3.2A6.5 6.5 0 1 0 20 15.5Z" />
         </>
     )),
+
+    heart: stroke(({ title }) => (
+        <>
+            {title ? <title>{title}</title> : null}
+            <path d="M12 21
+                 C10 19 4 14.5 4 10
+                 A4.5 4.5 0 0 1 12 7.5
+                 A4.5 4.5 0 0 1 20 10
+                 C20 14.5 14 19 12 21Z" />
+        </>
+    )),
+    heart2: fill(({ title }) => (
+        <>
+            {title ? <title>{title}</title> : null}
+            <path d="M12 21
+                 C10 19 4 14.5 4 10
+                 A4.5 4.5 0 0 1 12 7.5
+                 A4.5 4.5 0 0 1 20 10
+                 C20 14.5 14 19 12 21Z" />
+        </>
+    )),
+
+    leaf: stroke(({ title }) => (
+        <>
+            {title ? <title>{title}</title> : null}
+
+            {/* Leaf body */}
+            <path d="
+            M12 3
+            C17 6 20 10 17.5 15
+            C15.5 19 12 21 12 21
+            C12 21 8.5 19 6.5 15
+            C4 10 7 6 12 3
+            Z" />
+
+            {/* Center vein */}
+            <path d="M12 6v12" />
+
+            {/* Side veins */}
+            <path d="M12 11c-2 1-3.5 2.5-4.5 4" />
+            <path d="M12 11c2 1 3.5 2.5 4.5 4" />
+
+            {/* Straight stem */}
+            <path d="M12 21v2.5" />
+        </>
+    )),
+
+
+    checkcircle: stroke(({ title }) => (
+        <>
+            {title ? <title>{title}</title> : null}
+            <circle cx="12" cy="12" r="9" />
+            <path d="M8 12.5l2.3 2.3L16 9.8" />
+        </>
+    )),
+
+    xcircle: stroke(({ title }) => (
+        <>
+            {title ? <title>{title}</title> : null}
+            <circle cx="12" cy="12" r="9" />
+            <path d="M9 9l6 6" />
+            <path d="M15 9l-6 6" />
+        </>
+    )),
+
+    music: stroke(({ title }) => (
+        <>
+            {title ? <title>{title}</title> : null}
+
+            {/* stem */}
+            <path d="M14 4v11" />
+
+            {/* flag (curved) */}
+            <path d="M14 4c3 1 5.5 2.3 6 4.5c.4 1.8-.8 3.2-3 3.6" />
+
+            {/* note head */}
+            <path d="M12.2 18.5c-1.7.6-3.4-.1-3.8-1.5c-.4-1.4.6-2.8 2.3-3.4c1.7-.6 3.4.1 3.8 1.5c.4 1.4-.6 2.8-2.3 3.4z" />
+        </>
+    )),
+
+
+    music2: stroke(({ title }) => (
+        <>
+            {title ? <title>{title}</title> : null}
+
+            {/* stems */}
+            <path d="M10 6v9" />
+            <path d="M16 4v9" />
+
+            {/* beam */}
+            <path d="M10 6l6-2" />
+
+            {/* note heads */}
+            <circle cx="8.5" cy="17" r="2" />
+            <circle cx="14.5" cy="15" r="2" />
+        </>
+    )),
+
+    chat: stroke(({ title }) => (
+        <>
+            {title ? <title>{title}</title> : null}
+            <path d="M5 6.5A4.5 4.5 0 0 1 9.5 2h5A4.5 4.5 0 0 1 19 6.5v4A4.5 4.5 0 0 1 14.5 15H10l-4 3v-3.6A4.5 4.5 0 0 1 5 10.5v-4z" />
+            <path d="M9 8h6" />
+            <path d="M9 10.5h4.5" />
+        </>
+    )),
+
+    peace: stroke(({ title }) => (
+        <>
+            {title ? <title>{title}</title> : null}
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 3v18" />
+            <path d="M12 12l-5.5 5.5" />
+            <path d="M12 12l5.5 5.5" />
+        </>
+    )),
+
+    flag: stroke(({ title }) => (
+        <>
+            {title ? <title>{title}</title> : null}
+            <path d="M6 3v19" />
+            <path d="M6 4h10l-2 3 2 3H6" />
+        </>
+    )),
+
 } as const;
 
 export type BuiltinProfileIconName = keyof typeof ICONS;

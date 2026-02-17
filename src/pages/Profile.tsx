@@ -62,7 +62,6 @@ const Profile: React.FC = () => {
     // IMPORTANT:
     // `profile` here should remain "me" (authenticated user's profile)
     const {
-        profile: me,
         loading,
         error,
         applyProfilePatch,
@@ -414,15 +413,16 @@ const Profile: React.FC = () => {
                         </div>
                         <div>
                             <h1
-                                className={`text-2xl font-bold ${pres.nameClassName}`}
+                                className={`text-4xl font-bold ${pres.nameClassName}`}
                                 style={pres.nameStyle ?? { color: "#3b82f6" }}
                             >
                                 {pres.displayName}
                             </h1>
 
-                            {isOwnProfile && me?.role === "admin" && (
-                                <h3 className="text-sm mt-1 text-red-600">Admin</h3>
+                            {routeProfile?.role === "admin" ||  (
+                                <h3 className="text-sm -mt-2 text-red-600">Admin</h3>
                             )}
+
                         </div>
                     </div>
 

@@ -16,14 +16,22 @@ type Props = {
 export default function ProfileIcon({ name, className = "", title, style }: Props) {
     if (name === "letter") return null;
 
+    const OPTICAL_X_PX = 0.6; // try 0.4–0.9 if you want
+
     const common = {
         xmlns: "http://www.w3.org/2000/svg",
         viewBox: "0 0 24 24",
         className,
-        style,
+        style: {
+            display: "block", // baseline fix
+            transform: `translateX(${OPTICAL_X_PX}px)`,
+            transformOrigin: "center",
+            ...style,
+        } as React.CSSProperties,
         "aria-hidden": title ? undefined : true,
         role: title ? "img" : "presentation",
     } as const;
+
 
     const def = getIconDef(name);
 

@@ -1,12 +1,13 @@
 import React from "react";
-import ProfileIcon, { ProfileIconName } from "./ProfileIcon";
+import ProfileIcon from "./ProfileIcon";
+import {ProfileIconName} from "./profileIcons.tsx";
 
 interface AvatarProps {
     name: string;
     size?: string; // same as before (tailwind-ish number)
     color?: string | null;     // tailwind bg-* OR hex
     textColor?: string | null; // tailwind text-* OR hex
-    icon?: ProfileIconName | null; // NEW
+    icon?: ProfileIconName | null;
     style?: React.CSSProperties;
 }
 
@@ -39,37 +40,48 @@ export default function Avatar({
     const initial = (name?.trim()?.[0] ?? "?").toUpperCase();
 
     // icon size relative to avatar
-    const iconPx = Math.round(n * 2.2); // tweak if you want
+    const iconPx = Math.round(n * 3); // tweak if you want
 
     return (
         <div
             className={[
-                "rounded-full flex justify-center items-center font-bold",
+                "rounded-full flex items-center justify-center font-bold",
                 "border border-black border-opacity-10",
                 bgClass,
                 textClass,
             ].join(" ")}
+
             style={style}
             aria-label={name}
             title={name}
         >
             {showLetter ? (
                 <span
-                    className="relative top-[-1px]"
-                    style={{ fontSize: `${n * 2}px` }}
+                    style={{
+                        fontSize: `${n * 2}px`,
+                        lineHeight: avatarSize,         // vertically centers glyph in the circle
+                        width: "100%",
+                        textAlign: "center",            // centers horizontally
+                        display: "block",
+                        transform: "translate(-1px, -1px)", // optical nudge (tweak to taste)
+                    }}
                 >
-          {initial}
-        </span>
+                    {initial}
+                </span>
             ) : (
                 <ProfileIcon
                     name={icon}
                     className=""
-                    // width/height need inline since you’re not using tailwind for that here
-                    // (alternatively: className="w-6 h-6" if you prefer)
-                    // we’ll do inline to match your existing sizing approach
-                    {...{ style: { width: `${iconPx}px`, height: `${iconPx}px` } }}
+                    style={{
+                        width: `${iconPx}px`,
+                        height: `${iconPx}px`,
+                        display: "block",
+                        flex: "0 0 auto",
+                    }}
                 />
             )}
+
         </div>
     );
+
 }
