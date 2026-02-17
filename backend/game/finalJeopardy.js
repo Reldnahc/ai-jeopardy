@@ -116,7 +116,13 @@ async function finishGame(game, gameId, drawings, ctx) {
         const score = Number(scores[username] ?? 0);
         const wager = Number(wagers[username] ?? 0);
 
-        scores[username] = verdicts[username] === "correct" ? score + wager : score - wager;
+        if (verdicts[username] === "correct") {
+            scores[username] = score + wager;
+            ctx.fireAndForget(ctx.repos.profiles.incrementFinalJeopardyCorrects(username),"Increment FJ correct");
+        } else {
+            scores[username] = score - wager;
+        }
+
     }
 
     const top = Object.entries(scores)
@@ -274,15 +280,15 @@ export async function submitDrawing(game, gameId, player, drawing, ctx) {
 export function submitWager(game, gameId, player, wager, ctx) {
     // ✅ Ignore wagers from non-finalists
     const expected = getFinalistUsernames(game);
-    console.log(expected);
-    console.log(player);
     if (!expected.includes(player)) return;
+
+    ctx.fireAndForget(ctx.repos.profiles.incrementFinalJeopardyParticipations(player), "Increment final jeopardy Participation");
 
     if (!game.wagers) {
         game.wagers = {};
     }
     game.wagers[player] = wager;
-    void ctx.ensureFinalJeopardyWager(ctx, game, gameId, player, Number(wager));
+    ctx.fireAndForget(ctx.ensureFinalJeopardyWager(ctx, game, gameId, player, Number(wager)), "Ensuring final jeopardy wager");
 
     checkAllWagersSubmitted(game, gameId, ctx);
 }

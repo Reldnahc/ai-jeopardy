@@ -165,6 +165,8 @@ export async function autoResolveAfterJudgement(ctx, gameId, game, username, ver
     if (verdict === "correct") {
         game.selectedClue.isAnswerRevealed = true;
 
+        ctx.fireAndForget(ctx.repos.profiles.incrementCorrectAnswers(u), "Increment correct answer");
+
         const alive = await ctx.aiHostVoiceSequence(ctx, gameId, game, [
             { slot: "correct", after: () => ctx.broadcast(gameId, { type: "answer-revealed", clue: game.selectedClue }) },
         ]);
@@ -176,6 +178,7 @@ export async function autoResolveAfterJudgement(ctx, gameId, game, username, ver
 
         if (ddActive) {
             game.dailyDouble = null;
+            ctx.fireAndForget(ctx.repos.profiles.incrementDailyDoubleCorrect(u), "Increment Daily Double correct answer");
         }
 
         await ctx.sleep(3000);
@@ -184,6 +187,7 @@ export async function autoResolveAfterJudgement(ctx, gameId, game, username, ver
     }
 
     // verdict === "incorrect"
+    ctx.fireAndForget(ctx.repos.profiles.incrementWrongAnswers(u), "Increment wrong answer");
 
     // NEW: Daily Double never re-opens buzzers.
     if (ddActive) {
@@ -324,6 +328,19 @@ export function doUnlockBuzzerAuthoritative( gameId, game, ctx) {
                 }
 
                 const finish = async () => {
+                    const lockedPlayers = game.clueState?.lockedOut ?? {};
+
+                    for (const player of game.players) {
+                        const isLocked = lockedPlayers[player.username] === true;
+
+                        if (!isLocked) {
+                            ctx.fireAndForget(
+                                ctx.repos.profiles.incrementCluesSkipped(player.username),
+                                "incrementCluesSkipped",
+                            );
+                        }
+                    }
+
                     await ctx.sleepAndCheckGame(1000, gameId);
                     finishClueAndReturnToBoard(ctx, gameId, game);
                 }

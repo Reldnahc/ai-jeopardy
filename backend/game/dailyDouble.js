@@ -165,6 +165,11 @@ export async function finalizeDailyDoubleWagerAndStartClue(
     dd.wager = Number(wager || 0);
     dd.stage = "clue";
 
+
+    if (dd.wager === dd.maxWager){
+        ctx.fireAndForget(ctx.repos.profiles.incrementTrueDailyDoubles(dd.playerUsername), "Increment true Daily Double");
+    }
+
     if (!game.usedDailyDoubles) game.usedDailyDoubles = new Set();
     game.usedDailyDoubles.add(dd.clueKey);
 

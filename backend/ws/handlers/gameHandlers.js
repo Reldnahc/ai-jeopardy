@@ -228,6 +228,8 @@ export const gameHandlers = {
             return;
         }
 
+        ctx.fireAndForget(ctx.repos.profiles.incrementTotalBuzzes(stable), "Increment total buzzes");
+
         if (!game.buzzLockouts) game.buzzLockouts = {};
 
         const now = Date.now();
@@ -335,6 +337,8 @@ export const gameHandlers = {
 
                 // Accept winner
                 g.buzzed = winner.playerUsername;
+
+                ctx.fireAndForget(ctx.repos.profiles.incrementTimesBuzzed(winner.playerUsername), "Increment buzzes won");
 
                 ctx.broadcast(gameId, {
                     type: "buzz-result",
@@ -764,6 +768,8 @@ export const gameHandlers = {
         const callerStable = caller ? norm(ctx.playerStableId(caller)) : null; // username
         const callerDisplay = String(caller?.displayname ?? "").trim() || (callerStable ?? null);
 
+
+
         console.log("[CLUE SELECT ATTEMPT]", {
             phase: game.phase,
             selectorKey: game.selectorKey,     // username
@@ -798,6 +804,8 @@ export const gameHandlers = {
 
         // Any previous clue’s scheduled unlock should be canceled
         ctx.cancelAutoUnlock(game);
+
+        ctx.fireAndForget(ctx.repos.profiles.incrementCluesSelected(callerStable), "Increment Clues");
 
         const category =
             String(clue?.category ?? "").trim() ||
@@ -856,6 +864,9 @@ export const gameHandlers = {
             // Selector identity:
             const playerUsername = norm(game.selectorKey);                // canonical
             const playerDisplayname = String(game.selectorName ?? "").trim() || playerUsername;
+
+            ctx.fireAndForget(ctx.repos.profiles.incrementDailyDoubleFound(playerUsername), "Increment Daily Double found");
+
 
             const maxWager = ctx.computeDailyDoubleMaxWager(game, boardKey, playerUsername);
 
