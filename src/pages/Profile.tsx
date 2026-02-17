@@ -81,6 +81,8 @@ const Profile: React.FC = () => {
     const [routeProfile, setRouteProfile] = useState<P | null>(null);
     const [routeLoading, setRouteLoading] = useState(true);
     const [routeError, setRouteError] = useState<string | null>(null);
+    const [routeGaveUp, setRouteGaveUp] = useState(false);
+    const [retryTick, setRetryTick] = useState(0);
 
     const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -93,6 +95,7 @@ const Profile: React.FC = () => {
     }, [user?.id, routeProfile?.id]);
 
     const fetchSeq = useRef(0);
+    const fetchPublicProfileRef = useRef(fetchPublicProfile);
 
     /**
      * Pending customization overlay to prevent UI "snap back"
@@ -100,6 +103,7 @@ const Profile: React.FC = () => {
      */
     const pendingOverlayRef = useRef<CustomPatch>({});
     const pendingSinceRef = useRef<number>(0);
+
     const getSavedHexForTarget = (p: P, target: ColorTarget) => {
         const meta = COLOR_TARGETS.find((t) => t.key === target)!;
         const current = (p[target] ?? meta.defaultHex) as string;
@@ -125,7 +129,6 @@ const Profile: React.FC = () => {
     }
 
     function maybeClearOverlayIfServerMatches(serverProfile: P, patch: CustomPatch) {
-        // If the server returned the same value we asked for, clear that key from overlay.
         const next = { ...pendingOverlayRef.current };
         let changed = false;
 
@@ -139,35 +142,77 @@ const Profile: React.FC = () => {
         if (changed) pendingOverlayRef.current = next;
     }
 
-    // Load the profile for the route (/profile/:username)
+    useEffect(() => {
+        fetchPublicProfileRef.current = fetchPublicProfile;
+    }, [fetchPublicProfile]);
+
+    // Load route profile, but be resilient on refresh:
+    // - retry for ~3s
+    // - treat null as failure
+    // - don't nuke an already-rendered profile during transient failures
     useEffect(() => {
         const u = normalizeUsername(username);
         if (!u) return;
 
         const mySeq = ++fetchSeq.current;
+        let cancelled = false;
+
+        setRouteGaveUp(false);
+        setRouteError(null);
+
+        const attemptOnce = async (): Promise<boolean> => {
+            setRouteLoading(true);
+
+            try {
+                const p = await fetchPublicProfileRef.current(u);
+
+                if (cancelled || mySeq !== fetchSeq.current) return false;
+
+                // ✅ IMPORTANT: null/undefined is NOT success
+                if (!p) {
+                    setRouteError("Profile not found (yet). Retrying…");
+                    return false;
+                }
+
+                setRouteProfile(applyOverlay(p));
+                setRouteError(null);
+                return true;
+            } catch (e: unknown) {
+                if (cancelled || mySeq !== fetchSeq.current) return false;
+                setRouteError(toErrorMessage(e));
+                return false;
+            } finally {
+                if (!cancelled && mySeq === fetchSeq.current) setRouteLoading(false);
+            }
+        };
 
         void (async () => {
-            setRouteLoading(true);
-            setRouteError(null);
-            try {
-                const p = await fetchPublicProfile(u);
+            let ok = false;
 
-                if (mySeq !== fetchSeq.current) return;
+            // Fast initial attempt
+            ok = await attemptOnce();
 
-                // ALWAYS re-apply local overlay to avoid snapback.
-                setRouteProfile(applyOverlay(p));
-            } catch (e: unknown) {
-                if (mySeq === fetchSeq.current) {
-                    setRouteProfile(null);
-                    setRouteError(toErrorMessage(e));
-                }
-            } finally {
-                if (mySeq === fetchSeq.current) {
-                    setRouteLoading(false);
+            // If it failed AND we don't already have a profile rendered, retry a bit.
+            // (If we *do* have a profile, don't spam retries; just keep displaying it.)
+            if (!ok && !routeProfile) {
+                for (let i = 0; i < 9; i++) {
+                    if (cancelled || mySeq !== fetchSeq.current) return;
+                    await new Promise((r) => setTimeout(r, 300));
+                    ok = await attemptOnce();
+                    if (ok) break;
                 }
             }
+
+            if (!ok && !cancelled && mySeq === fetchSeq.current && !routeProfile) {
+                setRouteGaveUp(true);
+            }
         })();
-    }, [username, fetchPublicProfile]);
+
+        return () => {
+            cancelled = true;
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [username, retryTick]);
 
     // Keep bioDraft in sync with the DISPLAYED profile (routeProfile), not "me"
     useEffect(() => {
@@ -246,27 +291,25 @@ const Profile: React.FC = () => {
             if (data.profile) {
                 const serverProfile = data.profile as P;
 
-                // If server matches keys we set, clear those keys from overlay.
                 maybeClearOverlayIfServerMatches(serverProfile, patch);
 
-                // Apply overlay on top of server truth to prevent snapback.
                 const merged = applyOverlay(serverProfile)!;
 
                 applyProfilePatch(merged);
                 patchProfileByUsername(serverProfile.username, merged);
                 setRouteProfile((prev) => (prev ? { ...prev, ...merged } : merged));
 
-                // Safety: if backend is eventually consistent, auto-expire overlay after a bit.
-                // (Prevents an overlay sticking forever if server never echoes.)
                 const now = Date.now();
-                if (Object.keys(pendingOverlayRef.current).length > 0 && now - pendingSinceRef.current > 3000) {
+                if (
+                    Object.keys(pendingOverlayRef.current).length > 0 &&
+                    now - pendingSinceRef.current > 3000
+                ) {
                     pendingOverlayRef.current = {};
                 }
             }
         } catch (e: unknown) {
             setLocalError(toErrorMessage(e));
 
-            // On failure: clear overlay and revert to real data
             pendingOverlayRef.current = {};
 
             await refetchProfile();
@@ -288,7 +331,6 @@ const Profile: React.FC = () => {
         const next = normalizeHex(hexDraft, meta.defaultHex);
         setHexDraft(next);
 
-        // Build a typed patch without `any`
         const patch: CustomPatch =
             colorTarget === "color"
                 ? { color: next }
@@ -299,23 +341,54 @@ const Profile: React.FC = () => {
         await saveCustomization(patch);
     };
 
-    if (routeLoading || loading) {
+    // ---- Render guards ----
+
+    // If we already have a profile, keep showing it even if background loading happens.
+    if (!routeProfile && (routeLoading || loading) && !routeGaveUp) {
         return <LoadingScreen message="Loading profile" progress={-1} />;
     }
 
-    if (routeError || !routeProfile) {
+    // If we gave up and still don't have a profile, show a real error screen.
+    if (!routeProfile && routeGaveUp) {
         return (
-            <div className="flex items-center justify-center h-screen">
-                <p className="text-xl text-red-600">{routeError ? routeError : "Profile not found."}</p>
+            <div className="flex items-center justify-center h-screen p-6">
+                <div className="max-w-md w-full bg-white rounded-xl shadow p-6">
+                    <div className="text-xl font-semibold text-gray-900">Couldn’t load profile</div>
+                    <div className="mt-2 text-sm text-red-600">{routeError ?? "Unknown error"}</div>
+
+                    <div className="mt-4 flex gap-2">
+                        <button
+                            type="button"
+                            className="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700"
+                            onClick={() => {
+                                setRouteGaveUp(false);
+                                setRetryTick((n) => n + 1);
+                            }}
+                        >
+                            Retry
+                        </button>
+
+                        <Link
+                            to="/"
+                            className="px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-900 font-semibold hover:bg-gray-50"
+                        >
+                            Go home
+                        </Link>
+                    </div>
+                </div>
             </div>
         );
     }
 
+    // Safety: if we somehow get here with no profile, show a loading screen instead of "not found" flicker
+    if (!routeProfile) {
+        return <LoadingScreen message="Loading profile" progress={-1} />;
+    }
+
     const pres = getProfilePresentation({
         profile: routeProfile,
-        // for safety if routeProfile is ever partial / nullish, still show something
         fallbackName: routeProfile?.displayname || routeProfile?.username || "",
-        defaultNameColor: "#3b82f6", // profile page name default
+        defaultNameColor: "#3b82f6",
     });
 
     const nameColorMeta = COLOR_TARGETS.find((t) => t.key === "name_color")!;
@@ -323,7 +396,6 @@ const Profile: React.FC = () => {
         String(routeProfile.name_color ?? nameColorMeta.defaultHex),
         nameColorMeta.defaultHex
     );
-
 
     return (
         <div className="min-h-screen bg-gradient-to-r from-indigo-400 to-blue-700 flex items-center justify-center p-6">
@@ -343,7 +415,7 @@ const Profile: React.FC = () => {
                         <div>
                             <h1
                                 className={`text-2xl font-bold ${pres.nameClassName}`}
-                                style={pres.nameStyle ?? { color: "#3b82f6" }} // in case name_color isn't hex yet
+                                style={pres.nameStyle ?? { color: "#3b82f6" }}
                             >
                                 {pres.displayName}
                             </h1>
@@ -454,7 +526,6 @@ const Profile: React.FC = () => {
                                                 </div>
 
                                                 <div className="grid grid-cols-1 md:grid-cols-[auto,auto,1fr,auto] items-center gap-3 mb-3">
-                                                    {/* Color picker */}
                                                     <input
                                                         type="color"
                                                         value={normalizeHex(hexDraft, "#3b82f6")}
@@ -468,7 +539,6 @@ const Profile: React.FC = () => {
                                                         title="Pick color"
                                                     />
 
-                                                    {/* Hex input */}
                                                     <input
                                                         value={hexDraft}
                                                         onChange={(e) => setHexDraft(e.target.value)}
@@ -481,8 +551,6 @@ const Profile: React.FC = () => {
                                                         aria-label="Hex color"
                                                     />
 
-
-                                                    {/* Buttons live in a fixed rail */}
                                                     <div className="flex items-center justify-end gap-2">
                                                         <button
                                                             type="button"
@@ -552,8 +620,8 @@ const Profile: React.FC = () => {
                                                             >
                                                                 {icon === "letter" ? (
                                                                     <span className={pres.iconColorClass} style={pres.iconColorStyle}>
-                                                    {pres.displayName?.charAt(0).toUpperCase()}
-                                                </span>
+                                                                        {pres.displayName?.charAt(0).toUpperCase()}
+                                                                    </span>
                                                                 ) : (
                                                                     <ProfileIcon
                                                                         name={icon}
@@ -584,12 +652,11 @@ const Profile: React.FC = () => {
                                                             ].join(" ")}
                                                             onClick={() => saveCustomization({ font: f.id })}
                                                         >
-                                                        <span className={f.css} style={{ color: nameHexForFontPreview }}>
-                                                            {f.label}
-                                                        </span>
+                                                            <span className={f.css} style={{ color: nameHexForFontPreview }}>
+                                                                {f.label}
+                                                            </span>
                                                         </button>
                                                     ))}
-
                                                 </div>
                                             </div>
                                         </div>
@@ -598,7 +665,6 @@ const Profile: React.FC = () => {
                             )}
                         </div>
                     )}
-
 
                     {/* Player Stats */}
                     <div>
@@ -665,9 +731,7 @@ const Profile: React.FC = () => {
                         </div>
                     </div>
 
-                    {error && (
-                        <div className="text-xs text-gray-500">Session profile warning: {error}</div>
-                    )}
+                    {error && <div className="text-xs text-gray-500">Session profile warning: {error}</div>}
                 </div>
             </div>
         </div>
