@@ -2,11 +2,17 @@
 import type { Application, Request, Response } from "express";
 import { requireAuth } from "./requireAuth.js";
 import type { Repos } from "../repositories/index.js";
-import type { CustomizationPatch } from "../repositories/profileRepository.js";
+import type { CustomizationPatch } from "../repositories/profile/profile.types.js";
 import {containsProfanity} from "../services/profanityService.js";
+import { normalizeRole, isBanned, rank, type LadderRole } from "../../shared/roles.js";
+
 
 type ProfileRepos = Pick<Repos, "profiles" | "boards">;
 
+
+function asBody(v: unknown): Record<string, unknown> {
+  return typeof v === "object" && v !== null ? (v as Record<string, unknown>) : {};
+}
 function normalizeUsername(u: unknown): string {
   return String(u ?? "").trim().toLowerCase();
 }
@@ -167,4 +173,70 @@ export function registerProfileRoutes(app: Application, repos: ProfileRepos) {
       return res.status(500).json({ error: "Failed to load profile" });
     }
   });
+
+  app.post("/api/admin/set-role", requireAuth, async (req, res) => {
+    const actorId = String(req.user?.sub ?? "");
+    if (!actorId) return res.status(401).json({ error: "Unauthorized" });
+
+    const body = asBody(req.body);
+    const targetUserId = String(body.targetUserId ?? "");
+    const newRole = normalizeRole(body.newRole);
+
+    if (!targetUserId) return res.status(400).json({ error: "Missing targetUserId" });
+
+    // DB roles are authoritative
+    const actorRoleRaw = await repos.profiles.getRoleById(actorId);
+    const targetRoleRaw = await repos.profiles.getRoleById(targetUserId);
+
+    if (!actorRoleRaw) return res.status(403).json({ error: "Unauthorized" });
+    if (!targetRoleRaw) return res.status(404).json({ error: "Target not found" });
+
+    const actorRole = normalizeRole(actorRoleRaw);
+    const targetRole = normalizeRole(targetRoleRaw);
+
+    if (isBanned(actorRole)) return res.status(403).json({ error: "Banned" });
+
+    // Handle banned separately (policy choice)
+    if (newRole === "banned") {
+      // Example: moderators+ can ban, but only lower ranks
+      if (rank(actorRole) < rank("moderator")) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      if (targetRole !== "banned" && rank(targetRole) >= rank(actorRole)) {
+        return res.status(403).json({ error: "Cannot ban peer/superior" });
+      }
+
+      await repos.profiles.setRoleById(targetUserId, "banned");
+      return res.json({ ok: true });
+    }
+
+    // If target is banned and you're "unbanning" them, decide your policy:
+    // You probably want only moderators+ to unban.
+    if (targetRole === "banned") {
+      if (rank(actorRole) < rank("moderator")) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      // treat banned as "lowest" for comparisons if you want:
+      // allow unban only if you could otherwise modify them.
+    }
+
+    // From here, newRole is LadderRole
+    const newLadderRole = newRole as LadderRole;
+
+    // Must be able to modify the target (target strictly lower than actor)
+    if (targetRole !== "banned") {
+      if (rank(targetRole) >= rank(actorRole)) {
+        return res.status(403).json({ error: "Cannot modify peer/superior" });
+      }
+    }
+
+    // New role must be strictly lower than actor (can't grant your own level)
+    if (rank(newLadderRole) >= rank(actorRole)) {
+      return res.status(403).json({ error: "Cannot grant peer/superior role" });
+    }
+
+    await repos.profiles.setRoleById(targetUserId, newLadderRole);
+    return res.json({ ok: true });
+  });
+
 }

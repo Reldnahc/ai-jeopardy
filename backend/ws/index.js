@@ -50,7 +50,8 @@ export const attachWebSocketServer = (wss, repos) => {
             try {
                 await routeWsMessage(ws, raw, ctx);
             } catch (e) {
-                console.error("[WS] handler error:", e);
+                const message = e instanceof Error ? e.message : "Unknown error";
+                ws.send(JSON.stringify({ type: "error", code: "server_error", message }));
             }
         });
 

@@ -69,12 +69,15 @@ import {
 } from "../game/dailyDouble.js"
 import {numberToWords} from "../services/numberToWords.js";
 import {ensureBoardNarrationTtsForBoardData} from "../services/ai/board/boardTts.js";
+import {PermissionManager} from "../auth/permissionManager.js";
 // Minimal type for now; we’ll tighten later as you TS-migrate more modules.
 
 export const createWsContext = (wss: any, repos: any) => {
     const { broadcast, broadcastAll } = makeBroadcaster(wss);
 
     const ttsDuration = createTtsDurationService(repos);
+
+    const perms = new PermissionManager();
 
     const normalizeName = (name: unknown) => String(name || "").toLowerCase().trim();
 
@@ -100,6 +103,7 @@ export const createWsContext = (wss: any, repos: any) => {
         games,
         modelsByValue,
         appConfig,
+        perms,
         getTtsDurationMs: (assetId: string) => ttsDuration.getDurationMs(assetId),
         sleep,
         getClueKey,

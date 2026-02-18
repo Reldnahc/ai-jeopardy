@@ -1,6 +1,6 @@
 // backend/repositories/index.ts
 import type { Pool } from "pg";
-import { createProfileRepository } from "./profileRepository.js";
+import { createProfileRepository } from "./profile/profileRepository.js";
 import { createBoardRepository } from "./boardRepository.js";
 import { createImageAssetRepository } from "./imageAssetRepository.js";
 import { createTtsAssetRepository } from "./ttsAssetRepository.js";

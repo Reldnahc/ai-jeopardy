@@ -260,10 +260,8 @@ export function resolveModelOrFail({ ws, ctx, gameId, game, selectedModel, role 
     }
 
     const isPaidModel = Number(m.price ?? 0) > 0;
-
-    // If paid, require authed + privileged role
     if (isPaidModel) {
-        const allowed = role === "admin" || role === "privileged";
+        const allowed = ctx.perms.can(ws, "models:use-any", { selectedModel, gameId });
 
         if (!allowed) {
             ws.send(JSON.stringify({
