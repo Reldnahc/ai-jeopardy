@@ -20,6 +20,9 @@ services:
       NODE_ENV: development
       DATABASE_URL: ${DATABASE_URL}
       JWT_SECRET: ${JWT_SECRET}
+      KOKORO_URL: http://kokoro:8000
+      PIPER_URL: http://piper:8000
+      WHISPER_URL: http://whisper:8000
     command: ["bash","-lc","npm install && npm run build:backend && npm run dev:backend"]
     ports:
       - "3002:3002"
@@ -42,7 +45,7 @@ services:
     depends_on:
       - backend
 
-  piper-api:
+  piper:
     image: ghcr.io/reldnahc/ai-jeopardy-piper-api:latest
     environment:
       PIPER_MODEL: /models/en_US-amy-low.onnx
@@ -58,12 +61,12 @@ services:
     ports:
       - "8000:8000"
 
-  kokoro-api:
+  kokoro:
     image: ghcr.io/reldnahc/ai-jeopardy-kokoro-api:latest
     environment:
       KOKORO_LANG_CODE: "a"
       KOKORO_VOICE: "af_heart"
-      KOKORO_SAMPLE_RATE: "16000"
+      KOKORO_SAMPLE_RATE: "24000"
       MAX_INFLIGHT_PER_WORKER: "16"
 
     deploy:
@@ -75,6 +78,24 @@ services:
               capabilities: [gpu]
     ports:
       - "8001:8000"
+
+  whisper:
+    image: ghcr.io/reldnahc/ai-jeopardy-whisper-api:latest
+    environment:
+      WHISPER_MODEL: "medium"
+      DEVICE: "cuda"
+      COMPUTE_TYPE: "float16"     # try "int8_float16" if VRAM is tight
+      BEAM_SIZE: "5"
+
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    ports:
+      - "8002:8000"
 
 volumes:
   pgdata:

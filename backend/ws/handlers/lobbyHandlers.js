@@ -27,7 +27,7 @@ export const lobbyHandlers = {
         // Host-only
         if (!ctx.ensureHostOrFail({ ws, ctx, gameId, game })) return;
 
-        const s = ctx.ensureLobbySettings(game, ctx.appConfig);
+        const s = ctx.ensureLobbySettings(ctx, game, ctx.appConfig);
 
         const host = game.host;
         const categories = game.categories;
@@ -399,6 +399,7 @@ export const lobbyHandlers = {
                 visualMode: "off",
                 narrationEnabled: true,
                 boardJson: "",
+                sttProviderName: ctx.appConfig.ai.defaultSttProvider,
             },
             lockedCategories: {
                 firstBoard: Array(5).fill(false),

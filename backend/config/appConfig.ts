@@ -8,6 +8,8 @@ export const appConfig = Object.freeze({
 
     ai: {
         defaultModel: env.OPENAI_DEFAULT_MODEL,
+        defaultSttProvider: env.WHISPER_URL ? "whisper" : "openai",
+        sttModel: env.OPENAI_STT_MODEL,
         judgeModel: env.OPENAI_JUDGE_MODEL,
         imageJudgeModel: env.OPENAI_IMAGE_JUDGE_MODEL,
         cotdModel: env.OPENAI_COTD_MODEL,

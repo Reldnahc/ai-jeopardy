@@ -219,7 +219,7 @@ export function ensureHostOrFail({ ws, ctx, gameId, game }) {
     return true;
 }
 
-export function ensureLobbySettings(game, appConfig) {
+export function ensureLobbySettings(ctx, game, appConfig) {
     if (game.lobbySettings) return game.lobbySettings;
 
     game.lobbySettings = {
@@ -230,6 +230,7 @@ export function ensureLobbySettings(game, appConfig) {
         visualMode: "off", // "off" | "commons" | "brave"
         narrationEnabled: false,
         boardJson: "",
+        sttProviderName: ctx.appConfig.ai.defaultSttProvider,
     };
 
     return game.lobbySettings;

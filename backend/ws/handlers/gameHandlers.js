@@ -494,7 +494,6 @@ export const gameHandlers = {
         const playerDisplayname = String(player?.displayname ?? "").trim() || null;
         const playerUsername = norm(player?.username);
 
-        console.log(game.phase);
         // Must be in capture phase
         if (game.phase !== "ANSWER_CAPTURE") {
             ws.send(JSON.stringify({
@@ -593,7 +592,7 @@ export const gameHandlers = {
         // --- STT ---
         let transcript = "";
         try {
-            const stt = await ctx.transcribeAnswerAudio(buf, mimeType, game.selectedClue?.answer);
+            const stt = await ctx.transcribeAnswerAudio(buf, mimeType, game.selectedClue?.answer, game.lobbySettings.sttProviderName);
             transcript = String(stt || "").trim();
 
             if (!transcript) {
@@ -1001,7 +1000,7 @@ export const gameHandlers = {
         // --- STT (no expected answer context for wagering) ---
         let transcript = "";
         try {
-            const stt = await ctx.transcribeAnswerAudio(buf, mimeType, null);
+            const stt = await ctx.transcribeAnswerAudio(buf, mimeType, null, game.lobbySettings.sttProviderName);
             transcript = String(stt || "").trim();
         } catch (e) {
             console.error("[dd-wager] STT failed:", e?.message || e);

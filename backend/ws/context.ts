@@ -18,7 +18,7 @@ import {
 import { checkBoardTransition, isBoardFullyCleared } from "../game/stageTransition.js";
 import { getCOTD } from "../state/cotdStore.js";
 import { collectImageAssetIdsFromBoard } from "../services/imageAssetService.js";
-import { transcribeAnswerAudio } from "../services/sttService.js";
+import { transcribeAnswerAudio } from "../services/stt/sttService.js";
 import {
     applyNewGameState,
     broadcastPreloadBatch,
