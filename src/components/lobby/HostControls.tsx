@@ -1,10 +1,13 @@
-import { models } from '../../../shared/models.js';
+import { models } from "../../../shared/models.js";
 import { useProfile } from "../../contexts/ProfileContext.tsx";
 import React from "react";
 import type { LobbySettings } from "../../hooks/lobby/useLobbySocketSync.tsx";
+import type { LadderRole, Role } from "../../../shared/roles.js";
+import { atLeast, normalizeRole } from "../../../shared/roles.js";
 
 type ReasoningEffortSetting = "off" | "low" | "medium" | "high";
 type ModelDef = (typeof models)[number];
+
 interface HostControlsProps {
     lobbySettings: LobbySettings | null;
     updateLobbySettings: (patch: Partial<LobbySettings>) => void;
@@ -18,6 +21,22 @@ interface HostControlsProps {
     onCreateGame: () => void;
 }
 
+function asLadderRole(role: Role): LadderRole {
+    // normalizeRole can return "banned"; atLeast() expects LadderRole
+    return role === "banned" ? "default" : role;
+}
+
+function useRoleGate(rawRole: unknown) {
+    const role = normalizeRole(rawRole); // Role ("default" | ... | "banned")
+    const ladder = asLadderRole(role);
+
+    return {
+        role,
+        ladder,
+        atLeast: (min: LadderRole) => atLeast(ladder, min),
+    };
+}
+
 const HostControls: React.FC<HostControlsProps> = ({
                                                        lobbySettings,
                                                        updateLobbySettings,
@@ -29,7 +48,8 @@ const HostControls: React.FC<HostControlsProps> = ({
     const { profile } = useProfile();
     const [advancedOpen, setAdvancedOpen] = React.useState(false);
 
-    // Server-authoritative settings (hydrated from lobby snapshot)
+    const gate = useRoleGate(profile?.role);
+
     const selectedModel = lobbySettings?.selectedModel ?? "gpt-5.2";
     const timeToBuzz = lobbySettings?.timeToBuzz ?? 10;
     const timeToAnswer = lobbySettings?.timeToAnswer ?? 10;
@@ -53,7 +73,7 @@ const HostControls: React.FC<HostControlsProps> = ({
         updateLobbySettings({ visualMode: value });
     };
 
-    const setReasoningEffort = (value: "off" | "low" | "medium" | "high") => {
+    const setReasoningEffort = (value: ReasoningEffortSetting) => {
         updateLobbySettings({ reasoningEffort: value });
     };
 
@@ -61,17 +81,17 @@ const HostControls: React.FC<HostControlsProps> = ({
         updateLobbySettings({ boardJson: value });
     };
 
-
-    const selectedModelDef = models.find(m => m.value === selectedModel);
+    const selectedModelDef = models.find((m) => m.value === selectedModel);
     const modelSupportsReasoningEffort = selectedModelDef?.supportsReasoningEffort === true;
 
     const usingImportedBoard = boardJson.trim().length > 0;
 
-    const canUseBrave = profile?.role === "admin" || profile?.role === "privileged";
+    const canUsePremium = gate.atLeast("privileged");
+    const canUseBrave = gate.atLeast("privileged");
 
     const isReasoningLevelLocked = (level: ReasoningEffortSetting) => {
         if (level === "off" || level === "low") return false;
-        return !(profile?.role === "admin" || profile?.role === "privileged");
+        return !gate.atLeast("privileged");
     };
 
     // Group the models by price
@@ -83,8 +103,7 @@ const HostControls: React.FC<HostControlsProps> = ({
 
     function checkCantUseModel(model: ModelDef) {
         if (model.price === 0) return false;
-        const role = profile?.role;
-        return !(role === "admin" || role === "privileged");
+        return !canUsePremium;
     }
 
     const handleTimeChange = (
@@ -104,10 +123,10 @@ const HostControls: React.FC<HostControlsProps> = ({
             setBoardJson(text);
             setBoardJsonError(tryValidateBoardJson(text));
         } catch (err) {
-            // Clipboard can fail if not HTTPS / permission denied
             console.error("Clipboard paste failed:", err);
-            // Keep it simple: user can still Ctrl+V
-            setBoardJsonError("Could not read clipboard (permission denied or insecure context). Try Ctrl+V.");
+            setBoardJsonError(
+                "Could not read clipboard (permission denied or insecure context). Try Ctrl+V."
+            );
         }
     };
 
@@ -115,8 +134,7 @@ const HostControls: React.FC<HostControlsProps> = ({
         <div className="w-full">
             <div className="w-full rounded-xl border border-gray-200 bg-gray-50 p-4">
                 <div className="flex flex-col gap-4">
-
-                    {/* Top Row: Game Settings (left) + Start (right) */}
+                    {/* Top Row */}
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
                         {/* Game Settings left */}
                         <div className="lg:col-span-8">
@@ -124,7 +142,9 @@ const HostControls: React.FC<HostControlsProps> = ({
                                 <div className="flex items-center justify-between gap-2 mb-4">
                                     <div>
                                         <div className="text-gray-900 text-lg font-semibold">Game Settings</div>
-                                        <div className="text-sm text-gray-500">Timers for buzzing and answering.</div>
+                                        <div className="text-sm text-gray-500">
+                                            Timers for buzzing and answering.
+                                        </div>
                                     </div>
                                 </div>
 
@@ -201,9 +221,7 @@ const HostControls: React.FC<HostControlsProps> = ({
                                     Start Game
                                 </button>
 
-                                <div className="mt-3">
-
-                                </div>
+                                <div className="mt-3" />
                             </div>
                         </div>
                     </div>
@@ -218,9 +236,7 @@ const HostControls: React.FC<HostControlsProps> = ({
                         >
                             <div className="flex flex-col items-start">
                                 <div className="text-gray-900 font-semibold">Advanced Settings</div>
-                                <div className="text-xs text-gray-500">
-                                    Custom boards, model selection, visuals.
-                                </div>
+                                <div className="text-xs text-gray-500">Custom boards, model selection, visuals.</div>
                             </div>
 
                             <div
@@ -239,16 +255,13 @@ const HostControls: React.FC<HostControlsProps> = ({
                         >
                             <div className="overflow-hidden">
                                 <div className="border-t border-gray-200 p-4">
-                                    <div className="grid grid-colsTip: Advanced-1 lg:grid-cols-12 gap-4">
-
+                                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
                                         {/* Custom Board JSON */}
                                         <div className="lg:col-span-7">
                                             <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 h-full">
                                                 <div className="flex items-start justify-between gap-3 mb-2">
                                                     <div>
-                                                        <h3 className="text-gray-900 text-lg font-semibold">
-                                                            Custom Board JSON
-                                                        </h3>
+                                                        <h3 className="text-gray-900 text-lg font-semibold">Custom Board JSON</h3>
                                                         <p className="text-sm text-gray-600 mt-1">
                                                             Paste a saved board JSON to skip AI generation.
                                                         </p>
@@ -294,17 +307,15 @@ const HostControls: React.FC<HostControlsProps> = ({
                                         </div>
 
                                         {/* Model Settings */}
-                                        <div className="lg:col-span-5 ">
+                                        <div className="lg:col-span-5">
                                             <div
                                                 className={`rounded-xl border border-gray-200 bg-gray-50 p-4 ${
                                                     usingImportedBoard ? "opacity-50 pointer-events-none" : ""
                                                 }`}
                                             >
-                                                <div className="flex items-start justify-between gap-2 mb-3 ">
+                                                <div className="flex items-start justify-between gap-2 mb-3">
                                                     <div>
-                                                        <div className="text-gray-900 text-lg font-semibold">
-                                                            Model Settings
-                                                        </div>
+                                                        <div className="text-gray-900 text-lg font-semibold">Model Settings</div>
                                                         <div className="text-sm text-gray-500">
                                                             Choose a model and optional features.
                                                         </div>
@@ -318,9 +329,7 @@ const HostControls: React.FC<HostControlsProps> = ({
                                                 )}
 
                                                 <div className="flex flex-col gap-2">
-                                                    <label className="text-sm font-medium text-gray-800">
-                                                        Model Selection
-                                                    </label>
+                                                    <label className="text-sm font-medium text-gray-800">Model Selection</label>
                                                     <select
                                                         value={selectedModel}
                                                         onChange={onModelChange}
@@ -339,10 +348,7 @@ const HostControls: React.FC<HostControlsProps> = ({
                                                                         disabled={checkCantUseModel(model)}
                                                                     >
                                                                         {model.label}
-                                                                        {model.price > 0 &&
-                                                                        !(profile?.role === "admin" || profile?.role === "privileged")
-                                                                            ? " (Locked)"
-                                                                            : ""}
+                                                                        {model.price > 0 && !canUsePremium ? " (Locked)" : ""}
                                                                     </option>
                                                                 ))}
                                                             </optgroup>
@@ -350,7 +356,7 @@ const HostControls: React.FC<HostControlsProps> = ({
                                                     </select>
                                                 </div>
 
-                                                {/* Reserve space for reasoning effort (no jump) */}
+                                                {/* Reasoning Effort */}
                                                 <div className="mt-4 pt-3 border-t border-gray-300">
                                                     <div className="text-sm font-medium text-gray-700 mb-2">
                                                         Reasoning Effort
@@ -384,7 +390,7 @@ const HostControls: React.FC<HostControlsProps> = ({
                                                     </div>
                                                 </div>
 
-                                                {/* Visuals (can move down; container won't jump now) */}
+                                                {/* Visuals */}
                                                 <div className="mt-1 flex flex-col gap-2">
                                                     <div className="flex items-center gap-2">
                                                         <input
@@ -418,19 +424,18 @@ const HostControls: React.FC<HostControlsProps> = ({
                                                 </div>
                                             </div>
                                         </div>
-
+                                        {/* end grid */}
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
+                    {/* end stack */}
                 </div>
             </div>
         </div>
     );
-
-
 };
 
 export default HostControls;
