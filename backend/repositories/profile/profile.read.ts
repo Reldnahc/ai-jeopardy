@@ -20,6 +20,9 @@ export function createProfileReadRepo(pool: Pool) {
           c.text_color,
           c.name_color,
           c.border,
+          c.border_color,
+          c.background,
+          c.background_color,
           c.font
         from public.profiles p
         left join public.profile_customization c on c.profile_id = p.id
@@ -50,6 +53,9 @@ export function createProfileReadRepo(pool: Pool) {
           c.text_color,
           c.name_color,
           c.border,
+          c.border_color,
+          c.background,
+          c.background_color,
           c.font,
           c.icon,
 
@@ -89,6 +95,9 @@ export function createProfileReadRepo(pool: Pool) {
           c.text_color,
           c.name_color,
           c.border,
+          c.border_color,
+          c.background,
+          c.background_color,
           c.font,
           c.icon,
 
@@ -173,6 +182,9 @@ export function createProfileReadRepo(pool: Pool) {
           c.text_color,
           c.name_color,
           c.border,
+          c.border_color,
+          c.background,
+          c.background_color,
           c.font,
           c.icon,
 

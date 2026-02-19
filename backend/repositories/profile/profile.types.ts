@@ -21,6 +21,9 @@ export interface LeaderboardRow {
     text_color: string;
     name_color: string;
     border: string;
+    border_color: string;
+    background: string;
+    background_color: string;
     font: string | null;
     icon: string | null;
 }
@@ -37,6 +40,9 @@ export interface PublicUserRow {
     text_color: string;
     name_color: string;
     border: string;
+    border_color: string;
+    background: string;
+    background_color: string;
     font: string | null;
 }
 
@@ -50,6 +56,9 @@ export type CustomizationPatch = Partial<{
     text_color: string;
     name_color: string;
     border: string;
+    border_color: string;
+    background: string;
+    background_color: string;
     font: string | null;
     icon: string | null;
 }>;
@@ -81,6 +90,9 @@ export interface PublicProfileRow {
     text_color: string;
     name_color: string;
     border: string;
+    border_color: string;
+    background: string;
+    background_color: string;
     font: string | null;
     icon: string | null;
 
@@ -119,6 +131,9 @@ export interface SearchProfileRow {
     text_color: string;
     name_color: string;
     border: string;
+    border_color: string;
+    background: string;
+    background_color: string;
     font: string | null;
 }
 

@@ -42,6 +42,9 @@ export interface ProfileCustomization {
     text_color?: string | null;
     name_color?: string | null;
     border?: string | null;
+    border_color?: string | null;
+    background?: string | null;
+    background_color?: string | null;
     font?: string | null;
     icon?: ProfileIconName | null;
 }
@@ -59,7 +62,14 @@ export interface Profile extends ProfileCustomization, ProfileStats {
     updated_at?: string;
 }
 
-type ProfilesByUsername = Record<string, Profile>;
+interface CachedProfile {
+    profile: Profile;
+    cachedAt: number;
+}
+
+const PROFILE_TTL_MS = 60_000;
+
+type ProfilesByUsername = Record<string, CachedProfile>;
 
 interface ProfileContextType {
     /** Authenticated user's profile (/me). */
@@ -103,6 +113,11 @@ const ProfileContext = createContext<ProfileContextType>({
     setProfileExplicit: () => {},
 });
 
+function getErrorMessage(e: unknown): string {
+    if (e instanceof Error) return e.message;
+    return String(e);
+}
+
 function getApiBase() {
     if (import.meta.env.DEV) return import.meta.env.VITE_API_BASE || "http://localhost:3002";
     return "";
@@ -113,26 +128,14 @@ function normalizeUsername(u: unknown) {
 }
 
 function mergeDefined<T extends object>(prev: T, patch: Partial<T>): T {
-    const next: any = { ...prev };
-    for (const [k, v] of Object.entries(patch)) {
-        if (v !== undefined) next[k] = v; // allow null to intentionally clear
-    }
+    const next: T = { ...prev };
+    (Object.keys(patch) as Array<keyof T>).forEach((k) => {
+        const v = patch[k];
+        if (v !== undefined) {
+            next[k] = v;
+        }
+    });
     return next;
-}
-
-function isNewer(a?: string, b?: string) {
-    // If we can't compare, never block the write.
-    if (!a || !b) return true;
-
-    const ta = Date.parse(a);
-    const tb = Date.parse(b);
-
-    // Date.parse can fail if PG returns non-ISO strings in some environments
-    if (!Number.isFinite(ta) || !Number.isFinite(tb)) return true;
-
-    // Allow equal timestamps (important when updates happen within same ms or
-    // DB clock precision differs)
-    return ta >= tb;
 }
 
 
@@ -162,29 +165,49 @@ export const ProfileProvider: React.FC<{ children: ReactNode }> = ({ children })
 
         setProfilesByUsername((prev) => {
             const existing = prev[u];
-            if (!existing) return { ...prev, [u]: p };
+            if (!existing) {
+                return { ...prev, [u]: { profile: p, cachedAt: Date.now() } };
+            }
 
-            if (!isNewer(p.updated_at, existing.updated_at)) return prev;
-            return { ...prev, [u]: mergeDefined(existing, p) };
+            // Always merge; server can correct optimistic mistakes.
+            return {
+                ...prev,
+                [u]: {
+                    profile: mergeDefined(existing.profile, p),
+                    cachedAt: Date.now(),
+                },
+            };
         });
     }, []);
 
     const getProfileByUsername = useCallback(
-        (uRaw: string | null | undefined) => {
+        (uRaw: string | null | undefined): Profile | null => {
             const u = normalizeUsername(uRaw);
             if (!u) return null;
-            return profilesByUsername[u] ?? null;
+
+            const entry = profilesByUsername[u];
+            if (!entry) return null;
+
+            const isFresh = Date.now() - entry.cachedAt < PROFILE_TTL_MS;
+            return isFresh ? entry.profile : null;
         },
         [profilesByUsername]
     );
+
+
 
     const fetchPublicProfile = useCallback(
         async (uRaw: string): Promise<Profile | null> => {
             const u = normalizeUsername(uRaw);
             if (!u) return null;
 
-            // cached?
-            if (profilesByUsername[u]) return profilesByUsername[u];
+            // cached + fresh?
+            const entry = profilesByUsername[u];
+            if (entry) {
+                const isFresh = Date.now() - entry.cachedAt < PROFILE_TTL_MS;
+                if (isFresh) return entry.profile;
+            }
+
 
             // in-flight?
             if (inFlightPublic.current.has(u)) return null;
@@ -222,7 +245,15 @@ export const ProfileProvider: React.FC<{ children: ReactNode }> = ({ children })
             if (usernames.length === 0) return;
 
             // only fetch ones not in cache AND not already in flight
-            const missing = usernames.filter((u) => !profilesByUsername[u] && !inFlightPublic.current.has(u));
+            const now = Date.now();
+
+            const missing = usernames.filter((u) => {
+                const entry = profilesByUsername[u];
+                if (!entry) return true;
+
+                const isFresh = now - entry.cachedAt < PROFILE_TTL_MS;
+                return !isFresh;
+            });
             if (missing.length === 0) return;
 
             // mark in-flight per username so multiple callers don't race
@@ -290,10 +321,7 @@ export const ProfileProvider: React.FC<{ children: ReactNode }> = ({ children })
                 if (!prev) return prev;
                 if (patch.id && patch.id !== prev.id) return prev;
 
-                const optimistic = {
-                    ...patch,
-                    updated_at: new Date().toISOString(),
-                } as Partial<Profile>;
+                const optimistic = { ...patch } as Partial<Profile>;
 
                 const next = mergeDefined(prev, optimistic);
                 cacheUpsert(next);
@@ -307,17 +335,23 @@ export const ProfileProvider: React.FC<{ children: ReactNode }> = ({ children })
         const u = normalizeUsername(uRaw);
         if (!u) return;
 
-        const optimistic = {
-            ...patch,
-            updated_at: new Date().toISOString(),
-        } as Partial<Profile>;
+        const optimistic = { ...patch } as Partial<Profile>;
 
         setProfilesByUsername((prev) => {
             const existing = prev[u];
             if (!existing) return prev;
-            const next = mergeDefined(existing, optimistic);
-            return { ...prev, [u]: next };
+
+            const nextProfile = mergeDefined(existing.profile, optimistic);
+
+            return {
+                ...prev,
+                [u]: {
+                    profile: nextProfile,
+                    cachedAt: Date.now(),
+                },
+            };
         });
+
 
         setProfile((prev) => {
             if (!prev) return prev;
@@ -337,8 +371,8 @@ export const ProfileProvider: React.FC<{ children: ReactNode }> = ({ children })
                 return;
             }
             await fetchMeProfile();
-        } catch (e: any) {
-            setError(String(e?.message || e));
+        } catch (e: unknown) {
+            setError(getErrorMessage(e));
             setProfile(null);
         } finally {
             setProfileLoading(false);

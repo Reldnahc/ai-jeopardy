@@ -6,6 +6,56 @@ function isHexColor(s: unknown): s is string {
     return typeof s === "string" && /^#([0-9a-fA-F]{6})$/.test(s);
 }
 
+
+export type BorderPreset = "none" | "thin" | "thick" | "dashed" | "double" | "glow";
+
+
+export const BORDER_PRESETS: Array<{ id: BorderPreset; label: string }> = [
+    { id: "none", label: "None" },
+    { id: "thin", label: "Thin" },
+    { id: "thick", label: "Thick" },
+    { id: "dashed", label: "Dashed" },
+    { id: "double", label: "Double" },
+    { id: "glow", label: "Glow" },
+];
+
+export function getBorderStyle(presetRaw: unknown, colorRaw: unknown): React.CSSProperties | undefined {
+    const preset = String(presetRaw ?? "none") as BorderPreset;
+    const color = isHexColor(colorRaw) ? String(colorRaw) : "#000000";
+
+    switch (preset) {
+        case "none":
+            return undefined;
+
+        case "thin":
+            return { borderWidth: 2, borderStyle: "solid", borderColor: color };
+
+        case "thick":
+            return { borderWidth: 4, borderStyle: "solid", borderColor: color };
+
+        case "dashed":
+            return { borderWidth: 2, borderStyle: "dashed", borderColor: color };
+
+        case "double":
+            return { borderWidth: 6, borderStyle: "double", borderColor: color };
+
+        case "glow":
+            return {
+                borderWidth: 2,
+                borderStyle: "solid",
+                borderColor: color,
+                boxShadow: isHexColor(colorRaw)
+                    ? `0 0 0.8rem ${color}`
+                    : "0 0 0.8rem rgba(0,0,0,0.35)",
+            };
+
+        default:
+            return undefined;
+    }
+}
+
+
+
 export const PROFILE_COLOR_OPTIONS = [
     "#1d4ed8", "#1e40af", "#2563eb", "#0284c7", "#0369a1",
     "#0891b2", "#0f766e", "#15803d", "#166534", "#16a34a",
@@ -77,13 +127,10 @@ export const PROFILE_FONT_OPTIONS = [
     { id: "metalmania", label: "Metal Mania", css: "font-metalmania" },
 ] as const;
 
-
-
 const FONT_CLASS_MAP: Record<string, string> =
     Object.fromEntries(
         PROFILE_FONT_OPTIONS.map(f => [f.id, f.css])
     );
-
 
 export type ProfilePresentation = {
     displayName: string;
@@ -91,6 +138,10 @@ export type ProfilePresentation = {
 
     nameClassName: string;              // font class
     nameStyle?: React.CSSProperties;    // name color
+
+    background?: string;
+    backgroundColor?: string;
+    borderStyle?: React.CSSProperties;
 
     avatar: {
         nameForLetter: string;            // what Avatar uses for "letter"
@@ -120,6 +171,10 @@ export function getProfilePresentation(args: {
     const nameColor = profile?.name_color ?? defaultNameColor ?? "#ffffff";
     const nameStyle = isHexColor(nameColor) ? ({ color: nameColor } as React.CSSProperties) : undefined;
 
+    const background = profile?.background ?? "default";
+    const backgroundColor = profile?.background_color ?? "#f2f2f2";
+    const borderStyle = getBorderStyle(profile?.border, profile?.border_color);
+
     const fg = profile?.text_color ?? "#ffffff";
     const iconColorStyle = isHexColor(fg) ? ({ color: fg } as React.CSSProperties) : undefined;
     const iconColorClass = isHexColor(fg) ? "" : String(fg || "").trim(); // if you ever allow tailwind text-...
@@ -131,6 +186,10 @@ export function getProfilePresentation(args: {
         username,
         nameClassName,
         nameStyle,
+
+        background,
+        backgroundColor,
+        borderStyle,
 
         avatar: {
             nameForLetter: displayName, // Avatar uses initial from this

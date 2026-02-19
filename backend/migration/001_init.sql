@@ -63,6 +63,9 @@ CREATE TABLE IF NOT EXISTS public.profile_customization (
                                                             text_color text NOT NULL DEFAULT '#ffffff',
                                                             name_color text NOT NULL DEFAULT '#3b82f6',
                                                             border text NOT NULL DEFAULT 'none',
+                                                            border_color text NOT NULL DEFAULT '#000000',
+                                                            background text NOT NULL DEFAULT 'default',
+                                                            background_color text NOT NULL DEFAULT '#f2f2f2',
                                                             font text,
                                                             icon text,
 

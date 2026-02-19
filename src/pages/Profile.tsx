@@ -9,6 +9,7 @@ import LoadingScreen from "../components/common/LoadingScreen";
 import { Profile as P, useProfile } from "../contexts/ProfileContext";
 import ProfileIcon from "../components/common/ProfileIcon";
 import {
+    BORDER_PRESETS, getBorderStyle,
     getProfilePresentation,
     PROFILE_COLOR_OPTIONS,
     PROFILE_FONT_OPTIONS,
@@ -22,7 +23,7 @@ interface RouteParams extends Record<string, string | undefined> {
     username: string;
 }
 
-type CustomField = "color" | "text_color" | "name_color" | "bio" | "font" | "icon" | "border";
+type CustomField = "color" | "text_color" | "name_color" | "bio" | "font" | "icon" | "border" | "border_color" | "background_color";
 
 type CustomPatch = Partial<Pick<P, CustomField>>;
 type ModerationField = "bio" | "role";
@@ -32,7 +33,7 @@ type PatchMeResponse = {
     profile?: P;
     error?: string;
 };
-type ColorTarget = "color" | "text_color" | "name_color";
+type ColorTarget = "color" | "text_color" | "name_color" | "border_color" | "background_color";
 
 function getApiBase() {
     if (import.meta.env.DEV) return import.meta.env.VITE_API_BASE || "http://localhost:3002";
@@ -52,6 +53,8 @@ const COLOR_TARGETS: Array<{ key: ColorTarget; label: string; defaultHex: string
     { key: "color", label: "Icon Background", defaultHex: "#3b82f6" },
     { key: "text_color", label: "Icon Color", defaultHex: "#ffffff" },
     { key: "name_color", label: "Name Color", defaultHex: "#3b82f6" },
+    { key: "border_color", label: "Border Color", defaultHex: "#000000" },
+    { key: "background_color", label: "Background Color", defaultHex: "#f2f2f2" },
 ];
 
 function normalizeHex(input: string, fallback: string) {
@@ -158,6 +161,7 @@ const Profile: React.FC = () => {
     function applyOverlay(p: P | null): P | null {
         if (!p) return p;
         const overlay = pendingOverlayRef.current;
+        console.log(overlay);
         if (!overlay || Object.keys(overlay).length === 0) return p;
         // Overlay ALWAYS wins locally
         return { ...p, ...overlay };
@@ -412,15 +416,10 @@ const Profile: React.FC = () => {
         const next = normalizeHex(hexDraft, meta.defaultHex);
         setHexDraft(next);
 
-        const patch: CustomPatch =
-            colorTarget === "color"
-                ? { color: next }
-                : colorTarget === "text_color"
-                    ? { text_color: next }
-                    : { name_color: next };
-
+        const patch: CustomPatch = { [colorTarget]: next } as CustomPatch;
         await saveCustomization(patch);
     };
+
 
     // ---- Render guards ----
 
@@ -672,8 +671,8 @@ const Profile: React.FC = () => {
                         <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <h2 className="text-2xl font-semibold text-gray-800">User Settings</h2>
-                                    <p className="text-sm text-gray-600 mt-1">Colors, icon, and font</p>
+                                    <h2 className="text-2xl font-semibold text-gray-800">Profile Customization</h2>
+                                    <p className="text-sm text-gray-600 mt-1">Colors, icon, fonts, and borders</p>
                                 </div>
 
                                 <button
@@ -851,6 +850,51 @@ const Profile: React.FC = () => {
                                                     ))}
                                                 </div>
                                             </div>
+
+                                            {/* Border Picker */}
+                                            <div>
+                                                <h3 className="text-xl font-semibold mb-2 text-gray-800">Border</h3>
+
+                                                {(() => {
+                                                    // Use the saved border_color (fallback to black) for both the preview border AND label color
+                                                    const borderHex = normalizeHex(String(routeProfile.border_color ?? "#000000"), "#000000");
+
+                                                    return (
+                                                        <div className="flex flex-wrap gap-2">
+                                                            {BORDER_PRESETS.map((b) => {
+                                                                const selected = (routeProfile.border ?? "none") === b.id;
+
+                                                                // Preview the border style on the button itself.
+                                                                // For "none", still give the button a subtle outline so it doesn't look borderless.
+                                                                const previewStyle =
+                                                                    b.id === "none"
+                                                                        ? ({ border: "1px solid", borderColor: "#d1d5db" } as React.CSSProperties)
+                                                                        : (getBorderStyle(b.id, borderHex) ?? ({ border: "1px solid", borderColor: borderHex } as React.CSSProperties));
+
+                                                                return (
+                                                                    <button
+                                                                        key={b.id}
+                                                                        type="button"
+                                                                        className={[
+                                                                            "px-3 py-2 rounded-lg bg-white",
+                                                                            "text-sm font-semibold",
+                                                                            "hover:bg-gray-50",
+                                                                            "transition",
+                                                                            selected ? "ring-4 ring-blue-400" : "",
+                                                                        ].join(" ")}
+                                                                        style={previewStyle}
+                                                                        onClick={() => saveCustomization({ border: b.id })}
+                                                                        title={b.label}
+                                                                    >
+                                                                        <span style={{ color: borderHex }}>{b.label}</span>
+                                                                    </button>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    );
+                                                })()}
+                                            </div>
+
                                         </div>
                                     )}
                                 </div>

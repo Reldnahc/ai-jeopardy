@@ -31,9 +31,23 @@ export function createProfileCustomizationRepo(pool: Pool) {
             updates.push(`name_color = $${i++}`);
             values.push(patch.name_color);
         }
+
         if (patch.border !== undefined) {
             updates.push(`border = $${i++}`);
             values.push(patch.border);
+        }
+
+        if (patch.border_color !== undefined) {
+            updates.push(`border_color = $${i++}`);
+            values.push(patch.border_color);
+        }
+        if (patch.background !== undefined) {
+            updates.push(`background = $${i++}`);
+            values.push(patch.background);
+        }
+        if (patch.background_color !== undefined) {
+            updates.push(`background_color = $${i++}`);
+            values.push(patch.background_color);
         }
 
         if ("font" in patch) {
@@ -51,46 +65,49 @@ export function createProfileCustomizationRepo(pool: Pool) {
 
         const { rows } = await pool.query<MeProfileRow>(
             `
-        with upd_c as (
-          update public.profile_customization
-          set ${updates.join(", ")}, updated_at = now()
-          where profile_id = $${i}
-          returning profile_id
-        ),
-        upd_p as (
-          update public.profiles
-          set updated_at = now()
-          where id = (select profile_id from upd_c)
-          returning id
-        )
-        select
-          p.id,
-          p.email,
-          p.username,
-          p.role,
-          p.displayname,
-          p.tokens,
+                with upd_c as (
+                    update public.profile_customization
+                        set ${updates.join(", ")}, updated_at = now()
+                        where profile_id = $${i}
+        returning profile_id
+      ),
+      upd_p as (
+        update public.profiles
+        set updated_at = now()
+        where id = (select profile_id from upd_c)
+        returning id
+      )
+      select
+        p.id,
+        p.email,
+        p.username,
+        p.role,
+        p.displayname,
+        p.tokens,
 
-          c.bio,
-          c.color,
-          c.text_color,
-          c.name_color,
-          c.border,
-          c.font,
-          c.icon,
+        c.bio,
+        c.color,
+        c.text_color,
+        c.name_color,
+        c.border,
+        c.border_color,       
+        c.background,         
+        c.background_color,   
+        c.font,
+        c.icon,
 
-          s.games_finished,
-          s.games_won,
-          s.boards_generated,
-          s.money_won,
+        s.games_finished,
+        s.games_won,
+        s.boards_generated,
+        s.money_won,
 
-          p.created_at,
-          p.updated_at
-        from public.profiles p
-        left join public.profile_customization c on c.profile_id = p.id
-        left join public.profile_statistics s on s.profile_id = p.id
-        where p.id = (select id from upd_p)
-        limit 1
+        p.created_at,
+        p.updated_at
+      from public.profiles p
+      left join public.profile_customization c on c.profile_id = p.id
+      left join public.profile_statistics s on s.profile_id = p.id
+      where p.id = (select id from upd_p)
+      limit 1
       `,
             values
         );

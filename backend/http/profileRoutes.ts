@@ -106,9 +106,13 @@ export function registerProfileRoutes(app: Application, repos: ProfileRepos) {
       if ("color" in body && body.color !== undefined) patch.color = asTrimmedString(body.color);
       if ("text_color" in body && body.text_color !== undefined) patch.text_color = asTrimmedString(body.text_color);
 
-      // NEW:
       if ("name_color" in body && body.name_color !== undefined) patch.name_color = asTrimmedString(body.name_color);
+
       if ("border" in body && body.border !== undefined) patch.border = asTrimmedString(body.border);
+      if ("border_color" in body && body.border_color !== undefined) patch.border_color = asTrimmedString(body.border_color);
+
+      if ("background" in body && body.background !== undefined) patch.background = asTrimmedString(body.background);
+      if ("background_color" in body && body.background_color !== undefined) patch.background_color = asTrimmedString(body.background_color);
 
       const profile = await repos.profiles.updateCustomization(userId, patch);
       if (!profile) return res.status(400).json({ error: "No supported fields to update" });
