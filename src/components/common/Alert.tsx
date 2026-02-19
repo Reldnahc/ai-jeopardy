@@ -1,10 +1,12 @@
 import React, { ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import {createPortal} from "react-dom";
 
 interface AlertButton {
     label: string; // The text to display on the button
     onClick: () => void; // The callback when the button is clicked
     styleClass?: string; // Optional custom styles for the button
+    disabled?: boolean; // For disable-able functionality
 }
 
 interface AlertProps {
@@ -14,17 +16,14 @@ interface AlertProps {
     closeAlert: () => void; // Function to close the alert
 }
 
-const Alert: React.FC<AlertProps> = ({
-                                         isOpen,
-                                         text,
-                                         buttons,
-                                         closeAlert,
-                                     }) => {
-    return (
+const Alert: React.FC<AlertProps> = ({ isOpen, text, buttons, closeAlert }) => {
+    if (typeof document === "undefined") return null;
+
+    return createPortal(
         <AnimatePresence>
             {isOpen && (
                 <motion.div
-                    className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center"
+                    className="fixed inset-0 z-[9999] bg-black/50 flex items-center justify-center"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
@@ -41,13 +40,16 @@ const Alert: React.FC<AlertProps> = ({
                             {buttons.map((button, index) => (
                                 <button
                                     key={index}
-                                    className={`px-5 py-2 rounded-md focus:outline-none transition ${
-                                        button.styleClass ||
-                                        "bg-blue-600 text-white hover:bg-blue-700"
-                                    }`}
+                                    disabled={Boolean(button.disabled)}
+                                    className={[
+                                        "px-5 py-2 rounded-md focus:outline-none transition",
+                                        button.styleClass || "bg-blue-600 text-white hover:bg-blue-700",
+                                        button.disabled ? "opacity-50 cursor-not-allowed" : "",
+                                    ].join(" ")}
                                     onClick={() => {
-                                        button.onClick(); // Trigger button action
-                                        closeAlert(); // Close the alert
+                                        if (button.disabled) return;
+                                        button.onClick();
+                                        closeAlert();
                                     }}
                                 >
                                     {button.label}
@@ -57,7 +59,8 @@ const Alert: React.FC<AlertProps> = ({
                     </motion.div>
                 </motion.div>
             )}
-        </AnimatePresence>
+        </AnimatePresence>,
+        document.body
     );
 };
 

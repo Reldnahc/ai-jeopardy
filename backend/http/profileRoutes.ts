@@ -6,13 +6,8 @@ import type { CustomizationPatch } from "../repositories/profile/profile.types.j
 import {containsProfanity} from "../services/profanityService.js";
 import { normalizeRole, isBanned, rank, type LadderRole } from "../../shared/roles.js";
 
-
 type ProfileRepos = Pick<Repos, "profiles" | "boards">;
 
-
-function asBody(v: unknown): Record<string, unknown> {
-  return typeof v === "object" && v !== null ? (v as Record<string, unknown>) : {};
-}
 function normalizeUsername(u: unknown): string {
   return String(u ?? "").trim().toLowerCase();
 }
@@ -174,69 +169,112 @@ export function registerProfileRoutes(app: Application, repos: ProfileRepos) {
     }
   });
 
-  app.post("/api/admin/set-role", requireAuth, async (req, res) => {
-    const actorId = String(req.user?.sub ?? "");
-    if (!actorId) return res.status(401).json({ error: "Unauthorized" });
+  // --- Admin/Mod patch another user's profile ------------------------
+  // Supports:
+  //   - bio: moderators+ (can set to "" to delete)
+  //   - role: privileged+ (ladder roles), moderators+ (banned)
+  app.patch("/api/profile/:username", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const actorIdRaw = req.user?.sub ?? req.user?.id ?? req.user?.userId;
+      if (!actorIdRaw) return res.status(401).json({ error: "Unauthorized" });
+      const actorId = String(actorIdRaw);
 
-    const body = asBody(req.body);
-    const targetUserId = String(body.targetUserId ?? "");
-    const newRole = normalizeRole(body.newRole);
+      const username = normalizeUsername(req.params.username);
+      if (!username) return res.status(400).json({ error: "Missing username" });
 
-    if (!targetUserId) return res.status(400).json({ error: "Missing targetUserId" });
+      const body = asRecord(req.body);
 
-    // DB roles are authoritative
-    const actorRoleRaw = await repos.profiles.getRoleById(actorId);
-    const targetRoleRaw = await repos.profiles.getRoleById(targetUserId);
+      // Find target
+      const targetProfile = await repos.profiles.getPublicProfileByUsername(username);
+      if (!targetProfile) return res.status(404).json({ error: "Target not found" });
 
-    if (!actorRoleRaw) return res.status(403).json({ error: "Unauthorized" });
-    if (!targetRoleRaw) return res.status(404).json({ error: "Target not found" });
+      const targetUserId = String(targetProfile.id ?? "");
+      if (!targetUserId) return res.status(500).json({ error: "Target missing id" });
 
-    const actorRole = normalizeRole(actorRoleRaw);
-    const targetRole = normalizeRole(targetRoleRaw);
+      // DB roles are authoritative
+      const actorRoleRaw = await repos.profiles.getRoleById(actorId);
+      const targetRoleRaw = await repos.profiles.getRoleById(targetUserId);
 
-    if (isBanned(actorRole)) return res.status(403).json({ error: "Banned" });
+      if (!actorRoleRaw) return res.status(403).json({ error: "Unauthorized" });
+      if (!targetRoleRaw) return res.status(404).json({ error: "Target not found" });
 
-    // Handle banned separately (policy choice)
-    if (newRole === "banned") {
-      // Example: moderators+ can ban, but only lower ranks
-      if (rank(actorRole) < rank("moderator")) {
-        return res.status(403).json({ error: "Forbidden" });
-      }
-      if (targetRole !== "banned" && rank(targetRole) >= rank(actorRole)) {
-        return res.status(403).json({ error: "Cannot ban peer/superior" });
-      }
+      const actorRole = normalizeRole(actorRoleRaw);
+      const targetRole = normalizeRole(targetRoleRaw);
 
-      await repos.profiles.setRoleById(targetUserId, "banned");
-      return res.json({ ok: true });
-    }
+      if (isBanned(actorRole)) return res.status(403).json({ error: "Banned" });
 
-    // If target is banned and you're "unbanning" them, decide your policy:
-    // You probably want only moderators+ to unban.
-    if (targetRole === "banned") {
-      if (rank(actorRole) < rank("moderator")) {
-        return res.status(403).json({ error: "Forbidden" });
-      }
-      // treat banned as "lowest" for comparisons if you want:
-      // allow unban only if you could otherwise modify them.
-    }
+      const actorRank = rank(actorRole as LadderRole);
+      const targetEffectiveRank = targetRole === "banned" ? -1 : rank(targetRole as LadderRole);
 
-    // From here, newRole is LadderRole
-    const newLadderRole = newRole as LadderRole;
-
-    // Must be able to modify the target (target strictly lower than actor)
-    if (targetRole !== "banned") {
-      if (rank(targetRole) >= rank(actorRole)) {
+      // must be strictly higher than target to touch them
+      if (targetEffectiveRank >= actorRank) {
         return res.status(403).json({ error: "Cannot modify peer/superior" });
       }
-    }
 
-    // New role must be strictly lower than actor (can't grant your own level)
-    if (rank(newLadderRole) >= rank(actorRole)) {
-      return res.status(403).json({ error: "Cannot grant peer/superior role" });
-    }
+      let changed = false;
 
-    await repos.profiles.setRoleById(targetUserId, newLadderRole);
-    return res.json({ ok: true });
+      // --- Bio moderation (mods+) ---
+      if ("bio" in body) {
+        if (actorRank < rank("moderator")) {
+          return res.status(403).json({ error: "Forbidden" });
+        }
+
+        const nextBio = asTrimmedString(body.bio);
+
+        // If non-empty, enforce profanity rule (optional but consistent)
+        if (nextBio.length > 0 && containsProfanity(nextBio)) {
+          return res.status(400).json({ error: "Bio contains prohibited language." });
+        }
+
+        // Set bio. Your "delete bio" uses "".
+        await repos.profiles.updateCustomization(targetUserId, { bio: nextBio });
+        changed = true;
+      }
+
+      // --- Role changes ---
+      if ("role" in body) {
+        const newRole = normalizeRole(body.role);
+
+        // Ban: moderators+
+        if (newRole === "banned") {
+          if (actorRank < rank("moderator")) {
+            return res.status(403).json({ error: "Forbidden" });
+          }
+
+          // already checked peer/superior above
+          await repos.profiles.setRoleById(targetUserId, "banned");
+          changed = true;
+        } else {
+          // Ladder role change: privileged+
+          if (actorRank < rank("privileged")) {
+            return res.status(403).json({ error: "Forbidden" });
+          }
+
+          const newLadderRole = newRole as LadderRole;
+
+          // Can't grant peer/superior role
+          if (rank(newLadderRole) >= actorRank) {
+            return res.status(403).json({ error: "Cannot grant peer/superior role" });
+          }
+
+          // This allows BOTH promote and demote:
+          // any role below actor is valid, regardless of target's current role.
+          await repos.profiles.setRoleById(targetUserId, newLadderRole);
+          changed = true;
+        }
+      }
+
+      if (!changed) {
+        return res.status(400).json({ error: "No supported fields to update" });
+      }
+
+      // Return refreshed public profile
+      const updated = await repos.profiles.getPublicProfileByUsername(username);
+      return res.json({ profile: updated });
+    } catch (e) {
+      console.error("PATCH /api/profile/:username failed:", e);
+      return res.status(500).json({ error: "Failed to update profile" });
+    }
   });
 
 }

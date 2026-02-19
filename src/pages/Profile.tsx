@@ -1,5 +1,5 @@
 // frontend/pages/Profile.tsx
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState} from "react";
 import { Link, useParams } from "react-router-dom";
 import { Board } from "../types/Board";
 import ProfileGameCard from "../components/profile/ProfileGameCard";
@@ -14,23 +14,30 @@ import {
     PROFILE_FONT_OPTIONS,
 } from "../utils/profilePresentation.ts";
 import { PROFILE_ICON_OPTIONS } from "../components/common/profileIcons";
+import type { LadderRole, Role } from "../../shared/roles";
+import { LADDER_ROLES, normalizeRole, rank, atLeast } from "../../shared/roles";
+import Alert from "../components/common/Alert";
 
 interface RouteParams extends Record<string, string | undefined> {
     username: string;
 }
 
-function getApiBase() {
-    if (import.meta.env.DEV) return import.meta.env.VITE_API_BASE || "http://localhost:3002";
-    return "";
-}
-
 type CustomField = "color" | "text_color" | "name_color" | "bio" | "font" | "icon" | "border";
+
 type CustomPatch = Partial<Pick<P, CustomField>>;
+type ModerationField = "bio" | "role";
+type ModerationPatch = Partial<Pick<P, ModerationField>>;
 
 type PatchMeResponse = {
     profile?: P;
     error?: string;
 };
+type ColorTarget = "color" | "text_color" | "name_color";
+
+function getApiBase() {
+    if (import.meta.env.DEV) return import.meta.env.VITE_API_BASE || "http://localhost:3002";
+    return "";
+}
 
 function normalizeUsername(u: unknown) {
     return String(u ?? "").trim().toLowerCase();
@@ -40,7 +47,6 @@ function toErrorMessage(e: unknown) {
     return String(e);
 }
 
-type ColorTarget = "color" | "text_color" | "name_color";
 
 const COLOR_TARGETS: Array<{ key: ColorTarget; label: string; defaultHex: string }> = [
     { key: "color", label: "Icon Background", defaultHex: "#3b82f6" },
@@ -55,9 +61,36 @@ function normalizeHex(input: string, fallback: string) {
     return fallback;
 }
 
+function asLadderRole(role: Role): LadderRole {
+    return role === "banned" ? "default" : role;
+}
+
+function useRoleGate(rawRole: unknown) {
+    const role = normalizeRole(rawRole); // Role (may be "banned")
+    const ladder = asLadderRole(role);
+    return {
+        role,
+        ladder,
+        atLeast: (min: LadderRole) => atLeast(ladder, min),
+        rank: rank(ladder),
+    };
+}
+
+function prettyRoleLabel(r: string) {
+    switch (r) {
+        case "head_admin": return "Head Admin";
+        default: return r.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+    }
+}
+
 const Profile: React.FC = () => {
     const { username } = useParams<RouteParams>();
     const { user, token } = useAuth();
+    const {profile} = useProfile();
+
+    const viewerGate = useRoleGate(
+        user?.role ?? profile?.role ?? null
+    );
 
     // IMPORTANT:
     // `profile` here should remain "me" (authenticated user's profile)
@@ -88,6 +121,13 @@ const Profile: React.FC = () => {
     const [colorTarget, setColorTarget] = useState<ColorTarget>("color");
     const [hexDraft, setHexDraft] = useState<string>("#3b82f6");
 
+    const [promoteOpen, setPromoteOpen] = useState(false);
+    const [banOpen, setBanOpen] = useState(false);
+
+    const [promoteDraft, setPromoteDraft] = useState<LadderRole | "banned" | "">("");
+    const [banCheck, setBanCheck] = useState(false);
+
+
     // Viewing "my" profile if the route profile id matches the logged-in user id
     const isOwnProfile = useMemo(() => {
         return Boolean(user?.id && routeProfile?.id && user.id === routeProfile.id);
@@ -95,6 +135,7 @@ const Profile: React.FC = () => {
 
     const fetchSeq = useRef(0);
     const fetchPublicProfileRef = useRef(fetchPublicProfile);
+
 
     /**
      * Pending customization overlay to prevent UI "snap back"
@@ -325,6 +366,47 @@ const Profile: React.FC = () => {
         }
     };
 
+    const patchAnyProfile = async (targetUsername: string, patch: ModerationPatch) => {
+        if (!token) return;
+
+        // Optimistic local update for the route profile UI
+        addOverlay(patch);
+        setRouteProfile((prev) => (prev ? applyOverlay({ ...prev, ...patch }) : prev));
+
+        // Cache updates
+        applyProfilePatch(patch);
+        patchProfileByUsername(targetUsername, patch);
+
+        try {
+            const api = getApiBase();
+            const res = await fetch(`${api}/api/profile/${encodeURIComponent(targetUsername)}`, {
+                method: "PATCH",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify(patch),
+            });
+
+            const data = (await res.json()) as { profile?: P; error?: string };
+            if (!res.ok) throw new Error(data?.error || "Failed to update profile");
+
+            if (data.profile) {
+                const serverProfile = data.profile as P;
+                maybeClearOverlayIfServerMatches(serverProfile, patch);
+
+                const merged = applyOverlay(serverProfile)!;
+                applyProfilePatch(merged);
+                patchProfileByUsername(serverProfile.username, merged);
+                setRouteProfile((prev) => (prev ? { ...prev, ...merged } : merged));
+            }
+        } catch (e: unknown) {
+            setLocalError(toErrorMessage(e));
+            pendingOverlayRef.current = {};
+            await refetchProfile();
+        }
+    };
+
     const commitHexDraft = async () => {
         const meta = COLOR_TARGETS.find((t) => t.key === colorTarget)!;
         const next = normalizeHex(hexDraft, meta.defaultHex);
@@ -384,6 +466,50 @@ const Profile: React.FC = () => {
         return <LoadingScreen message="Loading profile" progress={-1} />;
     }
 
+
+    const targetRole: Role = normalizeRole(routeProfile.role);
+    const targetLadder: LadderRole = asLadderRole(targetRole);
+
+    const viewerRank = viewerGate.rank;
+    const targetRank = rank(targetLadder);
+
+    const canTouchTarget = viewerRank > targetRank;
+
+    // Permissions requested:
+    const canModerate = viewerGate.atLeast("moderator") && canTouchTarget;
+    const canPromote = viewerGate.atLeast("privileged") && canTouchTarget; // mods cannot promote
+    const canBan = viewerGate.atLeast("moderator") && canTouchTarget;
+
+    const viewerIsCreator = viewerGate.role === "creator";
+
+    // Build selectable roles:
+    // - Creator: any ladder role (and banned if you want), except maybe "creator" (your choice)
+    // - Others: any ladder role strictly below viewer rank
+    // Always: don't show roles that equal current role (optional)
+    const promotableRoles: (LadderRole | "banned")[] = viewerIsCreator
+        ? [...LADDER_ROLES, "banned"]
+        : (LADDER_ROLES.filter((r) => rank(r) < viewerRank) as LadderRole[]);
+
+    // Optional: remove current role so "no-op" isn't selectable
+    const targetNormalizedRole = normalizeRole(routeProfile.role);
+    const promotableRolesFiltered = promotableRoles.filter((r) => r !== targetNormalizedRole);
+
+    const canShowPromote = canPromote && promotableRolesFiltered.length > 0;
+
+
+    const doDeleteBio = async () => {
+        await patchAnyProfile(routeProfile.username, { bio: "" });
+    };
+
+    const doPromote = async () => {
+        if (!promoteDraft) return;
+        await patchAnyProfile(routeProfile.username, { role: promoteDraft satisfies Role });
+    };
+
+    const doBan = async () => {
+        await patchAnyProfile(routeProfile.username, { role: "banned" satisfies Role });
+    };
+
     const pres = getProfilePresentation({
         profile: routeProfile,
         fallbackName: routeProfile?.displayname || routeProfile?.username || "",
@@ -396,52 +522,86 @@ const Profile: React.FC = () => {
         nameColorMeta.defaultHex
     );
 
-    const role = routeProfile?.role?.toLowerCase() ?? null;
+    const normalizedRouteRole = normalizeRole(routeProfile.role);
 
-    const roleMeta: Record<string, { label: string; className: string }> = {
-        admin: { label: "Admin", className: "text-red-600" },
+    const roleMeta: Record<LadderRole | "banned", { label: string; className: string }> = {
+        default: { label: "Player", className: "text-gray-600" },
         moderator: { label: "Moderator", className: "text-blue-600" },
+        privileged: { label: "Privileged", className: "text-emerald-600" },
+        admin: { label: "Admin", className: "text-red-500" },
+        head_admin: { label: "Head Admin", className: "text-amber-700" },
         creator: { label: "Creator", className: "text-purple-600" },
+        banned: { label: "Banned", className: "text-red-800 line-through" },
     };
 
-    const roleInfo = role ? roleMeta[role] : null;
+    const roleInfo = roleMeta[normalizedRouteRole];
 
     return (
         <div className="min-h-screen bg-gradient-to-r from-indigo-400 to-blue-700 flex items-center justify-center p-6">
             <div className="max-w-3xl w-full bg-white rounded-xl shadow-2xl overflow-hidden p-6">
                 <div className="space-y-8">
                     {/* Profile Header */}
-                    <div className="flex items-center space-x-4">
-                        <div className="w-16 h-16 flex-shrink-0">
-                            <Avatar
-                                name={pres.avatar.nameForLetter}
-                                color={pres.avatar.bgColor}
-                                textColor={pres.avatar.fgColor}
-                                icon={pres.avatar.icon}
-                                size="16"
-                            />
-                        </div>
-                        <div>
-                            <h1
-                                className={`text-4xl font-bold ${pres.nameClassName}`}
-                                style={pres.nameStyle ?? { color: "#3b82f6" }}
-                            >
-                                {pres.displayName}
-                            </h1>
-                            <h3 className="text-black -mt-2 text-sm">
-                                @{pres.username}
-                                {roleInfo && (
-                                    <>
-                                        {" "}
-                                        -{" "}
-                                        <span className={`font-semibold ${roleInfo.className}`}>
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                            <div className="w-16 h-16 flex-shrink-0">
+                                <Avatar
+                                    name={pres.avatar.nameForLetter}
+                                    color={pres.avatar.bgColor}
+                                    textColor={pres.avatar.fgColor}
+                                    icon={pres.avatar.icon}
+                                    size="16"
+                                />
+                            </div>
+                            <div>
+                                <h1
+                                    className={`text-4xl font-bold ${pres.nameClassName}`}
+                                    style={pres.nameStyle ?? { color: "#3b82f6" }}
+                                >
+                                    {pres.displayName}
+                                </h1>
+                                <h3 className="text-black -mt-2 text-sm">
+                                    @{pres.username}
+                                    {roleInfo && (
+                                        <>
+                                            {" "}
+                                            -{" "}
+                                            <span className={`font-semibold ${roleInfo.className}`}>
                                             {roleInfo.label}
                                         </span>
-                                    </>
-                                )}
-                            </h3>
+                                        </>
+                                    )}
+                                </h3>
 
 
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            {canShowPromote && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setPromoteDraft("");
+                                        setPromoteOpen(true);
+                                    }}
+                                    className="px-3 py-2 rounded-lg border border-gray-300 bg-white text-gray-900 font-semibold hover:bg-gray-50"
+                                >
+                                    Promote
+                                </button>
+                            )}
+
+                            {canBan && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setBanCheck(false);
+                                        setBanOpen(true);
+                                    }}
+                                    className="px-3 py-2 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700"
+                                >
+                                    Ban
+                                </button>
+                            )}
                         </div>
                     </div>
 
@@ -450,7 +610,20 @@ const Profile: React.FC = () => {
                     )}
 
                     <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                        <h3 className="text-lg font-semibold text-gray-800 mb-2">Bio</h3>
+                        <div className="flex items-center justify-between mb-2">
+                            <h3 className="text-lg font-semibold text-gray-800">Bio</h3>
+
+                            {canModerate && (
+                                <button
+                                    type="button"
+                                    onClick={() => void doDeleteBio()}
+                                    className="px-3 py-1.5 rounded-md border border-gray-300 bg-white text-gray-900 font-semibold hover:bg-gray-50"
+                                    title="Clear this user's bio"
+                                >
+                                    Delete Bio
+                                </button>
+                            )}
+                        </div>
 
                         {isOwnProfile && token ? (
                             <div className="space-y-2">
@@ -749,6 +922,103 @@ const Profile: React.FC = () => {
                             )}
                         </div>
                     </div>
+
+
+
+                    <Alert
+                        isOpen={promoteOpen}
+                        closeAlert={() => setPromoteOpen(false)}
+                        text={
+                            <div className="space-y-3">
+                                <div className="font-semibold text-gray-900">Promote user</div>
+                                <div className="text-sm text-gray-600">
+                                    Promote to the role directly below you.
+                                </div>
+
+                                <select
+                                    value={promoteDraft}
+                                    onChange={(e) => setPromoteDraft(e.target.value as any)}
+                                    className="w-full p-2 rounded-md border border-gray-300 text-black bg-white"
+                                >
+                                    <option value="" disabled>
+                                        Select role…
+                                    </option>
+                                    {promotableRolesFiltered.map((r) => (
+                                        <option key={r} value={r}>
+                                            {prettyRoleLabel(r)}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        }
+                        buttons={
+                            promoteDraft
+                                ? [
+                                    {
+                                        label: "Cancel",
+                                        onClick: () => {},
+                                        styleClass:
+                                            "bg-white text-gray-900 border border-gray-300 hover:bg-gray-50",
+                                    },
+                                    { label: "OK", onClick: () => void doPromote() },
+                                ]
+                                : [
+                                    {
+                                        label: "Cancel",
+                                        onClick: () => {},
+                                        styleClass:
+                                            "bg-white text-gray-900 border border-gray-300 hover:bg-gray-50",
+                                    },
+                                ]
+                        }
+                    />
+
+                    <Alert
+                        isOpen={banOpen}
+                        closeAlert={() => setBanOpen(false)}
+                        text={
+                            <div className="space-y-3">
+                                <div className="font-semibold text-gray-900">Ban user</div>
+                                <div className="text-sm text-gray-600">
+                                    This will set their role to <span className="font-semibold">Banned</span>.
+                                </div>
+
+                                <label className="flex items-center gap-2 text-sm text-gray-800">
+                                    <input
+                                        type="checkbox"
+                                        checked={banCheck}
+                                        onChange={(e) => setBanCheck(e.target.checked)}
+                                        className="w-4 h-4"
+                                    />
+                                    I understand this action
+                                </label>
+                            </div>
+                        }
+                        buttons={
+                            banCheck
+                                ? [
+                                    {
+                                        label: "Cancel",
+                                        onClick: () => {},
+                                        styleClass:
+                                            "bg-white text-gray-900 border border-gray-300 hover:bg-gray-50",
+                                    },
+                                    {
+                                        label: "OK",
+                                        onClick: () => void doBan(),
+                                        styleClass: "bg-red-600 text-white hover:bg-red-700",
+                                    },
+                                ]
+                                : [
+                                    {
+                                        label: "Cancel",
+                                        onClick: () => {},
+                                        styleClass:
+                                            "bg-white text-gray-900 border border-gray-300 hover:bg-gray-50",
+                                    },
+                                ]
+                        }
+                    />
 
                     {error && <div className="text-xs text-gray-500">Session profile warning: {error}</div>}
                 </div>
