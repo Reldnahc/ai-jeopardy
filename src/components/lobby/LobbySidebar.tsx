@@ -1,13 +1,13 @@
 import React, { useEffect, useMemo } from "react";
-import Avatar from "../common/Avatar";
 import type { Player } from "../../types/Lobby";
 import { useProfile } from "../../contexts/ProfileContext";
 import { getProfilePresentation } from "../../utils/profilePresentation";
+import LobbyPlayerRow from "./LobbyPlayerRow";
 
 interface LobbySidebarProps {
     gameId: string | undefined;
     host: string | null; // host username
-    players: Player[];   // players contain username at minimum
+    players: Player[]; // players contain username at minimum
     copySuccess: boolean;
     setCopySuccess: React.Dispatch<React.SetStateAction<boolean>>;
     isHost: boolean;
@@ -36,7 +36,7 @@ const LobbySidebar: React.FC<LobbySidebarProps> = ({
     const usernames = useMemo(() => {
         const set = new Set<string>();
         for (const p of players) {
-            const u = String((p).username ?? "").trim();
+            const u = String(p.username ?? "").trim();
             if (u) set.add(u);
         }
         return Array.from(set);
@@ -49,7 +49,7 @@ const LobbySidebar: React.FC<LobbySidebarProps> = ({
 
     return (
         <div className="flex flex-col h-full w-full gap-5 box-border relative z-30">
-            {/* Game ID and Host Card */}
+            {/* Game ID */}
             <div
                 onClick={copyGameIdToClipboard}
                 className="
@@ -78,7 +78,7 @@ const LobbySidebar: React.FC<LobbySidebarProps> = ({
                 )}
             </div>
 
-            {/* Player List Section */}
+            {/* Player List */}
             <div className="flex flex-col gap-1 -mt-10">
                 <h2 className="text-4xl mt-3 font-extrabold font-swiss911 text-shadow-jeopardy tracking-wider bg-blue-700 text-white px-5 py-5 rounded-lg text-center w-full gap-2.5 shadow-md mb-3">
                     CONTESTANTS
@@ -86,64 +86,27 @@ const LobbySidebar: React.FC<LobbySidebarProps> = ({
 
                 <ul className="list-none p-0 m-0 flex flex-wrap lg:flex-col lg:w-full gap-4">
                     {players.map((player, index) => {
-                        const username = String((player).username ?? "").trim();
-
+                        const username = String(player.username ?? "").trim();
                         const profile = username ? getProfileByUsername(username) : null;
 
                         const pres = getProfilePresentation({
                             profile,
                             fallbackName: username,
-                            defaultNameColor: undefined, // let helper default (#ffffff) unless profile has name_color
+                            defaultNameColor: undefined,
                         });
 
                         const isHostRow = host === username;
 
                         return (
-                            <li
+                            <LobbyPlayerRow
                                 key={`${username || "player"}-${index}`}
-                                className={[
-                                    "flex items-center w-full lg:w-full p-3 rounded-lg text-base shadow-sm",
-                                    "text-blue-500",
-                                    isHostRow ? "bg-yellow-200" : "bg-gray-100",
-                                ].join(" ")}
-                            >
-                                <Avatar
-                                    name={pres.avatar.nameForLetter}
-                                    size="8"
-                                    color={pres.avatar.bgColor}
-                                    textColor={pres.avatar.fgColor}
-                                    icon={pres.avatar.icon}
-                                />
-
-                                <div className="flex flex-col ml-3">
-                  <span
-                      className={[
-                          pres.nameClassName,
-                          isHostRow ? "font-bold" : "",
-                      ].join(" ")}
-                      style={pres.nameStyle}
-                  >
-                    {pres.displayName || username}
-                  </span>
-
-                                    {isHostRow && (
-                                        <span className="text-yellow-500 text-sm -mt-2">Host</span>
-                                    )}
-
-                                    {isHost && !isHostRow && (
-                                        <button
-                                            type="button"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                onPromoteHost(username);
-                                            }}
-                                            className="mt-1 px-2 py-1 rounded bg-blue-600 text-white text-xs hover:bg-blue-500 w-fit"
-                                        >
-                                            Make Host
-                                        </button>
-                                    )}
-                                </div>
-                            </li>
+                                player={player}
+                                username={username}
+                                pres={pres}
+                                isHostRow={isHostRow}
+                                isHost={isHost}
+                                onPromoteHost={onPromoteHost}
+                            />
                         );
                     })}
                 </ul>

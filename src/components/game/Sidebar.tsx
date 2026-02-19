@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useProfile } from "../../contexts/ProfileContext.tsx";
-import Avatar from "../common/Avatar.tsx";
 import { Player } from "../../types/Lobby.ts";
 import MutedIcon from "../../icons/MutedIcon.tsx";
 import LoudIcon from "../../icons/LoudIcon.tsx";
 import { getProfilePresentation } from "../../utils/profilePresentation";
+import GamePlayerRow from "./GamePlayerRow.tsx";
 
 interface SidebarProps {
     players: Player[];
@@ -166,105 +166,26 @@ const Sidebar: React.FC<SidebarProps> = ({
 
                             const pres = getProfilePresentation({
                                 profile: publicProfile,
-                                fallbackName:  username,
-                                defaultNameColor: undefined, // let helper default unless profile has name_color
+                                fallbackName: username,
+                                defaultNameColor: undefined,
                             });
 
-                            const score = scores[player.username] ?? 0;
+                            const score = scores[username] ?? 0;
 
                             return (
-                                <li
+                                <GamePlayerRow
                                     key={username}
-                                    className={`
-                    flex items-center
-                    lg:p-2
-                    md:p-1
-                    min-h-[96px]
-                    rounded-xl
-                    mb-3
-                    text-blue-500
-                    shadow-sm
-                    border-2 border-transparent
-                    ${player.online === false ? "opacity-50" : ""}
-                    ${buzzResult === player.username
-                                        ? "bg-red-300 border-red-500"
-                                        : selectorName === player.displayname
-                                            ? "bg-blue-300 border-blue-500"
-                                            : "bg-gray-100"}
-                  `}
-                                >
-                                    {/* LEFT: Avatar */}
-                                    <div className="flex items-center justify-center shrink-0 pl-2">
-                                        <Avatar
-                                            name={pres.avatar.nameForLetter}
-                                            size="12"
-                                            color={pres.avatar.bgColor}
-                                            textColor={pres.avatar.fgColor}
-                                            icon={pres.avatar.icon}
-                                        />
-                                    </div>
-
-                                    {/* RIGHT: Name + Money */}
-                                    <div className="flex flex-col justify-center flex-1 ml-3 leading-tight min-w-0">
-                                        <span
-                                            className={[
-                                                "text-xl lg:text-2xl ml-2 truncate",
-                                                pres.nameClassName,
-                                            ].join(" ")}
-                                            style={pres.nameStyle}
-                                        >
-                                          {pres.displayName || username}
-                                        </span>
-
-                                        <RollerMoney
-                                            value={score}
-                                            className={`mt-1 font-extrabold font-swiss911 tracking-tighter text-shadow-jeopardy text-3xl ${
-                                                score < 0 ? "text-red-600" : "text-green-600"
-                                            }`}
-                                        />
-                                    </div>
-
-                                    {/* Admin controls */}
-                                    {me && me.role === "admin" && (
-                                        <div className="flex flex-col gap-2 ml-3 pr-2 shrink-0">
-                                            <button
-                                                onClick={() => handleScoreUpdate(player.username, lastQuestionValue)}
-                                                className="
-                                                      w-6 h-6
-                                                      bg-green-500 text-white
-                                                      rounded-xl
-                                                      flex items-center justify-center
-                                                      text-lg font-black
-                                                      shadow-sm
-                                                      hover:bg-green-600
-                                                      active:scale-[0.98]
-                                                    "
-                                                aria-label={`Increase ${player.displayname} score`}
-                                                title={`+${lastQuestionValue}`}
-                                            >
-                                                ＋
-                                            </button>
-
-                                            <button
-                                                onClick={() => handleScoreUpdate(player.username, -lastQuestionValue)}
-                                                className="
-                          w-6 h-6
-                          bg-red-500 text-white
-                          rounded-xl
-                          flex items-center justify-center
-                          text-lg font-black
-                          shadow-sm
-                          hover:bg-red-600
-                          active:scale-[0.98]
-                        "
-                                                aria-label={`Decrease ${player.displayname} score`}
-                                                title={`-${lastQuestionValue}`}
-                                            >
-                                                −
-                                            </button>
-                                        </div>
-                                    )}
-                                </li>
+                                    player={player}
+                                    username={username}
+                                    pres={pres}
+                                    score={score}
+                                    buzzResult={buzzResult}
+                                    selectorName={selectorName}
+                                    isAdmin={Boolean(me && me.role === "admin")}
+                                    lastQuestionValue={lastQuestionValue}
+                                    handleScoreUpdate={handleScoreUpdate}
+                                    RollerMoney={RollerMoney}
+                                />
                             );
                         })}
                     </ul>
@@ -282,13 +203,13 @@ const Sidebar: React.FC<SidebarProps> = ({
                                 onToggleDailyDoubleSnipe(next);
                             }}
                             className={`
-                px-6 py-3
-                text-white text-lg font-bold
-                rounded-lg
-                min-w-72
-                transition
-                ${ddSnipeEnabled ? "bg-purple-700 hover:bg-purple-800" : "bg-purple-500 hover:bg-purple-600"}
-              `}
+                                        px-6 py-3
+                                        text-white text-lg font-bold
+                                        rounded-lg
+                                        min-w-72
+                                        transition
+                                        ${ddSnipeEnabled ? "bg-purple-700 hover:bg-purple-800" : "bg-purple-500 hover:bg-purple-600"}
+                                      `}
                         >
                             {ddSnipeEnabled ? "DD Snipe: ON (Next Clue)" : "Enable DD Snipe (Next Clue)"}
                         </button>

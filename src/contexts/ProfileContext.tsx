@@ -188,11 +188,12 @@ export const ProfileProvider: React.FC<{ children: ReactNode }> = ({ children })
             const entry = profilesByUsername[u];
             if (!entry) return null;
 
-            const isFresh = Date.now() - entry.cachedAt < PROFILE_TTL_MS;
-            return isFresh ? entry.profile : null;
+            // Freshness should only affect fetch decisions, not rendering.
+            return entry.profile;
         },
         [profilesByUsername]
     );
+
 
 
 
