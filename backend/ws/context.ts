@@ -5,209 +5,221 @@ import { makeBroadcaster } from "./broadcast.js";
 import { scheduleLobbyCleanupIfEmpty, cancelLobbyCleanup } from "../lobby/cleanup.js";
 import { sendLobbySnapshot, buildLobbyState, getPlayerForSocket } from "../lobby/snapshot.js";
 import { startGameTimer, clearGameTimer } from "../game/timer.js";
-import { validateImportedBoardData, parseBoardJson, normalizeCategories11 } from "../validation/boardImport.js";
+import {
+  validateImportedBoardData,
+  parseBoardJson,
+  normalizeCategories11,
+} from "../validation/boardImport.js";
 import { requireHost, isHostSocket } from "../auth/hostGuard.js";
 import { createTrace } from "../services/trace.js";
 import { createBoardData, judgeClueAnswerFast, judgeImage } from "../services/aiService.js";
 import {
-    checkAllDrawingsSubmitted,
-    checkAllWagersSubmitted,
-    submitDrawing,
-    submitWager,
+  checkAllDrawingsSubmitted,
+  checkAllWagersSubmitted,
+  submitDrawing,
+  submitWager,
 } from "../game/finalJeopardy.js";
 import { checkBoardTransition, isBoardFullyCleared } from "../game/stageTransition.js";
 import { getCOTD } from "../state/cotdStore.js";
 import { collectImageAssetIdsFromBoard } from "../services/imageAssetService.js";
 import { transcribeAnswerAudio } from "../services/stt/sttService.js";
 import {
-    applyNewGameState,
-    broadcastPreloadBatch,
-    clearGenerationProgress,
-    ensureHostOrFail,
-    ensureLobbySettings,
-    getBoardDataOrFail,
-    getGameOrFail,
-    initPreloadState,
-    normalizeRole,
-    resetGenerationProgressAndNotify,
-    resolveModelOrFail,
-    resolveVisualPolicy,
-    safeAbortGeneration,
-    setupPreloadHandshake,
+  applyNewGameState,
+  broadcastPreloadBatch,
+  clearGenerationProgress,
+  ensureHostOrFail,
+  ensureLobbySettings,
+  getBoardDataOrFail,
+  getGameOrFail,
+  initPreloadState,
+  normalizeRole,
+  resetGenerationProgressAndNotify,
+  resolveModelOrFail,
+  resolveVisualPolicy,
+  safeAbortGeneration,
+  setupPreloadHandshake,
 } from "./handlers/game/createGameHelpers.js";
 import { createTtsDurationService } from "../services/ttsDurationService.js";
 import { clearAnswerWindow, startAnswerWindow } from "../game/answerWindow.js";
 import {
-    autoResolveAfterJudgement,
-    cancelAutoUnlock,
-    doUnlockBuzzerAuthoritative,
-    findCategoryForClue,
-    parseClueValue,
+  autoResolveAfterJudgement,
+  cancelAutoUnlock,
+  doUnlockBuzzerAuthoritative,
+  findCategoryForClue,
+  parseClueValue,
 } from "../game/gameLogic.js";
 import {
-    aiHostSayAsset,
-    aiHostSayByKey,
-    aiHostVoiceSequence,
-    ensureAiHostTtsBank,
-    ensureAiHostValueTts, ensureFinalJeopardyAnswer, ensureFinalJeopardyWager,
+  aiHostSayAsset,
+  aiHostSayByKey,
+  aiHostVoiceSequence,
+  ensureAiHostTtsBank,
+  ensureAiHostValueTts,
+  ensureFinalJeopardyAnswer,
+  ensureFinalJeopardyWager,
 } from "../game/host.js";
 import { verifyJwt } from "../auth/jwt.js";
 import { getBearerToken, playerStableId, verifyAccessToken } from "../services/userService.js";
-import {ensureTtsAsset} from "../services/tts/ensureTtsAsset.js";
-import {makeLimiter, plannedVisualSlots, populateCategoryVisuals} from "../services/ai/visuals.js";
-import {Game} from "./context.types.js";
-import {Clue} from "../../shared/types/board.js";
-import {appConfig} from "../config/appConfig.js";
-import {parseDailyDoubleWager} from "../services/ai/judge/wagerParse.js";
+import { ensureTtsAsset } from "../services/tts/ensureTtsAsset.js";
 import {
+  makeLimiter,
+  plannedVisualSlots,
+  populateCategoryVisuals,
+} from "../services/ai/visuals.js";
+import { Game } from "./context.types.js";
+import { Clue } from "../../shared/types/board.js";
+import { appConfig } from "../config/appConfig.js";
+import { parseDailyDoubleWager } from "../services/ai/judge/wagerParse.js";
+import {
+  computeDailyDoubleMaxWager,
+  startDdWagerCapture,
+  repromptDdWager,
+  clearDdWagerTimer,
+  finalizeDailyDoubleWagerAndStartClue,
+} from "../game/dailyDouble.js";
+import { numberToWords } from "../services/numberToWords.js";
+import { ensureBoardNarrationTtsForBoardData } from "../services/ai/board/boardTts.js";
+import { PermissionManager } from "../auth/permissionManager.js";
+// Minimal type for now; we’ll tighten later as you TS-migrate more modules.
+
+export const createWsContext = (wss: any, repos: any) => {
+  const { broadcast, broadcastAll } = makeBroadcaster(wss);
+
+  const ttsDuration = createTtsDurationService(repos);
+
+  const perms = new PermissionManager();
+
+  const normalizeName = (name: unknown) =>
+    String(name || "")
+      .toLowerCase()
+      .trim();
+
+  const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+  const sleepAndCheck = async (ms: number, check: () => boolean): Promise<boolean> => {
+    await sleep(ms);
+    return check();
+  };
+
+  const fireAndForget = (p: PromiseLike<unknown>, label: string) => {
+    Promise.resolve(p).catch((err) => {
+      console.error(`[bg:${label}]`, err);
+    });
+  };
+
+  const getClueKey = (game: Game, clue: Clue) =>
+    `${game.activeBoard ?? "firstBoard"}:${clue.value ?? ""}:${clue.question?.trim() ?? ""}`;
+
+  return {
+    wss,
+    games,
+    modelsByValue,
+    appConfig,
+    perms,
+    getTtsDurationMs: (assetId: string) => ttsDuration.getDurationMs(assetId),
+    sleep,
+    getClueKey,
+    repos,
+    normalizeName,
+    fireAndForget,
+    sleepAndCheckGame: (ms: number, gameId: string) =>
+      sleepAndCheck(ms, () => Boolean(games[gameId])),
+
+    ensureFinalJeopardyAnswer,
+    ensureFinalJeopardyWager,
+
+    numberToWords,
+
+    // comms
+    broadcast,
+    broadcastAll,
+
+    // lobby lifecycle
+    scheduleLobbyCleanupIfEmpty,
+    cancelLobbyCleanup,
+
+    // snapshots
+    sendLobbySnapshot,
+    buildLobbyState,
+    getPlayerForSocket,
+
+    // timers
+    startGameTimer,
+    clearGameTimer,
+
+    // import / categories
+    validateImportedBoardData,
+    parseBoardJson,
+    normalizeCategories11,
+
+    // auth
+    requireHost,
+    isHostSocket,
+
+    // answer capture window
+    startAnswerWindow,
+    clearAnswerWindow,
+
+    // inference
+    transcribeAnswerAudio,
+    judgeClueAnswerFast,
+    judgeImage,
+
+    findCategoryForClue,
+
+    // create-game
+    getGameOrFail,
+    ensureHostOrFail,
+    ensureLobbySettings,
+    normalizeRole,
+    resolveModelOrFail,
+    resolveVisualPolicy,
+    resetGenerationProgressAndNotify,
+    clearGenerationProgress,
+    safeAbortGeneration,
+    applyNewGameState,
+    getBoardDataOrFail,
+    ensureTtsAsset,
+    ensureBoardNarrationTtsForBoardData,
+
+    createTrace,
+    createBoardData,
+    submitWager,
+    submitDrawing,
+    checkAllWagersSubmitted,
+    checkAllDrawingsSubmitted,
+    isBoardFullyCleared,
+    getCOTD,
+    collectImageAssetIdsFromBoard,
+
+    cancelAutoUnlock,
+    doUnlockBuzzerAuthoritative,
+
+    ensureAiHostTtsBank,
+    ensureAiHostValueTts,
+    playerStableId,
+    getBearerToken,
+    verifyAccessToken,
+    aiHostVoiceSequence,
+    aiHostSayByKey,
+    aiHostSayAsset,
+    verifyJwt,
+    setupPreloadHandshake,
+    initPreloadState,
+    broadcastPreloadBatch,
+    checkBoardTransition,
+    parseClueValue,
+    autoResolveAfterJudgement,
+
+    plannedVisualSlots,
+    makeLimiter,
+    populateCategoryVisuals,
+
+    //daily double
+    parseDailyDoubleWager,
     computeDailyDoubleMaxWager,
     startDdWagerCapture,
     repromptDdWager,
     clearDdWagerTimer,
-    finalizeDailyDoubleWagerAndStartClue
-
-} from "../game/dailyDouble.js"
-import {numberToWords} from "../services/numberToWords.js";
-import {ensureBoardNarrationTtsForBoardData} from "../services/ai/board/boardTts.js";
-import {PermissionManager} from "../auth/permissionManager.js";
-// Minimal type for now; we’ll tighten later as you TS-migrate more modules.
-
-export const createWsContext = (wss: any, repos: any) => {
-    const { broadcast, broadcastAll } = makeBroadcaster(wss);
-
-    const ttsDuration = createTtsDurationService(repos);
-
-    const perms = new PermissionManager();
-
-    const normalizeName = (name: unknown) => String(name || "").toLowerCase().trim();
-
-    const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
-
-    const sleepAndCheck = async (ms: number, check: () => boolean): Promise<boolean> => {
-        await sleep(ms);
-        return check();
-    };
-
-    const fireAndForget = (p: PromiseLike<unknown>, label: string) => {
-        Promise.resolve(p).catch((err) => {
-            console.error(`[bg:${label}]`, err);
-        });
-    };
-
-    const getClueKey = (game: Game, clue: Clue) =>
-        `${game.activeBoard ?? "firstBoard"}:${clue.value ?? ""}:${clue.question?.trim() ?? ""}`;
-
-
-    return {
-        wss,
-        games,
-        modelsByValue,
-        appConfig,
-        perms,
-        getTtsDurationMs: (assetId: string) => ttsDuration.getDurationMs(assetId),
-        sleep,
-        getClueKey,
-        repos,
-        normalizeName,
-        fireAndForget,
-        sleepAndCheckGame: (ms: number, gameId: string)=> sleepAndCheck(ms, () => Boolean(games[gameId])),
-
-        ensureFinalJeopardyAnswer,
-        ensureFinalJeopardyWager,
-
-        numberToWords,
-
-        // comms
-        broadcast,
-        broadcastAll,
-
-        // lobby lifecycle
-        scheduleLobbyCleanupIfEmpty,
-        cancelLobbyCleanup,
-
-        // snapshots
-        sendLobbySnapshot,
-        buildLobbyState,
-        getPlayerForSocket,
-
-        // timers
-        startGameTimer,
-        clearGameTimer,
-
-        // import / categories
-        validateImportedBoardData,
-        parseBoardJson,
-        normalizeCategories11,
-
-        // auth
-        requireHost,
-        isHostSocket,
-
-        // answer capture window
-        startAnswerWindow,
-        clearAnswerWindow,
-
-        // inference
-        transcribeAnswerAudio,
-        judgeClueAnswerFast,
-        judgeImage,
-
-        findCategoryForClue,
-
-        // create-game
-        getGameOrFail,
-        ensureHostOrFail,
-        ensureLobbySettings,
-        normalizeRole,
-        resolveModelOrFail,
-        resolveVisualPolicy,
-        resetGenerationProgressAndNotify,
-        clearGenerationProgress,
-        safeAbortGeneration,
-        applyNewGameState,
-        getBoardDataOrFail,
-        ensureTtsAsset,
-        ensureBoardNarrationTtsForBoardData,
-
-        createTrace,
-        createBoardData,
-        submitWager,
-        submitDrawing,
-        checkAllWagersSubmitted,
-        checkAllDrawingsSubmitted,
-        isBoardFullyCleared,
-        getCOTD,
-        collectImageAssetIdsFromBoard,
-
-        cancelAutoUnlock,
-        doUnlockBuzzerAuthoritative,
-
-        ensureAiHostTtsBank,
-        ensureAiHostValueTts,
-        playerStableId,
-        getBearerToken,
-        verifyAccessToken,
-        aiHostVoiceSequence,
-        aiHostSayByKey,
-        aiHostSayAsset,
-        verifyJwt,
-        setupPreloadHandshake,
-        initPreloadState,
-        broadcastPreloadBatch,
-        checkBoardTransition,
-        parseClueValue,
-        autoResolveAfterJudgement,
-
-        plannedVisualSlots,
-        makeLimiter,
-        populateCategoryVisuals,
-
-        //daily double
-        parseDailyDoubleWager,
-        computeDailyDoubleMaxWager,
-        startDdWagerCapture,
-        repromptDdWager,
-        clearDdWagerTimer,
-        finalizeDailyDoubleWagerAndStartClue,
-    };
+    finalizeDailyDoubleWagerAndStartClue,
+  };
 };

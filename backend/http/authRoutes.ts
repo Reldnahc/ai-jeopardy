@@ -19,12 +19,16 @@ type JwtPayload = {
 export type AuthRepos = Pick<Repos, "profiles">;
 
 function normalizeEmail(email: unknown): string | null {
-  const v = String(email ?? "").trim().toLowerCase();
+  const v = String(email ?? "")
+    .trim()
+    .toLowerCase();
   return v.length ? v : null;
 }
 
 function normalizeUsername(username: unknown): string {
-  return String(username ?? "").trim().toLowerCase();
+  return String(username ?? "")
+    .trim()
+    .toLowerCase();
 }
 
 function asRecord(v: unknown): Record<string, unknown> {
@@ -45,12 +49,7 @@ export function registerAuthRoutes(app: Application, repos: AuthRepos) {
         return res.status(400).json({ error: "name contains prohibited language." });
       }
 
-
-
-      const displayname =
-          String(body.displayname ?? "").trim() ||
-          usernameRaw.trim() ||
-          username;
+      const displayname = String(body.displayname ?? "").trim() || usernameRaw.trim() || username;
 
       const email = normalizeEmail(body.email);
       const password = String(body.password ?? "");
@@ -72,17 +71,13 @@ export function registerAuthRoutes(app: Application, repos: AuthRepos) {
         return res.status(500).json({ error: "Signup failed" });
       }
 
-      const token = signJwt( user.id, user.username,user.role );
+      const token = signJwt(user.id, user.username, user.role);
       return res.json({ token, user });
     } catch (e: unknown) {
-      const msg = String(
-          (e as { message?: unknown } | null | undefined)?.message ?? ""
-      );
+      const msg = String((e as { message?: unknown } | null | undefined)?.message ?? "");
 
       if (msg.includes("duplicate key value")) {
-        return res
-            .status(409)
-            .json({ error: "Username (or email) already exists" });
+        return res.status(409).json({ error: "Username (or email) already exists" });
       }
 
       console.error("POST /api/auth/signup failed:", e);
@@ -109,13 +104,12 @@ export function registerAuthRoutes(app: Application, repos: AuthRepos) {
       const ok = await bcrypt.compare(password, user.password_hash);
       if (!ok) return res.status(401).json({ error: "Invalid credentials" });
 
-      const token = signJwt( user.id, user.username, user.role );
+      const token = signJwt(user.id, user.username, user.role);
 
       // don't leak hash
       delete user.password_hash;
       return res.json({ token, user });
     } catch (e) {
-
       console.error("POST /api/auth/login failed:", e);
       return res.status(500).json({ error: "Login failed" });
     }

@@ -2,8 +2,8 @@ import { callOpenAiJson, parseOpenAiJson } from "./openaiClient.js";
 import { appConfig } from "../../config/appConfig.js";
 
 export type CategoryOfTheDay = {
-    category: string;
-    description: string;
+  category: string;
+  description: string;
 };
 
 // in-memory history (resets on restart)
@@ -11,24 +11,24 @@ const RECENT_MAX = 40;
 const recent: string[] = [];
 
 function norm(s: string) {
-    return s.trim().toLowerCase();
+  return s.trim().toLowerCase();
 }
 
 function pushRecent(category: string) {
-    const n = norm(category);
-    const idx = recent.indexOf(n);
-    if (idx >= 0) recent.splice(idx, 1);
-    recent.unshift(n);
-    if (recent.length > RECENT_MAX) recent.pop();
+  const n = norm(category);
+  const idx = recent.indexOf(n);
+  if (idx >= 0) recent.splice(idx, 1);
+  recent.unshift(n);
+  if (recent.length > RECENT_MAX) recent.pop();
 }
 
 // super simple “shape” heuristic (helps reduce same-y naming patterns)
 function categoryShape(category: string): string {
-    const words = category.trim().split(/\s+/);
-    if (words.length === 1) return "1w";
-    if (words.length === 2) return "2w";
-    if (words.length === 3) return "3w";
-    return "4w+";
+  const words = category.trim().split(/\s+/);
+  if (words.length === 1) return "1w";
+  if (words.length === 2) return "2w";
+  if (words.length === 3) return "3w";
+  return "4w+";
 }
 
 // optional: track recent shapes too
@@ -36,25 +36,25 @@ const recentShapes: string[] = [];
 const SHAPES_MAX = 12;
 
 function pushShape(shape: string) {
-    recentShapes.unshift(shape);
-    if (recentShapes.length > SHAPES_MAX) recentShapes.pop();
+  recentShapes.unshift(shape);
+  if (recentShapes.length > SHAPES_MAX) recentShapes.pop();
 }
 
 function isTooSimilar(candidate: string): boolean {
-    const c = norm(candidate);
-    if (recent.includes(c)) return true;
+  const c = norm(candidate);
+  if (recent.includes(c)) return true;
 
-    // basic “near repeat” check (substring overlap)
-    // catches stuff like "Whimsical Wonder" vs "Whimsical Wonders"
-    for (const r of recent) {
-        if (r.includes(c) || c.includes(r)) return true;
-    }
+  // basic “near repeat” check (substring overlap)
+  // catches stuff like "Whimsical Wonder" vs "Whimsical Wonders"
+  for (const r of recent) {
+    if (r.includes(c) || c.includes(r)) return true;
+  }
 
-    return false;
+  return false;
 }
 
 async function generateOnce(): Promise<CategoryOfTheDay> {
-    const prompt = `
+  const prompt = `
 Create a "Category of the Day" for a Jeopardy-style game.
 
 Hard rules:
@@ -81,34 +81,34 @@ Return JSON only:
 }
 `.trim();
 
-    const response = await callOpenAiJson(appConfig.ai.cotdModel, prompt, {});
+  const response = await callOpenAiJson(appConfig.ai.cotdModel, prompt, {});
 
-    return parseOpenAiJson<CategoryOfTheDay>(response);
+  return parseOpenAiJson<CategoryOfTheDay>(response);
 }
 
 export async function createCategoryOfTheDay(): Promise<CategoryOfTheDay> {
-    // attempt 1
-    let out = await generateOnce();
+  // attempt 1
+  let out = await generateOnce();
 
-    // validate & retry once if too similar
-    if (isTooSimilar(out.category)) {
-        const prompt2 = `
+  // validate & retry once if too similar
+  if (isTooSimilar(out.category)) {
+    const prompt2 = `
 The previous category was too similar to recent ones.
 Generate a DIFFERENT category with a different wording and theme.
 Return JSON only with the same schema.
 `.trim();
 
-        const response2 = await callOpenAiJson(appConfig.ai.cotdModel, prompt2, {
-            // temperature: 1.1,
-            // presence_penalty: 0.7,
-        });
+    const response2 = await callOpenAiJson(appConfig.ai.cotdModel, prompt2, {
+      // temperature: 1.1,
+      // presence_penalty: 0.7,
+    });
 
-        out = parseOpenAiJson<CategoryOfTheDay>(response2);
-    }
+    out = parseOpenAiJson<CategoryOfTheDay>(response2);
+  }
 
-    // record
-    pushRecent(out.category);
-    pushShape(categoryShape(out.category));
+  // record
+  pushRecent(out.category);
+  pushShape(categoryShape(out.category));
 
-    return out;
+  return out;
 }

@@ -23,11 +23,13 @@ This repository is optimized for running via Docker and Docker Compose on a pers
 The application runs as two containers:
 
 ### Application Container
+
 - Node.js backend
 - Static frontend served from a Vite build output
 - API and WebSocket server on the same origin
 
 ### PostgreSQL Container
+
 - Stores:
   - user accounts and authentication data
   - generated boards
@@ -86,6 +88,7 @@ sql/001_init.sql
 When using the official PostgreSQL Docker image, this file is automatically executed on first startup if the database volume is empty.
 
 The schema includes:
+
 - profiles
 - jeopardy_boards
 - tts_assets
@@ -115,6 +118,7 @@ ANTHROPIC_API_KEY=
 ```
 
 Notes:
+
 - `DATABASE_URL` is constructed automatically inside docker-compose.
 - `VITE_API_BASE` is only used during local development builds.
 

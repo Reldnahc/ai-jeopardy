@@ -1,12 +1,12 @@
 let cotd = {
-    category: "",
-    description: ""
+  category: "",
+  description: "",
 };
 
 export function getCOTD() {
-    return cotd;
+  return cotd;
 }
 
 export function setCOTD(next) {
-    cotd = next;
+  cotd = next;
 }

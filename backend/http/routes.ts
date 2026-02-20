@@ -30,17 +30,17 @@ function setCachedTtsMeta(assetId: string, storageKey: string, contentType: stri
 
 function isConnectTimeoutError(err: unknown): boolean {
   const e =
-      typeof err === "object" && err !== null
-          ? (err as { message?: unknown; details?: unknown })
-          : {};
+    typeof err === "object" && err !== null
+      ? (err as { message?: unknown; details?: unknown })
+      : {};
 
   const msg = String(e.message ?? "");
   const details = String(e.details ?? "");
 
   return (
-      msg.includes("fetch failed") ||
-      msg.includes("UND_ERR_CONNECT_TIMEOUT") ||
-      details.includes("UND_ERR_CONNECT_TIMEOUT")
+    msg.includes("fetch failed") ||
+    msg.includes("UND_ERR_CONNECT_TIMEOUT") ||
+    details.includes("UND_ERR_CONNECT_TIMEOUT")
   );
 }
 
@@ -155,7 +155,8 @@ export function registerHttpRoutes(app: Application, distPath: string, repos: Ht
       // ---- 304 support (no Range) ----
       // (Browsers use this to confidently reuse cached content)
       const ifNoneMatch = req.headers["if-none-match"];
-      const wantsRange = typeof req.headers.range === "string" && req.headers.range.startsWith("bytes=");
+      const wantsRange =
+        typeof req.headers.range === "string" && req.headers.range.startsWith("bytes=");
       if (!wantsRange && ifNoneMatch === etag) {
         return res.status(304).end();
       }
@@ -193,7 +194,6 @@ export function registerHttpRoutes(app: Application, distPath: string, repos: Ht
       return res.status(500).json({ error: "TTS endpoint failed" });
     }
   });
-
 
   app.get("/api/tts-assets/:assetId", async (req: Request<AssetIdParams>, res: Response) => {
     const { assetId } = req.params; // ✅ string

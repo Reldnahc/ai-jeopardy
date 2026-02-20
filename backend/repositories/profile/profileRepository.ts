@@ -10,15 +10,15 @@ import { createProfileSearchRepo } from "./profile.search.js";
 import { createProfileStatsRepo } from "./profile.stats.js";
 
 export function createProfileRepository(pool: Pool) {
-    if (!pool) throw new Error("createProfileRepository: missing pool");
+  if (!pool) throw new Error("createProfileRepository: missing pool");
 
-    return {
-        ...createProfileRoleRepo(pool),
-        ...createProfileAuthRepo(pool),
-        ...createProfileReadRepo(pool),
-        ...createProfileSearchRepo(pool),
-        ...createProfileCustomizationRepo(pool),
-        ...createProfileLeaderboardRepo(pool),
-        ...createProfileStatsRepo(pool),
-    };
+  return {
+    ...createProfileRoleRepo(pool),
+    ...createProfileAuthRepo(pool),
+    ...createProfileReadRepo(pool),
+    ...createProfileSearchRepo(pool),
+    ...createProfileCustomizationRepo(pool),
+    ...createProfileLeaderboardRepo(pool),
+    ...createProfileStatsRepo(pool),
+  };
 }

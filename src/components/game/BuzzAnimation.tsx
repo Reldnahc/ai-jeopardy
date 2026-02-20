@@ -3,12 +3,12 @@ import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface BuzzAnimationProps {
-    playerName: string | null;
+  playerName: string | null;
 }
 
 const GLOW_STYLE: React.CSSProperties = {
-    color: "#FFF",
-    textShadow: `
+  color: "#FFF",
+  textShadow: `
     -2px -2px 0 #000,
     2px -2px 0 #000,
     -2px 2px 0 #000,
@@ -20,39 +20,39 @@ const GLOW_STYLE: React.CSSProperties = {
 };
 
 const BuzzAnimation: React.FC<BuzzAnimationProps> = ({ playerName }) => {
-    const [showAnimation, setShowAnimation] = useState(false);
+  const [showAnimation, setShowAnimation] = useState(false);
 
-    useEffect(() => {
-        if (!playerName) return;
-        setShowAnimation(true);
-        const t = window.setTimeout(() => setShowAnimation(false), 900); // slightly shorter feels snappier
-        return () => window.clearTimeout(t);
-    }, [playerName]);
+  useEffect(() => {
+    if (!playerName) return;
+    setShowAnimation(true);
+    const t = window.setTimeout(() => setShowAnimation(false), 900); // slightly shorter feels snappier
+    return () => window.clearTimeout(t);
+  }, [playerName]);
 
-    return (
-        <AnimatePresence>
-            {showAnimation && playerName && (
-                <motion.div
-                    initial={{ opacity: 0, y: 0, scale: 0.85 }}
-                    animate={{ opacity: 1, y: -80, scale: 1.15 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.9, ease: "easeOut" }}
-                    className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 text-center pointer-events-none"
-                    style={{
-                        willChange: "transform, opacity",
-                        transform: "translate3d(-50%, -50%, 0)", // Safari likes explicit 3d
-                        backfaceVisibility: "hidden",
-                    }}
-                >
-                    {/* Text is NOT animated; wrapper is */}
-                    <div className="text-6xl font-extrabold" style={GLOW_STYLE}>
-                        {playerName}
-                        <div className="text-red-500 text-4xl mt-2">BUZZED!</div>
-                    </div>
-                </motion.div>
-            )}
-        </AnimatePresence>
-    );
+  return (
+    <AnimatePresence>
+      {showAnimation && playerName && (
+        <motion.div
+          initial={{ opacity: 0, y: 0, scale: 0.85 }}
+          animate={{ opacity: 1, y: -80, scale: 1.15 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.9, ease: "easeOut" }}
+          className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 text-center pointer-events-none"
+          style={{
+            willChange: "transform, opacity",
+            transform: "translate3d(-50%, -50%, 0)", // Safari likes explicit 3d
+            backfaceVisibility: "hidden",
+          }}
+        >
+          {/* Text is NOT animated; wrapper is */}
+          <div className="text-6xl font-extrabold" style={GLOW_STYLE}>
+            {playerName}
+            <div className="text-red-500 text-4xl mt-2">BUZZED!</div>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
 };
 
 export default BuzzAnimation;

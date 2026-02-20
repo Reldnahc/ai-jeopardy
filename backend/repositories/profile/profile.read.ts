@@ -4,11 +4,13 @@ import type { MeProfileRow, PublicProfileRow, PublicUserRow } from "./profile.ty
 import { normalizeUsername } from "./profile.util.js";
 
 export function createProfileReadRepo(pool: Pool) {
-    async function getPublicUserById(userId: string | null | undefined): Promise<PublicUserRow | null> {
-        if (!userId) return null;
+  async function getPublicUserById(
+    userId: string | null | undefined,
+  ): Promise<PublicUserRow | null> {
+    if (!userId) return null;
 
-        const { rows } = await pool.query<PublicUserRow>(
-            `
+    const { rows } = await pool.query<PublicUserRow>(
+      `
         select
           p.id,
           p.email,
@@ -29,17 +31,17 @@ export function createProfileReadRepo(pool: Pool) {
         where p.id = $1
         limit 1
       `,
-            [userId]
-        );
+      [userId],
+    );
 
-        return rows?.[0] ?? null;
-    }
+    return rows?.[0] ?? null;
+  }
 
-    async function getMeProfile(userId: string | null | undefined): Promise<MeProfileRow | null> {
-        if (!userId) return null;
+  async function getMeProfile(userId: string | null | undefined): Promise<MeProfileRow | null> {
+    if (!userId) return null;
 
-        const { rows } = await pool.query<MeProfileRow>(
-            `
+    const { rows } = await pool.query<MeProfileRow>(
+      `
         select
           p.id,
           p.email,
@@ -72,18 +74,18 @@ export function createProfileReadRepo(pool: Pool) {
         where p.id = $1
         limit 1
       `,
-            [userId]
-        );
+      [userId],
+    );
 
-        return rows?.[0] ?? null;
-    }
+    return rows?.[0] ?? null;
+  }
 
-    async function getPublicProfileByUsername(usernameRaw: string): Promise<PublicProfileRow | null> {
-        const username = normalizeUsername(usernameRaw);
-        if (!username) return null;
+  async function getPublicProfileByUsername(usernameRaw: string): Promise<PublicProfileRow | null> {
+    const username = normalizeUsername(usernameRaw);
+    if (!username) return null;
 
-        const { rows } = await pool.query<PublicProfileRow>(
-            `
+    const { rows } = await pool.query<PublicProfileRow>(
+      `
         select
           p.id,
           p.username,
@@ -131,46 +133,46 @@ export function createProfileReadRepo(pool: Pool) {
         where p.username = $1
         limit 1
       `,
-            [username]
-        );
+      [username],
+    );
 
-        return rows?.[0] ?? null;
+    return rows?.[0] ?? null;
+  }
+
+  async function getIdByUsername(usernameRaw: string): Promise<string | null> {
+    const username = normalizeUsername(usernameRaw);
+    if (!username) return null;
+
+    const { rows } = await pool.query<{ id: string }>(
+      `select id from public.profiles where username = $1 limit 1`,
+      [username],
+    );
+
+    return rows?.[0]?.id ?? null;
+  }
+
+  async function getPublicProfilesByUsernames(
+    usernamesRaw: Array<string | null | undefined>,
+    opts?: { limit?: number },
+  ): Promise<PublicProfileRow[]> {
+    const limit = Math.min(Math.max(opts?.limit ?? 100, 1), 500);
+
+    const ordered: string[] = [];
+    const seen = new Set<string>();
+
+    for (const u of usernamesRaw ?? []) {
+      const n = normalizeUsername(u);
+      if (!n) continue;
+      if (seen.has(n)) continue;
+      seen.add(n);
+      ordered.push(n);
+      if (ordered.length >= limit) break;
     }
 
-    async function getIdByUsername(usernameRaw: string): Promise<string | null> {
-        const username = normalizeUsername(usernameRaw);
-        if (!username) return null;
+    if (ordered.length === 0) return [];
 
-        const { rows } = await pool.query<{ id: string }>(
-            `select id from public.profiles where username = $1 limit 1`,
-            [username]
-        );
-
-        return rows?.[0]?.id ?? null;
-    }
-
-    async function getPublicProfilesByUsernames(
-        usernamesRaw: Array<string | null | undefined>,
-        opts?: { limit?: number }
-    ): Promise<PublicProfileRow[]> {
-        const limit = Math.min(Math.max(opts?.limit ?? 100, 1), 500);
-
-        const ordered: string[] = [];
-        const seen = new Set<string>();
-
-        for (const u of usernamesRaw ?? []) {
-            const n = normalizeUsername(u);
-            if (!n) continue;
-            if (seen.has(n)) continue;
-            seen.add(n);
-            ordered.push(n);
-            if (ordered.length >= limit) break;
-        }
-
-        if (ordered.length === 0) return [];
-
-        const { rows } = await pool.query<PublicProfileRow>(
-            `
+    const { rows } = await pool.query<PublicProfileRow>(
+      `
         select
           p.id,
           p.username,
@@ -217,28 +219,28 @@ export function createProfileReadRepo(pool: Pool) {
         left join public.profile_statistics s on s.profile_id = p.id
         where p.username = any($1::text[])
       `,
-            [ordered]
-        );
+      [ordered],
+    );
 
-        const byUsername = new Map<string, PublicProfileRow>();
-        for (const r of rows ?? []) {
-            byUsername.set(normalizeUsername(r.username), r);
-        }
-
-        const out: PublicProfileRow[] = [];
-        for (const u of ordered) {
-            const r = byUsername.get(u);
-            if (r) out.push(r);
-        }
-
-        return out;
+    const byUsername = new Map<string, PublicProfileRow>();
+    for (const r of rows ?? []) {
+      byUsername.set(normalizeUsername(r.username), r);
     }
 
-    return {
-        getPublicUserById,
-        getMeProfile,
-        getPublicProfileByUsername,
-        getIdByUsername,
-        getPublicProfilesByUsernames,
-    };
+    const out: PublicProfileRow[] = [];
+    for (const u of ordered) {
+      const r = byUsername.get(u);
+      if (r) out.push(r);
+    }
+
+    return out;
+  }
+
+  return {
+    getPublicUserById,
+    getMeProfile,
+    getPublicProfileByUsername,
+    getIdByUsername,
+    getPublicProfilesByUsernames,
+  };
 }

@@ -1,5 +1,5 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -10,9 +10,9 @@ export default defineConfig({
       "/api": "http://localhost:3002",
     },
   },
-  base: '/',
-  envDir: '.',
+  base: "/",
+  envDir: ".",
   build: {
     chunkSizeWarningLimit: 700, // Setting this to 700kb gives you some headroom
   },
-})
+});

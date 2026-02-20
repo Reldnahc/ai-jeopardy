@@ -3,59 +3,58 @@ import type { JudgeTextResult, Verdict } from "./types.js";
 import { normalizeJeopardyText } from "./normalize.js";
 import { inferAnswerType, isTooGeneric } from "./heuristics.js";
 import { buildJudgePrompt } from "./prompt.js";
-import {appConfig} from "../../../config/appConfig.js";
+import { appConfig } from "../../../config/appConfig.js";
 
 export async function judgeClueAnswerFast(
-    expectedAnswer: string,
-    transcript: string,
-    question: string
+  expectedAnswer: string,
+  transcript: string,
+  question: string,
 ): Promise<JudgeTextResult> {
-    const transcriptRaw = String(transcript || "");
-    const expectedRaw = String(expectedAnswer || "");
+  const transcriptRaw = String(transcript || "");
+  const expectedRaw = String(expectedAnswer || "");
 
-    const normT = normalizeJeopardyText(transcriptRaw);
-    const normA = normalizeJeopardyText(expectedRaw);
+  const normT = normalizeJeopardyText(transcriptRaw);
+  const normA = normalizeJeopardyText(expectedRaw);
 
+  // Fast deterministic accept
+  if (normT && normA && normT === normA) {
+    return { verdict: "correct" };
+  }
 
-    // Fast deterministic accept
-    if (normT && normA && normT === normA) {
-        return { verdict: "correct" };
-    }
+  const tGeneric = isTooGeneric(normT);
+  const aGeneric = isTooGeneric(normA);
 
-    const tGeneric = isTooGeneric(normT);
-    const aGeneric = isTooGeneric(normA);
+  // only reject generic transcript if expected isn't also generic/short
+  if (tGeneric && !aGeneric) return { verdict: "incorrect" };
 
-    // only reject generic transcript if expected isn't also generic/short
-    if (tGeneric && !aGeneric) return { verdict: "incorrect" };
+  const answerType = inferAnswerType(expectedRaw);
 
-    const answerType = inferAnswerType(expectedRaw);
+  const prompt = buildJudgePrompt({
+    transcriptRaw,
+    expectedRaw,
+    question,
+    normT,
+    normA,
+    answerType,
+    strictness: "lenient",
+  });
 
-    const prompt = buildJudgePrompt({
-        transcriptRaw,
-        expectedRaw,
-        question,
-        normT,
-        normA,
-        answerType,
-        strictness: "lenient",
-    });
+  const r = await callOpenAiJson(appConfig.ai.judgeModel, prompt, {
+    reasoningEffort: "off",
+  });
 
-    const r = await callOpenAiJson(appConfig.ai.judgeModel, prompt, {
-        reasoningEffort: "off",
-    });
+  let parsed: unknown = null;
+  try {
+    parsed = parseOpenAiJson(r);
+  } catch {
+    parsed = null;
+  }
 
-    let parsed: unknown = null;
-    try {
-        parsed = parseOpenAiJson(r);
-    } catch {
-        parsed = null;
-    }
+  const verdict = (parsed as { verdict?: unknown } | null)?.verdict;
 
-    const verdict = (parsed as { verdict?: unknown } | null)?.verdict;
+  if (verdict !== "correct" && verdict !== "incorrect") {
+    return { verdict: "incorrect" };
+  }
 
-    if (verdict !== "correct" && verdict !== "incorrect") {
-        return { verdict: "incorrect" };
-    }
-
-    return { verdict: verdict as Verdict };
+  return { verdict: verdict as Verdict };
 }

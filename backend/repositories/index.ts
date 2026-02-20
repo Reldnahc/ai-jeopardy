@@ -8,12 +8,12 @@ import { createTtsAssetRepository } from "./ttsAssetRepository.js";
 export type Repos = ReturnType<typeof createRepos>;
 
 export function createRepos(pool: Pool) {
-    if (!pool) throw new Error("createRepos: missing pool");
+  if (!pool) throw new Error("createRepos: missing pool");
 
-    return {
-        profiles: createProfileRepository(pool),
-        boards: createBoardRepository(pool),
-        images: createImageAssetRepository(pool),
-        tts: createTtsAssetRepository(pool),
-    };
+  return {
+    profiles: createProfileRepository(pool),
+    boards: createBoardRepository(pool),
+    images: createImageAssetRepository(pool),
+    tts: createTtsAssetRepository(pool),
+  };
 }

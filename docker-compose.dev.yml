@@ -23,7 +23,7 @@ services:
       KOKORO_URL: http://kokoro:8000
       PIPER_URL: http://piper:8000
       WHISPER_URL: http://whisper:8000
-    command: ["bash","-lc","npm install && npm run build:backend && npm run dev:backend"]
+    command: ["bash", "-lc", "npm install && npm run build:backend && npm run dev:backend"]
     ports:
       - "3002:3002"
     depends_on:
@@ -39,7 +39,7 @@ services:
       NODE_ENV: development
       CHOKIDAR_USEPOLLING: "true"
       WATCHPACK_POLLING: "true"
-    command: ["bash","-lc","npm install && npm run dev:web"]
+    command: ["bash", "-lc", "npm install && npm run dev:web"]
     ports:
       - "5173:5173"
     depends_on:
@@ -84,7 +84,7 @@ services:
     environment:
       WHISPER_MODEL: "medium"
       DEVICE: "cuda"
-      COMPUTE_TYPE: "float16"     # try "int8_float16" if VRAM is tight
+      COMPUTE_TYPE: "float16" # try "int8_float16" if VRAM is tight
       BEAM_SIZE: "5"
 
     deploy:

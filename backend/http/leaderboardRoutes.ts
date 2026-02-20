@@ -5,19 +5,19 @@ import type { Repos } from "../repositories/index.js";
 type LeaderboardRepos = Pick<Repos, "profiles">;
 
 export function registerLeaderboardRoutes(app: Application, repos: LeaderboardRepos) {
-    app.get("/api/leaderboard", async (req: Request, res: Response) => {
-        try {
-            const q = req.query as Record<string, unknown>;
+  app.get("/api/leaderboard", async (req: Request, res: Response) => {
+    try {
+      const q = req.query as Record<string, unknown>;
 
-            const stat = q.stat;
-            const limit = q.limit;
-            const offset = q.offset;
+      const stat = q.stat;
+      const limit = q.limit;
+      const offset = q.offset;
 
-            const rows = await repos.profiles.listLeaderboard(stat, limit, offset);
-            return res.json({ rows });
-        } catch (e) {
-            console.error("GET /api/leaderboard failed:", e);
-            return res.status(500).json({ error: "Failed to load leaderboard" });
-        }
-    });
+      const rows = await repos.profiles.listLeaderboard(stat, limit, offset);
+      return res.json({ rows });
+    } catch (e) {
+      console.error("GET /api/leaderboard failed:", e);
+      return res.status(500).json({ error: "Failed to load leaderboard" });
+    }
+  });
 }

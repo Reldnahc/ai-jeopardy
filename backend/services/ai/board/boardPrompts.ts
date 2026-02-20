@@ -3,45 +3,45 @@
 export type ReasoningEffort = "off" | "low" | "medium" | "high";
 
 export type CategoryPromptSettings = {
-    includeVisuals: boolean;
-    maxVisualCluesPerCategory: number;
+  includeVisuals: boolean;
+  maxVisualCluesPerCategory: number;
 
-    reasoningEffort: ReasoningEffort;
+  reasoningEffort: ReasoningEffort;
 
-    // These are only used for the VISUAL rules text (not required for schema)
-    maxImageSearchTries: number;
-    commonsThumbWidth: number;
-    preferPhotos: boolean;
+  // These are only used for the VISUAL rules text (not required for schema)
+  maxImageSearchTries: number;
+  commonsThumbWidth: number;
+  preferPhotos: boolean;
 
-    /**
-     * Optional: include worked examples in the prompt.
-     * Costs tokens but tends to increase consistency.
-     */
-    includeExamples?: boolean;
+  /**
+   * Optional: include worked examples in the prompt.
+   * Costs tokens but tends to increase consistency.
+   */
+  includeExamples?: boolean;
 
-    /**
-     * Optional: include a "fill this out" template example.
-     * Costs tokens but helps lock the schema.
-     */
-    includeFillTemplate?: boolean;
+  /**
+   * Optional: include a "fill this out" template example.
+   * Costs tokens but helps lock the schema.
+   */
+  includeFillTemplate?: boolean;
 };
 
 export function valuesFor(double: boolean) {
-    return double ? [400, 800, 1200, 1600, 2000] : [200, 400, 600, 800, 1000];
+  return double ? [400, 800, 1200, 1600, 2000] : [200, 400, 600, 800, 1000];
 }
 
 function jsonSchemaSnippet(values: number[], includeVisuals: boolean) {
-    if (includeVisuals) {
-        return `{"category":"Category Name","values":[
+  if (includeVisuals) {
+    return `{"category":"Category Name","values":[
   {"value":${values[0]},"question":"Clue text","answer":"Correct response phrased as a question?","visual":{"commonsSearchQueries":["query 1","query 2"]}},
   {"value":${values[1]},"question":"...","answer":"...?"},
   {"value":${values[2]},"question":"...","answer":"...?"},
   {"value":${values[3]},"question":"...","answer":"...?"},
   {"value":${values[4]},"question":"...","answer":"...?"}
 ]}`;
-    }
+  }
 
-    return `{"category":"Category Name","values":[
+  return `{"category":"Category Name","values":[
   {"value":${values[0]},"question":"Clue text","answer":"Correct response phrased as a question?"},
   {"value":${values[1]},"question":"...","answer":"...?"},
   {"value":${values[2]},"question":"...","answer":"...?"},
@@ -51,7 +51,7 @@ function jsonSchemaSnippet(values: number[], includeVisuals: boolean) {
 }
 
 function difficultyRubric(values: number[]) {
-    return `
+  return `
 DIFFICULTY RUBRIC:
 - ${values[0]}: direct, widely-known fact (single-hop recall).
 - ${values[1]}: still common knowledge but slightly more specific.
@@ -62,16 +62,16 @@ DIFFICULTY RUBRIC:
 }
 
 function reasoningRules(settings: CategoryPromptSettings) {
-    if (settings.reasoningEffort === "off") return "";
+  if (settings.reasoningEffort === "off") return "";
 
-    const intensity =
-        settings.reasoningEffort === "low"
-            ? "Do a quick pass and fix obvious issues."
-            : settings.reasoningEffort === "medium"
-                ? "Do a careful pass and fix anything questionable."
-                : "Be extremely strict. Rewrite anything even slightly ambiguous.";
+  const intensity =
+    settings.reasoningEffort === "low"
+      ? "Do a quick pass and fix obvious issues."
+      : settings.reasoningEffort === "medium"
+        ? "Do a careful pass and fix anything questionable."
+        : "Be extremely strict. Rewrite anything even slightly ambiguous.";
 
-    return `
+  return `
 VERIFICATION STEP (${settings.reasoningEffort.toUpperCase()}):
 - ${intensity}
 - Fact-check every clue/answer pair.
@@ -88,9 +88,9 @@ VERIFICATION STEP (${settings.reasoningEffort.toUpperCase()}):
 }
 
 function visualRules(settings: CategoryPromptSettings) {
-    if (!settings.includeVisuals) return "";
+  if (!settings.includeVisuals) return "";
 
-    return `
+  return `
 VISUAL CLUES (optional per clue):
 - Make up to ${settings.maxVisualCluesPerCategory} of the 5 clues visual (or choose none).
 - Visual clues MUST still be solvable from the text alone (image is a bonus, not required).
@@ -112,8 +112,8 @@ VISUAL CLUES (optional per clue):
  * IMPORTANT: Instruct the model NOT to reuse these facts; it’s structure-only.
  */
 function fillTemplateExample(values: number[], includeVisuals: boolean) {
-    if (includeVisuals) {
-        return `
+  if (includeVisuals) {
+    return `
 FILL TEMPLATE (STRUCTURE ONLY; DO NOT REUSE FACTS):
 {
   "category": "YOUR CATEGORY NAME",
@@ -131,9 +131,9 @@ FILL TEMPLATE (STRUCTURE ONLY; DO NOT REUSE FACTS):
   ]
 }
 `.trim();
-    }
+  }
 
-    return `
+  return `
 FILL TEMPLATE (STRUCTURE ONLY; DO NOT REUSE FACTS):
 {
   "category": "YOUR CATEGORY NAME",
@@ -149,10 +149,10 @@ FILL TEMPLATE (STRUCTURE ONLY; DO NOT REUSE FACTS):
 }
 
 function workedExamples(includeVisuals: boolean) {
-    // NOTE: These are intended to show STYLE + DISAMBIGUATION, not be copied.
-    // Keep categories varied so the model learns broad patterns.
+  // NOTE: These are intended to show STYLE + DISAMBIGUATION, not be copied.
+  // Keep categories varied so the model learns broad patterns.
 
-    const ex1 = `
+  const ex1 = `
 EXAMPLE 1 (STRUCTURE + STYLE ONLY; DO NOT REUSE FACTS):
 {
   "category": "Rivers of the World",
@@ -166,7 +166,7 @@ EXAMPLE 1 (STRUCTURE + STYLE ONLY; DO NOT REUSE FACTS):
 }
 `.trim();
 
-    const ex2 = `
+  const ex2 = `
 EXAMPLE 4 (STRUCTURE + STYLE ONLY; DO NOT REUSE FACTS):
 {
   "category": "3-Letter Airport Codes",
@@ -180,7 +180,7 @@ EXAMPLE 4 (STRUCTURE + STYLE ONLY; DO NOT REUSE FACTS):
 }
 `.trim();
 
-    const ex3 = `
+  const ex3 = `
 EXAMPLE 3 (STRUCTURE + STYLE ONLY; DO NOT REUSE FACTS):
 {
   "category": "European Capitals",
@@ -194,7 +194,7 @@ EXAMPLE 3 (STRUCTURE + STYLE ONLY; DO NOT REUSE FACTS):
 }
 `.trim();
 
-    const ex4Visual = `
+  const ex4Visual = `
 EXAMPLE 4 (VISUAL FORMAT ONLY; DO NOT REUSE FACTS):
 {
   "category": "Famous Landmarks",
@@ -213,18 +213,18 @@ EXAMPLE 4 (VISUAL FORMAT ONLY; DO NOT REUSE FACTS):
 }
 `.trim();
 
-    // Keep 3–5 examples. If visuals enabled, include the visual-form example too.
-    return includeVisuals ? [ex1, ex2, ex3, ex4Visual].join("\n\n") : [ex1, ex2, ex3].join("\n\n");
+  // Keep 3–5 examples. If visuals enabled, include the visual-form example too.
+  return includeVisuals ? [ex1, ex2, ex3, ex4Visual].join("\n\n") : [ex1, ex2, ex3].join("\n\n");
 }
 
 export function categoryPrompt(
-    category: string,
-    double: boolean,
-    settings: CategoryPromptSettings
+  category: string,
+  double: boolean,
+  settings: CategoryPromptSettings,
 ) {
-    const values = valuesFor(double);
+  const values = valuesFor(double);
 
-    const rules = `
+  const rules = `
 You are a professional Jeopardy clue writer.
 
 TASK:
@@ -273,19 +273,17 @@ STRICT:
 ${reasoningRules(settings)}
 `.trim();
 
-    const template = settings.includeFillTemplate
-        ? `\n\n${fillTemplateExample(values, settings.includeVisuals)}`
-        : "";
+  const template = settings.includeFillTemplate
+    ? `\n\n${fillTemplateExample(values, settings.includeVisuals)}`
+    : "";
 
-    const examples = settings.includeExamples
-        ? `\n\n${workedExamples(settings.includeVisuals)}`
-        : "";
+  const examples = settings.includeExamples ? `\n\n${workedExamples(settings.includeVisuals)}` : "";
 
-    return `${rules}${template}${examples}`.trim();
+  return `${rules}${template}${examples}`.trim();
 }
 
 export function finalPrompt(category: string) {
-    return `
+  return `
 You are a professional Jeopardy Final Jeopardy writer.
 
 TASK:

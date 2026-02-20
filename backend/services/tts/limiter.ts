@@ -2,89 +2,89 @@
 import type { TtsProviderName } from "./types.js";
 
 type Job<T> = {
-    fn: () => Promise<T>;
-    resolve: (v: T) => void;
-    reject: (err: unknown) => void;
+  fn: () => Promise<T>;
+  resolve: (v: T) => void;
+  reject: (err: unknown) => void;
 };
 
 export type Limiter = {
-    schedule: <T>(fn: () => Promise<T>) => Promise<T>;
+  schedule: <T>(fn: () => Promise<T>) => Promise<T>;
 };
 
 function envNum(name: string, fallback: number): number {
-    const v = Number(process.env[name]);
-    return Number.isFinite(v) ? v : fallback;
+  const v = Number(process.env[name]);
+  return Number.isFinite(v) ? v : fallback;
 }
 
 function makeLimiter(concurrency: number, minDelayMs: number): Limiter {
-    let active = 0;
-    let lastStart = 0;
-    const queue: Array<Job<any>> = [];
+  let active = 0;
+  let lastStart = 0;
+  const queue: Array<Job<any>> = [];
 
-    function drain() {
-        if (active >= concurrency) return;
-        if (queue.length === 0) return;
+  function drain() {
+    if (active >= concurrency) return;
+    if (queue.length === 0) return;
 
-        const now = Date.now();
-        const waitMs = Math.max(0, minDelayMs - (now - lastStart));
+    const now = Date.now();
+    const waitMs = Math.max(0, minDelayMs - (now - lastStart));
 
-        if (waitMs > 0) {
-            setTimeout(drain, waitMs);
-            return;
-        }
-
-        const job = queue.shift()!;
-        active++;
-        lastStart = Date.now();
-
-        (async () => {
-            try {
-                const res = await job.fn();
-                job.resolve(res);
-            } catch (err) {
-                job.reject(err);
-            } finally {
-                active--;
-                drain();
-            }
-        })();
+    if (waitMs > 0) {
+      setTimeout(drain, waitMs);
+      return;
     }
 
-    return {
-        schedule<T>(fn: () => Promise<T>): Promise<T> {
-            return new Promise<T>((resolve, reject) => {
-                queue.push({ fn, resolve, reject });
-                drain();
-            });
-        },
-    };
+    const job = queue.shift()!;
+    active++;
+    lastStart = Date.now();
+
+    (async () => {
+      try {
+        const res = await job.fn();
+        job.resolve(res);
+      } catch (err) {
+        job.reject(err);
+      } finally {
+        active--;
+        drain();
+      }
+    })();
+  }
+
+  return {
+    schedule<T>(fn: () => Promise<T>): Promise<T> {
+      return new Promise<T>((resolve, reject) => {
+        queue.push({ fn, resolve, reject });
+        drain();
+      });
+    },
+  };
 }
 
 const _limiters: Partial<Record<TtsProviderName, Limiter>> = {};
 
 export function getLimiter(provider: TtsProviderName): Limiter {
-    if (_limiters[provider]) return _limiters[provider]!;
+  if (_limiters[provider]) return _limiters[provider]!;
 
-    if (provider === "piper") {
-        _limiters[provider] = makeLimiter(
-            envNum("TTS_PIPER_CONCURRENCY", 5),
-            envNum("TTS_PIPER_MIN_DELAY_MS", 0)
-        );
-        return _limiters[provider]!;
-    }
-
-    if (provider === "kokoro") {
-        _limiters[provider] = makeLimiter(
-            envNum("TTS_KOKORO_CONCURRENCY", 5),
-            envNum("TTS_KOKORO_MIN_DELAY_MS", 0)
-        );
-        return _limiters[provider]!;
-    }
-
-    // openai
+  if (provider === "piper") {
     _limiters[provider] = makeLimiter(
-        envNum("TTS_OPENAI_CONCURRENCY", 10),
-        envNum("TTS_OPENAI_MIN_DELAY_MS", 0)
+      envNum("TTS_PIPER_CONCURRENCY", 5),
+      envNum("TTS_PIPER_MIN_DELAY_MS", 0),
     );
     return _limiters[provider]!;
+  }
+
+  if (provider === "kokoro") {
+    _limiters[provider] = makeLimiter(
+      envNum("TTS_KOKORO_CONCURRENCY", 5),
+      envNum("TTS_KOKORO_MIN_DELAY_MS", 0),
+    );
+    return _limiters[provider]!;
+  }
+
+  // openai
+  _limiters[provider] = makeLimiter(
+    envNum("TTS_OPENAI_CONCURRENCY", 10),
+    envNum("TTS_OPENAI_MIN_DELAY_MS", 0),
+  );
+  return _limiters[provider]!;
 }

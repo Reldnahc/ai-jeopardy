@@ -3,10 +3,10 @@ import * as React from "react";
 import { getIconDef, type ProfileIconName } from "./profileIcons";
 
 type Props = {
-    name: ProfileIconName;
-    className?: string;
-    title?: string;
-    style?: React.CSSProperties;
+  name: ProfileIconName;
+  className?: string;
+  title?: string;
+  style?: React.CSSProperties;
 };
 
 /**
@@ -14,38 +14,44 @@ type Props = {
  * Control color via `className="text-..."` or inline `style={{ color: "#fff" }}` on the parent.
  */
 export default function ProfileIcon({ name, className = "", title, style }: Props) {
-    if (name === "letter") return null;
+  if (name === "letter") return null;
 
-    const OPTICAL_X_PX = 0.6; // try 0.4–0.9 if you want
+  const OPTICAL_X_PX = 0.6; // try 0.4–0.9 if you want
 
-    const common = {
-        xmlns: "http://www.w3.org/2000/svg",
-        viewBox: "0 0 24 24",
-        className,
-        style: {
-            display: "block", // baseline fix
-            transform: `translateX(${OPTICAL_X_PX}px)`,
-            transformOrigin: "center",
-            ...style,
-        } as React.CSSProperties,
-        "aria-hidden": title ? undefined : true,
-        role: title ? "img" : "presentation",
-    } as const;
+  const common = {
+    xmlns: "http://www.w3.org/2000/svg",
+    viewBox: "0 0 24 24",
+    className,
+    style: {
+      display: "block", // baseline fix
+      transform: `translateX(${OPTICAL_X_PX}px)`,
+      transformOrigin: "center",
+      ...style,
+    } as React.CSSProperties,
+    "aria-hidden": title ? undefined : true,
+    role: title ? "img" : "presentation",
+  } as const;
 
+  const def = getIconDef(name);
 
-    const def = getIconDef(name);
-
-    if (def.kind === "stroke") {
-        return (
-            <svg {...common} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <def.Renderer title={title} />
-            </svg>
-        );
-    }
-
+  if (def.kind === "stroke") {
     return (
-        <svg {...common} fill="currentColor">
-            <def.Renderer title={title} />
-        </svg>
+      <svg
+        {...common}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <def.Renderer title={title} />
+      </svg>
     );
+  }
+
+  return (
+    <svg {...common} fill="currentColor">
+      <def.Renderer title={title} />
+    </svg>
+  );
 }

@@ -2,19 +2,19 @@ import type { AnswerType, JudgeStrictness } from "./types.js";
 import { clampLen } from "./normalize.js";
 
 export function buildJudgePrompt(args: {
-    transcriptRaw: string;
-    expectedRaw: string;
-    question: string;
-    normT: string;
-    normA: string;
-    answerType: AnswerType;
-    strictness: JudgeStrictness;
+  transcriptRaw: string;
+  expectedRaw: string;
+  question: string;
+  normT: string;
+  normA: string;
+  answerType: AnswerType;
+  strictness: JudgeStrictness;
 }) {
-    const { transcriptRaw, expectedRaw, question, normT, normA, answerType, strictness } = args;
+  const { transcriptRaw, expectedRaw, question, normT, normA, answerType, strictness } = args;
 
-    const strictnessBlock =
-        strictness === "lenient"
-            ? `
+  const strictnessBlock =
+    strictness === "lenient"
+      ? `
 SCORING INTENT (LENIENT):
 - Prefer accepting reasonable spoken/typed variants.
 - Use the CLUE/QUESTION context to interpret intent and resolve ambiguity.
@@ -22,14 +22,14 @@ SCORING INTENT (LENIENT):
   even if abbreviated, shortened, or slightly imprecise.
 - Only mark incorrect if the response is clearly different, too vague, or plausibly refers to a different answer.
 `.trim()
-            : `
+      : `
 SCORING INTENT (STRICT):
 - Prefer correctness over generosity, but still use CLUE/QUESTION context for interpretation.
 - Accept only if it clearly refers to the same specific answer in the context of this clue.
 - If ambiguity remains after using the clue context, return "incorrect".
 `.trim();
 
-    return `
+  return `
 You are judging a Jeopardy-style player response.
 
 You MUST use the CLUE/QUESTION as context to interpret the player's intent and determine whether a shortened
@@ -89,13 +89,10 @@ Normalized Expected Answer: ${JSON.stringify(normA)}
 `.trim();
 }
 
-export function buildImageJudgePrompt(args: {
-    expectedRaw: string;
-    answerType: AnswerType;
-}) {
-    const { expectedRaw, answerType } = args;
+export function buildImageJudgePrompt(args: { expectedRaw: string; answerType: AnswerType }) {
+  const { expectedRaw, answerType } = args;
 
-    return `
+  return `
 You are judging a Final Jeopardy written response from an IMAGE.
 First, read the player's text from the image. Then judge correctness.
 

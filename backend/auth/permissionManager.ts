@@ -8,72 +8,72 @@ import { PERM_RULES } from "./permissions.js";
 export type PermissionReason = "ok" | "banned" | "forbidden";
 
 export type PermissionDecision = {
-    ok: boolean;
-    reason: PermissionReason;
-    role: Role;
-    perm: Perm;
+  ok: boolean;
+  reason: PermissionReason;
+  role: Role;
+  perm: Perm;
 };
 
 export class PermissionManager {
-    getRole(ws: WsLike): Role {
-        return normalizeRole(ws.auth?.role);
+  getRole(ws: WsLike): Role {
+    return normalizeRole(ws.auth?.role);
+  }
+
+  decide(ws: WsLike, perm: Perm, data?: unknown): PermissionDecision {
+    const role = this.getRole(ws);
+
+    if (isBanned(role)) {
+      return { ok: false, reason: "banned", role, perm };
     }
 
-    decide(ws: WsLike, perm: Perm, data?: unknown): PermissionDecision {
-        const role = this.getRole(ws);
+    const rule = PERM_RULES[perm];
 
-        if (isBanned(role)) {
-            return { ok: false, reason: "banned", role, perm };
-        }
-
-        const rule = PERM_RULES[perm];
-
-        if ("minRole" in rule) {
-            const ok = atLeast(role, rule.minRole);
-            return ok
-                ? { ok: true, reason: "ok", role, perm }
-                : { ok: false, reason: "forbidden", role, perm };
-        }
-
-        const ctx: PermissionContext = { role, ws, data };
-        const ok = rule.custom(ctx);
-
-        return ok
-            ? { ok: true, reason: "ok", role, perm }
-            : { ok: false, reason: "forbidden", role, perm };
+    if ("minRole" in rule) {
+      const ok = atLeast(role, rule.minRole);
+      return ok
+        ? { ok: true, reason: "ok", role, perm }
+        : { ok: false, reason: "forbidden", role, perm };
     }
 
-    can(ws: WsLike, perm: Perm, data?: unknown): boolean {
-        return this.decide(ws, perm, data).ok;
-    }
+    const ctx: PermissionContext = { role, ws, data };
+    const ok = rule.custom(ctx);
 
-    require(ws: WsLike, perm: Perm, data?: unknown): void {
-        const decision = this.decide(ws, perm, data);
-        if (decision.ok) return;
+    return ok
+      ? { ok: true, reason: "ok", role, perm }
+      : { ok: false, reason: "forbidden", role, perm };
+  }
 
-        const err = new Error(
-            decision.reason === "banned"
-                ? `Banned: ${decision.perm}`
-                : `Forbidden: ${decision.perm} (role=${decision.role})`
-        );
+  can(ws: WsLike, perm: Perm, data?: unknown): boolean {
+    return this.decide(ws, perm, data).ok;
+  }
 
-        (err as Error & { code?: "BANNED" | "FORBIDDEN" }).code =
-            decision.reason === "banned" ? "BANNED" : "FORBIDDEN";
+  require(ws: WsLike, perm: Perm, data?: unknown): void {
+    const decision = this.decide(ws, perm, data);
+    if (decision.ok) return;
 
-        throw err;
-    }
+    const err = new Error(
+      decision.reason === "banned"
+        ? `Banned: ${decision.perm}`
+        : `Forbidden: ${decision.perm} (role=${decision.role})`,
+    );
 
-    guard(ws: WsLike, perm: Perm, data?: unknown): boolean {
-        const decision = this.decide(ws, perm, data);
-        if (decision.ok) return true;
+    (err as Error & { code?: "BANNED" | "FORBIDDEN" }).code =
+      decision.reason === "banned" ? "BANNED" : "FORBIDDEN";
 
-        ws.send(
-            JSON.stringify({
-                type: "error",
-                code: decision.reason, // "banned" | "forbidden"
-                perm: decision.perm,
-            })
-        );
-        return false;
-    }
+    throw err;
+  }
+
+  guard(ws: WsLike, perm: Perm, data?: unknown): boolean {
+    const decision = this.decide(ws, perm, data);
+    if (decision.ok) return true;
+
+    ws.send(
+      JSON.stringify({
+        type: "error",
+        code: decision.reason, // "banned" | "forbidden"
+        perm: decision.perm,
+      }),
+    );
+    return false;
+  }
 }

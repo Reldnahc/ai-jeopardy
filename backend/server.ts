@@ -17,19 +17,18 @@ import { registerProfileRoutes } from "./http/profileRoutes.js";
 import { registerBoardRoutes } from "./http/boardRoutes.js";
 import { pool } from "./config/pg.js";
 import { createRepos } from "./repositories/index.js";
-import {appConfig} from "./config/appConfig.js";
-import {registerLeaderboardRoutes} from "./http/leaderboardRoutes.js";
-
+import { appConfig } from "./config/appConfig.js";
+import { registerLeaderboardRoutes } from "./http/leaderboardRoutes.js";
 
 const app = express();
 
 app.use(
-    cors({
-        origin: "http://localhost:5173",
-        credentials: true,
-        methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        allowedHeaders: ["Content-Type", "Authorization"],
-    })
+  cors({
+    origin: "http://localhost:5173",
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  }),
 );
 
 app.use(bodyParser.json());
@@ -54,42 +53,42 @@ registerHttpRoutes(app, distPath, repos);
 
 // --- External Service Config ---
 setGlobalDispatcher(
-    new Agent({
-        keepAliveTimeout: 60_000,
-        keepAliveMaxTimeout: 60_000,
-        connectTimeout: 10_000,
-        headersTimeout: 30_000,
-        bodyTimeout: 30_000,
-    })
+  new Agent({
+    keepAliveTimeout: 60_000,
+    keepAliveMaxTimeout: 60_000,
+    connectTimeout: 10_000,
+    headersTimeout: 30_000,
+    bodyTimeout: 30_000,
+  }),
 );
 
 const PORT = appConfig.server.port;
 
 async function refreshCOTD() {
-    try {
-        const next = await createCategoryOfTheDay();
-        setCOTD(next);
-        return next;
-    } catch (err) {
-        console.error("[COTD] Failed to refresh Category Of The Day:", err);
-        return getCOTD();
-    }
+  try {
+    const next = await createCategoryOfTheDay();
+    setCOTD(next);
+    return next;
+  } catch (err) {
+    console.error("[COTD] Failed to refresh Category Of The Day:", err);
+    return getCOTD();
+  }
 }
 
 async function bootstrap() {
-    await refreshCOTD();
-    attachWebSocketServer(wss, repos);
+  await refreshCOTD();
+  attachWebSocketServer(wss, repos);
 
-    server.listen(PORT, () => {
-        console.log(`HTTP + WS listening on :${PORT}`);
-    });
+  server.listen(PORT, () => {
+    console.log(`HTTP + WS listening on :${PORT}`);
+  });
 
-    setInterval(() => {
-        void refreshCOTD();
-    }, 86_400_000);//1 day
+  setInterval(() => {
+    void refreshCOTD();
+  }, 86_400_000); //1 day
 }
 
 bootstrap().catch((err) => {
-    console.error("Server bootstrap failed:", err);
-    process.exit(1);
+  console.error("Server bootstrap failed:", err);
+  process.exit(1);
 });

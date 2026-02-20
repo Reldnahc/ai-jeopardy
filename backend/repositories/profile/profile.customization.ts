@@ -3,68 +3,68 @@ import type { Pool } from "pg";
 import type { CustomizationPatch, MeProfileRow } from "./profile.types.js";
 
 export function createProfileCustomizationRepo(pool: Pool) {
-    async function updateCustomization(
-        userId: string | null | undefined,
-        patch: CustomizationPatch
-    ): Promise<MeProfileRow | null> {
-        if (!userId) return null;
+  async function updateCustomization(
+    userId: string | null | undefined,
+    patch: CustomizationPatch,
+  ): Promise<MeProfileRow | null> {
+    if (!userId) return null;
 
-        const updates: string[] = [];
-        const values: unknown[] = [];
-        let i = 1;
+    const updates: string[] = [];
+    const values: unknown[] = [];
+    let i = 1;
 
-        // allow null to clear bio/font/icon
-        if ("bio" in patch) {
-            updates.push(`bio = $${i++}`);
-            values.push(patch.bio ?? null);
-        }
+    // allow null to clear bio/font/icon
+    if ("bio" in patch) {
+      updates.push(`bio = $${i++}`);
+      values.push(patch.bio ?? null);
+    }
 
-        if (patch.color !== undefined) {
-            updates.push(`color = $${i++}`);
-            values.push(patch.color);
-        }
-        if (patch.text_color !== undefined) {
-            updates.push(`text_color = $${i++}`);
-            values.push(patch.text_color);
-        }
-        if (patch.name_color !== undefined) {
-            updates.push(`name_color = $${i++}`);
-            values.push(patch.name_color);
-        }
+    if (patch.color !== undefined) {
+      updates.push(`color = $${i++}`);
+      values.push(patch.color);
+    }
+    if (patch.text_color !== undefined) {
+      updates.push(`text_color = $${i++}`);
+      values.push(patch.text_color);
+    }
+    if (patch.name_color !== undefined) {
+      updates.push(`name_color = $${i++}`);
+      values.push(patch.name_color);
+    }
 
-        if (patch.border !== undefined) {
-            updates.push(`border = $${i++}`);
-            values.push(patch.border);
-        }
+    if (patch.border !== undefined) {
+      updates.push(`border = $${i++}`);
+      values.push(patch.border);
+    }
 
-        if (patch.border_color !== undefined) {
-            updates.push(`border_color = $${i++}`);
-            values.push(patch.border_color);
-        }
-        if (patch.background !== undefined) {
-            updates.push(`background = $${i++}`);
-            values.push(patch.background);
-        }
-        if (patch.background_color !== undefined) {
-            updates.push(`background_color = $${i++}`);
-            values.push(patch.background_color);
-        }
+    if (patch.border_color !== undefined) {
+      updates.push(`border_color = $${i++}`);
+      values.push(patch.border_color);
+    }
+    if (patch.background !== undefined) {
+      updates.push(`background = $${i++}`);
+      values.push(patch.background);
+    }
+    if (patch.background_color !== undefined) {
+      updates.push(`background_color = $${i++}`);
+      values.push(patch.background_color);
+    }
 
-        if ("font" in patch) {
-            updates.push(`font = $${i++}`);
-            values.push(patch.font ?? null);
-        }
-        if ("icon" in patch) {
-            updates.push(`icon = $${i++}`);
-            values.push(patch.icon ?? null);
-        }
+    if ("font" in patch) {
+      updates.push(`font = $${i++}`);
+      values.push(patch.font ?? null);
+    }
+    if ("icon" in patch) {
+      updates.push(`icon = $${i++}`);
+      values.push(patch.icon ?? null);
+    }
 
-        if (updates.length === 0) return null;
+    if (updates.length === 0) return null;
 
-        values.push(userId);
+    values.push(userId);
 
-        const { rows } = await pool.query<MeProfileRow>(
-            `
+    const { rows } = await pool.query<MeProfileRow>(
+      `
                 with upd_c as (
                     update public.profile_customization
                         set ${updates.join(", ")}, updated_at = now()
@@ -109,11 +109,11 @@ export function createProfileCustomizationRepo(pool: Pool) {
       where p.id = (select id from upd_p)
       limit 1
       `,
-            values
-        );
+      values,
+    );
 
-        return rows?.[0] ?? null;
-    }
+    return rows?.[0] ?? null;
+  }
 
-    return { updateCustomization };
+  return { updateCustomization };
 }

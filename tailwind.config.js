@@ -1,13 +1,13 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+  content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
   theme: {
     extend: {
       textShadow: {
         jeopardy: "0.04em 0.05em 0 rgba(0,0,0,0.9), 0.1em 0.1em 0 rgba(0,0,0,0.6)",
       },
       fontFamily: {
-        swiss911: ['"swiss911"', 'sans-serif'],
+        swiss911: ['"swiss911"', "sans-serif"],
 
         // Clean
         outfit: ["Outfit", "sans-serif"],
@@ -65,15 +65,15 @@ module.exports = {
 
       keyframes: {
         jump: {
-          '0%, 15%': { transform: 'translateY(0)' },
-          '25%': { transform: 'translateY(-10px)' },
-          '35%': { transform: 'translateY(0)' },
-          '100%': { transform: 'translateY(0)' },
+          "0%, 15%": { transform: "translateY(0)" },
+          "25%": { transform: "translateY(-10px)" },
+          "35%": { transform: "translateY(0)" },
+          "100%": { transform: "translateY(0)" },
         },
       },
       animation: {
         // 2.5s total duration ensures that after the jump, there’s a pause before the wave repeats.
-        jump: 'jump 2s ease-in-out infinite',
+        jump: "jump 2s ease-in-out infinite",
       },
     },
   },

@@ -3,15 +3,15 @@ import type { Pool } from "pg";
 import type { SearchProfileRow } from "./profile.types.js";
 
 export function createProfileSearchRepo(pool: Pool) {
-    async function searchProfiles(q: unknown, limit: number = 5): Promise<SearchProfileRow[]> {
-        const query = String(q ?? "").trim();
-        if (!query || query.length < 2) return [];
+  async function searchProfiles(q: unknown, limit: number = 5): Promise<SearchProfileRow[]> {
+    const query = String(q ?? "").trim();
+    if (!query || query.length < 2) return [];
 
-        const safeLimit = Number.isFinite(Number(limit)) ? Math.min(Math.max(Number(limit), 1), 20) : 5;
-        const like = `%${query}%`;
+    const safeLimit = Number.isFinite(Number(limit)) ? Math.min(Math.max(Number(limit), 1), 20) : 5;
+    const like = `%${query}%`;
 
-        const { rows } = await pool.query<SearchProfileRow>(
-            `
+    const { rows } = await pool.query<SearchProfileRow>(
+      `
         select
           p.username,
           p.displayname,
@@ -34,11 +34,11 @@ export function createProfileSearchRepo(pool: Pool) {
           p.username asc
         limit $3
       `,
-            [like, `${query}%`, safeLimit]
-        );
+      [like, `${query}%`, safeLimit],
+    );
 
-        return rows ?? [];
-    }
+    return rows ?? [];
+  }
 
-    return { searchProfiles };
+  return { searchProfiles };
 }
