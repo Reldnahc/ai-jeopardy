@@ -60,7 +60,7 @@ CREATE TABLE IF NOT EXISTS public.profile_customization (
 
                                                             bio text,
                                                             color text NOT NULL DEFAULT '#3b82f6',
-                                                            text_color text NOT NULL DEFAULT '#ffffff',
+                                                            text_color text NOT NULL DEFAULT '#f2f2f2',
                                                             name_color text NOT NULL DEFAULT '#3b82f6',
                                                             border text NOT NULL DEFAULT 'none',
                                                             border_color text NOT NULL DEFAULT '#000000',
