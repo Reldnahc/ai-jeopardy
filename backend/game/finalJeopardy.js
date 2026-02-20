@@ -106,33 +106,41 @@ async function finishGame(game, gameId, drawings, ctx) {
     ctx.broadcast(gameId, { type: "all-drawings-submitted", drawings });
     const pad = 25;
 
-    const wagers = game.wagers;
-    const verdicts = game.finalVerdicts;
-    const scores = game.scores;
+    const wagers = game.wagers || {};
+    const verdicts = game.finalVerdicts || {};
+    const scores = game.scores || {};
 
-    for (const player of game.players) {
+    // Only finalists participate in Final Jeopardy scoring + reveals
+    const finalists = getFinalistUsernames(game);
+    const finalistSet = new Set(finalists);
+
+    // Apply Final Jeopardy score changes (finalists only)
+    for (const player of game.players || []) {
         const username = player.username;
+        if (!finalistSet.has(username)) continue;
 
         const score = Number(scores[username] ?? 0);
         const wager = Number(wagers[username] ?? 0);
 
         if (verdicts[username] === "correct") {
             scores[username] = score + wager;
-            ctx.fireAndForget(ctx.repos.profiles.incrementFinalJeopardyCorrects(username),"Increment FJ correct");
+            ctx.fireAndForget(
+                ctx.repos.profiles.incrementFinalJeopardyCorrects(username),
+                "Increment FJ correct"
+            );
         } else {
             scores[username] = score - wager;
         }
-
     }
 
-    const top = Object.entries(scores)
-        .map(([username, score]) => {
-            const player = game.players.find(p => p.username === username);
-
+    // Rank top 3 among finalists only (can be < 3 if fewer finalists)
+    const top = finalists
+        .map((username) => {
+            const player = (game.players || []).find((p) => p.username === username);
             return {
                 username,
                 displayname: player?.displayname ?? username,
-                score: Number(score)
+                score: Number(scores[username] ?? 0),
             };
         })
         .sort((a, b) => b.score - a.score)
@@ -140,42 +148,42 @@ async function finishGame(game, gameId, drawings, ctx) {
 
     console.log(top);
 
-    let alive = await ctx.aiHostVoiceSequence(ctx, gameId, game, [{ slot: "final_jeopardy_finale", pad }]);
+    let alive = await ctx.aiHostVoiceSequence(ctx, gameId, game, [
+        { slot: "final_jeopardy_finale", pad },
+    ]);
     if (!alive) return;
 
+    // Reveal in reverse order (3rd -> 2nd -> 1st), and ALWAYS reveal even if <= 0
     for (let i = top.length - 1; i >= 0; i--) {
         const username = top[i].username;
         const displayname = top[i].displayname;
 
-        console.log(scores);
-        if (!scores[username] || scores[username] <= 0) continue;
-
         const maybeRevealAnswer = () => {
-            if (verdicts[username] === "correct" && !game.selectedClue.isAnswerRevealed) {
+            if (verdicts[username] === "correct" && !game.selectedClue?.isAnswerRevealed) {
                 game.selectedClue.isAnswerRevealed = true;
                 ctx.broadcast(gameId, { type: "answer-revealed", clue: game.selectedClue });
             }
         };
 
         const updateScore = async () => {
-            ctx.broadcast(gameId, { type: "update-score", username: username, score: top[i].score });
+            ctx.broadcast(gameId, { type: "update-score", username, score: top[i].score });
         };
 
         const revealWager = async () => {
-            ctx.broadcast(gameId, { type: "reveal-finalist-wager"});
+            ctx.broadcast(gameId, { type: "reveal-finalist-wager" });
         };
 
         ctx.broadcast(gameId, { type: "display-finalist", finalist: username });
 
-        const wager = Number(game.wagers[username] ?? 0);
+        const wager = Number(wagers[username] ?? 0);
         const sizeSuffix = wager > 5000 ? "lg" : "sm";
-        const followupSlot = verdicts[username] + "_followup_" + sizeSuffix;
+        const followupSlot = (verdicts[username] || "incorrect") + "_followup_" + sizeSuffix;
 
         alive = await ctx.aiHostVoiceSequence(ctx, gameId, game, [
             { slot: "final_jeopardy_finale2", pad },
             { slot: displayname, pad },
             { slot: "fja" + displayname, pad, after: maybeRevealAnswer },
-            { slot: verdicts[username], pad },
+            { slot: verdicts[username] || "incorrect", pad },
             { slot: "their_wager_was", pad, after: revealWager },
             { slot: "fjw" + displayname, pad, after: updateScore },
             { slot: followupSlot, pad },
@@ -183,13 +191,18 @@ async function finishGame(game, gameId, drawings, ctx) {
         if (!alive) return;
     }
 
-    if (!game.selectedClue.isAnswerRevealed) {
-        alive = await ctx.aiHostVoiceSequence(ctx, gameId, game, [{ slot: "nobody_final_jeopardy", pad }]);
+    // If nobody was correct, we may not have revealed the answer yet
+    if (!game.selectedClue?.isAnswerRevealed) {
+        alive = await ctx.aiHostVoiceSequence(ctx, gameId, game, [
+            { slot: "nobody_final_jeopardy", pad },
+        ]);
         if (!alive) return;
+
         game.selectedClue.isAnswerRevealed = true;
         ctx.broadcast(gameId, { type: "answer-revealed", clue: game.selectedClue });
     }
 
+    // Announce winner if exists (even if <= 0; up to you, but consistent)
     if (top[0]) {
         alive = await ctx.aiHostVoiceSequence(ctx, gameId, game, [
             { slot: "final_jeopardy_end", pad },
@@ -199,7 +212,8 @@ async function finishGame(game, gameId, drawings, ctx) {
         if (!alive) return;
     }
 
-    const finalScores = Object.fromEntries(game.players.map((p) => [p.username, 0]));
+    // Build final podium payouts
+    const finalScores = Object.fromEntries((game.players || []).map((p) => [p.username, 0]));
 
     if (top[0]) finalScores[top[0].username] = top[0].score > 3000 ? top[0].score : 3000;
     if (top[1]) finalScores[top[1].username] = 3000;
@@ -207,8 +221,9 @@ async function finishGame(game, gameId, drawings, ctx) {
 
     game.scores = finalScores;
 
+    // Collect usernames for DB ops (players + top)
     const usernames = new Set();
-    for (const p of game.players) usernames.add(ctx.normalizeName(p.username));
+    for (const p of game.players || []) usernames.add(ctx.normalizeName(p.username));
     for (const p of top.slice(0, 3)) if (p) usernames.add(ctx.normalizeName(p.username));
 
     const idByUsername = new Map();
@@ -219,32 +234,28 @@ async function finishGame(game, gameId, drawings, ctx) {
         })
     );
 
+    // Winner stats + money
     if (top[0]) {
-        const id = idByUsername.get(ctx.normalizeName(top[0].username));
-        if (id) {
-            ctx.fireAndForget(ctx.repos.profiles.incrementGamesWon(id), "incrementGamesWon");
-            ctx.fireAndForget(ctx.repos.profiles.addMoneyWon(id, top[0].score), "addMoneyWon:winner");
-        }
+        const username = ctx.normalizeName(top[0].username);
+        ctx.fireAndForget(ctx.repos.profiles.incrementGamesWon(username), "incrementGamesWon");
+        ctx.fireAndForget(ctx.repos.profiles.addMoneyWon(username, top[0].score), "addMoneyWon:winner");
     }
 
+    // 2nd/3rd money
     if (top[1]) {
-        const id = idByUsername.get(ctx.normalizeName(top[1].username));
-        if (id) {
-            ctx.fireAndForget(ctx.repos.profiles.addMoneyWon(id, 3000), "addMoneyWon:second");
-        }
+        const username = ctx.normalizeName(top[1].username);
+        ctx.fireAndForget(ctx.repos.profiles.addMoneyWon(username, 3000), "addMoneyWon:second");
     }
 
     if (top[2]) {
-        const id = idByUsername.get(ctx.normalizeName(top[2].username));
-        if (id) {
-            ctx.fireAndForget(ctx.repos.profiles.addMoneyWon(id, 2000), "addMoneyWon:third");
-        }
+        const username = ctx.normalizeName(top[2].username);
+        ctx.fireAndForget(ctx.repos.profiles.addMoneyWon(username, 2000), "addMoneyWon:third");
     }
 
-    for (const p of game.players) {
-        const id = idByUsername.get(ctx.normalizeName(p.username));
-        if (!id) continue;
-        ctx.fireAndForget(ctx.repos.profiles.incrementGamesFinished(id), "incrementGamesFinished");
+    // Everyone who was in the game finished a game
+    for (const p of game.players || []) {
+        const username = ctx.normalizeName(p.username);
+        ctx.fireAndForget(ctx.repos.profiles.incrementGamesFinished(username), "incrementGamesFinished");
     }
 
     ctx.broadcast(gameId, { type: "update-scores", scores: game.scores });
