@@ -11,6 +11,7 @@ export const PERMS = [
     "profiles:set-admin",
     "profiles:set-head-admin",
     "profiles:ban",
+    "models:use-any",
     "admin:panel",
 ] as const;
 
@@ -39,6 +40,9 @@ export const PERM_RULES: Record<Perm, PermissionRule> = {
     "profiles:set-head-admin": { minRole: "creator" },
 
     "profiles:ban": { minRole: "moderator" },
+
+    "models:use-any": { minRole: "privileged" },
+
 
     "admin:panel": { minRole: "admin" },
 };
