@@ -21,11 +21,7 @@ function getCachedTtsMeta(assetId: string): TtsMetaCacheEntry | null {
 }
 
 function setCachedTtsMeta(assetId: string, storageKey: string, contentType: string) {
-  ttsMetaCache.set(assetId, {
-    storageKey,
-    contentType,
-    expiresAt: Date.now() + TTS_CACHE_TTL_MS,
-  });
+  ttsMetaCache.set(assetId, { storageKey, contentType, expiresAt: Date.now() + TTS_CACHE_TTL_MS });
 }
 
 function isConnectTimeoutError(err: unknown): boolean {
