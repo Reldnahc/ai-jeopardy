@@ -18,12 +18,12 @@ function getFinalistUsernames(game) {
 }
 
 async function advanceToDrawingPhase(game, gameId, wagers, ctx) {
-    // ✅ stop wager timer once complete
+    //  stop wager timer once complete
     ctx.clearGameTimer(game, gameId, ctx);
 
     game.finalJeopardyStage = "drawing";
 
-    // ✅ include finalists so clients can hide drawing UI for non-finalists
+    // include finalists so clients can hide drawing UI for non-finalists
     const finalists = getFinalistUsernames(game);
     ctx.broadcast(gameId, {type: "all-wagers-submitted", wagers, finalists});
 
@@ -56,7 +56,7 @@ async function advanceToDrawingPhase(game, gameId, wagers, ctx) {
             type: "clue-selected",
             clue: game.selectedClue,
             clearedClues: Array.from(game.clearedClues || []),
-            // ✅ include finalists here too (some clients show drawing UI on clue-selected)
+            // include finalists here too (some clients show drawing UI on clue-selected)
             finalists: getFinalistUsernames(game),
         });
     };
@@ -263,7 +263,6 @@ async function finishGame(game, gameId, drawings, ctx) {
 }
 
 export async function submitDrawing(game, gameId, player, drawing, ctx) {
-    // ✅ Ignore drawings from non-finalists (score <= 0, offline, etc.)
     const expected = getFinalistUsernames(game);
     if (!expected.includes(player)) return;
 
@@ -289,7 +288,6 @@ export async function submitDrawing(game, gameId, player, drawing, ctx) {
 }
 
 export function submitWager(game, gameId, player, wager, ctx) {
-    // ✅ Ignore wagers from non-finalists
     const expected = getFinalistUsernames(game);
     if (!expected.includes(player)) return;
 
