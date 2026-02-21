@@ -6,6 +6,7 @@ import MutedIcon from "../../icons/MutedIcon.tsx";
 import LoudIcon from "../../icons/LoudIcon.tsx";
 import { getProfilePresentation } from "../../utils/profilePresentation";
 import GamePlayerRow from "./GamePlayerRow.tsx";
+import { atLeast } from "../../../shared/roles.ts";
 
 interface SidebarProps {
   players: Player[];
@@ -135,7 +136,6 @@ const Sidebar: React.FC<SidebarProps> = ({
   onChangeAudioVolume,
   onToggleDailyDoubleSnipe,
 }) => {
-  // ✅ Same pattern as LobbySidebar:
   const { profile: me, getProfileByUsername, fetchPublicProfiles } = useProfile();
   const [ddSnipeEnabled, setDdSnipeEnabled] = useState(false);
 
@@ -186,7 +186,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                   score={score}
                   buzzResult={buzzResult}
                   selectorName={selectorName}
-                  isAdmin={Boolean(me && me.role === "admin")}
+                  showScoreButtons={Boolean(me && atLeast(me.role, "admin"))}
                   lastQuestionValue={lastQuestionValue}
                   handleScoreUpdate={handleScoreUpdate}
                   RollerMoney={RollerMoney}
@@ -199,7 +199,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Fixed Bottom Section */}
       <div className="absolute bottom-0 left-0 right-0 w-full md:w-64 lg:w-96 flex flex-col items-center gap-5 z-[100]">
-        {me && me.role === "admin" && activeBoard !== "finalJeopardy" && (
+        {me && atLeast(me.role, "admin") && activeBoard !== "finalJeopardy" && (
           <>
             <button
               onClick={() => {

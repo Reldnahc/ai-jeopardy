@@ -11,6 +11,7 @@ import React, {
 } from "react";
 import { useAuth } from "./AuthContext";
 import { ProfileIconName } from "../components/common/profileIcons.tsx";
+import { LadderRole } from "../../shared/roles.ts";
 
 export interface ProfileStats {
   boards_generated?: number | null;
@@ -55,7 +56,7 @@ export interface Profile extends ProfileCustomization, ProfileStats {
   displayname: string;
 
   email?: string | null;
-  role?: string | null;
+  role: LadderRole;
   tokens?: number | null;
 
   created_at?: string;

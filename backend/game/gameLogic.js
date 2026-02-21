@@ -129,9 +129,9 @@ function returnToBoard(game, gameId, ctx, transitioned = false) {
 function finishClueAndReturnToBoard(ctx, gameId, game) {
   if (!game) return;
 
-  // Mark cleared if we have a clue
   if (game.selectedClue) {
     if (!game.clearedClues) game.clearedClues = new Set();
+
     const clueId = `${game.selectedClue.value}-${game.selectedClue.question}`;
     game.clearedClues.add(clueId);
 
@@ -139,9 +139,11 @@ function finishClueAndReturnToBoard(ctx, gameId, game) {
     ctx.broadcast(gameId, { type: "daily-double-hide-modal" });
 
     const transitioned = ctx.checkBoardTransition(game, gameId, ctx);
+    returnToBoard(game, gameId, ctx, transitioned);
+    return;
   }
 
-  returnToBoard(game, gameId, ctx, transitioned);
+  returnToBoard(game, gameId, ctx);
 }
 
 export function parseClueValue(val) {

@@ -16,7 +16,7 @@ interface Props {
   selectorName: string | null;
 
   // admin controls
-  isAdmin: boolean;
+  showScoreButtons: boolean;
   lastQuestionValue: number;
   handleScoreUpdate: (player: string, delta: number) => void;
 
@@ -59,7 +59,7 @@ export default function GamePlayerRow({
   score,
   buzzResult,
   selectorName,
-  isAdmin,
+  showScoreButtons,
   lastQuestionValue,
   handleScoreUpdate,
   RollerMoney,
@@ -135,7 +135,7 @@ export default function GamePlayerRow({
       </div>
 
       {/* Admin controls */}
-      {isAdmin && (
+      {showScoreButtons && (
         <div className="flex flex-col gap-2 ml-3 pr-2 shrink-0">
           <button
             onClick={() => handleScoreUpdate(username, lastQuestionValue)}
