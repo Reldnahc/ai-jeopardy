@@ -13,17 +13,20 @@ export function isBoardFullyCleared(game, boardKey) {
 
 export function checkBoardTransition(game, gameId, ctx) {
   if (game.activeBoard === "firstBoard") {
-    if (!ctx.isBoardFullyCleared(game, "firstBoard")) return;
+    if (!ctx.isBoardFullyCleared(game, "firstBoard")) return false;
 
     void startDoubleJeopardy(game, gameId, ctx);
-    return;
+    return true;
   }
 
   if (game.activeBoard === "secondBoard") {
-    if (!ctx.isBoardFullyCleared(game, "secondBoard")) return;
+    if (!ctx.isBoardFullyCleared(game, "secondBoard")) return false;
 
-    startFinalJeopardy(game, gameId, ctx);
+    void startFinalJeopardy(game, gameId, ctx);
+    return true;
   }
+
+  return false;
 }
 
 async function startDoubleJeopardy(game, gameId, ctx) {

@@ -85,7 +85,7 @@ function unlockBoardSelection(ctx, gameId, game, lockVersion) {
   });
 }
 
-function returnToBoard(game, gameId, ctx) {
+function returnToBoard(game, gameId, ctx, transitioned = false) {
   // Reset clue state
   game.selectedClue = null;
   game.buzzed = null;
@@ -112,14 +112,18 @@ function returnToBoard(game, gameId, ctx) {
     boardSelectionLocked: game.boardSelectionLocked,
   });
 
-  (async () => {
+  const announceSelector = async () => {
     const pad = 25;
 
     await ctx.aiHostVoiceSequence(ctx, gameId, game, [
       { slot: selectorName, pad },
       { slot: "your_up", pad, after: () => unlockBoardSelection(ctx, gameId, game, lockVersion) },
     ]);
-  })();
+  };
+
+  if (!transitioned) {
+    ctx.fireAndForget(announceSelector(), "announcing selector");
+  }
 }
 
 function finishClueAndReturnToBoard(ctx, gameId, game) {
@@ -134,10 +138,10 @@ function finishClueAndReturnToBoard(ctx, gameId, game) {
     ctx.broadcast(gameId, { type: "clue-cleared", clueId });
     ctx.broadcast(gameId, { type: "daily-double-hide-modal" });
 
-    ctx.checkBoardTransition(game, gameId, ctx);
+    const transitioned = ctx.checkBoardTransition(game, gameId, ctx);
   }
 
-  returnToBoard(game, gameId, ctx);
+  returnToBoard(game, gameId, ctx, transitioned);
 }
 
 export function parseClueValue(val) {
