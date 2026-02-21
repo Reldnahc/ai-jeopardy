@@ -41,7 +41,7 @@ export default function ProfileHeader({
             {pres.displayName}
           </h1>
 
-          <h3 className="text-black -mt-2 text-sm">
+          <h3 className="text-black -mt-1 text-sm">
             @{pres.username}
             {roleInfo && (
               <>
