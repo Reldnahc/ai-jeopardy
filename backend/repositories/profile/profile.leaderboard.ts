@@ -37,6 +37,7 @@ export function createProfileLeaderboardRepo(pool: Pool) {
         select
           p.username,
           p.displayname,
+          p.role,
           coalesce(s.${safeStat}, 0)::float8 as value,
 
           coalesce(c.color, '#3b82f6') as color,

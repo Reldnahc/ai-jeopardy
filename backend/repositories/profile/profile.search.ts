@@ -17,6 +17,7 @@ export function createProfileSearchRepo(pool: Pool) {
           p.displayname,
 
           c.color,
+          c.icon,
           c.text_color,
           c.name_color,
           c.border,

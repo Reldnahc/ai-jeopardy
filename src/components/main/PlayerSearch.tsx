@@ -1,38 +1,49 @@
 import React, { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Avatar from "../common/Avatar";
+import { fetchJson, getApiBase } from "../../utils/utils.ts";
+import { getProfilePresentation } from "../../utils/profilePresentation.ts";
+import type { Profile } from "../../contexts/ProfileContext";
+import type { ProfileIconName } from "../common/profileIcons.tsx";
 
 type ProfileSearchRow = {
   username: string;
   displayname: string;
   color: string | null;
   text_color: string | null;
+
+  name_color?: string | null;
+  border?: string | null;
+  font?: string | null;
+  icon?: ProfileIconName | null;
 };
 
-function getApiBase() {
-  // In dev, allow explicit override
-  if (import.meta.env.DEV) {
-    return import.meta.env.VITE_API_BASE || "http://localhost:3002";
-  }
+function toSearchProfile(u: ProfileSearchRow): Profile {
+  const username = String(u.username ?? "")
+    .trim()
+    .toLowerCase();
+  const displayname = String(u.displayname ?? username).trim();
 
-  // In prod, use same-origin
-  return "";
-}
+  return {
+    id: `search:${username}`, // synthetic but stable
+    username,
+    displayname,
 
-async function fetchJson<T>(url: string): Promise<T> {
-  const res = await fetch(url);
-  const text = await res.text();
-  let payload: any = null;
-  try {
-    payload = text ? JSON.parse(text) : null;
-  } catch {}
+    // cosmetics (fallbacks)
+    color: u.color ?? "#3b82f6",
+    text_color: u.text_color ?? "#ffffff",
+    name_color: u.name_color ?? "#111827",
+    border: u.border ?? "",
+    font: u.font ?? null,
+    icon: (u.icon as ProfileIconName) ?? null,
 
-  if (!res.ok) {
-    const msg = payload?.error || text || `HTTP ${res.status}`;
-    throw new Error(msg);
-  }
-
-  return payload as T;
+    // optional Profile fields
+    role: "default",
+    email: null,
+    tokens: null,
+    created_at: undefined,
+    updated_at: undefined,
+  };
 }
 
 const PlayerSearch: React.FC = () => {
@@ -55,14 +66,7 @@ const PlayerSearch: React.FC = () => {
 
     const t = next.trim();
 
-    if (!t) {
-      setMatchingUsers([]);
-      setIsDropdownVisible(false);
-      setLoading(false);
-      return;
-    }
-
-    if (t.length < 2) {
+    if (!t || t.length < 2) {
       setMatchingUsers([]);
       setIsDropdownVisible(false);
       setLoading(false);
@@ -95,7 +99,7 @@ const PlayerSearch: React.FC = () => {
 
   const handleUserSelect = (username: string) => {
     setIsDropdownVisible(false);
-    navigate(`/profile/${username}`);
+    navigate(`/profile/${encodeURIComponent(username)}`);
   };
 
   return (
@@ -130,7 +134,6 @@ const PlayerSearch: React.FC = () => {
         ) : loading ? (
           <>Searching…</>
         ) : (
-          // keep height, show nothing
           <span className="opacity-0">placeholder</span>
         )}
       </div>
@@ -138,21 +141,43 @@ const PlayerSearch: React.FC = () => {
       {isDropdownVisible && matchingUsers.length > 0 && (
         <ul
           className="absolute left-0 right-0 bg-white border border-gray-300 rounded shadow-lg z-10"
-          style={{ top: "calc(100% - 1rem)" }} // subtract the helper line height (min-h-[1rem])
+          style={{ top: "calc(100% - 1rem)" }} // subtract helper line height
         >
-          {matchingUsers.map((user) => (
-            <li
-              key={user.username}
-              className="p-3 hover:bg-blue-100 cursor-pointer text-black flex items-center space-x-3"
-              style={{ minHeight: "3rem" }}
-              onMouseDown={(ev) => ev.preventDefault()}
-              onClick={() => handleUserSelect(user.username)}
-            >
-              <Avatar size={"8"} displayname={user.displayname} username={user.username} />
-              <span className="whitespace-nowrap">{user.displayname}</span>
-              <span className="ml-auto text-xs text-gray-500">@{user.username}</span>
-            </li>
-          ))}
+          {matchingUsers.map((user) => {
+            const pres = getProfilePresentation({
+              profile: toSearchProfile(user),
+              fallbackName: user.displayname || user.username,
+              defaultNameColor: "#111827",
+            });
+
+            return (
+              <li
+                key={user.username}
+                className="p-3 hover:bg-blue-100 cursor-pointer text-black flex items-center space-x-3"
+                style={{ minHeight: "3rem" }}
+                onMouseDown={(ev) => ev.preventDefault()}
+                onClick={() => handleUserSelect(user.username)}
+              >
+                <div className="w-8 h-8 flex-shrink-0">
+                  <Avatar
+                    name={pres.avatar.nameForLetter}
+                    color={pres.avatar.bgColor}
+                    textColor={pres.avatar.fgColor}
+                    icon={pres.avatar.icon}
+                    size="9"
+                  />
+                </div>
+
+                <span className="min-w-0 truncate">
+                  <span className={pres.nameClassName} style={pres.nameStyle ?? undefined}>
+                    {user.displayname}
+                  </span>
+                </span>
+
+                <span className="ml-auto text-xs text-gray-500">@{user.username}</span>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

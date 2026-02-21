@@ -4,49 +4,9 @@ import { Link } from "react-router-dom";
 import Avatar from "../components/common/Avatar";
 import { getProfilePresentation } from "../utils/profilePresentation";
 import type { Profile } from "../contexts/ProfileContext";
-
-function getApiBase() {
-  if (import.meta.env.DEV) {
-    return import.meta.env.VITE_API_BASE || "http://localhost:3002";
-  }
-  return "";
-}
-
-function safeJsonParse(text: string): unknown {
-  if (!text) return null;
-  try {
-    return JSON.parse(text) as unknown;
-  } catch {
-    return null;
-  }
-}
-
-function getErrorMessage(payload: unknown, fallback: string) {
-  if (payload && typeof payload === "object" && "error" in payload) {
-    const e = (payload as Record<string, unknown>).error;
-    if (typeof e === "string" && e.trim()) return e;
-  }
-  return fallback;
-}
-
-export async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, init);
-  const text = await res.text();
-
-  const payload = safeJsonParse(text);
-
-  if (!res.ok) {
-    const fallback = text?.trim() || `HTTP ${res.status}`;
-    throw new Error(getErrorMessage(payload, fallback));
-  }
-
-  // If the server returns empty body on 204 etc
-  if (payload === null) {
-    return null as unknown as T;
-  }
-
-  return payload as T;
-}
+import { LeaderboardRow } from "../../backend/repositories/profile/profile.types.ts";
+import { ProfileIconName } from "../components/common/profileIcons.tsx";
+import { getApiBase, fetchJson } from "../utils/utils.ts";
 
 type StatKey =
   | "money_won"
@@ -60,22 +20,6 @@ type StatKey =
   | "daily_double_correct"
   | "clues_selected";
 
-type LeaderboardRow = {
-  username: string;
-  displayname: string;
-
-  // Value for selected stat
-  value: number;
-
-  // cosmetics (optional)
-  color?: string;
-  text_color?: string;
-  name_color?: string;
-  border?: string;
-  font?: string | null;
-  icon?: Profile["icon"] | null;
-};
-
 const STAT_OPTIONS: Array<{
   key: StatKey;
   label: string;
@@ -84,7 +28,6 @@ const STAT_OPTIONS: Array<{
   { key: "money_won", label: "Money Won", format: (n) => `$${Math.trunc(n).toLocaleString()}` },
   { key: "games_won", label: "Games Won", format: (n) => Math.trunc(n).toLocaleString() },
   { key: "games_finished", label: "Games Finished", format: (n) => Math.trunc(n).toLocaleString() },
-
   {
     key: "correct_answers",
     label: "Correct Answers",
@@ -118,28 +61,24 @@ const STAT_OPTIONS: Array<{
 ];
 
 function toLeaderboardProfile(r: LeaderboardRow): Profile {
-  // getProfilePresentation needs a full Profile (requires `id`)
-  // Leaderboard rows don't have IDs, so use a stable synthetic one.
   const u = String(r.username ?? "")
     .trim()
     .toLowerCase();
   const display = String(r.displayname ?? u).trim();
 
   return {
-    id: `leaderboard:${u}`, // synthetic but stable
+    id: `leaderboard:${u}`,
     username: u,
     displayname: display,
 
-    // cosmetics
     color: r.color ?? "#3b82f6",
     text_color: r.text_color ?? "#ffffff",
     name_color: r.name_color ?? "#111827",
     border: r.border ?? "",
     font: r.font ?? null,
-    icon: r.icon ?? null,
+    icon: (r.icon as ProfileIconName) ?? null,
 
-    // optional fields on Profile (safe to omit, but we can be explicit)
-    role: null,
+    role: r.role,
     email: null,
     tokens: null,
 
@@ -161,18 +100,43 @@ const Leaderboard: React.FC = () => {
 
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
+  // --- race-proof refs ------------------------------------------------
+  const requestGenRef = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
+
+  const loadingRef = useRef(false);
+  const hasMoreRef = useRef(true);
+  const rowsLenRef = useRef(0);
+
+  useEffect(() => {
+    loadingRef.current = loading;
+  }, [loading]);
+
+  useEffect(() => {
+    hasMoreRef.current = hasMore;
+  }, [hasMore]);
+
+  useEffect(() => {
+    rowsLenRef.current = rows.length;
+  }, [rows.length]);
+
   const selectedStat = useMemo(() => {
     return STAT_OPTIONS.find((s) => s.key === stat) ?? STAT_OPTIONS[0];
   }, [stat]);
 
-  const fetchRows = async (offset: number, limit: number) => {
-    // hard stop at 100
-    if (rows.length >= MAX_ROWS) {
+  const fetchRows = async (offset: number, limit: number, signal?: AbortSignal) => {
+    const genAtCall = requestGenRef.current;
+
+    // hard stop
+    if (rowsLenRef.current >= MAX_ROWS) {
       setHasMore(false);
       return;
     }
 
-    if (loading || !hasMore) return;
+    // Important: use refs (not closure state) so we don't "every other time" skip
+    if (loadingRef.current || !hasMoreRef.current) return;
+
+    loadingRef.current = true;
     setLoading(true);
     setError(null);
 
@@ -185,9 +149,13 @@ const Leaderboard: React.FC = () => {
 
       const data = await fetchJson<{ rows: LeaderboardRow[] }>(
         `${api}/api/leaderboard?${params.toString()}`,
+        { signal },
       );
 
-      const incoming = (data.rows ?? []).map((r) => ({
+      // If stat changed mid-flight, ignore results
+      if (requestGenRef.current !== genAtCall) return;
+
+      const incoming = (data?.rows ?? []).map((r) => ({
         ...r,
         value: Number(r.value ?? 0),
         username: String(r.username ?? "")
@@ -201,30 +169,57 @@ const Leaderboard: React.FC = () => {
         return merged.slice(0, MAX_ROWS);
       });
 
-      // stop when backend ends OR when we hit 100
       if (incoming.length < limit || offset + incoming.length >= MAX_ROWS) {
         setHasMore(false);
       }
     } catch (e: unknown) {
+      // Abort isn't a "real" error; don't poison hasMore
+      if (e instanceof DOMException && e.name === "AbortError") return;
+      if (e instanceof Error && e.message.toLowerCase().includes("aborted")) return;
+
+      if (requestGenRef.current !== genAtCall) return;
+
       setError(e instanceof Error ? e.message : String(e));
       setHasMore(false);
     } finally {
-      setLoading(false);
+      if (requestGenRef.current === genAtCall) {
+        loadingRef.current = false;
+        setLoading(false);
+      }
     }
   };
 
+  // Stat change: abort previous, reset, then load first page
   useEffect(() => {
+    requestGenRef.current += 1;
+
+    abortRef.current?.abort();
+    const ac = new AbortController();
+    abortRef.current = ac;
+
+    // reset refs immediately to avoid "blocked by old loading"
+    rowsLenRef.current = 0;
+    hasMoreRef.current = true;
+    loadingRef.current = false;
+
     setRows([]);
     setHasMore(true);
     setError(null);
-  }, [stat]);
+    setLoading(false);
 
-  useEffect(() => {
-    void fetchRows(0, Math.min(PAGE_SIZE, MAX_ROWS));
+    void fetchRows(0, Math.min(PAGE_SIZE, MAX_ROWS), ac.signal);
+
+    return () => {
+      ac.abort();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stat]);
 
+  // Infinite load: do NOT attach until we have at least 1 row,
+  // otherwise we can request offset=0 twice in some layouts.
   useEffect(() => {
+    if (rows.length === 0) return;
+
     const el = loadMoreRef.current;
     if (!el) return;
 
@@ -232,15 +227,16 @@ const Leaderboard: React.FC = () => {
       (entries) => {
         const first = entries[0];
         if (!first?.isIntersecting) return;
-        if (!hasMore || loading) return;
+        if (!hasMoreRef.current || loadingRef.current) return;
 
-        const remaining = MAX_ROWS - rows.length;
+        const remaining = MAX_ROWS - rowsLenRef.current;
         if (remaining <= 0) {
           setHasMore(false);
           return;
         }
 
-        void fetchRows(rows.length, Math.min(PAGE_SIZE, remaining));
+        const ac = abortRef.current;
+        void fetchRows(rowsLenRef.current, Math.min(PAGE_SIZE, remaining), ac?.signal);
       },
       { threshold: 1.0 },
     );
@@ -248,10 +244,11 @@ const Leaderboard: React.FC = () => {
     observer.observe(el);
     return () => observer.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows.length, loading, hasMore]);
+  }, [rows.length]);
 
-  // no search/filtering anymore
   const visible = rows;
+
+  if (error) console.error(error);
 
   return (
     <div className="min-h-screen bg-gradient-to-r from-indigo-400 to-blue-700 flex flex-col items-center p-6">
@@ -278,14 +275,6 @@ const Leaderboard: React.FC = () => {
               </button>
             ))}
           </div>
-
-          {error && (
-            <div className="mb-6 text-center">
-              <div className="inline-block bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg">
-                {error}
-              </div>
-            </div>
-          )}
 
           <div className="hidden md:block">
             <div className="overflow-x-auto rounded-lg border border-gray-200">

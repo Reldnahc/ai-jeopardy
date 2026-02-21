@@ -1,4 +1,5 @@
 // backend/repositories/profile/profile.types.ts
+import { Role } from "../../../shared/roles.js";
 
 export type LeaderboardStatKey =
   | "money_won"
@@ -16,6 +17,7 @@ export interface LeaderboardRow {
   username: string;
   displayname: string;
   value: number;
+  role: Role;
 
   color: string;
   text_color: string;
@@ -126,7 +128,7 @@ export interface PublicProfileRow {
 export interface SearchProfileRow {
   username: string;
   displayname: string;
-
+  icon: string;
   color: string;
   text_color: string;
   name_color: string;
