@@ -1,4 +1,4 @@
-// frontend/pages/Profile.tsx
+// src/pages/Profile.tsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Board } from "../types/Board";
@@ -138,7 +138,7 @@ const Profile: React.FC = () => {
   const [promoteOpen, setPromoteOpen] = useState(false);
   const [banOpen, setBanOpen] = useState(false);
 
-  const [promoteDraft, setPromoteDraft] = useState<LadderRole | "banned" | "">("");
+  const [promoteDraft, setPromoteDraft] = useState<LadderRole | "">("");
   const [banCheck, setBanCheck] = useState(false);
 
   // Viewing "my" profile if the route profile id matches the logged-in user id
