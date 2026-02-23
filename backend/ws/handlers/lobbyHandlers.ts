@@ -2,7 +2,7 @@ import type { JsonMap, PlayerState } from "../../types/runtime.js";
 import type { SocketState } from "../../types/runtime.js";
 import type { Ctx } from "../context.types.js";
 
-type HandlerArgs = { ws: SocketState; data: Record<string, any>; ctx: Ctx };
+type HandlerArgs = { ws: SocketState; data: Record<string, unknown>; ctx: Ctx };
 type HandlerFn = (args: HandlerArgs) => Promise<unknown> | unknown;
 type GameIdData = { gameId: string };
 type PreloadDoneData = { gameId: string; username?: string; token?: number; playerKey?: string };

@@ -1,7 +1,7 @@
 import type { GameState, PlayerState, SocketState } from "../../types/runtime.js";
 import type { Ctx } from "../context.types.js";
 
-type HandlerArgs = { ws: SocketState; data: Record<string, any>; ctx: Ctx };
+type HandlerArgs = { ws: SocketState; data: Record<string, unknown>; ctx: Ctx };
 type HandlerFn = (args: HandlerArgs) => Promise<unknown> | unknown;
 type JoinGameData = { gameId: string; username?: string; displayname?: string };
 type LeaveGameData = { gameId: string; username?: string };
