@@ -2,14 +2,24 @@ import type { SocketState } from "../../types/runtime.js";
 import type { Ctx } from "../context.types.js";
 import type { PlayerState } from "../../types/runtime.js";
 
-type HandlerArgs = { ws: SocketState; data: Record<string, any>; ctx: Ctx };
-type HandlerFn = (args: HandlerArgs) => Promise<unknown> | unknown;
+type HandlerArgs<TData extends Record<string, unknown> = Record<string, unknown>> = {
+  ws: SocketState;
+  data: TData;
+  ctx: Ctx;
+};
+type HandlerFn<TData extends Record<string, unknown> = Record<string, unknown>> = (
+  args: HandlerArgs<TData>,
+) => Promise<unknown> | unknown;
+
+type RequestTimeSyncData = { clientSentAt?: number };
+type AuthData = { token?: string };
+type RequestPlayerListData = { gameId: string };
 
 export const userHandlers: Record<string, HandlerFn> = {
-  ping: async ({ ws }) => {
+  ping: async ({ ws }: HandlerArgs) => {
     ws.send(JSON.stringify({ type: "pong", t: Date.now() }));
   },
-  "request-time-sync": async ({ ws, data }) => {
+  "request-time-sync": async ({ ws, data }: HandlerArgs<RequestTimeSyncData>) => {
     const clientSentAt = Number(data?.clientSentAt || 0);
     ws.send(
       JSON.stringify({
@@ -19,7 +29,7 @@ export const userHandlers: Record<string, HandlerFn> = {
       }),
     );
   },
-  auth: async ({ ws, data, ctx }) => {
+  auth: async ({ ws, data, ctx }: HandlerArgs<AuthData>) => {
     const token = data?.token;
 
     if (!token) {
@@ -47,7 +57,7 @@ export const userHandlers: Record<string, HandlerFn> = {
       ws.send(JSON.stringify({ type: "auth-result", ok: false }));
     }
   },
-  "check-cotd": async ({ ws, ctx }) => {
+  "check-cotd": async ({ ws, ctx }: HandlerArgs) => {
     ws.send(
       JSON.stringify({
         type: "category-of-the-day",
@@ -55,7 +65,7 @@ export const userHandlers: Record<string, HandlerFn> = {
       }),
     );
   },
-  "request-player-list": async ({ ws, data, ctx }) => {
+  "request-player-list": async ({ ws, data, ctx }: HandlerArgs<RequestPlayerListData>) => {
     const { gameId } = data;
     ws.send(
       JSON.stringify({
