@@ -3,6 +3,11 @@ import type { Ctx } from "../context.types.js";
 
 type HandlerArgs = { ws: SocketState; data: Record<string, any>; ctx: Ctx };
 type HandlerFn = (args: HandlerArgs) => Promise<unknown> | unknown;
+type JoinGameData = { gameId: string; username?: string; displayname?: string };
+type LeaveGameData = { gameId: string; username?: string };
+type BuzzData = { gameId: string; estimatedServerBuzzAtMs?: number; clientSeq?: number };
+type GameIdData = { gameId: string };
+type UpdateScoreData = { gameId: string; username: string; delta: number };
 
 function normUsername(u: unknown): string {
   return String(u ?? "")
@@ -16,7 +21,7 @@ function pickDisplayname(d: unknown, fallbackUsername: string): string {
 }
 
 export const gameHandlers: Record<string, HandlerFn> = {
-  "join-game": async ({ ws, data, ctx }) => {
+  "join-game": async ({ ws, data, ctx }: { ws: SocketState; data: JoinGameData; ctx: Ctx }) => {
     const { gameId, username, displayname } = data ?? {};
     const u = normUsername(username);
 
@@ -167,7 +172,7 @@ export const gameHandlers: Record<string, HandlerFn> = {
     });
   },
 
-  "leave-game": async ({ ws, data, ctx }) => {
+  "leave-game": async ({ ws, data, ctx }: { ws: SocketState; data: LeaveGameData; ctx: Ctx }) => {
     const { gameId, username } = data ?? {};
     if (!gameId || !ctx.games?.[gameId]) return;
 
@@ -219,7 +224,7 @@ export const gameHandlers: Record<string, HandlerFn> = {
     ctx.checkAllDrawingsSubmitted(game, gameId, ctx);
   },
 
-  buzz: async ({ ws, data, ctx }) => {
+  buzz: async ({ ws, data, ctx }: { ws: SocketState; data: BuzzData; ctx: Ctx }) => {
     const { gameId } = data;
     const game = ctx.games?.[gameId] as GameState | undefined;
     if (!game) return;
@@ -495,7 +500,7 @@ export const gameHandlers: Record<string, HandlerFn> = {
     });
   },
 
-  "unlock-buzzer": async ({ ws, data, ctx }) => {
+  "unlock-buzzer": async ({ ws, data, ctx }: { ws: SocketState; data: GameIdData; ctx: Ctx }) => {
     const { gameId } = data;
     const game = ctx.games[gameId];
     if (!game) return;
@@ -506,7 +511,7 @@ export const gameHandlers: Record<string, HandlerFn> = {
     ctx.doUnlockBuzzerAuthoritative(gameId, game, ctx);
   },
 
-  "lock-buzzer": async ({ ws, data, ctx }) => {
+  "lock-buzzer": async ({ ws, data, ctx }: { ws: SocketState; data: GameIdData; ctx: Ctx }) => {
     const { gameId } = data;
     if (!ctx.requireHost(ctx.games[gameId], ws)) return;
 
@@ -770,7 +775,7 @@ export const gameHandlers: Record<string, HandlerFn> = {
       .catch((e: unknown) => console.error("[answer-audio-blob] autoResolve failed:", e));
   },
 
-  "reset-buzzer": async ({ ws, data, ctx }) => {
+  "reset-buzzer": async ({ ws, data, ctx }: { ws: SocketState; data: GameIdData; ctx: Ctx }) => {
     const { gameId } = data;
     const game = ctx.games[gameId];
     if (!game) return;
@@ -792,7 +797,7 @@ export const gameHandlers: Record<string, HandlerFn> = {
     }); // client now clears on reset-buzzer anyway
   },
 
-  "mark-all-complete": async ({ ws, data, ctx }) => {
+  "mark-all-complete": async ({ ws, data, ctx }: { ws: SocketState; data: GameIdData; ctx: Ctx }) => {
     const { gameId } = data;
     const game = ctx.games[gameId];
     if (!game) return;
@@ -1171,7 +1176,7 @@ export const gameHandlers: Record<string, HandlerFn> = {
     }
   },
 
-  "update-score": async ({ ws, data, ctx }) => {
+  "update-score": async ({ ws, data, ctx }: { ws: SocketState; data: UpdateScoreData; ctx: Ctx }) => {
     const { gameId, username, delta } = data;
     const game = ctx.games[gameId];
     if (!game) return;
