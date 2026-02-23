@@ -457,7 +457,7 @@ export const gameHandlers: Record<string, HandlerFn> = {
 
             ctx
               .autoResolveAfterJudgement(ctx, gameId, ggg, winner.playerUsername, "incorrect")
-              .catch((e) => console.error("[answer-timeout] autoResolve failed:", e));
+              .catch((e: unknown) => console.error("[answer-timeout] autoResolve failed:", e));
           });
         }, startCaptureAfterMs);
       }, COLLECT_MS);
@@ -540,7 +540,7 @@ export const gameHandlers: Record<string, HandlerFn> = {
       );
       return ctx
         .autoResolveAfterJudgement(ctx, gameId, game, playerUsername, "incorrect")
-        .catch((e) => console.error("[answer-audio-blob] autoResolve failed:", e));
+        .catch((e: unknown) => console.error("[answer-audio-blob] autoResolve failed:", e));
     }
 
     // Session must match (stale protection)
@@ -555,7 +555,7 @@ export const gameHandlers: Record<string, HandlerFn> = {
       );
       return ctx
         .autoResolveAfterJudgement(ctx, gameId, game, playerUsername, "incorrect")
-        .catch((e) => console.error("[answer-audio-blob] autoResolve failed:", e));
+        .catch((e: unknown) => console.error("[answer-audio-blob] autoResolve failed:", e));
     }
 
     const answeringUsername = norm(game.answeringPlayerUsername); // rename this in game state
@@ -570,7 +570,7 @@ export const gameHandlers: Record<string, HandlerFn> = {
       );
       return ctx
         .autoResolveAfterJudgement(ctx, gameId, game, playerUsername, "incorrect")
-        .catch((e) => console.error("[answer-audio-blob] autoResolve failed:", e));
+        .catch((e: unknown) => console.error("[answer-audio-blob] autoResolve failed:", e));
     }
 
     // Basic payload validation / size limits
@@ -585,7 +585,7 @@ export const gameHandlers: Record<string, HandlerFn> = {
       );
       return ctx
         .autoResolveAfterJudgement(ctx, gameId, game, playerUsername, "incorrect")
-        .catch((e) => console.error("[answer-audio-blob] autoResolve failed:", e));
+        .catch((e: unknown) => console.error("[answer-audio-blob] autoResolve failed:", e));
     }
 
     // Decode base64
@@ -603,7 +603,7 @@ export const gameHandlers: Record<string, HandlerFn> = {
       );
       return ctx
         .autoResolveAfterJudgement(ctx, gameId, game, playerUsername, "incorrect")
-        .catch((e) => console.error("[answer-audio-blob] autoResolve failed:", e));
+        .catch((e: unknown) => console.error("[answer-audio-blob] autoResolve failed:", e));
     }
 
     // Hard cap: keep small to avoid WS abuse (tune later)
@@ -619,7 +619,7 @@ export const gameHandlers: Record<string, HandlerFn> = {
       );
       return ctx
         .autoResolveAfterJudgement(ctx, gameId, game, playerUsername, "incorrect")
-        .catch((e) => console.error("[answer-audio-blob] autoResolve failed:", e));
+        .catch((e: unknown) => console.error("[answer-audio-blob] autoResolve failed:", e));
     }
 
     // Stop the answer window (prevents timeout firing)
@@ -683,7 +683,7 @@ export const gameHandlers: Record<string, HandlerFn> = {
 
         return ctx
           .autoResolveAfterJudgement(ctx, gameId, game, playerUsername, "incorrect")
-          .catch((e) => console.error("[answer-audio-blob] autoResolve failed:", e));
+          .catch((e: unknown) => console.error("[answer-audio-blob] autoResolve failed:", e));
       }
     } catch (e) {
       console.error("[answer-audio-blob] STT failed:", e?.message || e);
@@ -713,7 +713,7 @@ export const gameHandlers: Record<string, HandlerFn> = {
 
       return ctx
         .autoResolveAfterJudgement(ctx, gameId, game, playerUsername, "incorrect")
-        .catch((err) => console.error("[answer-audio-blob-error] autoResolve failed:", err));
+        .catch((err: unknown) => console.error("[answer-audio-blob-error] autoResolve failed:", err));
     }
 
     ctx.broadcast(gameId, {
@@ -767,7 +767,7 @@ export const gameHandlers: Record<string, HandlerFn> = {
 
     return ctx
       .autoResolveAfterJudgement(ctx, gameId, game, playerUsername, verdict)
-      .catch((e) => console.error("[answer-audio-blob] autoResolve failed:", e));
+      .catch((e: unknown) => console.error("[answer-audio-blob] autoResolve failed:", e));
   },
 
   "reset-buzzer": async ({ ws, data, ctx }) => {

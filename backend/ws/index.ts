@@ -13,7 +13,7 @@ type WsServerLike = {
 export const attachWebSocketServer = (wss: WsServerLike, repos: Record<string, unknown>) => {
   const ctx = createWsContext(wss, repos);
 
-  wss.on("connection", (ws) => {
+  wss.on("connection", (ws: SocketState) => {
     ws.id = crypto.randomUUID();
     ws.isAlive = true;
 

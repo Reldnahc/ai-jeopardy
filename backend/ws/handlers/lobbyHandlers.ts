@@ -831,7 +831,9 @@ export const lobbyHandlers: Record<string, HandlerFn> = {
         .trim()
         .toLowerCase();
     const used = new Set(
-      game.categories.map((c, i) => (i === globalIndex ? "" : norm(c))).filter((v) => v.length > 0),
+      game.categories
+        .map((c: unknown, i: number) => (i === globalIndex ? "" : norm(c)))
+        .filter((v: string) => v.length > 0),
     );
 
     const list = Array.isArray(candidates) ? candidates : [];

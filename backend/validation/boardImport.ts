@@ -19,7 +19,7 @@ const isCategoryShape = (value: unknown): value is CategoryShape => {
 export const normalizeCategories11 = (arr: unknown): string[] => {
   const next = Array.isArray(arr) ? arr.slice(0, 11) : [];
   while (next.length < 11) next.push("");
-  return next.map((v) => String(v ?? ""));
+  return next.map((v: unknown) => String(v ?? ""));
 };
 
 const isNonEmptyString = (v: unknown): v is string =>
