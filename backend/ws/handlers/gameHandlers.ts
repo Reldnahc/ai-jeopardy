@@ -673,7 +673,7 @@ export const gameHandlers: Record<string, WsHandler> = {
         buf,
         mimeType,
         game.selectedClue?.answer,
-        game.lobbySettings.sttProviderName,
+        game.lobbySettings.sttProviderName as Parameters<typeof ctx.transcribeAnswerAudio>[3],
       );
       transcript = String(stt || "").trim();
 
@@ -999,8 +999,8 @@ export const gameHandlers: Record<string, WsHandler> = {
 
     // Normal (non-DD) path:
     await ctx.aiHostVoiceSequence(ctx, gameId, game, [
-      { slot: game.selectedClue.category, pad },
-      { slot: game.selectedClue.value, after: broadcastClueSelected },
+      { slot: String(game.selectedClue.category ?? ""), pad },
+      { slot: String(game.selectedClue.value ?? ""), after: broadcastClueSelected },
       { assetId: ttsAssetId },
     ]);
 
@@ -1115,7 +1115,7 @@ export const gameHandlers: Record<string, WsHandler> = {
         buf,
         mimeType,
         null,
-        game.lobbySettings.sttProviderName,
+        game.lobbySettings.sttProviderName as Parameters<typeof ctx.transcribeAnswerAudio>[3],
       );
       transcript = String(stt || "").trim();
     } catch (e) {
@@ -1178,8 +1178,6 @@ export const gameHandlers: Record<string, WsHandler> = {
     });
 
     return await ctx.finalizeDailyDoubleWagerAndStartClue(gameId, game, ctx, {
-      username: playerUsername,
-      displayname: playerDisplayname,
       wager,
       fallback: false,
       reason: null,
@@ -1257,7 +1255,7 @@ export const gameHandlers: Record<string, WsHandler> = {
       const asset = await ctx.ensureTtsAsset(
         {
           text: safeText,
-          textType: textType || "text",
+          textType: (textType || "text") as "text" | "ssml",
           voiceId: voiceId || "amy",
           engine: "standard",
           outputFormat: "mp3",
