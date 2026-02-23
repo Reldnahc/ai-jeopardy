@@ -1,86 +1,140 @@
-import React from "react";
+import { useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { useProfile } from "../../contexts/ProfileContext.tsx";
+import Avatar from "../common/Avatar.tsx";
+import { getProfilePresentation } from "../../utils/profilePresentation";
 
 interface FinalScoreScreenProps {
   scores: Record<string, number>;
 }
 
-const FinalScoreScreen: React.FC<FinalScoreScreenProps> = ({ scores }) => {
+type ScoreEntry = {
+  username: string;
+  score: number;
+};
+
+const FinalScoreScreen = ({ scores }: FinalScoreScreenProps) => {
   const navigate = useNavigate();
-  const sortedScores = Object.entries(scores).sort(([, a], [, b]) => b - a);
+  const { getProfileByUsername, fetchPublicProfiles } = useProfile();
+
+  const sortedScores = useMemo<ScoreEntry[]>(() => {
+    return Object.entries(scores)
+      .map(([username, score]) => ({ username, score }))
+      .sort((a, b) => b.score - a.score);
+  }, [scores]);
+
+  const usernames = useMemo(
+    () =>
+      sortedScores.map((entry) => entry.username.trim()).filter((username) => username.length > 0),
+    [sortedScores],
+  );
+
+  useEffect(() => {
+    if (usernames.length === 0) return;
+    void fetchPublicProfiles(usernames).catch(() => {});
+  }, [fetchPublicProfiles, usernames]);
+
+  const topScore = sortedScores[0]?.score ?? 0;
+  const winnerCount = sortedScores.filter((entry) => entry.score === topScore).length;
+
+  const rankTone = (index: number) => {
+    if (index === 0) return "from-amber-300/60 to-yellow-400/60 border-amber-200/90";
+    if (index === 1) return "from-slate-200/45 to-slate-100/35 border-slate-200/80";
+    if (index === 2) return "from-orange-300/45 to-orange-200/35 border-orange-200/80";
+    return "from-white/15 to-white/5 border-white/20";
+  };
 
   return (
-    <div className="min-h-screen w-full text-white px-6 py-16 flex flex-col">
-      {/* Header */}
-      <div className="max-w-7xl mx-auto mb-14 w-full">
-        <h1 className="text-5xl md:text-6xl font-swiss911 tracking-wide text-yellow-400 text-shadow-jeopardy drop-shadow-xl">
-          Final Scores
-        </h1>
-        <div className="h-1 w-40 bg-yellow-400 mt-4 rounded-full" />
-      </div>
-
-      {/* Score Grid */}
-      <div className="max-w-7xl mx-auto w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {sortedScores.map(([player, score], index) => (
-          <div
-            key={player}
-            className={`
-              relative p-6 rounded-2xl
-              flex justify-between items-center
-              transition-all duration-300
-              hover:scale-[1.02]
-              ${
-                index === 0
-                  ? `
-                  bg-gradient-to-r from-yellow-400 to-yellow-500 
-                  text-gray-900 
-                  shadow-2xl shadow-yellow-500/40
-                  border-4 border-yellow-300
-                `
-                  : `
-                  bg-white/5 backdrop-blur-md
-                  border border-white/10
-                  hover:bg-white/10
-                `
-              }
-            `}
-          >
-            {index === 0 && (
-              <span className="absolute -top-3 -left-3 bg-blue-600 text-yellow-400 text-xs font-bold px-3 py-1 rounded-full border border-yellow-400">
-                CHAMPION
-              </span>
-            )}
-
-            <span className={`text-2xl ${index === 0 ? "font-bold" : "font-semibold"}`}>
-              {player}
-            </span>
-
-            <span className={`text-2xl tabular-nums ${index === 0 ? "font-bold" : ""}`}>
-              ${score.toLocaleString()}
-            </span>
+    <div className="h-full w-full overflow-y-auto px-4 py-6 md:px-8 md:py-8 text-white">
+      <div className="mx-auto w-full max-w-5xl rounded-xl border border-white/20 bg-[#0e2f63]/80 p-4 md:p-6 shadow-2xl backdrop-blur-sm">
+        <div className="flex flex-wrap items-end justify-between gap-4 border-b border-white/20 pb-4">
+          <div>
+            <h1 className="font-swiss911 text-5xl md:text-6xl tracking-wide text-yellow-300 text-shadow-jeopardy">
+              Final Results
+            </h1>
+            <p className="mt-1 text-sm md:text-base text-blue-100/90">
+              {winnerCount > 1 ? `${winnerCount} players tied for first` : "Champion crowned"}
+            </p>
           </div>
-        ))}
-      </div>
 
-      {/* Spacer pushes button to bottom only if there's extra vertical space */}
-      <div className="flex-1" />
+          <div className="flex gap-2 md:gap-3">
+            <div className="rounded-lg border border-yellow-200/40 bg-yellow-300/15 px-3 py-2">
+              <div className="text-[11px] uppercase tracking-wide text-yellow-100/80">
+                Top Score
+              </div>
+              <div className="font-swiss911 text-2xl leading-none text-yellow-200">
+                ${topScore.toLocaleString()}
+              </div>
+            </div>
+          </div>
+        </div>
 
-      {/* Return Button */}
-      <div className="max-w-7xl mx-auto w-full pt-10">
-        <button
-          onClick={() => navigate("/")}
-          className="
-            px-10 py-4 text-lg font-bold tracking-wide
-            bg-gradient-to-r from-orange-500 to-red-500
-            rounded-xl
-            transition-all duration-300
-            hover:scale-105 hover:shadow-2xl
-            shadow-lg
-            focus:outline-none focus:ring-2 focus:ring-orange-400
-          "
-        >
-          Return Home
-        </button>
+        <div className="mt-4 space-y-2.5">
+          {sortedScores.map((entry, index) => {
+            const profile = getProfileByUsername(entry.username);
+            const pres = getProfilePresentation({
+              profile,
+              fallbackName: entry.username,
+              defaultNameColor: "#f8fafc",
+            });
+            const isChampion = index === 0 && winnerCount === 1;
+
+            return (
+              <div
+                key={entry.username}
+                className={`relative flex items-center gap-3 rounded-lg border bg-gradient-to-r px-3 py-2.5 md:px-4 md:py-3 ${rankTone(index)}`}
+              >
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-black/30 font-swiss911 text-xl leading-none text-white md:h-9 md:w-9 md:text-2xl">
+                  {index + 1}
+                </div>
+
+                <Avatar
+                  name={pres.avatar.nameForLetter}
+                  size="9"
+                  color={pres.avatar.bgColor}
+                  textColor={pres.avatar.fgColor}
+                  icon={pres.avatar.icon}
+                />
+
+                <div className="min-w-0 flex-1">
+                  <div
+                    className={`truncate text-lg leading-none md:text-xl ${pres.nameClassName}`}
+                    style={pres.nameStyle}
+                    title={pres.displayName}
+                  >
+                    {pres.displayName}
+                  </div>
+                  {pres.displayName !== entry.username && (
+                    <div className="mt-0.5 truncate text-xs text-slate-100/75">
+                      {entry.username}
+                    </div>
+                  )}
+                </div>
+
+                <div
+                  className={`shrink-0 font-swiss911 text-3xl leading-none md:text-4xl ${entry.score < 0 ? "text-red-200" : "text-green-200"}`}
+                >
+                  ${entry.score.toLocaleString()}
+                </div>
+
+                {isChampion && (
+                  <div className="absolute -top-3.5 right-3 rounded-md border border-yellow-200 bg-yellow-300 px-3 py-1 font-swiss911 text-sm tracking-wide text-[#3f2a00]">
+                    Champion
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="mt-5 flex justify-end">
+          <button
+            onClick={() => navigate("/")}
+            className="rounded-lg border border-white/25 bg-white/15 px-6 py-2.5 font-swiss911 text-2xl tracking-wide text-white transition hover:bg-white/25"
+          >
+            Return Home
+          </button>
+        </div>
       </div>
     </div>
   );
