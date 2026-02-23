@@ -1,4 +1,6 @@
 // backend/ws/lifecycle.js
+import type { SocketState } from "../types/runtime.js";
+import type { Ctx } from "./context.types.js";
 
 /**
  * Handles a socket disconnect in a server-authoritative way.
@@ -7,7 +9,11 @@
  * - schedules lobby grace cleanup if applicable
  * - unblocks Final Jeopardy stages if required players disappear
  */
-export function handleSocketClose(ws, ctx, interval) {
+export function handleSocketClose(
+  ws: SocketState,
+  ctx: Ctx,
+  interval: NodeJS.Timeout,
+): void {
   try {
     console.log(`WebSocket closed for socket ${ws.id}`);
 

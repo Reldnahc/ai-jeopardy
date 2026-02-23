@@ -1,6 +1,8 @@
 import { appConfig } from "../config/appConfig.js";
+import type { GameState, PlayerState } from "../types/runtime.js";
+import type { Ctx } from "../ws/context.types.js";
 
-function getExpectedFinalists(game) {
+function getExpectedFinalists(game: GameState): PlayerState[] {
   const players = Array.isArray(game?.players) ? game.players : [];
 
   return players.filter((p) => {
@@ -10,14 +12,19 @@ function getExpectedFinalists(game) {
   });
 }
 
-function getFinalistUsernames(game) {
+function getFinalistUsernames(game: GameState): string[] {
   if (Array.isArray(game?.finalJeopardyFinalists)) return game.finalJeopardyFinalists;
   const names = getExpectedFinalists(game).map((p) => p.username);
   game.finalJeopardyFinalists = names;
   return names;
 }
 
-async function advanceToDrawingPhase(game, gameId, wagers, ctx) {
+async function advanceToDrawingPhase(
+  game: GameState,
+  gameId: string,
+  wagers: Record<string, number>,
+  ctx: Ctx,
+) {
   //  stop wager timer once complete
   ctx.clearGameTimer(game, gameId, ctx);
 
@@ -99,7 +106,12 @@ async function advanceToDrawingPhase(game, gameId, wagers, ctx) {
   });
 }
 
-async function finishGame(game, gameId, drawings, ctx) {
+async function finishGame(
+  game: GameState,
+  gameId: string,
+  drawings: Record<string, string>,
+  ctx: Ctx,
+) {
   ctx.clearGameTimer(game, gameId, ctx);
 
   game.finalJeopardyStage = "finale";
@@ -265,7 +277,13 @@ async function finishGame(game, gameId, drawings, ctx) {
   ctx.broadcast(gameId, { type: "final-score-screen" });
 }
 
-export async function submitDrawing(game, gameId, player, drawing, ctx) {
+export async function submitDrawing(
+  game: GameState,
+  gameId: string,
+  player: string,
+  drawing: string,
+  ctx: Ctx,
+) {
   const expected = getFinalistUsernames(game);
   if (!expected.includes(player)) return;
 
@@ -290,7 +308,13 @@ export async function submitDrawing(game, gameId, player, drawing, ctx) {
   checkAllDrawingsSubmitted(game, gameId, ctx);
 }
 
-export function submitWager(game, gameId, player, wager, ctx) {
+export function submitWager(
+  game: GameState,
+  gameId: string,
+  player: string,
+  wager: number,
+  ctx: Ctx,
+) {
   const expected = getFinalistUsernames(game);
   if (!expected.includes(player)) return;
 
@@ -311,7 +335,7 @@ export function submitWager(game, gameId, player, wager, ctx) {
   checkAllWagersSubmitted(game, gameId, ctx);
 }
 
-export function checkAllWagersSubmitted(game, gameId, ctx) {
+export function checkAllWagersSubmitted(game: GameState, gameId: string, ctx: Ctx) {
   if (!game?.isFinalJeopardy) return;
   if (game.finalJeopardyStage !== "wager") return;
 
@@ -327,7 +351,7 @@ export function checkAllWagersSubmitted(game, gameId, ctx) {
   }
 }
 
-export function checkAllDrawingsSubmitted(game, gameId, ctx) {
+export function checkAllDrawingsSubmitted(game: GameState, gameId: string, ctx: Ctx) {
   if (!game?.isFinalJeopardy) return null;
   if (game.finalJeopardyStage !== "drawing") return null;
 

@@ -1,5 +1,10 @@
-export function isBoardFullyCleared(game, boardKey) {
-  const board = game?.boardData?.[boardKey];
+import type { GameState, PlayerState } from "../types/runtime.js";
+import type { Ctx } from "../ws/context.types.js";
+
+export function isBoardFullyCleared(game: GameState, boardKey: string): boolean {
+  const board = game?.boardData?.[boardKey] as
+    | { categories?: Array<{ values?: Array<{ value?: unknown; question?: string }> }> }
+    | undefined;
   if (!board?.categories) return false;
 
   for (const cat of board.categories) {
@@ -11,7 +16,7 @@ export function isBoardFullyCleared(game, boardKey) {
   return true;
 }
 
-export function checkBoardTransition(game, gameId, ctx) {
+export function checkBoardTransition(game: GameState, gameId: string, ctx: Ctx): boolean {
   if (game.activeBoard === "firstBoard") {
     if (!ctx.isBoardFullyCleared(game, "firstBoard")) return false;
 
@@ -29,7 +34,7 @@ export function checkBoardTransition(game, gameId, ctx) {
   return false;
 }
 
-async function startDoubleJeopardy(game, gameId, ctx) {
+async function startDoubleJeopardy(game: GameState, gameId: string, ctx: Ctx) {
   ctx.broadcast(gameId, {
     type: "phase-changed",
     phase: "transition",
@@ -79,7 +84,7 @@ async function startDoubleJeopardy(game, gameId, ctx) {
   });
 }
 
-function getExpectedFinalists(game) {
+function getExpectedFinalists(game: GameState): PlayerState[] {
   const players = Array.isArray(game?.players) ? game.players : [];
   return players.filter((p) => {
     const score = Number(game.scores?.[p.username] ?? 0);
@@ -92,14 +97,14 @@ function getExpectedFinalists(game) {
  * Cache the finalist list for the whole Final Jeopardy run.
  * Prevents weirdness if scores/online flags change mid-phase.
  */
-function getFinalistNames(game) {
+function getFinalistNames(game: GameState): string[] {
   if (Array.isArray(game?.finalJeopardyFinalists)) return game.finalJeopardyFinalists;
   const names = getExpectedFinalists(game).map((p) => p.username);
   game.finalJeopardyFinalists = names;
   return names;
 }
 
-async function startFinalJeopardy(game, gameId, ctx) {
+async function startFinalJeopardy(game: GameState, gameId: string, ctx: Ctx) {
   game.activeBoard = "finalJeopardy";
   game.isFinalJeopardy = true;
   game.finalJeopardyStage = "wager";

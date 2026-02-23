@@ -1,7 +1,13 @@
-export const makeBroadcaster = (wss) => {
-  const broadcast = (gameId, payload) => {
+import type { JsonMap, SocketState } from "../types/runtime.js";
+import type WebSocket from "ws";
+
+type WsServerLike = { clients: Set<WebSocket> };
+
+export const makeBroadcaster = (wss: WsServerLike) => {
+  const broadcast = (gameId: string, payload: JsonMap) => {
     const msg = JSON.stringify(payload);
-    for (const client of wss.clients) {
+    for (const rawClient of wss.clients) {
+      const client = rawClient as SocketState;
       if (client.readyState !== 1) continue;
       if (client.gameId !== gameId) continue;
 
@@ -13,9 +19,10 @@ export const makeBroadcaster = (wss) => {
     }
   };
 
-  const broadcastAll = (payload) => {
+  const broadcastAll = (payload: JsonMap) => {
     const msg = JSON.stringify(payload);
-    for (const client of wss.clients) {
+    for (const rawClient of wss.clients) {
+      const client = rawClient as SocketState;
       if (client.readyState !== 1) continue;
       try {
         client.send(msg);

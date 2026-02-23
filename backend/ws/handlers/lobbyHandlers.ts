@@ -1,11 +1,13 @@
-function normalizeBgColor(input, fallback = "bg-blue-500") {
+import type { JsonMap, PlayerState } from "../../types/runtime.js";
+
+function normalizeBgColor(input: unknown, fallback = "bg-blue-500") {
   const s = String(input ?? "").trim();
   if (/^bg-[a-z]+-\d{3}$/.test(s)) return s; // tailwind class
   if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(s)) return s; // allow hex if you support it
   return fallback;
 }
 
-function normalizeTextColor(input, fallback = "text-white") {
+function normalizeTextColor(input: unknown, fallback = "text-white") {
   const s = String(input ?? "").trim();
   if (/^text-[a-z]+-\d{3}$/.test(s)) return s;
   if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(s)) return s;
@@ -374,7 +376,7 @@ export const lobbyHandlers = {
     const startedAt = Date.now();
     const reqId = `${startedAt}-${Math.random().toString(16).slice(2, 6)}`;
 
-    const sendTimed = (type, payloadObj) => {
+    const sendTimed = (type: string, payloadObj: JsonMap) => {
       const t0 = Date.now();
       try {
         ws.send(JSON.stringify(payloadObj));
@@ -502,7 +504,7 @@ export const lobbyHandlers = {
           .toLowerCase() === u,
     );
 
-    const attachSocket = (player) => {
+    const attachSocket = (player: PlayerState) => {
       player.id = ws.id;
       player.online = true;
       player.username = u; // server-authoritative identity
@@ -652,7 +654,8 @@ export const lobbyHandlers = {
         };
       }
 
-      const p = typeof patch === "object" && patch !== null ? patch : {};
+      const p =
+        typeof patch === "object" && patch !== null ? (patch as Record<string, unknown>) : {};
 
       // Validate + apply
       if (typeof p.timeToBuzz === "number" && Number.isFinite(p.timeToBuzz)) {
@@ -816,7 +819,7 @@ export const lobbyHandlers = {
     else if (bt === "secondBoard") globalIndex = 5 + idx;
     else globalIndex = 10;
 
-    const norm = (s) =>
+    const norm = (s: unknown) =>
       String(s ?? "")
         .trim()
         .toLowerCase();

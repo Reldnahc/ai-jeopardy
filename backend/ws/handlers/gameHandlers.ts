@@ -1,10 +1,10 @@
-function normUsername(u) {
+function normUsername(u: unknown): string {
   return String(u ?? "")
     .trim()
     .toLowerCase();
 }
 
-function pickDisplayname(d, fallbackUsername) {
+function pickDisplayname(d: unknown, fallbackUsername: string): string {
   const s = String(d ?? "").trim();
   return s || fallbackUsername;
 }
@@ -505,7 +505,7 @@ export const gameHandlers = {
     const { gameId, answerSessionId, mimeType, dataBase64 } = data || {};
     const game = ctx.games?.[gameId];
     if (!game) return;
-    const norm = (v) =>
+    const norm = (v: unknown) =>
       String(v ?? "")
         .trim()
         .toLowerCase();
@@ -636,7 +636,7 @@ export const gameHandlers = {
       transcript = String(stt || "").trim();
 
       if (!transcript) {
-        const parseValue = (val) => {
+        const parseValue = (val: unknown) => {
           const n = Number(String(val || "").replace(/[^0-9]/g, ""));
           return Number.isFinite(n) ? n : 0;
         };
@@ -673,7 +673,7 @@ export const gameHandlers = {
     } catch (e) {
       console.error("[answer-audio-blob] STT failed:", e?.message || e);
 
-      const parseValue = (val) => {
+      const parseValue = (val: unknown) => {
         const n = Number(String(val || "").replace(/[^0-9]/g, ""));
         return Number.isFinite(n) ? n : 0;
       };
@@ -805,8 +805,10 @@ export const gameHandlers = {
     const { gameId, clue } = data;
     const game = ctx.games?.[gameId];
     if (!game) return;
+    const clueObj =
+      clue && typeof clue === "object" ? (clue as Record<string, unknown>) : ({} as Record<string, unknown>);
 
-    const norm = (v) =>
+    const norm = (v: unknown) =>
       String(v ?? "")
         .trim()
         .toLowerCase();
@@ -852,18 +854,18 @@ export const gameHandlers = {
 
     ctx.fireAndForget(ctx.repos.profiles.incrementCluesSelected(callerStable), "Increment Clues");
 
-    const category = String(clue?.category ?? "").trim() || ctx.findCategoryForClue(game, clue);
+    const category = String(clueObj.category ?? "").trim() || ctx.findCategoryForClue(game, clueObj);
 
     game.selectedClue = {
-      ...clue,
+      ...clueObj,
       category: category || undefined,
       isAnswerRevealed: false,
     };
 
     // ---- CLUE STATE START ----
     const boardKey = game.activeBoard || "firstBoard";
-    const v = String(clue?.value ?? "");
-    const q = String(clue?.question ?? "").trim();
+    const v = String(clueObj.value ?? "");
+    const q = String(clueObj.question ?? "").trim();
     const clueKey = `${boardKey}:${v}:${q}`;
 
     const ddKeys = game.boardData?.dailyDoubleClueKeys?.[boardKey] || [];
@@ -966,7 +968,7 @@ export const gameHandlers = {
     const game = ctx.games?.[gameId];
     if (!game) return;
 
-    const norm = (v) =>
+    const norm = (v: unknown) =>
       String(v ?? "")
         .trim()
         .toLowerCase();
@@ -1185,8 +1187,9 @@ export const gameHandlers = {
   },
   "tts-ensure": async ({ ws, data, ctx }) => {
     const { gameId, text, textType, voiceId, requestId } = data ?? {};
+    const safeText = typeof text === "string" ? text : "";
 
-    if (!gameId || !text || !text.trim()) return;
+    if (!gameId || !safeText.trim()) return;
 
     const game = ctx.games?.[gameId];
     if (!game) return;
@@ -1205,7 +1208,7 @@ export const gameHandlers = {
     try {
       const asset = await ctx.ensureTtsAsset(
         {
-          text,
+          text: safeText,
           textType: textType || "text",
           voiceId: voiceId || "amy",
           engine: "standard",

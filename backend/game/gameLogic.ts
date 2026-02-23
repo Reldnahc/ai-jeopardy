@@ -1,22 +1,25 @@
-function normUsername(u) {
+import type { BoardClue, GameState } from "../types/runtime.js";
+import type { Ctx } from "../ws/context.types.js";
+
+function normUsername(u: unknown): string {
   return String(u ?? "")
     .trim()
     .toLowerCase();
 }
 
-function findPlayerByUsername(game, username) {
+function findPlayerByUsername(game: GameState, username: string) {
   const u = normUsername(username);
   if (!u) return null;
   return (game?.players || []).find((p) => normUsername(p?.username) === u) || null;
 }
 
-function displaynameFor(game, username) {
+function displaynameFor(game: GameState, username: string) {
   const p = findPlayerByUsername(game, username);
   const d = String(p?.displayname ?? "").trim();
   return d || String(username ?? "").trim(); // fallback
 }
 
-function applyScore(game, username, delta) {
+function applyScore(game: GameState, username: string, delta: number) {
   const u = normUsername(username);
   if (!u) return;
 
@@ -24,7 +27,7 @@ function applyScore(game, username, delta) {
   game.scores[u] = (game.scores[u] || 0) + Number(delta || 0);
 }
 
-function getDailyDoubleWagerIfActive(game) {
+function getDailyDoubleWagerIfActive(game: GameState): number | null {
   const dd = game?.dailyDouble;
   if (!dd) return null;
 
@@ -40,17 +43,17 @@ function getDailyDoubleWagerIfActive(game) {
   return w;
 }
 
-function getActiveClueWorth(game) {
+function getActiveClueWorth(game: GameState): number {
   const wager = getDailyDoubleWagerIfActive(game);
   if (wager !== null) return wager;
   return parseClueValue(game?.selectedClue?.value);
 }
 
-function isDailyDoubleActiveForCurrentClue(game) {
+function isDailyDoubleActiveForCurrentClue(game: GameState): boolean {
   return getDailyDoubleWagerIfActive(game) !== null;
 }
 
-function lockBoardSelection(ctx, gameId, game) {
+function lockBoardSelection(ctx: Ctx, gameId: string, game: GameState): number {
   if (!game) return 0;
 
   game.boardSelectionLocked = true;
@@ -66,7 +69,12 @@ function lockBoardSelection(ctx, gameId, game) {
   return game.boardSelectionLockVersion;
 }
 
-function unlockBoardSelection(ctx, gameId, game, lockVersion) {
+function unlockBoardSelection(
+  ctx: Ctx,
+  gameId: string,
+  game: GameState,
+  lockVersion?: number,
+) {
   if (!game) return;
 
   // Only unlock if this scheduled unlock is still current
@@ -85,7 +93,7 @@ function unlockBoardSelection(ctx, gameId, game, lockVersion) {
   });
 }
 
-function returnToBoard(game, gameId, ctx, transitioned = false) {
+function returnToBoard(game: GameState, gameId: string, ctx: Ctx, transitioned = false) {
   // Reset clue state
   game.selectedClue = null;
   game.buzzed = null;
@@ -126,7 +134,7 @@ function returnToBoard(game, gameId, ctx, transitioned = false) {
   }
 }
 
-function finishClueAndReturnToBoard(ctx, gameId, game) {
+function finishClueAndReturnToBoard(ctx: Ctx, gameId: string, game: GameState) {
   if (!game) return;
 
   if (game.selectedClue) {
@@ -146,12 +154,18 @@ function finishClueAndReturnToBoard(ctx, gameId, game) {
   returnToBoard(game, gameId, ctx);
 }
 
-export function parseClueValue(val) {
+export function parseClueValue(val: unknown): number {
   const n = Number(String(val || "").replace(/[^0-9]/g, ""));
   return Number.isFinite(n) ? n : 0;
 }
 
-export async function autoResolveAfterJudgement(ctx, gameId, game, username, verdict) {
+export async function autoResolveAfterJudgement(
+  ctx: Ctx,
+  gameId: string,
+  game: GameState,
+  username: string,
+  verdict: string,
+) {
   if (!game || !game.selectedClue) return;
 
   const u = normUsername(username);
@@ -291,7 +305,7 @@ export async function autoResolveAfterJudgement(ctx, gameId, game, username, ver
   ]);
 }
 
-export function cancelAutoUnlock(game) {
+export function cancelAutoUnlock(game: GameState) {
   if (game?.autoUnlockTimer) {
     clearTimeout(game.autoUnlockTimer);
     game.autoUnlockTimer = null;
@@ -299,7 +313,7 @@ export function cancelAutoUnlock(game) {
   game.autoUnlockClueKey = null;
 }
 
-export function doUnlockBuzzerAuthoritative(gameId, game, ctx) {
+export function doUnlockBuzzerAuthoritative(gameId: string, game: GameState, ctx: Ctx) {
   if (!game) return;
 
   // Always restart the buzz timer window when we "unlock"
@@ -364,9 +378,12 @@ export function doUnlockBuzzerAuthoritative(gameId, game, ctx) {
   });
 }
 
-export function findCategoryForClue(game, clue) {
+export function findCategoryForClue(game: GameState, clue: BoardClue | null | undefined) {
   const boardKey = game.activeBoard || "firstBoard";
-  const cats = game.boardData?.[boardKey]?.categories;
+  const board = game.boardData?.[boardKey] as
+    | { categories?: Array<{ category?: string; values?: Array<{ value?: unknown; question?: string }> }> }
+    | undefined;
+  const cats = board?.categories;
   if (!Array.isArray(cats)) return null;
 
   const v = clue?.value;

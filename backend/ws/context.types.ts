@@ -1,8 +1,6 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { createWsContext } from "./context.js";
 
 export type Trace = {
-  mark?: (name: string, data?: any) => void;
+  mark?: (name: string, data?: Record<string, unknown>) => void;
 };
 export type AsyncLimiter = <T>(fn: () => Promise<T>) => Promise<T>;
 // This matches your current ensureTtsAsset signature (old Polly style).
@@ -51,7 +49,7 @@ export type Game = {
   activeBoard?: ActiveBoard;
   ttsProvider?: string | null;
 };
-export type Ctx = ReturnType<typeof createWsContext>;
+export type Ctx = any;
 
 export type SayResult = { assetId: string; ms: number };
 

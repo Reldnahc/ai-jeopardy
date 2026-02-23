@@ -1,15 +1,16 @@
 import { games } from "../state/gamesStore.js";
+import type { GameState } from "../types/runtime.js";
 
 export const LOBBY_EMPTY_GRACE_MS = 60_000 * 2; // tune: 30s–120s
 
-export const cancelLobbyCleanup = (game) => {
+export const cancelLobbyCleanup = (game: GameState | null | undefined) => {
   if (!game) return;
   if (game.cleanupTimer) clearTimeout(game.cleanupTimer);
   game.cleanupTimer = null;
   game.emptySince = null;
 };
 
-export const scheduleLobbyCleanupIfEmpty = (gameId) => {
+export const scheduleLobbyCleanupIfEmpty = (gameId: string) => {
   const game = games[gameId];
   if (!game) return;
 
