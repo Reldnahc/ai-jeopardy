@@ -104,7 +104,7 @@ export function registerHttpRoutes(app: Application, distPath: string, repos: Ht
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     return res.send(`
       <!doctype html>
-      <html>
+      <html lang="en">
         <head>
           <meta charset="utf-8" />
           <title>Image Test</title>
@@ -261,7 +261,7 @@ export function registerHttpRoutes(app: Application, distPath: string, repos: Ht
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     return res.send(`
       <!doctype html>
-      <html>
+      <html lang="en">
         <head>
           <meta charset="utf-8" />
           <title>TTS Test</title>
