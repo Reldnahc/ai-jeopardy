@@ -4,6 +4,22 @@ import type { Ctx } from "../context.types.js";
 
 type HandlerArgs = { ws: SocketState; data: Record<string, any>; ctx: Ctx };
 type HandlerFn = (args: HandlerArgs) => Promise<unknown> | unknown;
+type GameIdData = { gameId: string };
+type PreloadDoneData = { gameId: string; username?: string; token?: number; playerKey?: string };
+type GameReadyData = { gameId: string; username?: string };
+type CreateLobbyData = {
+  username?: string;
+  displayname?: string;
+  playerKey?: string;
+  categories?: unknown;
+};
+type JoinLobbyData = {
+  gameId: string;
+  username?: string;
+  displayname?: string;
+  playerKey?: string;
+};
+type LeaveLobbyData = { gameId?: string; playerKey?: string; username?: string };
 
 function normalizeBgColor(input: unknown, fallback = "bg-blue-500") {
   const s = String(input ?? "").trim();
@@ -20,7 +36,7 @@ function normalizeTextColor(input: unknown, fallback = "text-white") {
 }
 
 export const lobbyHandlers: Record<string, HandlerFn> = {
-  "create-game": async ({ ws, data, ctx }) => {
+  "create-game": async ({ ws, data, ctx }: { ws: SocketState; data: GameIdData; ctx: Ctx }) => {
     const { gameId } = data ?? {};
 
     // Use server-authoritative host name for trace context (no client spoofing)
@@ -197,7 +213,7 @@ export const lobbyHandlers: Record<string, HandlerFn> = {
     trace.end({ success: true });
   },
 
-  "preload-done": async ({ ws, data, ctx }) => {
+  "preload-done": async ({ ws, data, ctx }: { ws: SocketState; data: PreloadDoneData; ctx: Ctx }) => {
     const { gameId, username, token, playerKey } = data ?? {};
     if (!gameId || !ctx.games?.[gameId]) return;
 
@@ -287,7 +303,7 @@ export const lobbyHandlers: Record<string, HandlerFn> = {
     });
   },
 
-  "game-ready": async ({ ws, data, ctx }) => {
+  "game-ready": async ({ ws, data, ctx }: { ws: SocketState; data: GameReadyData; ctx: Ctx }) => {
     const { gameId, username } = data ?? {};
     if (!gameId || !ctx.games?.[gameId]) return;
 
@@ -379,7 +395,7 @@ export const lobbyHandlers: Record<string, HandlerFn> = {
     }
   },
 
-  "create-lobby": async ({ ws, data, ctx }) => {
+  "create-lobby": async ({ ws, data, ctx }: { ws: SocketState; data: CreateLobbyData; ctx: Ctx }) => {
     const startedAt = Date.now();
     const reqId = `${startedAt}-${Math.random().toString(16).slice(2, 6)}`;
 
@@ -474,7 +490,7 @@ export const lobbyHandlers: Record<string, HandlerFn> = {
       console.warn(`[create-lobby][${reqId}] TOTAL SLOW`, { totalMs: total, gameId: newGameId });
   },
 
-  "join-lobby": async ({ ws, data, ctx }) => {
+  "join-lobby": async ({ ws, data, ctx }: { ws: SocketState; data: JoinLobbyData; ctx: Ctx }) => {
     const { gameId, username, displayname, playerKey } = data ?? {};
 
     if (!gameId || !ctx.games?.[gameId]) {
@@ -568,7 +584,7 @@ export const lobbyHandlers: Record<string, HandlerFn> = {
     });
   },
 
-  "leave-lobby": async ({ ws, data, ctx }) => {
+  "leave-lobby": async ({ ws, data, ctx }: { ws: SocketState; data: LeaveLobbyData; ctx: Ctx }) => {
     const { gameId, playerKey, username } = data ?? {};
 
     const effectiveGameId =
