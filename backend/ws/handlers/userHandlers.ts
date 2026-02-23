@@ -1,5 +1,6 @@
 import type { SocketState } from "../../types/runtime.js";
 import type { Ctx } from "../context.types.js";
+import type { PlayerState } from "../../types/runtime.js";
 
 type HandlerArgs = { ws: SocketState; data: Record<string, any>; ctx: Ctx };
 type HandlerFn = (args: HandlerArgs) => Promise<unknown> | unknown;
@@ -60,7 +61,7 @@ export const userHandlers: Record<string, HandlerFn> = {
       JSON.stringify({
         type: "player-list-update",
         gameId,
-        players: ctx.games[gameId].players.map((p) => ({
+        players: ctx.games[gameId].players.map((p: PlayerState) => ({
           username: p.username,
           displayname: p.displayname,
           online: p?.online,

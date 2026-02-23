@@ -87,8 +87,8 @@ export function collectImageAssetIdsFromBoard(boardData: BoardLike | null | unde
   const collect = (
     categories: Array<{ values?: Array<{ media?: { type?: string; assetId?: string } }> }> = [],
   ) => {
-    (categories ?? []).forEach((cat) => {
-      (cat.values ?? []).forEach((clue) => {
+    (categories ?? []).forEach((cat: { values?: Array<{ media?: { type?: string; assetId?: string } }> }) => {
+      (cat.values ?? []).forEach((clue: { media?: { type?: string; assetId?: string } }) => {
         const media = clue?.media;
         if (media?.type === "image" && typeof media.assetId === "string" && media.assetId.trim()) {
           ids.add(media.assetId.trim());

@@ -1,5 +1,6 @@
 import type { BoardClue, GameState } from "../types/runtime.js";
 import type { Ctx } from "../ws/context.types.js";
+import type { PlayerState } from "../types/runtime.js";
 
 function normUsername(u: unknown): string {
   return String(u ?? "")
@@ -10,7 +11,7 @@ function normUsername(u: unknown): string {
 function findPlayerByUsername(game: GameState, username: string) {
   const u = normUsername(username);
   if (!u) return null;
-  return (game?.players || []).find((p) => normUsername(p?.username) === u) || null;
+  return (game?.players || []).find((p: PlayerState) => normUsername(p?.username) === u) || null;
 }
 
 function displaynameFor(game: GameState, username: string) {
@@ -260,7 +261,7 @@ export async function autoResolveAfterJudgement(
 
   // Check if anyone remains eligible to buzz (username-keyed)
   const players = game.players || [];
-  const anyoneLeft = players.some((pp) => {
+  const anyoneLeft = players.some((pp: PlayerState) => {
     const id = normUsername(pp?.username);
     if (!id) return false;
     return !game.clueState?.lockedOut?.[id];

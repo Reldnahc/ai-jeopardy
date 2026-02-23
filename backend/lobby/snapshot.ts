@@ -6,12 +6,12 @@ export const buildLobbyState = (gameId: string, ws: SocketState) => {
   const game = games[gameId];
   if (!game) return null;
 
-  const you = game.players?.find((p) => p.id === ws.id) || null;
+  const you = game.players?.find((p: PlayerState) => p.id === ws.id) || null;
 
   return {
     type: "lobby-state",
     gameId,
-    players: game.players.map((p) => ({
+    players: game.players.map((p: PlayerState) => ({
       username: p.username,
       displayname: p.displayname,
       online: p?.online !== false,
@@ -48,7 +48,7 @@ export const getPlayerForSocket = (
   ws: SocketState | null | undefined,
 ): PlayerState | null => {
   if (!game || !ws) return null;
-  return (game.players || []).find((p) => p.id === ws.id) || null;
+  return (game.players || []).find((p: PlayerState) => p.id === ws.id) || null;
 };
 
 export const sendLobbySnapshot = (ws: SocketState, gameId: string) => {

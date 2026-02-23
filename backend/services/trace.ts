@@ -25,7 +25,7 @@ export function createTrace(label: string, meta: TraceMeta = {}) {
   function end(extra: Record<string, unknown> = {}) {
     const total = Date.now() - start;
     console.log(`[TRACE ${id}] ${label} DONE +${total}ms`, { ...meta, ...extra });
-    if (marks.length) console.table(marks.map((m) => ({ dt: m.dt, name: m.name })));
+    if (marks.length) console.table(marks.map((m: { dt: number; name: string }) => ({ dt: m.dt, name: m.name })));
     return { id, total, marks };
   }
 
