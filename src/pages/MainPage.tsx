@@ -8,6 +8,7 @@ import PageCardContainer from "../components/common/PageCardContainer.tsx";
 import { Player } from "../types/Lobby.ts";
 import { getUniqueCategories } from "../categories/getUniqueCategories.ts";
 import { useGameSession } from "../hooks/useGameSession.ts";
+const ADJECTIVES = ["Hallucinated", "Intelligent", "Dreamt", "Generated", "Conjured", "Created"];
 
 function getOrCreatePlayerKey(): string {
   const key = "playerKey";
@@ -34,9 +35,8 @@ export default function MainPage() {
   const { isSocketReady, sendJson, subscribe } = useWebSocket();
   const navigate = useNavigate();
 
-  const adjectives = ["Hallucinated", "Intelligent", "Dreamt", "Generated", "Conjured", "Created"];
   const randomAdjective = useMemo(
-    () => adjectives[Math.floor(Math.random() * adjectives.length)],
+    () => ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)],
     [],
   );
 

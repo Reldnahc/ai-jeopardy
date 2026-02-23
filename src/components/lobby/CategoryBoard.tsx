@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useMemo, useRef } from "react";
+import React, { useEffect, useLayoutEffect, useRef } from "react";
 import LockIcon from "../../icons/LockIcon.tsx";
 import RedoIcon from "../../icons/RedoIcon.tsx";
 
@@ -53,9 +53,8 @@ const CategoryBoard: React.FC<CategoryBoardProps> = ({
   const inputRefs = useRef<Array<HTMLInputElement | null>>([]);
 
   // Ensure stable length for refs (so indexes match categories)
-  useMemo(() => {
+  useEffect(() => {
     inputRefs.current = Array(categories.length).fill(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categories.length]);
 
   // Fit on mount + whenever categories change

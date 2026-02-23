@@ -165,7 +165,7 @@ export default function Game() {
 
     clearSession();
     navigate("/");
-  }, [gameId, myUsername, isSocketReady, sendJson, clearSession, navigate]);
+  }, [gameId, myUsername, sendJson, clearSession, navigate]);
 
   const playAudioUrl = useCallback(
     (httpUrl: string) => {

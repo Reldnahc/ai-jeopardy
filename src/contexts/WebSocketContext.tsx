@@ -192,7 +192,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         for (const listener of listenersRef.current) listener(msg);
       };
     },
-    [flushQueue],
+    [flushQueue, perfNowMs],
   );
 
   const ensureSocket = useCallback(() => {

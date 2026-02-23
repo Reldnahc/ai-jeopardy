@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Category, Clue } from "../../../shared/types/board.ts";
 import JeopardyGrid from "./JeopardyGrid.tsx"; // Import the grid component
 import WagerInput from "./WagerInput.tsx"; // Import the wager input component
@@ -99,20 +99,6 @@ const JeopardyBoard: React.FC<JeopardyBoardProps> = ({
   const canvas_with_mask = document.querySelector("#react-sketch-canvas__stroke-group-0");
   if (canvas_with_mask) canvas_with_mask.removeAttribute("mask");
 
-  // Automatically submit $0 wager upfront if the player has $0 or less
-  useEffect(() => {
-    if (canSelectClue) return;
-    console.log(isFinalJeopardy);
-    console.log(scores[currentPlayer]);
-    if (
-      isFinalJeopardy &&
-      (scores[currentPlayer] <= 0 || !scores[currentPlayer]) &&
-      !wagerSubmitted.includes(currentPlayer)
-    ) {
-      submitWager(currentPlayer);
-    }
-  }, [currentPlayer, scores, wagerSubmitted, isFinalJeopardy]);
-
   useEffect(() => {
     if (selectedClue) {
       setLocalSelectedClue(selectedClue);
@@ -134,40 +120,58 @@ const JeopardyBoard: React.FC<JeopardyBoardProps> = ({
     setWagers((prev) => ({ ...prev, [player]: wager }));
   };
 
-  const submitWager = (player: string) => {
-    const score = scores[player] ?? 0;
+  const submitWager = useCallback(
+    (player: string) => {
+      const score = scores[player] ?? 0;
 
-    // If score is <= 0 in Final Jeopardy, wager MUST be 0.
-    const rawWager = wagers[player];
-    const normalizedWager = score <= 0 ? 0 : Math.max(0, Number.isFinite(rawWager) ? rawWager : 0);
+      // If score is <= 0 in Final Jeopardy, wager MUST be 0.
+      const rawWager = wagers[player];
+      const normalizedWager =
+        score <= 0 ? 0 : Math.max(0, Number.isFinite(rawWager) ? rawWager : 0);
 
-    // Only enforce max-wager rule when score > 0
-    if (score > 0 && normalizedWager > score) {
-      showAlert("Invalid Wager", <span>Wager cannot exceed current score!</span>, [
-        {
-          label: "Okay",
-          actionValue: "okay",
-          styleClass: "bg-green-500 text-white hover:bg-green-600",
-        },
-      ]);
-      return;
+      // Only enforce max-wager rule when score > 0
+      if (score > 0 && normalizedWager > score) {
+        showAlert("Invalid Wager", <span>Wager cannot exceed current score!</span>, [
+          {
+            label: "Okay",
+            actionValue: "okay",
+            styleClass: "bg-green-500 text-white hover:bg-green-600",
+          },
+        ]);
+        return;
+      }
+
+      // Persist the wager locally (so UI shows 0 too)
+      setWagers((prev) => ({ ...prev, [player]: normalizedWager }));
+
+      // Prevent duplicate submits
+      setWagerSubmitted((prev) => (prev.includes(player) ? prev : [...prev, player]));
+
+      if (normalizedWager > 0) {
+        sendJson({
+          type: "submit-wager",
+          gameId,
+          player,
+          wager: normalizedWager,
+        });
+      }
+    },
+    [scores, wagers, sendJson, gameId, showAlert],
+  );
+
+  // Automatically submit $0 wager upfront if the player has $0 or less
+  useEffect(() => {
+    if (canSelectClue) return;
+    console.log(isFinalJeopardy);
+    console.log(scores[currentPlayer]);
+    if (
+      isFinalJeopardy &&
+      (scores[currentPlayer] <= 0 || !scores[currentPlayer]) &&
+      !wagerSubmitted.includes(currentPlayer)
+    ) {
+      submitWager(currentPlayer);
     }
-
-    // Persist the wager locally (so UI shows 0 too)
-    setWagers((prev) => ({ ...prev, [player]: normalizedWager }));
-
-    // Prevent duplicate submits
-    setWagerSubmitted((prev) => (prev.includes(player) ? prev : [...prev, player]));
-
-    if (normalizedWager > 0) {
-      sendJson({
-        type: "submit-wager",
-        gameId,
-        player,
-        wager: normalizedWager,
-      });
-    }
-  };
+  }, [canSelectClue, currentPlayer, scores, wagerSubmitted, isFinalJeopardy, submitWager]);
 
   if (!boardData || boardData.length === 0) {
     return <p>No board data available.</p>; // Handle invalid board data

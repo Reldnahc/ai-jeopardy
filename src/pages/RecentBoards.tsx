@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import GameCard from "../components/recentboards/GameCard";
 import PageCardContainer from "../components/common/PageCardContainer.tsx";
 import { Board } from "../types/Board.ts";
@@ -12,32 +12,35 @@ const RecentBoards = () => {
   const [filterModel, setFilterModel] = useState<string | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
-  const fetchBoards = async (offset: number = 0, limit: number = 10) => {
-    if (loading || !hasMoreBoards) return;
-    setLoading(true);
+  const fetchBoards = useCallback(
+    async (offset: number = 0, limit: number = 10) => {
+      if (loading || !hasMoreBoards) return;
+      setLoading(true);
 
-    try {
-      const api = getApiBase();
-      const params = new URLSearchParams();
-      params.set("offset", String(offset));
-      params.set("limit", String(limit));
-      if (filterModel) params.set("model", filterModel);
+      try {
+        const api = getApiBase();
+        const params = new URLSearchParams();
+        params.set("offset", String(offset));
+        params.set("limit", String(limit));
+        if (filterModel) params.set("model", filterModel);
 
-      const data = await fetchJson<{ boards: Board[] }>(
-        `${api}/api/boards/recent?${params.toString()}`,
-      );
+        const data = await fetchJson<{ boards: Board[] }>(
+          `${api}/api/boards/recent?${params.toString()}`,
+        );
 
-      const newBoards = data.boards ?? [];
-      setBoards((prev) => [...prev, ...newBoards]);
+        const newBoards = data.boards ?? [];
+        setBoards((prev) => [...prev, ...newBoards]);
 
-      if (newBoards.length < limit) setHasMoreBoards(false);
-    } catch (e) {
-      console.error("Error fetching boards:", e);
-      setHasMoreBoards(false);
-    } finally {
-      setLoading(false);
-    }
-  };
+        if (newBoards.length < limit) setHasMoreBoards(false);
+      } catch (e) {
+        console.error("Error fetching boards:", e);
+        setHasMoreBoards(false);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [loading, hasMoreBoards, filterModel],
+  );
 
   useEffect(() => {
     setBoards([]);
@@ -47,8 +50,7 @@ const RecentBoards = () => {
   useEffect(() => {
     // load first page when filter changes
     fetchBoards(0, 10);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterModel]);
+  }, [filterModel, fetchBoards]);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -62,7 +64,7 @@ const RecentBoards = () => {
 
     if (loadMoreRef.current) observer.observe(loadMoreRef.current);
     return () => observer.disconnect();
-  }, [boards.length, loading, hasMoreBoards]);
+  }, [boards.length, loading, hasMoreBoards, fetchBoards]);
 
   return (
     <div className="min-h-screen bg-gradient-to-r from-indigo-400 to-blue-700 flex flex-col items-center p-6">

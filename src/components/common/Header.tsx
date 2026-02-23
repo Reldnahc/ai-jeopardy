@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import LoginForm from "./LoginForm.tsx";
 import { motion, AnimatePresence } from "framer-motion";
@@ -33,7 +33,7 @@ const Header: React.FC = () => {
     setMenuOpen(false);
   };
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     const prevent = location.pathname.includes("/game/") || location.pathname.includes("/lobby/");
     if (prevent) {
       showAlert("Logout Unavailable", <span>You cannot log out in a game or lobby.</span>, [
@@ -48,7 +48,7 @@ const Header: React.FC = () => {
 
     logout();
     closeAllMenus();
-  };
+  }, [location.pathname, showAlert, logout]);
 
   // Close dropdown or mobile menu when clicking outside
   useEffect(() => {
@@ -94,7 +94,7 @@ const Header: React.FC = () => {
       { key: "stats", label: "Stats", to: `/profile/${u}/stats`, kind: "link" },
       { key: "logout", label: "Log out", kind: "action", danger: true, onClick: handleLogout },
     ];
-  }, [user?.username, location.pathname]);
+  }, [user, handleLogout]);
 
   return (
     <header className="bg-gradient-to-r from-indigo-400 to-blue-700 text-white w-full h-[5.5rem] shadow-md">
