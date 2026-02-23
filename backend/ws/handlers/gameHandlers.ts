@@ -825,7 +825,9 @@ export const gameHandlers: Record<string, WsHandler> = {
     if (!game) return;
     if (!game.clearedClues) game.clearedClues = new Set();
     const boardKey = game.activeBoard || "firstBoard";
-    const board = game.boardData?.[boardKey];
+    const board = game.boardData?.[boardKey] as
+      | { categories?: Array<{ values?: Array<{ value?: unknown; question?: unknown }> }> }
+      | undefined;
     if (!board?.categories) return;
     for (const cat of board.categories) {
       for (const clue of cat.values || []) {

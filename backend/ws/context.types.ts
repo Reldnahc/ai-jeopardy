@@ -1,4 +1,6 @@
 
+import type { WsContext } from "../types/runtime.js";
+
 export type Trace = {
   mark?: (name: string, data?: Record<string, unknown>) => void;
 };
@@ -13,8 +15,6 @@ export type EnsureTtsAssetParams = {
   outputFormat: string;
   provider: string;
 };
-
-export type TtsAsset = { id: string };
 
 export type AiHostTtsBank = {
   slotAssets: Record<string, string[]>;
@@ -49,7 +49,23 @@ export type Game = {
   activeBoard?: ActiveBoard;
   ttsProvider?: string | null;
 };
-export type Ctx = any;
+
+type LoosenContextFns<T> = {
+  [K in keyof T]: T[K] extends (...args: any[]) => unknown ? (...args: unknown[]) => any : T[K];
+};
+
+type RepoFns = Record<string, (...args: unknown[]) => any>;
+type CtxRepos = Record<string, unknown> & {
+  profiles: RepoFns;
+  boards: RepoFns;
+  images?: RepoFns;
+  tts?: RepoFns;
+};
+
+export type Ctx = Omit<LoosenContextFns<WsContext>, "repos" | "numberToWords"> & {
+  repos: CtxRepos;
+  numberToWords: (value: number) => string;
+};
 
 export type SayResult = { assetId: string; ms: number };
 

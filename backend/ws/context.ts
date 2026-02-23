@@ -65,7 +65,6 @@ import {
   plannedVisualSlots,
   populateCategoryVisuals,
 } from "../services/ai/visuals.js";
-import { Game } from "./context.types.js";
 import { Clue } from "../../shared/types/board.js";
 import { appConfig } from "../config/appConfig.js";
 import { parseDailyDoubleWager } from "../services/ai/judge/wagerParse.js";
@@ -79,6 +78,9 @@ import {
 import { numberToWords } from "../services/numberToWords.js";
 import { ensureBoardNarrationTtsForBoardData } from "../services/ai/board/boardTts.js";
 import { PermissionManager } from "../auth/permissionManager.js";
+type GameForClueKey = {
+  activeBoard?: "firstBoard" | "secondBoard" | "finalJeopardy" | null;
+};
 // Minimal type for now; we’ll tighten later as you TS-migrate more modules.
 
 export const createWsContext = (wss: any, repos: any) => {
@@ -106,7 +108,7 @@ export const createWsContext = (wss: any, repos: any) => {
     });
   };
 
-  const getClueKey = (game: Game, clue: Clue) =>
+  const getClueKey = (game: GameForClueKey, clue: Clue) =>
     `${game.activeBoard ?? "firstBoard"}:${clue.value ?? ""}:${clue.question?.trim() ?? ""}`;
 
   return {
