@@ -89,12 +89,14 @@ export default function Game() {
   } = useGameSocketSync({ gameId, username: myUsername });
 
   // Persistent WebSocket connection
-  const { sendJson, nowFromPerfMs, perfNowMs, lastSyncAgeMs } = useWebSocket();
+  const { sendJson, nowMs, nowFromPerfMs, perfNowMs, lastSyncAgeMs } = useWebSocket();
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
   const compressorRef = useRef<DynamicsCompressorNode | null>(null);
+  const [isAudioReady, setIsAudioReady] = useState(false);
+  const [audioUnlockTick, setAudioUnlockTick] = useState(0);
 
   const buzzSeqRef = useRef(0);
 
@@ -168,9 +170,9 @@ export default function Game() {
   }, [gameId, myUsername, sendJson, clearSession, navigate]);
 
   const playAudioUrl = useCallback(
-    (httpUrl: string) => {
+    async (httpUrl: string, offsetMs: number = 0): Promise<boolean> => {
       const a = audioRef.current;
-      if (!a) return;
+      if (!a) return false;
 
       try {
         a.pause();
@@ -180,16 +182,35 @@ export default function Game() {
         const gain = gainNodeRef.current;
         if (gain) gain.gain.value = audioVolume;
 
-        a.currentTime = 0;
-
         // If we preloaded this URL, use the blob URL so there is NO network on play.
         const blobUrl = getCachedAudioBlobUrl(httpUrl);
         a.src = blobUrl || httpUrl;
 
-        if (audioVolume <= 0) return;
-        void a.play();
+        const seekSec = Math.max(0, offsetMs / 1000);
+        const seekToOffset = () => {
+          try {
+            a.currentTime = seekSec;
+          } catch {
+            // ignore seek errors; playback will start at 0
+          }
+        };
+
+        if (seekSec > 0) {
+          if (a.readyState >= 1) {
+            seekToOffset();
+          } else {
+            a.addEventListener("loadedmetadata", seekToOffset, { once: true });
+          }
+        } else {
+          a.currentTime = 0;
+        }
+
+        if (audioVolume <= 0) return false;
+        await a.play();
+        return true;
       } catch (e) {
         console.debug("TTS play blocked:", e);
+        return false;
       }
     },
     [audioVolume],
@@ -221,17 +242,41 @@ export default function Game() {
   useEffect(() => {
     if (!aiHostAsset) return;
     if (lastAiHostAssetPlayedRef.current === aiHostAsset) return;
-    lastAiHostAssetPlayedRef.current = aiHostAsset;
 
-    const idx = aiHostAsset.indexOf("::");
-    const assetId = (idx >= 0 ? aiHostAsset.slice(idx + 2) : aiHostAsset).trim();
+    const parts = aiHostAsset.split("::");
+    const assetId = String(parts[1] ?? aiHostAsset).trim();
+    const startedAtMs = Math.max(0, Number(parts[2] ?? 0) || 0);
+    const baseOffsetMs = Math.max(0, Number(parts[3] ?? 0) || 0);
+    const receivedAtMs = Math.max(0, Number(parts[4] ?? 0) || 0);
     if (!assetId) return;
 
+    if (!isAudioReady) return;
     if (!narrationEnabled) return;
     if (audioMuted) return;
 
-    playAudioUrl(ttsUrl(assetId));
-  }, [aiHostAsset, narrationEnabled, audioMuted, playAudioUrl]);
+    const computedOffsetMs = (() => {
+      if (startedAtMs > 0) {
+        // Recompute against server-synced clock so delayed user gesture still seeks correctly.
+        return Math.max(baseOffsetMs, Math.round(nowMs() - startedAtMs));
+      }
+      if (receivedAtMs > 0) {
+        return Math.max(baseOffsetMs, Math.round(baseOffsetMs + (Date.now() - receivedAtMs)));
+      }
+      return baseOffsetMs;
+    })();
+
+    let cancelled = false;
+    void playAudioUrl(ttsUrl(assetId), computedOffsetMs).then((played) => {
+      if (cancelled) return;
+      if (played) {
+        lastAiHostAssetPlayedRef.current = aiHostAsset;
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [aiHostAsset, narrationEnabled, audioMuted, isAudioReady, audioUnlockTick, nowMs, playAudioUrl]);
 
   useEffect(() => {
     const audio = new Audio();
@@ -258,6 +303,7 @@ export default function Game() {
     audioCtxRef.current = ctx;
     gainNodeRef.current = gain;
     compressorRef.current = compressor;
+    setIsAudioReady(true);
 
     return () => {
       audio.pause();
@@ -273,6 +319,7 @@ export default function Game() {
       audioCtxRef.current = null;
       gainNodeRef.current = null;
       compressorRef.current = null;
+      setIsAudioReady(false);
     };
   }, []);
 
@@ -281,6 +328,26 @@ export default function Game() {
     if (!gain) return;
     gain.gain.value = audioVolume;
   }, [audioVolume]);
+
+  useEffect(() => {
+    const unlockAudio = () => {
+      const ctx = audioCtxRef.current;
+      if (ctx && ctx.state !== "running") {
+        void ctx.resume().catch(() => {});
+      }
+      setAudioUnlockTick((v) => v + 1);
+    };
+
+    window.addEventListener("pointerdown", unlockAudio, { passive: true });
+    window.addEventListener("keydown", unlockAudio);
+    window.addEventListener("touchstart", unlockAudio, { passive: true });
+
+    return () => {
+      window.removeEventListener("pointerdown", unlockAudio);
+      window.removeEventListener("keydown", unlockAudio);
+      window.removeEventListener("touchstart", unlockAudio);
+    };
+  }, []);
 
   useEffect(() => {
     const wasReady = prevSocketReadyRef.current;

@@ -120,6 +120,13 @@ export type Game = {
   categories?: Category[] | null;
   boardData?: BoardDataLike;
   aiHostTts?: AiHostTtsBank | null;
+  aiHostPlayback?: {
+    assetId: string;
+    startedAtMs: number;
+    durationMs?: number | null;
+    endsAtMs?: number | null;
+    clearTimer?: ReturnType<typeof setTimeout> | null;
+  } | null;
   activeBoard?: ActiveBoard;
   ttsProvider?: string | null;
 };

@@ -105,6 +105,13 @@ function collectBoardValues(game: Game): number[] {
   return Array.from(valueSet).sort((a, b) => a - b);
 }
 
+const AI_HOST_PLAYBACK_GRACE_MS = 250;
+
+function clearAiHostPlaybackTimer(game: Game) {
+  const timer = game.aiHostPlayback?.clearTimer;
+  if (timer) clearTimeout(timer);
+}
+
 export async function ensureAiHostValueTts(opts: {
   ctx: Ctx;
   game: Game;
@@ -348,10 +355,47 @@ export async function ensureAiHostTtsBank(opts: {
 export function aiHostSayAsset(
   ctx: Ctx,
   gameId: string,
+  game: Game,
   assetId: string | null | undefined,
+  durationMsRaw?: number | null,
 ): string | null {
   if (!assetId) return null;
-  ctx.broadcast(gameId, { type: "ai-host-say", assetId });
+
+  clearAiHostPlaybackTimer(game);
+
+  const startedAtMs = Date.now();
+  const durationMs =
+    typeof durationMsRaw === "number" && Number.isFinite(durationMsRaw) && durationMsRaw > 0
+      ? Math.round(durationMsRaw)
+      : null;
+
+  const nextPlayback = {
+    assetId,
+    startedAtMs,
+    durationMs,
+    endsAtMs: durationMs ? startedAtMs + durationMs : null,
+    clearTimer: null as ReturnType<typeof setTimeout> | null,
+  };
+
+  if (durationMs) {
+    nextPlayback.clearTimer = setTimeout(() => {
+      if (
+        game.aiHostPlayback?.assetId === assetId &&
+        game.aiHostPlayback?.startedAtMs === startedAtMs
+      ) {
+        game.aiHostPlayback = null;
+      }
+    }, durationMs + AI_HOST_PLAYBACK_GRACE_MS);
+  }
+
+  game.aiHostPlayback = nextPlayback;
+
+  ctx.broadcast(gameId, {
+    type: "ai-host-say",
+    assetId,
+    startedAtMs,
+    durationMs: durationMs ?? undefined,
+  });
   return assetId;
 }
 
@@ -372,13 +416,13 @@ const withTimeout = async <T>(p: Promise<T>, ms: number, fallback: T): Promise<T
 export async function aiHostSayByAsset(
   ctx: Ctx,
   gameId: string,
+  game: Game,
   assetId: string,
 ): Promise<SayResult | null> {
   if (!assetId) return null;
 
-  aiHostSayAsset(ctx, gameId, assetId);
-
   const ms = await withTimeout(ctx.getTtsDurationMs(assetId), 1000, 0);
+  aiHostSayAsset(ctx, gameId, game, assetId, ms);
   return { assetId, ms: Number(ms) || 0 };
 }
 
@@ -410,9 +454,8 @@ export async function aiHostSayByKey(
 
   if (!assetId) return null;
 
-  aiHostSayAsset(ctx, gameId, assetId);
-
   const ms = await withTimeout(ctx.getTtsDurationMs(assetId), 1000, 0);
+  aiHostSayAsset(ctx, gameId, game, assetId, ms);
   return { assetId, ms: Number(ms) || 0 };
 }
 
@@ -426,7 +469,7 @@ export async function aiHostVoiceSequence(
   for (const step of steps) {
     const said: SayResult = step.slot
       ? await aiHostSayByKey(ctx, gameId, game, step.slot)
-      : await aiHostSayByAsset(ctx, gameId, step.assetId);
+      : await aiHostSayByAsset(ctx, gameId, game, step.assetId);
 
     const ms = said?.ms ?? 0;
     const alive = await ctx.sleepAndCheckGame(ms + (step.pad ?? 0), gameId);

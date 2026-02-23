@@ -154,6 +154,12 @@ type GameStateMessage = {
   boardSelectionLocked?: boolean | null;
   boardSelectionLockReason?: string | null;
   boardSelectionLockVersion?: number;
+  aiHostPlayback?: {
+    assetId: string;
+    startedAtMs: number;
+    durationMs?: number | null;
+    elapsedMs?: number;
+  } | null;
 };
 
 type UseGameSocketSyncArgs = {
@@ -162,6 +168,17 @@ type UseGameSocketSyncArgs = {
 };
 
 type TtsReady = { requestId?: string; assetId: string; url: string };
+
+function makeAiHostAssetPayload(args: {
+  seq: number;
+  assetId: string;
+  startedAtMs?: number | null;
+  offsetMs: number;
+}): string {
+  const startedAt = Number.isFinite(args.startedAtMs ?? NaN) ? Number(args.startedAtMs) : 0;
+  const receivedAt = Date.now();
+  return `${args.seq}::${args.assetId}::${startedAt}::${Math.max(0, Math.round(args.offsetMs))}::${receivedAt}`;
+}
 
 export function useGameSocketSync({ gameId, username }: UseGameSocketSyncArgs) {
   const { isSocketReady, sendJson, subscribe, nowMs } = useWebSocket();
@@ -232,6 +249,7 @@ export function useGameSocketSync({ gameId, username }: UseGameSocketSyncArgs) {
   const [answerProcessing, setAnswerProcessing] = useState<AnswerProcessingMsg | null>(null);
 
   const aiHostSeqRef = useRef<number>(0);
+  const aiHostPlaybackHydrationRef = useRef<string | null>(null);
 
   const clearDdWagerUi = () => {
     setDdWagerCapture(null);
@@ -291,14 +309,6 @@ export function useGameSocketSync({ gameId, username }: UseGameSocketSyncArgs) {
     const h = norm(host);
     return Boolean(h && myUsername && h === myUsername);
   }, [host, myUsername]);
-
-  // join-game whenever socket is ready (username-based)
-  useEffect(() => {
-    if (!isSocketReady) return;
-    if (!gameId || !myUsername) return;
-
-    sendJson({ type: "join-game", gameId, username: myUsername });
-  }, [isSocketReady, gameId, myUsername, sendJson]);
 
   useEffect(() => {
     if (!isSocketReady) return;
@@ -408,6 +418,38 @@ export function useGameSocketSync({ gameId, username }: UseGameSocketSyncArgs) {
           setTimerDuration(typeof m.timerDuration === "number" ? m.timerDuration : 0);
         } else {
           resetLocalTimerState();
+        }
+
+        if (m.aiHostPlayback?.assetId) {
+          const playback = m.aiHostPlayback;
+          const offsetFromElapsed =
+            typeof playback.elapsedMs === "number" && Number.isFinite(playback.elapsedMs)
+              ? playback.elapsedMs
+              : nowMs() - playback.startedAtMs;
+          const offsetMs = Math.max(0, Math.round(offsetFromElapsed));
+          const dedupeKey = `${playback.assetId}:${playback.startedAtMs}`;
+          const durationMs =
+            typeof playback.durationMs === "number" && Number.isFinite(playback.durationMs)
+              ? Math.max(0, playback.durationMs)
+              : null;
+
+          if (
+            aiHostPlaybackHydrationRef.current !== dedupeKey &&
+            (durationMs == null || offsetMs < durationMs + 250)
+          ) {
+            aiHostPlaybackHydrationRef.current = dedupeKey;
+            aiHostSeqRef.current += 1;
+            setAiHostAsset(
+              makeAiHostAssetPayload({
+                seq: aiHostSeqRef.current,
+                assetId: playback.assetId,
+                startedAtMs: playback.startedAtMs,
+                offsetMs,
+              }),
+            );
+          }
+        } else {
+          aiHostPlaybackHydrationRef.current = null;
         }
 
         if (m.phase !== "DD_WAGER_CAPTURE") clearDdWagerUi();
@@ -558,12 +600,41 @@ export function useGameSocketSync({ gameId, username }: UseGameSocketSyncArgs) {
       }
 
       if (message.type === "ai-host-say") {
-        const m = message as { text?: string; assetId?: string };
+        const m = message as {
+          text?: string;
+          assetId?: string;
+          startedAtMs?: number;
+          durationMs?: number;
+          elapsedMs?: number;
+        };
 
         const assetId = typeof m.assetId === "string" ? m.assetId.trim() : "";
         if (assetId) {
+          const offsetMs = (() => {
+            if (typeof m.elapsedMs === "number" && Number.isFinite(m.elapsedMs)) {
+              return Math.max(0, Math.round(m.elapsedMs));
+            }
+            if (typeof m.startedAtMs === "number" && Number.isFinite(m.startedAtMs)) {
+              return Math.max(0, Math.round(nowMs() - m.startedAtMs));
+            }
+            return 0;
+          })();
+          const durationMs =
+            typeof m.durationMs === "number" && Number.isFinite(m.durationMs)
+              ? Math.max(0, m.durationMs)
+              : null;
+
+          if (durationMs != null && offsetMs >= durationMs + 250) return;
+
           aiHostSeqRef.current += 1;
-          setAiHostAsset(`${aiHostSeqRef.current}::${assetId}`);
+          setAiHostAsset(
+            makeAiHostAssetPayload({
+              seq: aiHostSeqRef.current,
+              assetId,
+              startedAtMs: m.startedAtMs,
+              offsetMs,
+            }),
+          );
           return;
         }
 

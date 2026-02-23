@@ -107,6 +107,13 @@ export type GameState = {
     valueAssetsByValue?: Record<string, string>;
     [key: string]: unknown;
   } | null;
+  aiHostPlayback?: {
+    assetId: string;
+    startedAtMs: number;
+    durationMs?: number | null;
+    endsAtMs?: number | null;
+    clearTimer?: NodeJS.Timeout | null;
+  } | null;
   finalJeopardyFinalists?: string[] | null;
   isFinalJeopardy?: boolean;
   finalJeopardyStage?: string | null;

@@ -122,6 +122,29 @@ export const gameHandlers: Record<string, WsHandler> = {
     const fjDrawings =
       game.isFinalJeopardy && game.finalJeopardyStage === "finale" ? game.drawings || {} : null;
 
+    const aiHostPlayback = (() => {
+      const playback = game.aiHostPlayback;
+      if (!playback?.assetId || typeof playback.startedAtMs !== "number") return null;
+
+      const now = Date.now();
+      const elapsedMs = Math.max(0, now - playback.startedAtMs);
+      const durationMs =
+        typeof playback.durationMs === "number" && Number.isFinite(playback.durationMs)
+          ? Math.max(0, playback.durationMs)
+          : null;
+
+      // If duration is unknown, cap replay window to avoid stale replays after reconnect.
+      const staleCutoffMs = durationMs != null ? durationMs + 250 : 15_000;
+      if (elapsedMs >= staleCutoffMs) return null;
+
+      return {
+        assetId: playback.assetId,
+        startedAtMs: playback.startedAtMs,
+        durationMs,
+        elapsedMs,
+      };
+    })();
+
     ws.send(
       JSON.stringify({
         type: "game-state",
@@ -178,8 +201,21 @@ export const gameHandlers: Record<string, WsHandler> = {
         answerSessionId: game.answerSessionId || null,
         answerDeadlineAt: game.answerDeadlineAt || null,
         answerClueKey: game.answerClueKey || null,
+        aiHostPlayback,
       }),
     );
+
+    if (aiHostPlayback?.assetId) {
+      ws.send(
+        JSON.stringify({
+          type: "ai-host-say",
+          assetId: aiHostPlayback.assetId,
+          startedAtMs: aiHostPlayback.startedAtMs,
+          durationMs: aiHostPlayback.durationMs ?? undefined,
+          elapsedMs: aiHostPlayback.elapsedMs,
+        }),
+      );
+    }
 
     // Notify others (consistent payload)
     ctx.broadcast(gameId, {
