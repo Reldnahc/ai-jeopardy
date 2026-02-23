@@ -1,25 +1,15 @@
-import type { SocketState } from "../../types/runtime.js";
-import type { Ctx } from "../context.types.js";
 import type { PlayerState } from "../../types/runtime.js";
-
-type HandlerArgs<TData extends Record<string, unknown> = Record<string, unknown>> = {
-  ws: SocketState;
-  data: TData;
-  ctx: Ctx;
-};
-type HandlerFn<TData extends Record<string, unknown> = Record<string, unknown>> = (
-  args: HandlerArgs<TData>,
-) => Promise<unknown> | unknown;
+import type { WsHandler, WsHandlerArgs } from "./types.js";
 
 type RequestTimeSyncData = { clientSentAt?: number };
 type AuthData = { token?: string };
 type RequestPlayerListData = { gameId: string };
 
-export const userHandlers: Record<string, HandlerFn> = {
-  ping: async ({ ws }: HandlerArgs) => {
+export const userHandlers: Record<string, WsHandler> = {
+  ping: async ({ ws }: WsHandlerArgs) => {
     ws.send(JSON.stringify({ type: "pong", t: Date.now() }));
   },
-  "request-time-sync": async ({ ws, data }: HandlerArgs<RequestTimeSyncData>) => {
+  "request-time-sync": async ({ ws, data }: WsHandlerArgs<RequestTimeSyncData>) => {
     const clientSentAt = Number(data?.clientSentAt || 0);
     ws.send(
       JSON.stringify({
@@ -29,7 +19,7 @@ export const userHandlers: Record<string, HandlerFn> = {
       }),
     );
   },
-  auth: async ({ ws, data, ctx }: HandlerArgs<AuthData>) => {
+  auth: async ({ ws, data, ctx }: WsHandlerArgs<AuthData>) => {
     const token = data?.token;
 
     if (!token) {
@@ -57,7 +47,7 @@ export const userHandlers: Record<string, HandlerFn> = {
       ws.send(JSON.stringify({ type: "auth-result", ok: false }));
     }
   },
-  "check-cotd": async ({ ws, ctx }: HandlerArgs) => {
+  "check-cotd": async ({ ws, ctx }: WsHandlerArgs) => {
     ws.send(
       JSON.stringify({
         type: "category-of-the-day",
@@ -65,7 +55,7 @@ export const userHandlers: Record<string, HandlerFn> = {
       }),
     );
   },
-  "request-player-list": async ({ ws, data, ctx }: HandlerArgs<RequestPlayerListData>) => {
+  "request-player-list": async ({ ws, data, ctx }: WsHandlerArgs<RequestPlayerListData>) => {
     const { gameId } = data;
     ws.send(
       JSON.stringify({

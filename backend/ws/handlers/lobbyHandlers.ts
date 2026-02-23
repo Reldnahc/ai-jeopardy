@@ -1,9 +1,8 @@
 import type { JsonMap, PlayerState } from "../../types/runtime.js";
 import type { SocketState } from "../../types/runtime.js";
 import type { Ctx } from "../context.types.js";
+import type { WsHandler, WsHandlerArgs } from "./types.js";
 
-type HandlerArgs = { ws: SocketState; data: Record<string, unknown>; ctx: Ctx };
-type HandlerFn = (args: HandlerArgs) => Promise<unknown> | unknown;
 type GameIdData = { gameId: string };
 type PreloadDoneData = { gameId: string; username?: string; token?: number; playerKey?: string };
 type GameReadyData = { gameId: string; username?: string };
@@ -56,8 +55,8 @@ function normalizeTextColor(input: unknown, fallback = "text-white") {
   return fallback;
 }
 
-export const lobbyHandlers: Record<string, HandlerFn> = {
-  "create-game": async ({ ws, data, ctx }: { ws: SocketState; data: GameIdData; ctx: Ctx }) => {
+export const lobbyHandlers: Record<string, WsHandler> = {
+  "create-game": async ({ ws, data, ctx }: WsHandlerArgs<GameIdData>) => {
     const { gameId } = data ?? {};
 
     // Use server-authoritative host name for trace context (no client spoofing)
@@ -234,7 +233,7 @@ export const lobbyHandlers: Record<string, HandlerFn> = {
     trace.end({ success: true });
   },
 
-  "preload-done": async ({ ws, data, ctx }: { ws: SocketState; data: PreloadDoneData; ctx: Ctx }) => {
+  "preload-done": async ({ ws, data, ctx }: WsHandlerArgs<PreloadDoneData>) => {
     const { gameId, username, token, playerKey } = data ?? {};
     if (!gameId || !ctx.games?.[gameId]) return;
 
@@ -324,7 +323,7 @@ export const lobbyHandlers: Record<string, HandlerFn> = {
     });
   },
 
-  "game-ready": async ({ ws, data, ctx }: { ws: SocketState; data: GameReadyData; ctx: Ctx }) => {
+  "game-ready": async ({ ws, data, ctx }: WsHandlerArgs<GameReadyData>) => {
     const { gameId, username } = data ?? {};
     if (!gameId || !ctx.games?.[gameId]) return;
 
@@ -416,7 +415,7 @@ export const lobbyHandlers: Record<string, HandlerFn> = {
     }
   },
 
-  "create-lobby": async ({ ws, data, ctx }: { ws: SocketState; data: CreateLobbyData; ctx: Ctx }) => {
+  "create-lobby": async ({ ws, data, ctx }: WsHandlerArgs<CreateLobbyData>) => {
     const startedAt = Date.now();
     const reqId = `${startedAt}-${Math.random().toString(16).slice(2, 6)}`;
 
@@ -511,7 +510,7 @@ export const lobbyHandlers: Record<string, HandlerFn> = {
       console.warn(`[create-lobby][${reqId}] TOTAL SLOW`, { totalMs: total, gameId: newGameId });
   },
 
-  "join-lobby": async ({ ws, data, ctx }: { ws: SocketState; data: JoinLobbyData; ctx: Ctx }) => {
+  "join-lobby": async ({ ws, data, ctx }: WsHandlerArgs<JoinLobbyData>) => {
     const { gameId, username, displayname, playerKey } = data ?? {};
 
     if (!gameId || !ctx.games?.[gameId]) {
@@ -605,7 +604,7 @@ export const lobbyHandlers: Record<string, HandlerFn> = {
     });
   },
 
-  "leave-lobby": async ({ ws, data, ctx }: { ws: SocketState; data: LeaveLobbyData; ctx: Ctx }) => {
+  "leave-lobby": async ({ ws, data, ctx }: WsHandlerArgs<LeaveLobbyData>) => {
     const { gameId, playerKey, username } = data ?? {};
 
     const effectiveGameId =
@@ -664,15 +663,7 @@ export const lobbyHandlers: Record<string, HandlerFn> = {
     ctx.scheduleLobbyCleanupIfEmpty(effectiveGameId);
   },
 
-  "update-lobby-settings": async ({
-    ws,
-    data,
-    ctx,
-  }: {
-    ws: SocketState;
-    data: UpdateLobbySettingsData;
-    ctx: Ctx;
-  }) => {
+  "update-lobby-settings": async ({ ws, data, ctx }: WsHandlerArgs<UpdateLobbySettingsData>) => {
     try {
       const { gameId, patch } = data ?? {};
       if (!gameId) {
@@ -754,15 +745,7 @@ export const lobbyHandlers: Record<string, HandlerFn> = {
     }
   },
 
-  "check-lobby": async ({
-    ws,
-    data,
-    ctx,
-  }: {
-    ws: SocketState;
-    data: CheckLobbyData;
-    ctx: Ctx;
-  }) => {
+  "check-lobby": async ({ ws, data, ctx }: WsHandlerArgs<CheckLobbyData>) => {
     const { gameId } = data;
 
     let isValid = false;
@@ -773,15 +756,7 @@ export const lobbyHandlers: Record<string, HandlerFn> = {
     ws.send(JSON.stringify({ type: "check-lobby-response", isValid, gameId }));
   },
 
-  "promote-host": async ({
-    ws,
-    data,
-    ctx,
-  }: {
-    ws: SocketState;
-    data: PromoteHostData;
-    ctx: Ctx;
-  }) => {
+  "promote-host": async ({ ws, data, ctx }: WsHandlerArgs<PromoteHostData>) => {
     const { gameId, targetUsername } = data ?? {};
     const game = ctx.games?.[gameId];
     if (!game || !game.inLobby) return;
@@ -815,15 +790,7 @@ export const lobbyHandlers: Record<string, HandlerFn> = {
     });
   },
 
-  "toggle-lock-category": async ({
-    ws,
-    data,
-    ctx,
-  }: {
-    ws: SocketState;
-    data: ToggleLockCategoryData;
-    ctx: Ctx;
-  }) => {
+  "toggle-lock-category": async ({ ws, data, ctx }: WsHandlerArgs<ToggleLockCategoryData>) => {
     const { gameId, boardType, index } = data;
     const game = ctx.games[gameId];
     if (!game) return;
@@ -863,15 +830,7 @@ export const lobbyHandlers: Record<string, HandlerFn> = {
     });
   },
 
-  "randomize-category": async ({
-    ws,
-    data,
-    ctx,
-  }: {
-    ws: SocketState;
-    data: RandomizeCategoryData;
-    ctx: Ctx;
-  }) => {
+  "randomize-category": async ({ ws, data, ctx }: WsHandlerArgs<RandomizeCategoryData>) => {
     const { gameId, boardType, index, candidates } = data;
     const game = ctx.games[gameId];
     if (!game) return;
@@ -940,15 +899,7 @@ export const lobbyHandlers: Record<string, HandlerFn> = {
     });
   },
 
-  "update-category": async ({
-    ws,
-    data,
-    ctx,
-  }: {
-    ws: SocketState;
-    data: UpdateCategoryData;
-    ctx: Ctx;
-  }) => {
+  "update-category": async ({ ws, data, ctx }: WsHandlerArgs<UpdateCategoryData>) => {
     try {
       const { gameId, boardType, index, value } = data ?? {};
 
@@ -1025,15 +976,7 @@ export const lobbyHandlers: Record<string, HandlerFn> = {
     }
   },
 
-  "update-categories": async ({
-    ws,
-    data,
-    ctx,
-  }: {
-    ws: SocketState;
-    data: UpdateCategoriesData;
-    ctx: Ctx;
-  }) => {
+  "update-categories": async ({ ws, data, ctx }: WsHandlerArgs<UpdateCategoriesData>) => {
     const { gameId, categories } = data;
     const game = ctx.games[gameId];
 
@@ -1057,15 +1000,7 @@ export const lobbyHandlers: Record<string, HandlerFn> = {
     }
   },
 
-  "request-lobby-state": async ({
-    ws,
-    data,
-    ctx,
-  }: {
-    ws: SocketState;
-    data: GameIdData;
-    ctx: Ctx;
-  }) => {
+  "request-lobby-state": async ({ ws, data, ctx }: WsHandlerArgs<GameIdData>) => {
     const gameId = data.gameId;
     const snapshot = ctx.buildLobbyState(gameId, ws);
     if (!snapshot) {
