@@ -1,15 +1,15 @@
-
 import type { WsContext } from "../types/runtime.js";
+import type { LoosenContextFns, RepoFns } from "./context.unsafe-types.js";
 
 export type Trace = {
   mark?: (name: string, data?: Record<string, unknown>) => void;
 };
+
 export type AsyncLimiter = <T>(fn: () => Promise<T>) => Promise<T>;
-// This matches your current ensureTtsAsset signature (old Polly style).
-// Later we’ll replace this with your new providers-based ensureTtsAsset types.
+
 export type EnsureTtsAssetParams = {
   text: string;
-  textType: "text"; // you only use "text" currently in host.ts
+  textType: "text";
   voiceId: string;
   engine: string;
   outputFormat: string;
@@ -54,11 +54,6 @@ export type Game = {
   ttsProvider?: string | null;
 };
 
-type LoosenContextFns<T> = {
-  [K in keyof T]: T[K] extends (...args: any[]) => unknown ? (...args: unknown[]) => any : T[K];
-};
-
-type RepoFns = Record<string, (...args: unknown[]) => any>;
 type CtxRepos = Record<string, unknown> & {
   profiles: RepoFns;
   boards: RepoFns;
