@@ -1,4 +1,19 @@
-export const clearGameTimer = (game, gameId, ctx) => {
+import type { GameState, TimerKind } from "../types/runtime.js";
+import type { Ctx } from "../ws/context.types.js";
+
+type TimerExpireArgs = {
+  gameId: string;
+  game: GameState;
+  broadcast: Ctx["broadcast"];
+  timerVersion: number;
+  timerKind: TimerKind | null;
+};
+
+export const clearGameTimer = (
+  game: GameState | null | undefined,
+  gameId: string,
+  ctx: Ctx,
+) => {
   if (!game) return;
   if (game.timerTimeout) {
     clearTimeout(game.timerTimeout);
@@ -14,7 +29,14 @@ export const clearGameTimer = (game, gameId, ctx) => {
   game.timerKind = null; // "buzz" | "answer" | null
 };
 
-export const startGameTimer = (gameId, game, ctx, durationSeconds, kind, onExpire) => {
+export const startGameTimer = (
+  gameId: string,
+  game: GameState | null | undefined,
+  ctx: Ctx,
+  durationSeconds: number,
+  kind?: TimerKind | null,
+  onExpire?: ((args: TimerExpireArgs) => void) | null,
+) => {
   if (!game) return;
 
   // Cancel any previous timer and bump version so stale timeouts can't win

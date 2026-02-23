@@ -102,7 +102,21 @@ export async function populateCategoryVisuals(
           attribution: found.attribution,
           trace: settings.trace,
         },
-        ctx.repos,
+        (ctx.repos as unknown) as {
+          images?: {
+            getIdBySha256(sha256: string): Promise<string | null>;
+            upsertImageAsset(
+              sha256: string,
+              bytes: Buffer,
+              size: number,
+              width: number | null,
+              height: number | null,
+              sourceUrl: string | null,
+              license: string | null,
+              attribution: string | null,
+            ): Promise<string | null>;
+          };
+        },
       );
 
       clue.media = { type: "image", assetId };

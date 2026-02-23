@@ -1,4 +1,14 @@
-export const clearAnswerWindow = (game) => {
+import type { GameState } from "../types/runtime.js";
+
+type BroadcastFn = (gameId: string, payload: Record<string, unknown>) => void;
+type AnswerWindowExpireArgs = {
+  gameId: string;
+  game: GameState;
+  broadcast: BroadcastFn;
+  answerWindowVersion: number;
+};
+
+export const clearAnswerWindow = (game: GameState | null | undefined) => {
   if (!game) return;
   if (game.answerTimer) {
     clearTimeout(game.answerTimer);
@@ -9,7 +19,13 @@ export const clearAnswerWindow = (game) => {
   game.answerWindowVersion = null;
 };
 
-export const startAnswerWindow = (gameId, game, broadcast, durationMs, onExpire) => {
+export const startAnswerWindow = (
+  gameId: string,
+  game: GameState | null | undefined,
+  broadcast: BroadcastFn,
+  durationMs: number,
+  onExpire?: ((args: AnswerWindowExpireArgs) => void) | null,
+) => {
   if (!game) return;
 
   clearAnswerWindow(game);

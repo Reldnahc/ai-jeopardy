@@ -1,16 +1,17 @@
 import { games } from "../state/gamesStore.js";
 import { normalizeCategories11 } from "../validation/boardImport.js";
+import type { GameState, PlayerState, SocketState } from "../types/runtime.js";
 
-export const buildLobbyState = (gameId, ws) => {
+export const buildLobbyState = (gameId: string, ws: SocketState) => {
   const game = games[gameId];
   if (!game) return null;
 
-  const you = game.players?.find((p) => p.id === ws.id) || null;
+  const you = game.players?.find((p: PlayerState) => p.id === ws.id) || null;
 
   return {
     type: "lobby-state",
     gameId,
-    players: game.players.map((p) => ({
+    players: game.players.map((p: PlayerState) => ({
       username: p.username,
       displayname: p.displayname,
       online: p?.online !== false,
@@ -42,12 +43,15 @@ export const buildLobbyState = (gameId, ws) => {
   };
 };
 
-export const getPlayerForSocket = (game, ws) => {
+export const getPlayerForSocket = (
+  game: GameState | null | undefined,
+  ws: SocketState | null | undefined,
+): PlayerState | null => {
   if (!game || !ws) return null;
-  return (game.players || []).find((p) => p.id === ws.id) || null;
+  return (game.players || []).find((p: PlayerState) => p.id === ws.id) || null;
 };
 
-export const sendLobbySnapshot = (ws, gameId) => {
+export const sendLobbySnapshot = (ws: SocketState, gameId: string) => {
   const snap = buildLobbyState(gameId, ws);
   if (snap) ws.send(JSON.stringify(snap));
 };

@@ -1,12 +1,24 @@
 import { estimateMp3DurationMsFromHeaderBytes } from "./mp3Duration.js";
 import { estimateWavDurationMsFromHeaderBytes } from "./wavDuration.js";
 
-export function createTtsDurationService(repos) {
+type TtsBinaryRow = {
+  data?: Buffer | Uint8Array | null;
+  bytes?: number | null;
+  content_type?: string | null;
+};
+
+type TtsDurationRepos = {
+  tts?: {
+    getBinaryById(assetId: string): Promise<TtsBinaryRow | null>;
+  };
+};
+
+export function createTtsDurationService(repos: TtsDurationRepos) {
   if (!repos?.tts) throw new Error("createTtsDurationService: missing repos.tts");
 
-  const cache = new Map();
+  const cache = new Map<string, number>();
 
-  async function getDurationMs(assetId) {
+  async function getDurationMs(assetId: string | null | undefined): Promise<number | null> {
     if (!assetId) return null;
     if (cache.has(assetId)) return cache.get(assetId);
 

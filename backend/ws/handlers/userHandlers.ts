@@ -1,8 +1,17 @@
-export const userHandlers = {
-  ping: async ({ ws }) => {
+import type { PlayerState } from "../../types/runtime.js";
+import { normalizeRole } from "../../../shared/roles.js";
+import type { Role } from "../../../shared/roles.js";
+import type { WsHandler, WsHandlerArgs } from "./types.js";
+
+type RequestTimeSyncData = { clientSentAt?: number };
+type AuthData = { token?: string };
+type RequestPlayerListData = { gameId: string };
+
+export const userHandlers: Record<string, WsHandler> = {
+  ping: async ({ ws }: WsHandlerArgs) => {
     ws.send(JSON.stringify({ type: "pong", t: Date.now() }));
   },
-  "request-time-sync": async ({ ws, data }) => {
+  "request-time-sync": async ({ ws, data }: WsHandlerArgs<RequestTimeSyncData>) => {
     const clientSentAt = Number(data?.clientSentAt || 0);
     ws.send(
       JSON.stringify({
@@ -12,7 +21,7 @@ export const userHandlers = {
       }),
     );
   },
-  auth: async ({ ws, data, ctx }) => {
+  auth: async ({ ws, data, ctx }: WsHandlerArgs<AuthData>) => {
     const token = data?.token;
 
     if (!token) {
@@ -25,12 +34,14 @@ export const userHandlers = {
       const payload = ctx.verifyJwt(token);
       const userId = payload?.sub;
 
-      let role = payload?.role || "default";
+      const toRole = (value: unknown): Role | "default" => normalizeRole(value);
+
+      let role: Role | "default" = toRole(payload?.role);
 
       // Prefer DB role (prevents stale tokens)
       if (userId) {
         const dbRole = await ctx.repos.profiles.getRoleById(userId);
-        if (dbRole) role = dbRole;
+        if (dbRole) role = toRole(dbRole);
       }
 
       ws.auth = { isAuthed: true, userId, role };
@@ -40,7 +51,7 @@ export const userHandlers = {
       ws.send(JSON.stringify({ type: "auth-result", ok: false }));
     }
   },
-  "check-cotd": async ({ ws, ctx }) => {
+  "check-cotd": async ({ ws, ctx }: WsHandlerArgs) => {
     ws.send(
       JSON.stringify({
         type: "category-of-the-day",
@@ -48,13 +59,13 @@ export const userHandlers = {
       }),
     );
   },
-  "request-player-list": async ({ ws, data, ctx }) => {
+  "request-player-list": async ({ ws, data, ctx }: WsHandlerArgs<RequestPlayerListData>) => {
     const { gameId } = data;
     ws.send(
       JSON.stringify({
         type: "player-list-update",
         gameId,
-        players: ctx.games[gameId].players.map((p) => ({
+        players: ctx.games[gameId].players.map((p: PlayerState) => ({
           username: p.username,
           displayname: p.displayname,
           online: p?.online,

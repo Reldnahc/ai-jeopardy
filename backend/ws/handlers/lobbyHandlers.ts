@@ -1,19 +1,62 @@
-function normalizeBgColor(input, fallback = "bg-blue-500") {
+import type { JsonMap, PlayerState } from "../../types/runtime.js";
+import type { SocketState } from "../../types/runtime.js";
+import type { Ctx } from "../context.types.js";
+import type { WsHandler, WsHandlerArgs } from "./types.js";
+
+type GameIdData = { gameId: string };
+type PreloadDoneData = { gameId: string; username?: string; token?: number; playerKey?: string };
+type GameReadyData = { gameId: string; username?: string };
+type CreateLobbyData = {
+  username?: string;
+  displayname?: string;
+  playerKey?: string;
+  categories?: unknown;
+};
+type JoinLobbyData = {
+  gameId: string;
+  username?: string;
+  displayname?: string;
+  playerKey?: string;
+};
+type LeaveLobbyData = { gameId?: string; playerKey?: string; username?: string };
+type UpdateLobbySettingsData = { gameId: string; patch?: Record<string, unknown> };
+type CheckLobbyData = { gameId: string };
+type PromoteHostData = { gameId: string; targetUsername?: string };
+type ToggleLockCategoryData = {
+  gameId: string;
+  boardType: "firstBoard" | "secondBoard" | "finalJeopardy";
+  index: number;
+};
+type RandomizeCategoryData = {
+  gameId: string;
+  boardType: "firstBoard" | "secondBoard" | "finalJeopardy";
+  index?: number;
+  candidates?: unknown[];
+};
+type UpdateCategoryData = {
+  gameId: string;
+  boardType: "firstBoard" | "secondBoard" | "finalJeopardy";
+  index?: number;
+  value?: string;
+};
+type UpdateCategoriesData = { gameId: string; categories?: unknown };
+
+function normalizeBgColor(input: unknown, fallback = "bg-blue-500") {
   const s = String(input ?? "").trim();
   if (/^bg-[a-z]+-\d{3}$/.test(s)) return s; // tailwind class
   if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(s)) return s; // allow hex if you support it
   return fallback;
 }
 
-function normalizeTextColor(input, fallback = "text-white") {
+function normalizeTextColor(input: unknown, fallback = "text-white") {
   const s = String(input ?? "").trim();
   if (/^text-[a-z]+-\d{3}$/.test(s)) return s;
   if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(s)) return s;
   return fallback;
 }
 
-export const lobbyHandlers = {
-  "create-game": async ({ ws, data, ctx }) => {
+export const lobbyHandlers: Record<string, WsHandler> = {
+  "create-game": async ({ ws, data, ctx }: WsHandlerArgs<GameIdData>) => {
     const { gameId } = data ?? {};
 
     // Use server-authoritative host name for trace context (no client spoofing)
@@ -30,7 +73,7 @@ export const lobbyHandlers = {
     const s = ctx.ensureLobbySettings(ctx, game, ctx.appConfig);
 
     const host = game.host;
-    const categories = game.categories;
+    const categories = ctx.normalizeCategories11(game.categories);
     const role = ctx.normalizeRole(ws);
 
     const selectedModel = s.selectedModel;
@@ -159,7 +202,7 @@ export const lobbyHandlers = {
 
     // --- AI authority bootstrapping (selector + welcome audio) ---
     // Pick a starting selector (random online player; fallback to first player)
-    const online = (game.players ?? []).filter((p) => p?.online !== false);
+    const online = (game.players ?? []).filter((p: PlayerState) => p?.online !== false);
     const pool = online.length > 0 ? online : (game.players ?? []);
     const pick = pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : null;
 
@@ -190,7 +233,7 @@ export const lobbyHandlers = {
     trace.end({ success: true });
   },
 
-  "preload-done": async ({ ws, data, ctx }) => {
+  "preload-done": async ({ ws, data, ctx }: WsHandlerArgs<PreloadDoneData>) => {
     const { gameId, username, token, playerKey } = data ?? {};
     if (!gameId || !ctx.games?.[gameId]) return;
 
@@ -222,8 +265,8 @@ export const lobbyHandlers = {
       game.preload.requiredForToken.length === 0
     ) {
       game.preload.requiredForToken = (game.players ?? [])
-        .filter((p) => p.online)
-        .map((p) =>
+        .filter((p: PlayerState) => p.online)
+        .map((p: PlayerState) =>
           String(ctx.playerStableId(p) ?? "")
             .trim()
             .toLowerCase(),
@@ -235,7 +278,9 @@ export const lobbyHandlers = {
     // We only wait on requiredForToken.
     const required = game.preload.requiredForToken;
 
-    const allDone = required.every((id) => game.preload.acksByPlayer?.[id] === finalToken);
+    const allDone = required.every(
+      (id: string) => game.preload.acksByPlayer?.[id] === finalToken,
+    );
     if (!allDone) return;
 
     // Phase 2: everyone is ready → start game
@@ -254,8 +299,8 @@ export const lobbyHandlers = {
 
     // Now that we're transitioning phases, expected acks should reflect who is online NOW.
     const requiredNow = (game.players ?? [])
-      .filter((p) => p.online)
-      .map((p) =>
+      .filter((p: PlayerState) => p.online)
+      .map((p: PlayerState) =>
         String(ctx.playerStableId(p) ?? "")
           .trim()
           .toLowerCase(),
@@ -263,7 +308,7 @@ export const lobbyHandlers = {
       .filter(Boolean);
 
     game.gameReady = {
-      expected: Object.fromEntries(requiredNow.map((id) => [id, true])),
+      expected: Object.fromEntries(requiredNow.map((id: string) => [id, true])),
       acks: {},
       done: false,
     };
@@ -278,7 +323,7 @@ export const lobbyHandlers = {
     });
   },
 
-  "game-ready": async ({ ws, data, ctx }) => {
+  "game-ready": async ({ ws, data, ctx }: WsHandlerArgs<GameReadyData>) => {
     const { gameId, username } = data ?? {};
     if (!gameId || !ctx.games?.[gameId]) return;
 
@@ -299,7 +344,7 @@ export const lobbyHandlers = {
     game.gameReady.acks[stable] = true;
 
     const expectedIds = Object.keys(game.gameReady.expected);
-    const allReady = expectedIds.every((id) => game.gameReady.acks[id]);
+    const allReady = expectedIds.every((id: string) => game.gameReady.acks[id]);
     if (!allReady) return;
 
     game.gameReady.done = true;
@@ -370,11 +415,11 @@ export const lobbyHandlers = {
     }
   },
 
-  "create-lobby": async ({ ws, data, ctx }) => {
+  "create-lobby": async ({ ws, data, ctx }: WsHandlerArgs<CreateLobbyData>) => {
     const startedAt = Date.now();
     const reqId = `${startedAt}-${Math.random().toString(16).slice(2, 6)}`;
 
-    const sendTimed = (type, payloadObj) => {
+    const sendTimed = (type: string, payloadObj: JsonMap) => {
       const t0 = Date.now();
       try {
         ws.send(JSON.stringify(payloadObj));
@@ -450,7 +495,7 @@ export const lobbyHandlers = {
       type: "lobby-created",
       gameId: newGameId,
       categories: ctx.games[newGameId].categories,
-      players: ctx.games[newGameId].players.map((p) => ({
+      players: ctx.games[newGameId].players.map((p: PlayerState) => ({
         username: p.username,
         displayname: p.displayname,
         online: Boolean(p.online),
@@ -465,7 +510,7 @@ export const lobbyHandlers = {
       console.warn(`[create-lobby][${reqId}] TOTAL SLOW`, { totalMs: total, gameId: newGameId });
   },
 
-  "join-lobby": async ({ ws, data, ctx }) => {
+  "join-lobby": async ({ ws, data, ctx }: WsHandlerArgs<JoinLobbyData>) => {
     const { gameId, username, displayname, playerKey } = data ?? {};
 
     if (!gameId || !ctx.games?.[gameId]) {
@@ -491,18 +536,18 @@ export const lobbyHandlers = {
 
     // 1) Reconnect by playerKey when available
     const existingByKey = stableKey
-      ? game.players.find((p) => p.playerKey && p.playerKey === stableKey)
+      ? game.players.find((p: PlayerState) => p.playerKey && p.playerKey === stableKey)
       : null;
 
     // 2) Fallback reconnect by username
     const existingByUsername = game.players.find(
-      (p) =>
+      (p: PlayerState) =>
         String(p.username ?? "")
           .trim()
           .toLowerCase() === u,
     );
 
-    const attachSocket = (player) => {
+    const attachSocket = (player: PlayerState) => {
       player.id = ws.id;
       player.online = true;
       player.username = u; // server-authoritative identity
@@ -520,9 +565,9 @@ export const lobbyHandlers = {
     } else {
       // NEW PLAYER (but still protect against race)
       const race = stableKey
-        ? game.players.find((p) => p.playerKey === stableKey)
+        ? game.players.find((p: PlayerState) => p.playerKey === stableKey)
         : game.players.find(
-            (p) =>
+            (p: PlayerState) =>
               String(p.username ?? "")
                 .trim()
                 .toLowerCase() === u,
@@ -550,7 +595,7 @@ export const lobbyHandlers = {
     // Broadcast a minimal list (UI will fetch cosmetics by username)
     ctx.broadcast(gameId, {
       type: "player-list-update",
-      players: game.players.map((p) => ({
+      players: game.players.map((p: PlayerState) => ({
         username: p.username,
         displayname: p.displayname,
         online: Boolean(p.online),
@@ -559,7 +604,7 @@ export const lobbyHandlers = {
     });
   },
 
-  "leave-lobby": async ({ ws, data, ctx }) => {
+  "leave-lobby": async ({ ws, data, ctx }: WsHandlerArgs<LeaveLobbyData>) => {
     const { gameId, playerKey, username } = data ?? {};
 
     const effectiveGameId =
@@ -580,7 +625,7 @@ export const lobbyHandlers = {
 
     const before = game.players.length;
 
-    game.players = game.players.filter((p) => {
+    game.players = game.players.filter((p: PlayerState) => {
       const pid = ctx.playerStableId(p); // must match your stable-id logic
       return pid !== stable;
     });
@@ -607,7 +652,7 @@ export const lobbyHandlers = {
 
     ctx.broadcast(effectiveGameId, {
       type: "player-list-update",
-      players: game.players.map((p) => ({
+      players: game.players.map((p: PlayerState) => ({
         username: p.username,
         displayname: p.displayname,
         online: Boolean(p.online),
@@ -618,7 +663,7 @@ export const lobbyHandlers = {
     ctx.scheduleLobbyCleanupIfEmpty(effectiveGameId);
   },
 
-  "update-lobby-settings": async ({ ws, data, ctx }) => {
+  "update-lobby-settings": async ({ ws, data, ctx }: WsHandlerArgs<UpdateLobbySettingsData>) => {
     try {
       const { gameId, patch } = data ?? {};
       if (!gameId) {
@@ -652,7 +697,8 @@ export const lobbyHandlers = {
         };
       }
 
-      const p = typeof patch === "object" && patch !== null ? patch : {};
+      const p =
+        typeof patch === "object" && patch !== null ? (patch as Record<string, unknown>) : {};
 
       // Validate + apply
       if (typeof p.timeToBuzz === "number" && Number.isFinite(p.timeToBuzz)) {
@@ -699,7 +745,7 @@ export const lobbyHandlers = {
     }
   },
 
-  "check-lobby": async ({ ws, data, ctx }) => {
+  "check-lobby": async ({ ws, data, ctx }: WsHandlerArgs<CheckLobbyData>) => {
     const { gameId } = data;
 
     let isValid = false;
@@ -710,7 +756,7 @@ export const lobbyHandlers = {
     ws.send(JSON.stringify({ type: "check-lobby-response", isValid, gameId }));
   },
 
-  "promote-host": async ({ ws, data, ctx }) => {
+  "promote-host": async ({ ws, data, ctx }: WsHandlerArgs<PromoteHostData>) => {
     const { gameId, targetUsername } = data ?? {};
     const game = ctx.games?.[gameId];
     if (!game || !game.inLobby) return;
@@ -722,7 +768,7 @@ export const lobbyHandlers = {
     if (!targetU) return;
 
     const targetPlayer = (game.players || []).find(
-      (p) =>
+      (p: PlayerState) =>
         String(p.username ?? "")
           .trim()
           .toLowerCase() === targetU,
@@ -735,7 +781,7 @@ export const lobbyHandlers = {
 
     ctx.broadcast(gameId, {
       type: "player-list-update",
-      players: game.players.map((p) => ({
+      players: game.players.map((p: PlayerState) => ({
         username: p.username,
         displayname: p.displayname,
         online: Boolean(p.online),
@@ -744,7 +790,7 @@ export const lobbyHandlers = {
     });
   },
 
-  "toggle-lock-category": async ({ ws, data, ctx }) => {
+  "toggle-lock-category": async ({ ws, data, ctx }: WsHandlerArgs<ToggleLockCategoryData>) => {
     const { gameId, boardType, index } = data;
     const game = ctx.games[gameId];
     if (!game) return;
@@ -784,7 +830,7 @@ export const lobbyHandlers = {
     });
   },
 
-  "randomize-category": async ({ ws, data, ctx }) => {
+  "randomize-category": async ({ ws, data, ctx }: WsHandlerArgs<RandomizeCategoryData>) => {
     const { gameId, boardType, index, candidates } = data;
     const game = ctx.games[gameId];
     if (!game) return;
@@ -816,12 +862,14 @@ export const lobbyHandlers = {
     else if (bt === "secondBoard") globalIndex = 5 + idx;
     else globalIndex = 10;
 
-    const norm = (s) =>
+    const norm = (s: unknown) =>
       String(s ?? "")
         .trim()
         .toLowerCase();
     const used = new Set(
-      game.categories.map((c, i) => (i === globalIndex ? "" : norm(c))).filter((v) => v.length > 0),
+      game.categories
+        .map((c: unknown, i: number) => (i === globalIndex ? "" : norm(c)))
+        .filter((v: string) => v.length > 0),
     );
 
     const list = Array.isArray(candidates) ? candidates : [];
@@ -851,7 +899,7 @@ export const lobbyHandlers = {
     });
   },
 
-  "update-category": async ({ ws, data, ctx }) => {
+  "update-category": async ({ ws, data, ctx }: WsHandlerArgs<UpdateCategoryData>) => {
     try {
       const { gameId, boardType, index, value } = data ?? {};
 
@@ -928,7 +976,7 @@ export const lobbyHandlers = {
     }
   },
 
-  "update-categories": async ({ ws, data, ctx }) => {
+  "update-categories": async ({ ws, data, ctx }: WsHandlerArgs<UpdateCategoriesData>) => {
     const { gameId, categories } = data;
     const game = ctx.games[gameId];
 
@@ -952,7 +1000,7 @@ export const lobbyHandlers = {
     }
   },
 
-  "request-lobby-state": async ({ ws, data, ctx }) => {
+  "request-lobby-state": async ({ ws, data, ctx }: WsHandlerArgs<GameIdData>) => {
     const gameId = data.gameId;
     const snapshot = ctx.buildLobbyState(gameId, ws);
     if (!snapshot) {

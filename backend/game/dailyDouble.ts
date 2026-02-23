@@ -1,7 +1,10 @@
+import type { GameState } from "../types/runtime.js";
+import type { Ctx } from "../ws/context.types.js";
+
 function makeSessionId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
-export function clearDdWagerTimer(ctx, gameId, game) {
+export function clearDdWagerTimer(ctx: Ctx, gameId: string, game: GameState) {
   if (game._ddWagerTimer) {
     clearTimeout(game._ddWagerTimer);
   }
@@ -12,7 +15,13 @@ export function clearDdWagerTimer(ctx, gameId, game) {
   });
 }
 
-function armDdWagerTimer(gameId, game, ctx, ddWagerSessionId, durationMs) {
+function armDdWagerTimer(
+  gameId: string,
+  game: GameState,
+  ctx: Ctx,
+  ddWagerSessionId: string,
+  durationMs: number,
+) {
   clearDdWagerTimer(ctx, gameId, game);
 
   console.log("[DD] armDdWagerTimer", { gameId, ddWagerSessionId, durationMs });
@@ -32,7 +41,12 @@ function armDdWagerTimer(gameId, game, ctx, ddWagerSessionId, durationMs) {
   }, durationMs + PAD_MS);
 }
 
-export async function repromptDdWager(gameId, game, ctx, args) {
+export async function repromptDdWager(
+  gameId: string,
+  game: GameState,
+  ctx: Ctx,
+  args: { reason?: string } | null,
+) {
   const dd = game.dailyDouble;
   if (!dd) return;
 
@@ -88,7 +102,12 @@ export async function repromptDdWager(gameId, game, ctx, args) {
   startDdWagerCapture(gameId, game, ctx);
 }
 
-export function startDdWagerCapture(gameId, game, ctx, opts = {}) {
+export function startDdWagerCapture(
+  gameId: string,
+  game: GameState,
+  ctx: Ctx,
+  opts: Record<string, unknown> = {},
+) {
   const dd = game.dailyDouble;
   if (!dd) return;
 
@@ -124,13 +143,13 @@ export function startDdWagerCapture(gameId, game, ctx, opts = {}) {
   ctx.startGameTimer(gameId, game, ctx, Math.ceil(durationMs / 1000), "wager");
 }
 
-function parseValueAsNumber(val) {
+function parseValueAsNumber(val: unknown): number {
   const n = Number(String(val || "").replace(/[^0-9]/g, ""));
   return Number.isFinite(n) ? n : 0;
 }
 
-function computeBoardMax(game, boardKey) {
-  const board = game.boardData?.[boardKey];
+function computeBoardMax(game: GameState, boardKey: string): number {
+  const board = game.boardData?.[boardKey] as { categories?: Array<{ values?: Array<{ value?: unknown }> }> } | undefined;
   let max = 0;
   for (const cat of board?.categories || []) {
     for (const clue of cat?.values || []) {
@@ -141,14 +160,23 @@ function computeBoardMax(game, boardKey) {
   return max || 0;
 }
 
-export function computeDailyDoubleMaxWager(game, boardKey, playerName) {
+export function computeDailyDoubleMaxWager(
+  game: GameState,
+  boardKey: string,
+  playerName: string,
+): number {
   const boardMax = computeBoardMax(game, boardKey);
   const score = Number(game.scores?.[playerName] || 0);
   // Jeopardy rule: max is max(boardMax, score); if score negative, still boardMax
   return Math.max(boardMax, score, 0);
 }
 
-export async function finalizeDailyDoubleWagerAndStartClue(gameId, game, ctx, args) {
+export async function finalizeDailyDoubleWagerAndStartClue(
+  gameId: string,
+  game: GameState,
+  ctx: Ctx,
+  args: { wager?: number; fallback?: boolean; reason?: string | null; fallbackWager?: number } | null,
+) {
   const { wager, fallback = false, reason = null } = args || {};
 
   const dd = game.dailyDouble;
@@ -274,6 +302,6 @@ export async function finalizeDailyDoubleWagerAndStartClue(gameId, game, ctx, ar
 
     ctx
       .autoResolveAfterJudgement(ctx, gameId, g, game.answeringPlayerKey, "incorrect")
-      .catch((e) => console.error("[dd-answer-timeout] autoResolve failed:", e));
+      .catch((e: unknown) => console.error("[dd-answer-timeout] autoResolve failed:", e));
   });
 }

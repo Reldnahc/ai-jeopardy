@@ -1,16 +1,49 @@
-function normUsername(u) {
+import type { GameState, PlayerState, SocketState } from "../../types/runtime.js";
+import type { Ctx } from "../context.types.js";
+import type { WsHandler, WsHandlerArgs } from "./types.js";
+
+type JoinGameData = { gameId: string; username?: string; displayname?: string };
+type LeaveGameData = { gameId: string; username?: string };
+type BuzzData = { gameId: string; estimatedServerBuzzAtMs?: number; clientSeq?: number };
+type GameIdData = { gameId: string };
+type UpdateScoreData = { gameId: string; username: string; delta: number };
+type DdSnipeNextData = { gameId: string; enabled?: boolean };
+type AnswerAudioBlobData = {
+  gameId: string;
+  answerSessionId?: string;
+  mimeType?: string;
+  dataBase64?: string;
+};
+type ClueSelectedData = { gameId: string; clue?: Record<string, unknown> };
+type DailyDoubleWagerAudioBlobData = {
+  gameId: string;
+  ddWagerSessionId?: string;
+  mimeType?: string;
+  dataBase64?: string;
+};
+type SubmitWagerData = { gameId: string; player: string; wager: number };
+type SubmitDrawingData = { gameId: string; player: string; drawing: string };
+type TtsEnsureData = {
+  gameId: string;
+  text?: string;
+  textType?: string;
+  voiceId?: string;
+  requestId?: string;
+};
+
+function normUsername(u: unknown): string {
   return String(u ?? "")
     .trim()
     .toLowerCase();
 }
 
-function pickDisplayname(d, fallbackUsername) {
+function pickDisplayname(d: unknown, fallbackUsername: string): string {
   const s = String(d ?? "").trim();
   return s || fallbackUsername;
 }
 
-export const gameHandlers = {
-  "join-game": async ({ ws, data, ctx }) => {
+export const gameHandlers: Record<string, WsHandler> = {
+  "join-game": async ({ ws, data, ctx }: WsHandlerArgs<JoinGameData>) => {
     const { gameId, username, displayname } = data ?? {};
     const u = normUsername(username);
 
@@ -24,10 +57,10 @@ export const gameHandlers = {
       return;
     }
 
-    const game = ctx.games[gameId];
+    const game = ctx.games[gameId] as GameState;
 
     // Find by username (canonical identity)
-    let player = (game.players ?? []).find((p) => normUsername(p.username) === u);
+    let player = (game.players ?? []).find((p: PlayerState) => normUsername(p.username) === u);
 
     if (player) {
       // Reconnect
@@ -46,7 +79,7 @@ export const gameHandlers = {
       const profile = await ctx.repos.profiles.getPublicProfileByUsername(u);
 
       // Race condition check (still by username)
-      player = (game.players ?? []).find((p) => normUsername(p.username) === u);
+      player = (game.players ?? []).find((p: PlayerState) => normUsername(p.username) === u);
       if (player) {
         player.id = ws.id;
         player.online = true;
@@ -69,8 +102,8 @@ export const gameHandlers = {
     }
 
     const me =
-      game.players.find((p) => p.id === ws.id) ||
-      game.players.find((p) => normUsername(p.username) === u) ||
+      game.players.find((p: PlayerState) => p.id === ws.id) ||
+      game.players.find((p: PlayerState) => normUsername(p.username) === u) ||
       null;
 
     const myUsername = normUsername(me?.username);
@@ -95,7 +128,7 @@ export const gameHandlers = {
         type: "game-state",
         gameId,
 
-        players: game.players.map((p) => ({
+        players: game.players.map((p: PlayerState) => ({
           username: p.username,
           displayname: p.displayname,
           online: p?.online !== false,
@@ -152,7 +185,7 @@ export const gameHandlers = {
     // Notify others (consistent payload)
     ctx.broadcast(gameId, {
       type: "player-list-update",
-      players: game.players.map((p) => ({
+      players: game.players.map((p: PlayerState) => ({
         username: p.username,
         displayname: p.displayname,
         online: p?.online !== false,
@@ -161,24 +194,26 @@ export const gameHandlers = {
     });
   },
 
-  "leave-game": async ({ ws, data, ctx }) => {
+  "leave-game": async ({ ws, data, ctx }: WsHandlerArgs<LeaveGameData>) => {
     const { gameId, username } = data ?? {};
     if (!gameId || !ctx.games?.[gameId]) return;
 
-    const game = ctx.games[gameId];
+    const game = ctx.games[gameId] as GameState;
 
     const u = normUsername(username);
 
     const leavingPlayer =
-      (u && game.players.find((p) => normUsername(p.username) === u)) ||
-      game.players.find((p) => p.id === ws.id);
+      (u && game.players.find((p: PlayerState) => normUsername(p.username) === u)) ||
+      game.players.find((p: PlayerState) => p.id === ws.id);
 
     if (!leavingPlayer) return;
 
     const leavingUsername = normUsername(leavingPlayer.username);
 
     // HARD REMOVE from players
-    game.players = game.players.filter((p) => normUsername(p.username) !== leavingUsername);
+    game.players = game.players.filter(
+      (p: PlayerState) => normUsername(p.username) !== leavingUsername,
+    );
 
     // PURGE per-player state
     if (game.wagers) delete game.wagers[leavingUsername];
@@ -199,7 +234,7 @@ export const gameHandlers = {
 
     ctx.broadcast(gameId, {
       type: "player-list-update",
-      players: game.players.map((p) => ({
+      players: game.players.map((p: PlayerState) => ({
         username: p.username,
         displayname: p.displayname,
         online: p?.online !== false,
@@ -211,12 +246,12 @@ export const gameHandlers = {
     ctx.checkAllDrawingsSubmitted(game, gameId, ctx);
   },
 
-  buzz: async ({ ws, data, ctx }) => {
+  buzz: async ({ ws, data, ctx }: WsHandlerArgs<BuzzData>) => {
     const { gameId } = data;
-    const game = ctx.games?.[gameId];
+    const game = ctx.games?.[gameId] as GameState | undefined;
     if (!game) return;
 
-    const player = game.players.find((p) => p.id === ws.id);
+    const player = game.players.find((p: PlayerState) => p.id === ws.id);
     if (!player?.username) return;
 
     const stable = ctx.playerStableId(player); // should be normalized username
@@ -336,7 +371,11 @@ export const gameHandlers = {
 
         if (candidates.length === 0) return;
 
-        candidates.sort((a, b) => {
+        candidates.sort(
+          (
+            a: { est: number; arrival: number; msgSeq?: number },
+            b: { est: number; arrival: number; msgSeq?: number },
+          ) => {
           const dt = a.est - b.est;
           if (Math.abs(dt) <= EPS_MS) {
             const da = a.arrival - b.arrival;
@@ -344,7 +383,8 @@ export const gameHandlers = {
             return (a.msgSeq || 0) - (b.msgSeq || 0);
           }
           return dt;
-        });
+          },
+        );
 
         const winner = candidates[0];
         if (!winner?.playerUsername) return;
@@ -444,7 +484,7 @@ export const gameHandlers = {
 
             ctx
               .autoResolveAfterJudgement(ctx, gameId, ggg, winner.playerUsername, "incorrect")
-              .catch((e) => console.error("[answer-timeout] autoResolve failed:", e));
+              .catch((e: unknown) => console.error("[answer-timeout] autoResolve failed:", e));
           });
         }, startCaptureAfterMs);
       }, COLLECT_MS);
@@ -454,7 +494,9 @@ export const gameHandlers = {
     const clientSeq = Number(data?.clientSeq || 0);
 
     // Dedupe: avoid multiple from same player
-    const already = game.pendingBuzz.candidates.find((c) => c.playerUsername === stable);
+    const already = game.pendingBuzz.candidates.find(
+      (c: { playerUsername: string }) => c.playerUsername === stable,
+    );
     if (!already) {
       game.pendingBuzz.candidates.push({
         playerUsername: stable,
@@ -467,9 +509,9 @@ export const gameHandlers = {
     }
   },
 
-  "dd-snipe-next": async ({ ws, data, ctx }) => {
+  "dd-snipe-next": async ({ ws, data, ctx }: WsHandlerArgs<DdSnipeNextData>) => {
     const { gameId, enabled } = data || {};
-    const game = ctx.games?.[gameId];
+    const game = ctx.games?.[gameId] as GameState | undefined;
     if (!game) return;
 
     game.ddSnipeNext = Boolean(enabled);
@@ -480,7 +522,7 @@ export const gameHandlers = {
     });
   },
 
-  "unlock-buzzer": async ({ ws, data, ctx }) => {
+  "unlock-buzzer": async ({ ws, data, ctx }: WsHandlerArgs<GameIdData>) => {
     const { gameId } = data;
     const game = ctx.games[gameId];
     if (!game) return;
@@ -491,7 +533,7 @@ export const gameHandlers = {
     ctx.doUnlockBuzzerAuthoritative(gameId, game, ctx);
   },
 
-  "lock-buzzer": async ({ ws, data, ctx }) => {
+  "lock-buzzer": async ({ ws, data, ctx }: WsHandlerArgs<GameIdData>) => {
     const { gameId } = data;
     if (!ctx.requireHost(ctx.games[gameId], ws)) return;
 
@@ -501,15 +543,15 @@ export const gameHandlers = {
     }
   },
 
-  "answer-audio-blob": async ({ ws, data, ctx }) => {
+  "answer-audio-blob": async ({ ws, data, ctx }: WsHandlerArgs<AnswerAudioBlobData>) => {
     const { gameId, answerSessionId, mimeType, dataBase64 } = data || {};
     const game = ctx.games?.[gameId];
     if (!game) return;
-    const norm = (v) =>
+    const norm = (v: unknown) =>
       String(v ?? "")
         .trim()
         .toLowerCase();
-    const player = game.players?.find((p) => p.id === ws.id);
+    const player = game.players?.find((p: PlayerState) => p.id === ws.id);
     const playerDisplayname = String(player?.displayname ?? "").trim() || null;
     const playerUsername = norm(player?.username);
 
@@ -525,7 +567,7 @@ export const gameHandlers = {
       );
       return ctx
         .autoResolveAfterJudgement(ctx, gameId, game, playerUsername, "incorrect")
-        .catch((e) => console.error("[answer-audio-blob] autoResolve failed:", e));
+        .catch((e: unknown) => console.error("[answer-audio-blob] autoResolve failed:", e));
     }
 
     // Session must match (stale protection)
@@ -540,7 +582,7 @@ export const gameHandlers = {
       );
       return ctx
         .autoResolveAfterJudgement(ctx, gameId, game, playerUsername, "incorrect")
-        .catch((e) => console.error("[answer-audio-blob] autoResolve failed:", e));
+        .catch((e: unknown) => console.error("[answer-audio-blob] autoResolve failed:", e));
     }
 
     const answeringUsername = norm(game.answeringPlayerUsername); // rename this in game state
@@ -555,7 +597,7 @@ export const gameHandlers = {
       );
       return ctx
         .autoResolveAfterJudgement(ctx, gameId, game, playerUsername, "incorrect")
-        .catch((e) => console.error("[answer-audio-blob] autoResolve failed:", e));
+        .catch((e: unknown) => console.error("[answer-audio-blob] autoResolve failed:", e));
     }
 
     // Basic payload validation / size limits
@@ -570,7 +612,7 @@ export const gameHandlers = {
       );
       return ctx
         .autoResolveAfterJudgement(ctx, gameId, game, playerUsername, "incorrect")
-        .catch((e) => console.error("[answer-audio-blob] autoResolve failed:", e));
+        .catch((e: unknown) => console.error("[answer-audio-blob] autoResolve failed:", e));
     }
 
     // Decode base64
@@ -588,7 +630,7 @@ export const gameHandlers = {
       );
       return ctx
         .autoResolveAfterJudgement(ctx, gameId, game, playerUsername, "incorrect")
-        .catch((e) => console.error("[answer-audio-blob] autoResolve failed:", e));
+        .catch((e: unknown) => console.error("[answer-audio-blob] autoResolve failed:", e));
     }
 
     // Hard cap: keep small to avoid WS abuse (tune later)
@@ -604,7 +646,7 @@ export const gameHandlers = {
       );
       return ctx
         .autoResolveAfterJudgement(ctx, gameId, game, playerUsername, "incorrect")
-        .catch((e) => console.error("[answer-audio-blob] autoResolve failed:", e));
+        .catch((e: unknown) => console.error("[answer-audio-blob] autoResolve failed:", e));
     }
 
     // Stop the answer window (prevents timeout firing)
@@ -631,12 +673,12 @@ export const gameHandlers = {
         buf,
         mimeType,
         game.selectedClue?.answer,
-        game.lobbySettings.sttProviderName,
+        game.lobbySettings.sttProviderName as Parameters<typeof ctx.transcribeAnswerAudio>[3],
       );
       transcript = String(stt || "").trim();
 
       if (!transcript) {
-        const parseValue = (val) => {
+        const parseValue = (val: unknown) => {
           const n = Number(String(val || "").replace(/[^0-9]/g, ""));
           return Number.isFinite(n) ? n : 0;
         };
@@ -668,12 +710,12 @@ export const gameHandlers = {
 
         return ctx
           .autoResolveAfterJudgement(ctx, gameId, game, playerUsername, "incorrect")
-          .catch((e) => console.error("[answer-audio-blob] autoResolve failed:", e));
+          .catch((e: unknown) => console.error("[answer-audio-blob] autoResolve failed:", e));
       }
     } catch (e) {
       console.error("[answer-audio-blob] STT failed:", e?.message || e);
 
-      const parseValue = (val) => {
+      const parseValue = (val: unknown) => {
         const n = Number(String(val || "").replace(/[^0-9]/g, ""));
         return Number.isFinite(n) ? n : 0;
       };
@@ -698,7 +740,7 @@ export const gameHandlers = {
 
       return ctx
         .autoResolveAfterJudgement(ctx, gameId, game, playerUsername, "incorrect")
-        .catch((err) => console.error("[answer-audio-blob-error] autoResolve failed:", err));
+        .catch((err: unknown) => console.error("[answer-audio-blob-error] autoResolve failed:", err));
     }
 
     ctx.broadcast(gameId, {
@@ -752,10 +794,10 @@ export const gameHandlers = {
 
     return ctx
       .autoResolveAfterJudgement(ctx, gameId, game, playerUsername, verdict)
-      .catch((e) => console.error("[answer-audio-blob] autoResolve failed:", e));
+      .catch((e: unknown) => console.error("[answer-audio-blob] autoResolve failed:", e));
   },
 
-  "reset-buzzer": async ({ ws, data, ctx }) => {
+  "reset-buzzer": async ({ ws, data, ctx }: WsHandlerArgs<GameIdData>) => {
     const { gameId } = data;
     const game = ctx.games[gameId];
     if (!game) return;
@@ -777,13 +819,15 @@ export const gameHandlers = {
     }); // client now clears on reset-buzzer anyway
   },
 
-  "mark-all-complete": async ({ ws, data, ctx }) => {
+  "mark-all-complete": async ({ ws, data, ctx }: WsHandlerArgs<GameIdData>) => {
     const { gameId } = data;
     const game = ctx.games[gameId];
     if (!game) return;
     if (!game.clearedClues) game.clearedClues = new Set();
     const boardKey = game.activeBoard || "firstBoard";
-    const board = game.boardData?.[boardKey];
+    const board = game.boardData?.[boardKey] as
+      | { categories?: Array<{ values?: Array<{ value?: unknown; question?: unknown }> }> }
+      | undefined;
     if (!board?.categories) return;
     for (const cat of board.categories) {
       for (const clue of cat.values || []) {
@@ -801,12 +845,14 @@ export const gameHandlers = {
     ctx.checkBoardTransition(game, gameId, ctx);
   },
 
-  "clue-selected": async ({ ws, data, ctx }) => {
+  "clue-selected": async ({ ws, data, ctx }: WsHandlerArgs<ClueSelectedData>) => {
     const { gameId, clue } = data;
     const game = ctx.games?.[gameId];
     if (!game) return;
+    const clueObj =
+      clue && typeof clue === "object" ? (clue as Record<string, unknown>) : ({} as Record<string, unknown>);
 
-    const norm = (v) =>
+    const norm = (v: unknown) =>
       String(v ?? "")
         .trim()
         .toLowerCase();
@@ -852,18 +898,18 @@ export const gameHandlers = {
 
     ctx.fireAndForget(ctx.repos.profiles.incrementCluesSelected(callerStable), "Increment Clues");
 
-    const category = String(clue?.category ?? "").trim() || ctx.findCategoryForClue(game, clue);
+    const category = String(clueObj.category ?? "").trim() || ctx.findCategoryForClue(game, clueObj);
 
     game.selectedClue = {
-      ...clue,
+      ...clueObj,
       category: category || undefined,
       isAnswerRevealed: false,
     };
 
     // ---- CLUE STATE START ----
     const boardKey = game.activeBoard || "firstBoard";
-    const v = String(clue?.value ?? "");
-    const q = String(clue?.question ?? "").trim();
+    const v = String(clueObj.value ?? "");
+    const q = String(clueObj.question ?? "").trim();
     const clueKey = `${boardKey}:${v}:${q}`;
 
     const ddKeys = game.boardData?.dailyDoubleClueKeys?.[boardKey] || [];
@@ -953,20 +999,24 @@ export const gameHandlers = {
 
     // Normal (non-DD) path:
     await ctx.aiHostVoiceSequence(ctx, gameId, game, [
-      { slot: game.selectedClue.category, pad },
-      { slot: game.selectedClue.value, after: broadcastClueSelected },
+      { slot: String(game.selectedClue.category ?? ""), pad },
+      { slot: String(game.selectedClue.value ?? ""), after: broadcastClueSelected },
       { assetId: ttsAssetId },
     ]);
 
     ctx.doUnlockBuzzerAuthoritative(gameId, game, ctx);
   },
 
-  "daily-double-wager-audio-blob": async ({ ws, data, ctx }) => {
+  "daily-double-wager-audio-blob": async ({
+    ws,
+    data,
+    ctx,
+  }: WsHandlerArgs<DailyDoubleWagerAudioBlobData>) => {
     const { gameId, ddWagerSessionId, mimeType, dataBase64 } = data || {};
     const game = ctx.games?.[gameId];
     if (!game) return;
 
-    const norm = (v) =>
+    const norm = (v: unknown) =>
       String(v ?? "")
         .trim()
         .toLowerCase();
@@ -998,7 +1048,7 @@ export const gameHandlers = {
     }
 
     // Only the DD player may submit (username-based)
-    const player = game.players?.find((p) => p.id === ws.id);
+    const player = game.players?.find((p: PlayerState) => p.id === ws.id);
     const playerUsername = norm(player?.username);
     const playerDisplayname = String(player?.displayname ?? "").trim() || null;
 
@@ -1065,7 +1115,7 @@ export const gameHandlers = {
         buf,
         mimeType,
         null,
-        game.lobbySettings.sttProviderName,
+        game.lobbySettings.sttProviderName as Parameters<typeof ctx.transcribeAnswerAudio>[3],
       );
       transcript = String(stt || "").trim();
     } catch (e) {
@@ -1128,15 +1178,13 @@ export const gameHandlers = {
     });
 
     return await ctx.finalizeDailyDoubleWagerAndStartClue(gameId, game, ctx, {
-      username: playerUsername,
-      displayname: playerDisplayname,
       wager,
       fallback: false,
       reason: null,
     });
   },
 
-  "reveal-answer": async ({ ws, data, ctx }) => {
+  "reveal-answer": async ({ ws, data, ctx }: WsHandlerArgs<GameIdData>) => {
     const { gameId } = data;
     const game = ctx.games[gameId];
     if (!game) return;
@@ -1154,7 +1202,7 @@ export const gameHandlers = {
     }
   },
 
-  "update-score": async ({ ws, data, ctx }) => {
+  "update-score": async ({ ws, data, ctx }: WsHandlerArgs<UpdateScoreData>) => {
     const { gameId, username, delta } = data;
     const game = ctx.games[gameId];
     if (!game) return;
@@ -1167,7 +1215,7 @@ export const gameHandlers = {
       scores: game.scores,
     });
   },
-  "submit-wager": async ({ ws, data, ctx }) => {
+  "submit-wager": async ({ ws, data, ctx }: WsHandlerArgs<SubmitWagerData>) => {
     const { gameId, player, wager } = data;
     const game = ctx.games[gameId];
 
@@ -1175,7 +1223,7 @@ export const gameHandlers = {
       await ctx.submitWager(game, gameId, player, wager, ctx);
     }
   },
-  "submit-drawing": async ({ ws, data, ctx }) => {
+  "submit-drawing": async ({ ws, data, ctx }: WsHandlerArgs<SubmitDrawingData>) => {
     const { gameId, player, drawing } = data;
     const game = ctx.games[gameId];
 
@@ -1183,10 +1231,11 @@ export const gameHandlers = {
       await ctx.submitDrawing(game, gameId, player, drawing, ctx);
     }
   },
-  "tts-ensure": async ({ ws, data, ctx }) => {
+  "tts-ensure": async ({ ws, data, ctx }: WsHandlerArgs<TtsEnsureData>) => {
     const { gameId, text, textType, voiceId, requestId } = data ?? {};
+    const safeText = typeof text === "string" ? text : "";
 
-    if (!gameId || !text || !text.trim()) return;
+    if (!gameId || !safeText.trim()) return;
 
     const game = ctx.games?.[gameId];
     if (!game) return;
@@ -1205,8 +1254,8 @@ export const gameHandlers = {
     try {
       const asset = await ctx.ensureTtsAsset(
         {
-          text,
-          textType: textType || "text",
+          text: safeText,
+          textType: (textType || "text") as "text" | "ssml",
           voiceId: voiceId || "amy",
           engine: "standard",
           outputFormat: "mp3",

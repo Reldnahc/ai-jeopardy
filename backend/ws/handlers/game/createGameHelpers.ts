@@ -1,6 +1,26 @@
-function makePreloadTtsBatcher({ ctx, gameId, game, flushMs = 250, maxBatch = 12, trace }) {
-  let buf = [];
-  let timer = null;
+import type { GameState, JsonMap, PlayerState, SocketState } from "../../../types/runtime.js";
+import type { Ctx } from "../../context.types.js";
+
+type TraceLike = { mark: (name: string, data?: Record<string, unknown>) => void } | null;
+type CreateGameArgs = { ws: SocketState; ctx: Ctx; gameId: string; game?: GameState | null };
+
+function makePreloadTtsBatcher({
+  ctx,
+  gameId,
+  game,
+  flushMs = 250,
+  maxBatch = 12,
+  trace,
+}: {
+  ctx: Ctx;
+  gameId: string;
+  game: GameState;
+  flushMs?: number;
+  maxBatch?: number;
+  trace?: TraceLike;
+}) {
+  let buf: string[] = [];
+  let timer: NodeJS.Timeout | null = null;
 
   const flush = () => {
     timer = null;
@@ -23,7 +43,7 @@ function makePreloadTtsBatcher({ ctx, gameId, game, flushMs = 250, maxBatch = 12
   };
 
   return {
-    push(id) {
+    push(id: string) {
       const v = String(id ?? "").trim();
       if (!v) return;
 
@@ -40,8 +60,8 @@ function makePreloadTtsBatcher({ ctx, gameId, game, flushMs = 250, maxBatch = 12
   };
 }
 
-function collectNarrationTextsFromBoard(boardData) {
-  const texts = [];
+function collectNarrationTextsFromBoard(boardData: GameState["boardData"]) {
+  const texts: string[] = [];
 
   const boards = [
     boardData?.firstBoard?.categories ?? [],
@@ -68,10 +88,20 @@ function collectNarrationTextsFromBoard(boardData) {
 
 // --- NEW ---
 // Call once at start of create-game so clients can begin preloading ASAP.
-export function initPreloadState({ ctx, gameId, game, trace }) {
+export function initPreloadState({
+  ctx,
+  gameId,
+  game,
+  trace,
+}: {
+  ctx: Ctx;
+  gameId: string;
+  game: GameState | null | undefined;
+  trace?: TraceLike;
+}) {
   if (!game) return null;
 
-  const onlinePlayers = (game.players ?? []).filter((p) => p.online);
+  const onlinePlayers = (game.players ?? []).filter((p: PlayerState) => p.online);
 
   game.preload = {
     active: true,
@@ -88,12 +118,12 @@ export function initPreloadState({ ctx, gameId, game, trace }) {
   };
 
   trace?.mark?.("preload_state_initialized", {
-    requiredPlayers: game.preload.required.length,
-    requiredPlayerIds: game.preload.required,
+    requiredPlayers: game.preload.required?.length ?? 0,
+    requiredPlayerIds: game.preload.required ?? [],
   });
 
   // If nobody is required, skip handshake (avoid deadlock)
-  if (game.preload.required.length === 0) {
+  if ((game.preload.required?.length ?? 0) === 0) {
     trace?.mark?.("preload_no_required_players");
     return game.preload;
   }
@@ -115,6 +145,15 @@ export function broadcastPreloadBatch({
   final = false,
   trace,
   reason,
+}: {
+  ctx: Ctx;
+  gameId: string;
+  game: GameState;
+  imageAssetIds?: string[];
+  ttsAssetIds?: string[];
+  final?: boolean;
+  trace?: TraceLike;
+  reason?: string;
 }) {
   if (!game?.preload?.active) return null;
 
@@ -158,7 +197,19 @@ export function broadcastPreloadBatch({
 
 // --- UPDATED ---
 // This now just sends the FINAL batch (board images + board tts + ai-host tts union)
-export async function setupPreloadHandshake({ ctx, gameId, game, boardData, trace }) {
+export async function setupPreloadHandshake({
+  ctx,
+  gameId,
+  game,
+  boardData,
+  trace,
+}: {
+  ctx: Ctx;
+  gameId: string;
+  game: GameState;
+  boardData: GameState["boardData"];
+  trace?: TraceLike;
+}) {
   trace?.mark?.("preload_handshake_start", {
     gameId,
     narrationEnabled: Boolean(game?.lobbySettings?.narrationEnabled),
@@ -194,7 +245,7 @@ export async function setupPreloadHandshake({ ctx, gameId, game, boardData, trac
   return { imageAssetIds, ttsAssetIds };
 }
 
-export function getGameOrFail({ ws, ctx, gameId }) {
+export function getGameOrFail({ ws, ctx, gameId }: CreateGameArgs): GameState | null {
   if (!gameId) {
     ws.send(JSON.stringify({ type: "error", message: "create-game missing gameId" }));
     return null;
@@ -209,7 +260,12 @@ export function getGameOrFail({ ws, ctx, gameId }) {
   return game;
 }
 
-export function ensureHostOrFail({ ws, ctx, gameId, game }) {
+export function ensureHostOrFail({
+  ws,
+  ctx,
+  gameId,
+  game,
+}: CreateGameArgs & { game: GameState }): boolean {
   if (!ctx.isHostSocket(game, ws)) {
     ws.send(JSON.stringify({ type: "error", message: "Only the host can start the game." }));
     ctx.sendLobbySnapshot(ws, gameId);
@@ -218,7 +274,11 @@ export function ensureHostOrFail({ ws, ctx, gameId, game }) {
   return true;
 }
 
-export function ensureLobbySettings(ctx, game, appConfig) {
+export function ensureLobbySettings(
+  ctx: Ctx,
+  game: GameState,
+  appConfig: { ai: { defaultModel: string } },
+): NonNullable<GameState["lobbySettings"]> {
   if (game.lobbySettings) return game.lobbySettings;
 
   game.lobbySettings = {
@@ -235,11 +295,21 @@ export function ensureLobbySettings(ctx, game, appConfig) {
   return game.lobbySettings;
 }
 
-export function normalizeRole(ws) {
+export function normalizeRole(ws: SocketState): string {
   return String(ws.auth?.role ?? "default").toLowerCase();
 }
 
-export function resolveModelOrFail({ ws, ctx, gameId, game, selectedModel, role }) {
+export function resolveModelOrFail({
+  ws,
+  ctx,
+  gameId,
+  game,
+  selectedModel,
+  role,
+}: CreateGameArgs & { game: GameState; selectedModel: string; role: string }): {
+  disabled?: boolean;
+  price?: number;
+} | null {
   const m = ctx.modelsByValue?.[selectedModel];
 
   // Unknown model? reject (prevents passing arbitrary provider/model ids)
@@ -279,7 +349,21 @@ export function resolveModelOrFail({ ws, ctx, gameId, game, selectedModel, role 
   return m;
 }
 
-export function resolveVisualPolicy({ role, boardJson, visualMode }) {
+export function resolveVisualPolicy({
+  role,
+  boardJson,
+  visualMode,
+}: {
+  role: string;
+  boardJson: string;
+  visualMode: string;
+}): {
+  usingImportedBoard: boolean;
+  effectiveIncludeVisuals: boolean;
+  requestedProvider: string;
+  canUseBrave: boolean;
+  effectiveImageProvider?: string;
+} {
   const usingImportedBoard = Boolean(boardJson && boardJson.trim());
 
   // Visual policy:
@@ -306,7 +390,15 @@ export function resolveVisualPolicy({ role, boardJson, visualMode }) {
   };
 }
 
-export function resetGenerationProgressAndNotify({ ctx, gameId, game }) {
+export function resetGenerationProgressAndNotify({
+  ctx,
+  gameId,
+  game,
+}: {
+  ctx: Ctx;
+  gameId: string;
+  game: GameState;
+}) {
   ctx.broadcast(gameId, { type: "trigger-loading" });
 
   game.generationDone = 0;
@@ -321,18 +413,28 @@ export function resetGenerationProgressAndNotify({ ctx, gameId, game }) {
   });
 }
 
-export function clearGenerationProgress(game) {
+export function clearGenerationProgress(game: GameState) {
   game.generationDone = null;
   game.generationTotal = null;
   game.generationProgress = null;
 }
 
-export function safeAbortGeneration(game) {
+export function safeAbortGeneration(game: GameState) {
   game.isGenerating = false;
   clearGenerationProgress(game);
 }
 
-export function applyNewGameState({ game, boardData, timeToBuzz, timeToAnswer }) {
+export function applyNewGameState({
+  game,
+  boardData,
+  timeToBuzz,
+  timeToAnswer,
+}: {
+  game: GameState;
+  boardData: GameState["boardData"];
+  timeToBuzz: number;
+  timeToAnswer: number;
+}) {
   game.buzzed = null;
   game.buzzerLocked = true;
   game.buzzLockouts = {};
@@ -360,7 +462,19 @@ export async function getBoardDataOrFail({
   effectiveImageProvider,
   reasoningEffort,
   trace,
-}) {
+}: {
+  ctx: Ctx;
+  game: GameState;
+  gameId: string;
+  categories: string[];
+  selectedModel: string;
+  host: string;
+  boardJson: string;
+  effectiveIncludeVisuals: boolean;
+  effectiveImageProvider?: string;
+  reasoningEffort: string;
+  trace?: TraceLike;
+}): Promise<GameState["boardData"] | null> {
   const usingImportedBoard = Boolean(boardJson && boardJson.trim());
   const ttsBatcher = makePreloadTtsBatcher({ ctx, gameId, game, trace });
 
@@ -369,7 +483,8 @@ export async function getBoardDataOrFail({
       const imported = ctx.parseBoardJson(boardJson);
       const v = ctx.validateImportedBoardData(imported);
       if (!v.ok) {
-        ctx.broadcast(gameId, { type: "create-board-failed", message: v.error });
+        const message = "error" in v ? v.error : "Invalid board JSON";
+        ctx.broadcast(gameId, { type: "create-board-failed", message });
         game.isGenerating = false;
         return null;
       }
@@ -377,9 +492,9 @@ export async function getBoardDataOrFail({
       await ctx.ensureBoardNarrationTtsForBoardData({
         ctx,
         game,
-        boardData: imported,
+        boardData: imported as Parameters<typeof ctx.ensureBoardNarrationTtsForBoardData>[0]["boardData"],
         narrationEnabled: Boolean(game?.lobbySettings?.narrationEnabled),
-        onTtsReady: (id) => ttsBatcher.push(id),
+        onTtsReady: (id: string) => ttsBatcher.push(id),
         trace,
       });
 
@@ -403,7 +518,7 @@ export async function getBoardDataOrFail({
       });
 
       ttsBatcher.flush();
-      return imported;
+      return imported as GameState["boardData"];
     }
 
     game.isGenerating = true;
@@ -414,10 +529,10 @@ export async function getBoardDataOrFail({
       imageProvider: effectiveImageProvider,
       maxVisualCluesPerCategory: 2,
       narrationEnabled: Boolean(game?.lobbySettings?.narrationEnabled),
-      reasoningEffort,
+      reasoningEffort: reasoningEffort as "off" | "low" | "medium" | "high",
       trace,
-      onTtsReady: (id) => ttsBatcher.push(id),
-      onProgress: ({ done, total, progress }) => {
+      onTtsReady: (id: string) => ttsBatcher.push(id),
+      onProgress: ({ done, total, progress }: { done: number; total: number; progress: number }) => {
         const g = ctx.games?.[gameId];
         if (!g) return;
 

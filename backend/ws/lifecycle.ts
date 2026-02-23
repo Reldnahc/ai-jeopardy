@@ -1,4 +1,7 @@
 // backend/ws/lifecycle.js
+import type { SocketState } from "../types/runtime.js";
+import type { Ctx } from "./context.types.js";
+import type { PlayerState } from "../types/runtime.js";
 
 /**
  * Handles a socket disconnect in a server-authoritative way.
@@ -7,7 +10,11 @@
  * - schedules lobby grace cleanup if applicable
  * - unblocks Final Jeopardy stages if required players disappear
  */
-export function handleSocketClose(ws, ctx, interval) {
+export function handleSocketClose(
+  ws: SocketState,
+  ctx: Ctx,
+  interval: NodeJS.Timeout,
+): void {
   try {
     console.log(`WebSocket closed for socket ${ws.id}`);
 
@@ -17,7 +24,7 @@ export function handleSocketClose(ws, ctx, interval) {
     const game = gameId ? ctx.games[gameId] : null;
     if (!game) return;
 
-    const player = game.players?.find((p) => p.id === ws.id);
+    const player = game.players?.find((p: PlayerState) => p.id === ws.id);
     if (!player) return;
 
     player.online = false;
@@ -26,7 +33,7 @@ export function handleSocketClose(ws, ctx, interval) {
     // Broadcast updated list (missing online => true)
     ctx.broadcast(gameId, {
       type: "player-list-update",
-      players: game.players.map((p) => ({
+      players: game.players.map((p: PlayerState) => ({
         username: p.username,
         displayname: p.displayname,
         online: p?.online,

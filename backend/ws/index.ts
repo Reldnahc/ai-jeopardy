@@ -2,11 +2,19 @@
 import { createWsContext } from "./context.js";
 import { routeWsMessage } from "./router.js";
 import { handleSocketClose } from "./lifecycle.js";
+import type { SocketState } from "../types/runtime.js";
+import type { Repos } from "../repositories/index.js";
+import type WebSocket from "ws";
 
-export const attachWebSocketServer = (wss, repos) => {
+type WsServerLike = {
+  clients: Set<WebSocket>;
+  on(event: "connection", listener: (ws: SocketState) => void): void;
+};
+
+export const attachWebSocketServer = (wss: WsServerLike, repos: Repos) => {
   const ctx = createWsContext(wss, repos);
 
-  wss.on("connection", (ws) => {
+  wss.on("connection", (ws: SocketState) => {
     ws.id = crypto.randomUUID();
     ws.isAlive = true;
 
@@ -21,7 +29,7 @@ export const attachWebSocketServer = (wss, repos) => {
       ws.isAlive = true;
     });
 
-    ws.on("message", async (raw) => {
+    ws.on("message", async (raw: Buffer | string) => {
       // raw is usually a Buffer
       const text = Buffer.isBuffer(raw) ? raw.toString("utf8") : String(raw);
 
@@ -56,10 +64,11 @@ export const attachWebSocketServer = (wss, repos) => {
     });
 
     const interval = setInterval(() => {
-      wss.clients.forEach((ws) => {
-        if (ws.isAlive === false) return ws.terminate();
-        ws.isAlive = false;
-        ws.ping();
+      wss.clients.forEach((client: WebSocket) => {
+        const socket = client as SocketState;
+        if (socket.isAlive === false) return socket.terminate();
+        socket.isAlive = false;
+        socket.ping();
       });
     }, 20_000);
 
