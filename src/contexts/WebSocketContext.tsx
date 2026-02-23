@@ -9,6 +9,13 @@ import React, {
 } from "react";
 type WSMessage = { type: string; [key: string]: unknown };
 type Listener = (msg: WSMessage) => void;
+type TimeSyncMessage = {
+  type: "send-time-sync";
+  clientSentAt?: unknown;
+  clientSentPerf?: unknown;
+  serverNow?: unknown;
+};
+type WebSocketWithCleanup = WebSocket & { __cleanupSync?: () => void };
 
 interface WebSocketContextType {
   isSocketReady: boolean;
@@ -110,7 +117,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         };
         document.addEventListener("visibilitychange", onVis);
 
-        (ws as any).__cleanupSync = () => {
+        (ws as WebSocketWithCleanup).__cleanupSync = () => {
           if (syncInterval) window.clearInterval(syncInterval);
           document.removeEventListener("visibilitychange", onVis);
         };
@@ -128,7 +135,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       ws.onclose = (e) => {
         console.warn("[WS] closed", { code: e.code, reason: e.reason, wasClean: e.wasClean });
         try {
-          (ws as any).__cleanupSync?.();
+          (ws as WebSocketWithCleanup).__cleanupSync?.();
         } catch {
           //ignore
         }
@@ -162,9 +169,10 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         const msg = parsed as WSMessage;
 
         if (msg.type === "send-time-sync") {
-          const clientSentAt = Number((msg as any).clientSentAt || 0);
-          const clientSentPerf = Number((msg as any).clientSentPerf || 0);
-          const serverNow = Number((msg as any).serverNow || 0);
+          const syncMsg = msg as WSMessage & TimeSyncMessage;
+          const clientSentAt = Number(syncMsg.clientSentAt || 0);
+          const clientSentPerf = Number(syncMsg.clientSentPerf || 0);
+          const serverNow = Number(syncMsg.serverNow || 0);
 
           const clientRecvAt = Date.now();
           const clientRecvPerf = perfNowMs();

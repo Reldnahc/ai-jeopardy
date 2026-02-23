@@ -66,8 +66,9 @@ const Signup: React.FC = () => {
       });
 
       setSuccess("Account created!");
-    } catch (err) {
-      setError(String((err as any)?.message || err || "Signup failed"));
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err || "Signup failed");
+      setError(message);
     } finally {
       setLoading(false);
     }

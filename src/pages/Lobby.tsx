@@ -77,7 +77,7 @@ const Lobby: React.FC = () => {
     if (h) set.add(h);
 
     for (const p of players ?? []) {
-      const u = String((p as any)?.username ?? "")
+      const u = String((p as { username?: unknown })?.username ?? "")
         .trim()
         .toLowerCase();
       if (u) set.add(u);
@@ -143,8 +143,12 @@ const Lobby: React.FC = () => {
       // We only do minimal checks here because server is authoritative.
       if (typeof parsed !== "object" || parsed === null) return "Board JSON must be an object.";
 
-      const p = parsed as any;
-      const bd = p.boardData && typeof p.boardData === "object" ? p.boardData : p;
+      const p = parsed as Record<string, unknown>;
+      const boardDataCandidate = p.boardData;
+      const bd =
+        boardDataCandidate && typeof boardDataCandidate === "object"
+          ? (boardDataCandidate as Record<string, unknown>)
+          : p;
 
       if (!bd.firstBoard || !bd.secondBoard || !bd.finalJeopardy) {
         return "Missing firstBoard / secondBoard / finalJeopardy.";

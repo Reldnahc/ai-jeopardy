@@ -71,6 +71,14 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
 }) => {
   const { sendJson } = useWebSocket();
 
+  function createAudioContext(): AudioContext {
+    const ctor =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!ctor) throw new Error("AudioContext not supported");
+    return new ctor();
+  }
+
   const imageAssetId =
     localSelectedClue?.media?.type === "image" ? localSelectedClue.media.assetId : null;
 
@@ -154,7 +162,7 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
         const VAD_INTERVAL_MS = 80; // how often to sample audio
         const RMS_THRESHOLD = 0.018; // tweak: lower = more sensitive, higher = less sensitive
 
-        audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        audioCtx = createAudioContext();
         source = audioCtx.createMediaStreamSource(stream);
         analyser = audioCtx.createAnalyser();
         analyser.fftSize = 2048;

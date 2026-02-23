@@ -29,8 +29,9 @@ const AuthForm: React.FC = () => {
         await signup({ username: cleanUsername, displayname: username, password, email: null });
         setMessage({ type: "success", text: "Account created successfully!" });
       }
-    } catch (err: any) {
-      setMessage({ type: "error", text: err?.message || `${action} failed.` });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : `${action} failed.`;
+      setMessage({ type: "error", text: message });
     } finally {
       setLoading(false);
     }

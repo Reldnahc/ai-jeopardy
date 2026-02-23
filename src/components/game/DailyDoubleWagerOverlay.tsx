@@ -39,6 +39,14 @@ function blobToBase64(blob: Blob): Promise<string> {
   });
 }
 
+function createAudioContext(): AudioContext {
+  const ctor =
+    window.AudioContext ||
+    (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!ctor) throw new Error("AudioContext not supported");
+  return new ctor();
+}
+
 export default function DailyDoubleWagerOverlay({
   gameId,
   myUsername,
@@ -99,7 +107,7 @@ export default function DailyDoubleWagerOverlay({
         const VAD_INTERVAL_MS = 80;
         const RMS_THRESHOLD = 0.018;
 
-        audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        audioCtx = createAudioContext();
         source = audioCtx.createMediaStreamSource(stream);
         analyser = audioCtx.createAnalyser();
         analyser.fftSize = 2048;

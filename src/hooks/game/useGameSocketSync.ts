@@ -101,6 +101,10 @@ type DailyDoubleWagerLockedMsg = {
   wager: number;
 };
 
+type DailyDoubleState = {
+  playerName?: string;
+};
+
 type GameStateMessage = {
   type: "game-state";
   gameId?: string;
@@ -142,7 +146,7 @@ type GameStateMessage = {
   selectorName?: string | null; // displayname
 
   // DD
-  dailyDouble?: any | null;
+  dailyDouble?: DailyDoubleState | null;
   ddWagerSessionId?: string | null;
   ddWagerDeadlineAt?: number | null;
   ddShowModal?: { username: string; displayname: string; maxWager: number } | null;
@@ -362,11 +366,10 @@ export function useGameSocketSync({ gameId, username }: UseGameSocketSyncArgs) {
             setDdWagerCapture({
               type: "daily-double-wager-capture-start",
               gameId: gameId ?? "",
-              playerName: m.dailyDouble.playerName,
               ddWagerSessionId: m.ddWagerSessionId,
               durationMs,
               deadlineAt: m.ddWagerDeadlineAt,
-            } as any);
+            });
             setDdWagerHeard(null);
             setDdWagerLocked(null);
             setDdWagerError(null);

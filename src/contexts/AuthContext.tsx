@@ -27,6 +27,8 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 const TOKEN_KEY = "aiJeopardy.jwt";
+type MeResponse = { user: AppUser; error?: string };
+type ApiError = Error & { status?: number; payload?: unknown };
 
 function getApiBase() {
   if (import.meta.env.DEV) return import.meta.env.VITE_API_BASE || "http://localhost:3002";
@@ -48,21 +50,26 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     });
 
     const text = await res.text();
-    let payload: any = null;
+    let payload: MeResponse | null = null;
     try {
-      payload = text ? JSON.parse(text) : null;
-    } catch {}
+      payload = text ? (JSON.parse(text) as MeResponse) : null;
+    } catch {
+      // ignore malformed JSON and let fallback handling below run
+    }
 
     if (!res.ok) {
       const msg = payload?.error || text || `HTTP ${res.status}`;
-      const err: any = new Error(msg);
+      const err = new Error(msg) as ApiError;
       err.status = res.status;
       err.payload = payload;
       throw err;
     }
 
-    const data = payload ?? (text ? JSON.parse(text) : null);
-    return data.user as AppUser;
+    const data: MeResponse | null = payload ?? (text ? (JSON.parse(text) as MeResponse) : null);
+    if (!data?.user) {
+      throw new Error("Invalid /api/auth/me response: missing user");
+    }
+    return data.user;
   }
 
   useEffect(() => {
@@ -87,11 +94,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           setUser(me);
           setToken(t);
         }
-      } catch (e: any) {
+      } catch (e: unknown) {
         console.error("AuthContext boot failed:", e);
 
-        const status = e?.status;
-        const apiErr = e?.payload?.error;
+        const err = e as ApiError;
+        const status = err?.status;
+        const payload = err?.payload as { error?: string } | undefined;
+        const apiErr = payload?.error;
 
         const isAuthFailure =
           status === 401 ||
