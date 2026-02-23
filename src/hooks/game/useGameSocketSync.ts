@@ -336,6 +336,7 @@ export function useGameSocketSync({ gameId, username }: UseGameSocketSyncArgs) {
           setWagers(snapWagers);
 
           const stage = m.finalJeopardyStage ?? null;
+          setIsGameOver(stage === "finale");
           const submitted = stage !== "wager" && stage != null;
           setAllWagersSubmitted(submitted);
 
@@ -343,6 +344,7 @@ export function useGameSocketSync({ gameId, username }: UseGameSocketSyncArgs) {
           if (submitted) setFinalWagers(snapWagers);
           setDrawings(m.drawings ?? null);
         } else {
+          setIsGameOver(false);
           setAllWagersSubmitted(false);
           setWagers({});
           setFinalWagers({});
