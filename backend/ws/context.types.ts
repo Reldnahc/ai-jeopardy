@@ -1,10 +1,19 @@
 import type { WsContext } from "../types/runtime.js";
 import type { startGameTimer, clearGameTimer } from "../game/timer.js";
-import type { validateImportedBoardData, parseBoardJson, normalizeCategories11 } from "../validation/boardImport.js";
+import type {
+  validateImportedBoardData,
+  parseBoardJson,
+  normalizeCategories11,
+} from "../validation/boardImport.js";
 import type { requireHost, isHostSocket } from "../auth/hostGuard.js";
 import type { createTrace } from "../services/trace.js";
 import type { createBoardData, judgeClueAnswerFast, judgeImage } from "../services/aiService.js";
-import type { checkAllDrawingsSubmitted, checkAllWagersSubmitted, submitDrawing, submitWager } from "../game/finalJeopardy.js";
+import type {
+  checkAllDrawingsSubmitted,
+  checkAllWagersSubmitted,
+  submitDrawing,
+  submitWager,
+} from "../game/finalJeopardy.js";
 import type { checkBoardTransition, isBoardFullyCleared } from "../game/stageTransition.js";
 import type { getCOTD } from "../state/cotdStore.js";
 import type { collectImageAssetIdsFromBoard } from "../services/imageAssetService.js";
@@ -45,7 +54,11 @@ import type {
 import type { verifyJwt } from "../auth/jwt.js";
 import type { getBearerToken, playerStableId, verifyAccessToken } from "../services/userService.js";
 import type { ensureTtsAsset } from "../services/tts/ensureTtsAsset.js";
-import type { makeLimiter, plannedVisualSlots, populateCategoryVisuals } from "../services/ai/visuals.js";
+import type {
+  makeLimiter,
+  plannedVisualSlots,
+  populateCategoryVisuals,
+} from "../services/ai/visuals.js";
 import type { parseDailyDoubleWager } from "../services/ai/judge/wagerParse.js";
 import type {
   computeDailyDoubleMaxWager,
@@ -56,7 +69,6 @@ import type {
 } from "../game/dailyDouble.js";
 import type { numberToWords } from "../services/numberToWords.js";
 import type { ensureBoardNarrationTtsForBoardData } from "../services/ai/board/boardTts.js";
-import type { Role } from "../../shared/roles.js";
 
 export type Trace = {
   mark: (name: string, data?: Record<string, unknown>) => void;
@@ -298,7 +310,10 @@ export type Ctx = Omit<
   finalizeDailyDoubleWagerAndStartClue: typeof finalizeDailyDoubleWagerAndStartClue;
   numberToWords: typeof numberToWords;
   getTtsDurationMs: (assetId: string) => Promise<number>;
-  getClueKey: (game: { activeBoard?: string | null }, clue: { value?: unknown; question?: string | null }) => string;
+  getClueKey: (
+    game: { activeBoard?: string | null },
+    clue: { value?: unknown; question?: string | null },
+  ) => string;
   normalizeName: (name: unknown) => string;
   fireAndForget: (p: PromiseLike<unknown>, label: string) => void;
   ensureFinalJeopardyAnswer: typeof ensureFinalJeopardyAnswer;

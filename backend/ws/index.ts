@@ -30,16 +30,6 @@ export const attachWebSocketServer = (wss: WsServerLike, repos: Repos) => {
     });
 
     ws.on("message", async (raw: Buffer | string) => {
-      // raw is usually a Buffer
-      const text = Buffer.isBuffer(raw) ? raw.toString("utf8") : String(raw);
-
-      // Parse once (so we can intercept rtt-pong AND reuse for logging)
-      let data = null;
-      try {
-        data = JSON.parse(text);
-      } catch {
-        // ignore parse; router may handle other formats if any
-      }
       // if (data) {
       //     console.log("[WS:IN]", {
       //         socketId: ws.id,

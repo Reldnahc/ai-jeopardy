@@ -102,12 +102,7 @@ export async function repromptDdWager(
   startDdWagerCapture(gameId, game, ctx);
 }
 
-export function startDdWagerCapture(
-  gameId: string,
-  game: GameState,
-  ctx: Ctx,
-  opts: Record<string, unknown> = {},
-) {
+export function startDdWagerCapture(gameId: string, game: GameState, ctx: Ctx) {
   const dd = game.dailyDouble;
   if (!dd) return;
 
@@ -149,7 +144,9 @@ function parseValueAsNumber(val: unknown): number {
 }
 
 function computeBoardMax(game: GameState, boardKey: string): number {
-  const board = game.boardData?.[boardKey] as { categories?: Array<{ values?: Array<{ value?: unknown }> }> } | undefined;
+  const board = game.boardData?.[boardKey] as
+    | { categories?: Array<{ values?: Array<{ value?: unknown }> }> }
+    | undefined;
   let max = 0;
   for (const cat of board?.categories || []) {
     for (const clue of cat?.values || []) {
@@ -175,7 +172,12 @@ export async function finalizeDailyDoubleWagerAndStartClue(
   gameId: string,
   game: GameState,
   ctx: Ctx,
-  args: { wager?: number; fallback?: boolean; reason?: string | null; fallbackWager?: number } | null,
+  args: {
+    wager?: number;
+    fallback?: boolean;
+    reason?: string | null;
+    fallbackWager?: number;
+  } | null,
 ) {
   const { wager, fallback = false, reason = null } = args || {};
 

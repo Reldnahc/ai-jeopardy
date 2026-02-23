@@ -90,10 +90,8 @@ export async function transcribeAnswerAudio(
       rethrowAsSttError(err);
     }
 
-    console.error(
-      "[stt] failed",
-      safeJson({ message: (err as any)?.message, stack: (err as any)?.stack }),
-    );
+    const e = err as { message?: unknown; stack?: unknown };
+    console.error("[stt] failed", safeJson({ message: e?.message, stack: e?.stack }));
     throw err instanceof Error ? err : new Error("STT failed");
   }
 }

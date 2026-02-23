@@ -4,6 +4,12 @@ import { ingestImageToDbFromUrl } from "../imageAssetService.js";
 import { Ctx } from "../../ws/context.types.js";
 
 type TraceLike = { mark: (event: string, meta?: Record<string, unknown>) => void };
+type VisualClue = {
+  question?: unknown;
+  visual?: { commonsSearchQueries?: unknown[] };
+  media?: { type: "image"; assetId: string };
+};
+type VisualCategory = { values?: VisualClue[] };
 
 export type VisualSettings = {
   includeVisuals: boolean;
@@ -51,14 +57,20 @@ export function makeLimiter(maxConcurrent: number) {
 
   return <T>(fn: () => Promise<T>) =>
     new Promise<T>((resolve, reject) => {
-      queue.push(() => fn().then(resolve, reject) as any);
+      queue.push(async () => {
+        try {
+          resolve(await fn());
+        } catch (err) {
+          reject(err);
+        }
+      });
       runNext();
     });
 }
 
 export async function populateCategoryVisuals(
   ctx: Ctx,
-  cat: any,
+  cat: VisualCategory,
   settings: VisualSettings,
   progressTick?: ProgressTick,
 ) {
@@ -72,7 +84,10 @@ export async function populateCategoryVisuals(
   const values = Array.isArray(cat?.values) ? cat.values : [];
 
   const visualClues = values
-    .filter((c: any) => c?.visual?.commonsSearchQueries?.length)
+    .filter(
+      (c) =>
+        Array.isArray(c?.visual?.commonsSearchQueries) && c.visual.commonsSearchQueries.length > 0,
+    )
     .slice(0, maxPerCategory);
 
   let attemptedSlots = 0;
@@ -80,7 +95,17 @@ export async function populateCategoryVisuals(
   for (const clue of visualClues) {
     attemptedSlots += 1;
     try {
-      const found = await pickImageForQueries(clue.visual.commonsSearchQueries, {
+      const queries = (clue.visual?.commonsSearchQueries ?? [])
+        .map((q) => String(q ?? "").trim())
+        .filter(Boolean);
+
+      if (queries.length === 0) {
+        clue.question = stripVisualWording(clue.question);
+        delete clue.visual;
+        continue;
+      }
+
+      const found = await pickImageForQueries(queries, {
         maxQueries: settings.maxImageSearchTries,
         searchLimit: 5,
         preferPhotos: settings.preferPhotos,
@@ -102,7 +127,7 @@ export async function populateCategoryVisuals(
           attribution: found.attribution,
           trace: settings.trace,
         },
-        (ctx.repos as unknown) as {
+        ctx.repos as unknown as {
           images?: {
             getIdBySha256(sha256: string): Promise<string | null>;
             upsertImageAsset(

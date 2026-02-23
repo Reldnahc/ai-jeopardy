@@ -14,18 +14,19 @@ function safeJson(obj: unknown): string {
   }
 }
 
-function describeOpenAiError(err: any) {
+function describeOpenAiError(err: unknown) {
+  const e = err as Record<string, unknown>;
   return {
-    name: err?.name,
-    message: err?.message,
-    status: err?.status,
-    code: err?.code,
-    type: err?.type,
-    param: err?.param,
-    request_id: err?.request_id,
-    headers: err?.headers,
-    error: err?.error,
-    stack: err?.stack,
+    name: e?.name,
+    message: e?.message,
+    status: e?.status,
+    code: e?.code,
+    type: e?.type,
+    param: e?.param,
+    request_id: e?.request_id,
+    headers: e?.headers,
+    error: e?.error,
+    stack: e?.stack,
   };
 }
 
@@ -42,7 +43,7 @@ export class OpenAiSttProvider implements SttProvider {
       file,
     });
 
-    const text = String((resp as any)?.text || "").trim();
+    const text = String((resp as { text?: unknown })?.text || "").trim();
 
     return {
       text,
@@ -69,12 +70,12 @@ export class OpenAiSttProvider implements SttProvider {
       prompt: args.prompt,
     });
 
-    return String((resp as any)?.text || "").trim();
+    return String((resp as { text?: unknown })?.text || "").trim();
   }
 }
 
 export function rethrowAsSttError(err: unknown): never {
-  const info = describeOpenAiError(err as any);
+  const info = describeOpenAiError(err);
   console.error("[stt] openai failed", safeJson(info));
   throw new Error(
     `STT failed: status=${info.status ?? "?"} message=${info.message ?? "?"} request_id=${info.request_id ?? "?"}`,

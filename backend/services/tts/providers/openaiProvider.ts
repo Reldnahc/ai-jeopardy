@@ -8,6 +8,7 @@ export const openaiProvider: TtsProvider = {
     return req.outputFormat === "mp3" || req.outputFormat === "wav";
   },
   async synthesize(req) {
+    void req;
     // TODO: Implement using your OpenAI client choice.
     // Return Buffer with audio bytes.
 

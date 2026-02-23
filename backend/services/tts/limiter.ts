@@ -19,7 +19,7 @@ function envNum(name: string, fallback: number): number {
 function makeLimiter(concurrency: number, minDelayMs: number): Limiter {
   let active = 0;
   let lastStart = 0;
-  const queue: Array<Job<any>> = [];
+  const queue: Array<Job<unknown>> = [];
 
   function drain() {
     if (active >= concurrency) return;

@@ -133,8 +133,8 @@ export function useProfilePageController(usernameParam: string | undefined) {
   const [promoteOpen, setPromoteOpen] = useState(false);
   const [banOpen, setBanOpen] = useState(false);
 
-  // Use Role directly to avoid casts when patching role
-  const [promoteDraft, setPromoteDraft] = useState<Role | "">("");
+  // Promote flow only allows ladder roles; "banned" is handled by separate ban action.
+  const [promoteDraft, setPromoteDraft] = useState<LadderRole | "">("");
   const [banCheck, setBanCheck] = useState(false);
 
   const isOwnProfile = useMemo(
@@ -439,8 +439,8 @@ export function useProfilePageController(usernameParam: string | undefined) {
 
   const viewerIsCreator = viewerGate.role === "creator";
 
-  const promotableRoles: (LadderRole | "banned")[] = viewerIsCreator
-    ? [...LADDER_ROLES, "banned"]
+  const promotableRoles: LadderRole[] = viewerIsCreator
+    ? [...LADDER_ROLES]
     : (LADDER_ROLES.filter((r) => rank(r) < viewerRank) as LadderRole[]);
 
   const targetNormalizedRole = normalizeRole(routeProfile?.role);

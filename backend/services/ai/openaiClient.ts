@@ -9,6 +9,8 @@ export type OpenAiCallOptions = {
 };
 
 const openai = new OpenAI();
+type ModelDef = { supportsReasoningEffort?: boolean };
+type ChatCreateParams = Parameters<typeof openai.chat.completions.create>[0];
 
 function cleanJsonText(s: unknown) {
   return String(s ?? "")
@@ -17,7 +19,8 @@ function cleanJsonText(s: unknown) {
 }
 
 export function parseOpenAiJson<T = unknown>(response: unknown): T {
-  const content = (response as any)?.choices?.[0]?.message?.content;
+  const root = response as { choices?: Array<{ message?: { content?: unknown } }> };
+  const content = root?.choices?.[0]?.message?.content;
 
   if (!content) throw new Error("OpenAI response missing message content.");
   return JSON.parse(cleanJsonText(content)) as T;
@@ -28,7 +31,7 @@ export async function callOpenAiJson(
   prompt: string,
   options: OpenAiCallOptions = {},
 ) {
-  const modelDef = (modelsByValue as any)[model];
+  const modelDef = (modelsByValue as Record<string, ModelDef>)[model];
   const effort = options.reasoningEffort;
   const image = options.image;
 
@@ -43,15 +46,18 @@ export async function callOpenAiJson(
       ]
     : prompt;
 
-  const payload: any = {
+  const payload = {
     model,
     messages: [{ role: "user", content }],
     response_format: { type: "json_object" },
   };
 
   if (includeReasoningEffort) {
-    payload.reasoning_effort = effort;
+    return openai.chat.completions.create({
+      ...payload,
+      reasoning_effort: effort,
+    } as unknown as ChatCreateParams);
   }
 
-  return openai.chat.completions.create(payload);
+  return openai.chat.completions.create(payload as ChatCreateParams);
 }

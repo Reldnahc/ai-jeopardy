@@ -35,10 +35,10 @@ export default function ModerationAlerts(props: {
       <Alert
         isOpen={promoteOpen}
         closeAlert={() => setPromoteOpen(false)}
+        header="Promote User"
         text={
           <div className="space-y-3">
-            <div className="font-semibold text-gray-900">Promote user</div>
-            <div className="text-sm text-gray-600">Promote to the role directly below you.</div>
+            <div className="text-sm text-white/90">Promote to the role directly below you.</div>
 
             <select
               value={promoteDraft}
@@ -80,14 +80,14 @@ export default function ModerationAlerts(props: {
       <Alert
         isOpen={banOpen}
         closeAlert={() => setBanOpen(false)}
+        header="Ban User"
         text={
           <div className="space-y-3">
-            <div className="font-semibold text-gray-900">Ban user</div>
-            <div className="text-sm text-gray-600">
+            <div className="text-sm text-white/90">
               This will set their role to <span className="font-semibold">Banned</span>.
             </div>
 
-            <label className="flex items-center gap-2 text-sm text-gray-800">
+            <label className="flex items-center gap-2 text-sm text-white">
               <input
                 type="checkbox"
                 checked={banCheck}

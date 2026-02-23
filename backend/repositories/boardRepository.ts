@@ -22,12 +22,12 @@ export function createBoardRepository(pool: Pool) {
     limit: unknown = 10,
     offset: unknown = 0,
     model: unknown = null,
-  ): Promise<any[]> {
+  ): Promise<unknown[]> {
     const l = clampInt(limit, 1, 50, 10);
     const o = clampInt(offset, 0, 1_000_000, 0);
     const m = typeof model === "string" && model.trim() ? model.trim() : null;
 
-    const { rows } = await pool.query<{ board: any }>(
+    const { rows } = await pool.query<{ board: unknown }>(
       `
       select board
       from jeopardy_boards
@@ -46,11 +46,11 @@ export function createBoardRepository(pool: Pool) {
     username: unknown,
     limit: unknown = 10,
     offset: unknown = 0,
-  ): Promise<any[]> {
+  ): Promise<unknown[]> {
     const l = clampInt(limit, 1, 50, 10);
     const o = clampInt(offset, 0, 1_000_000, 0);
 
-    const { rows } = await pool.query<{ board: any }>(
+    const { rows } = await pool.query<{ board: unknown }>(
       `
       select jb.board
       from jeopardy_boards jb
