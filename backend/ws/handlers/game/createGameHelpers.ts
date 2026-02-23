@@ -1,4 +1,4 @@
-import type { GameState, JsonMap, PlayerState, SocketState } from "../../../types/runtime.js";
+import type { GameState, PlayerState, SocketState } from "../../../types/runtime.js";
 import type { Ctx } from "../../context.types.js";
 
 type TraceLike = { mark: (name: string, data?: Record<string, unknown>) => void } | null;
@@ -492,7 +492,9 @@ export async function getBoardDataOrFail({
       await ctx.ensureBoardNarrationTtsForBoardData({
         ctx,
         game,
-        boardData: imported as Parameters<typeof ctx.ensureBoardNarrationTtsForBoardData>[0]["boardData"],
+        boardData: imported as Parameters<
+          typeof ctx.ensureBoardNarrationTtsForBoardData
+        >[0]["boardData"],
         narrationEnabled: Boolean(game?.lobbySettings?.narrationEnabled),
         onTtsReady: (id: string) => ttsBatcher.push(id),
         trace,
@@ -532,7 +534,15 @@ export async function getBoardDataOrFail({
       reasoningEffort: reasoningEffort as "off" | "low" | "medium" | "high",
       trace,
       onTtsReady: (id: string) => ttsBatcher.push(id),
-      onProgress: ({ done, total, progress }: { done: number; total: number; progress: number }) => {
+      onProgress: ({
+        done,
+        total,
+        progress,
+      }: {
+        done: number;
+        total: number;
+        progress: number;
+      }) => {
         const g = ctx.games?.[gameId];
         if (!g) return;
 
