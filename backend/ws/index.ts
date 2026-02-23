@@ -3,6 +3,7 @@ import { createWsContext } from "./context.js";
 import { routeWsMessage } from "./router.js";
 import { handleSocketClose } from "./lifecycle.js";
 import type { SocketState } from "../types/runtime.js";
+import type { Repos } from "../repositories/index.js";
 import type WebSocket from "ws";
 
 type WsServerLike = {
@@ -10,7 +11,7 @@ type WsServerLike = {
   on(event: "connection", listener: (ws: SocketState) => void): void;
 };
 
-export const attachWebSocketServer = (wss: WsServerLike, repos: Record<string, unknown>) => {
+export const attachWebSocketServer = (wss: WsServerLike, repos: Repos) => {
   const ctx = createWsContext(wss, repos);
 
   wss.on("connection", (ws: SocketState) => {

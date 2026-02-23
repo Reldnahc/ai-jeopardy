@@ -113,7 +113,7 @@ export type Game = {
 };
 
 type ProfileRepo = Record<string, (...args: unknown[]) => Promise<unknown>> & {
-  getRoleById: (id: string) => Promise<Role | null>;
+  getRoleById: (id: string) => Promise<string | null>;
   getPublicProfileByUsername: (username: string) => Promise<{
     displayname?: string | null;
     color?: string | null;

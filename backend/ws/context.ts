@@ -1,4 +1,6 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+import type WebSocket from "ws";
+import type { Repos } from "../repositories/index.js";
+import type { Ctx } from "./context.types.js";
 import { games } from "../state/gamesStore.js";
 import { modelsByValue } from "../../shared/models.js";
 import { makeBroadcaster } from "./broadcast.js";
@@ -78,12 +80,13 @@ import {
 import { numberToWords } from "../services/numberToWords.js";
 import { ensureBoardNarrationTtsForBoardData } from "../services/ai/board/boardTts.js";
 import { PermissionManager } from "../auth/permissionManager.js";
+type WsServerLike = { clients: Set<WebSocket> };
 type GameForClueKey = {
   activeBoard?: "firstBoard" | "secondBoard" | "finalJeopardy" | null;
 };
 // Minimal type for now; we’ll tighten later as you TS-migrate more modules.
 
-export const createWsContext = (wss: any, repos: any) => {
+export const createWsContext = (wss: WsServerLike, repos: Repos): Ctx => {
   const { broadcast, broadcastAll } = makeBroadcaster(wss);
 
   const ttsDuration = createTtsDurationService(repos);
@@ -112,7 +115,6 @@ export const createWsContext = (wss: any, repos: any) => {
     `${game.activeBoard ?? "firstBoard"}:${clue.value ?? ""}:${clue.question?.trim() ?? ""}`;
 
   return {
-    wss,
     games,
     modelsByValue,
     appConfig,
