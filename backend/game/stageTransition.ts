@@ -49,7 +49,7 @@ async function startDoubleJeopardy(game: GameState, gameId: string, ctx: Ctx) {
   const pick =
     players.length === 0
       ? null
-      : players.reduce((lowest, p) => {
+      : players.reduce((lowest: PlayerState, p: PlayerState) => {
           const score = game.scores?.[p.name] ?? 0;
           const lowestScore = game.scores?.[lowest.name] ?? 0;
 
@@ -86,7 +86,7 @@ async function startDoubleJeopardy(game: GameState, gameId: string, ctx: Ctx) {
 
 function getExpectedFinalists(game: GameState): PlayerState[] {
   const players = Array.isArray(game?.players) ? game.players : [];
-  return players.filter((p) => {
+  return players.filter((p: PlayerState) => {
     const score = Number(game.scores?.[p.username] ?? 0);
     const online = p?.online !== false; // default true
     return score > 0 && online;
@@ -99,7 +99,7 @@ function getExpectedFinalists(game: GameState): PlayerState[] {
  */
 function getFinalistNames(game: GameState): string[] {
   if (Array.isArray(game?.finalJeopardyFinalists)) return game.finalJeopardyFinalists;
-  const names = getExpectedFinalists(game).map((p) => p.username);
+  const names = getExpectedFinalists(game).map((p: PlayerState) => p.username);
   game.finalJeopardyFinalists = names;
   return names;
 }

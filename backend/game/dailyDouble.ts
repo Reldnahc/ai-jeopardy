@@ -302,6 +302,6 @@ export async function finalizeDailyDoubleWagerAndStartClue(
 
     ctx
       .autoResolveAfterJudgement(ctx, gameId, g, game.answeringPlayerKey, "incorrect")
-      .catch((e) => console.error("[dd-answer-timeout] autoResolve failed:", e));
+      .catch((e: unknown) => console.error("[dd-answer-timeout] autoResolve failed:", e));
   });
 }

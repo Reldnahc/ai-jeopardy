@@ -1,4 +1,4 @@
-import type { GameState, JsonMap, SocketState } from "../../../types/runtime.js";
+import type { GameState, JsonMap, PlayerState, SocketState } from "../../../types/runtime.js";
 import type { Ctx } from "../../context.types.js";
 
 type TraceLike = { mark?: (name: string, data?: Record<string, unknown>) => void } | null;
@@ -101,7 +101,7 @@ export function initPreloadState({
 }) {
   if (!game) return null;
 
-  const onlinePlayers = (game.players ?? []).filter((p) => p.online);
+  const onlinePlayers = (game.players ?? []).filter((p: PlayerState) => p.online);
 
   game.preload = {
     active: true,
@@ -493,7 +493,7 @@ export async function getBoardDataOrFail({
         game,
         boardData: imported,
         narrationEnabled: Boolean(game?.lobbySettings?.narrationEnabled),
-        onTtsReady: (id) => ttsBatcher.push(id),
+        onTtsReady: (id: string) => ttsBatcher.push(id),
         trace,
       });
 
@@ -530,7 +530,7 @@ export async function getBoardDataOrFail({
       narrationEnabled: Boolean(game?.lobbySettings?.narrationEnabled),
       reasoningEffort,
       trace,
-      onTtsReady: (id) => ttsBatcher.push(id),
+      onTtsReady: (id: string) => ttsBatcher.push(id),
       onProgress: ({ done, total, progress }: { done: number; total: number; progress: number }) => {
         const g = ctx.games?.[gameId];
         if (!g) return;

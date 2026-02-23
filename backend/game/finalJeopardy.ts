@@ -5,7 +5,7 @@ import type { Ctx } from "../ws/context.types.js";
 function getExpectedFinalists(game: GameState): PlayerState[] {
   const players = Array.isArray(game?.players) ? game.players : [];
 
-  return players.filter((p) => {
+  return players.filter((p: PlayerState) => {
     const score = Number(game.scores[p.username] ?? 0);
     const online = p?.online !== false; // default true if missing
     return score > 0 && online;
@@ -14,7 +14,7 @@ function getExpectedFinalists(game: GameState): PlayerState[] {
 
 function getFinalistUsernames(game: GameState): string[] {
   if (Array.isArray(game?.finalJeopardyFinalists)) return game.finalJeopardyFinalists;
-  const names = getExpectedFinalists(game).map((p) => p.username);
+  const names = getExpectedFinalists(game).map((p: PlayerState) => p.username);
   game.finalJeopardyFinalists = names;
   return names;
 }
@@ -147,15 +147,15 @@ async function finishGame(
 
   // Rank top 3 among finalists only (can be < 3 if fewer finalists)
   const top = finalists
-    .map((username) => {
-      const player = (game.players || []).find((p) => p.username === username);
+    .map((username: string) => {
+      const player = (game.players || []).find((p: PlayerState) => p.username === username);
       return {
         username,
         displayname: player?.displayname ?? username,
         score: Number(scores[username] ?? 0),
       };
     })
-    .sort((a, b) => b.score - a.score)
+    .sort((a: { score: number }, b: { score: number }) => b.score - a.score)
     .slice(0, 3);
 
   console.log(top);
@@ -225,7 +225,9 @@ async function finishGame(
   }
 
   // Build final podium payouts
-  const finalScores = Object.fromEntries((game.players || []).map((p) => [p.username, 0]));
+  const finalScores = Object.fromEntries(
+    (game.players || []).map((p: PlayerState) => [p.username, 0]),
+  );
 
   if (top[0]) finalScores[top[0].username] = top[0].score > 3000 ? top[0].score : 3000;
   if (top[1]) finalScores[top[1].username] = 3000;
@@ -240,7 +242,7 @@ async function finishGame(
 
   const idByUsername = new Map();
   await Promise.all(
-    [...usernames].map(async (u) => {
+    [...usernames].map(async (u: string) => {
       const id = await ctx.repos.profiles.getIdByUsername(u);
       idByUsername.set(u, id);
     }),
@@ -344,7 +346,7 @@ export function checkAllWagersSubmitted(game: GameState, gameId: string, ctx: Ct
 
   const allSubmitted =
     expected.length === 0 ||
-    expected.every((name) => Object.prototype.hasOwnProperty.call(wagers, name));
+    expected.every((name: string) => Object.prototype.hasOwnProperty.call(wagers, name));
 
   if (allSubmitted) {
     void advanceToDrawingPhase(game, gameId, wagers, ctx);
@@ -360,7 +362,7 @@ export function checkAllDrawingsSubmitted(game: GameState, gameId: string, ctx: 
 
   const allSubmitted =
     expected.length === 0 ||
-    expected.every((name) => Object.prototype.hasOwnProperty.call(drawings, name));
+    expected.every((name: string) => Object.prototype.hasOwnProperty.call(drawings, name));
 
   if (allSubmitted) {
     void finishGame(game, gameId, drawings, ctx);
