@@ -3,8 +3,9 @@ import { gameHandlers } from "./handlers/gameHandlers.js";
 import { userHandlers } from "./handlers/userHandlers.js";
 import type { SocketState } from "../types/runtime.js";
 import type { Ctx } from "./context.types.js";
+import type { WsHandler } from "./handlers/types.js";
 
-const HANDLERS = {
+const HANDLERS: Record<string, WsHandler> = {
   ...userHandlers,
   ...lobbyHandlers,
   ...gameHandlers,
