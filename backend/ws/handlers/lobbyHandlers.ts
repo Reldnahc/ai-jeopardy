@@ -73,7 +73,7 @@ export const lobbyHandlers: Record<string, WsHandler> = {
     const s = ctx.ensureLobbySettings(ctx, game, ctx.appConfig);
 
     const host = game.host;
-    const categories = game.categories;
+    const categories = ctx.normalizeCategories11(game.categories);
     const role = ctx.normalizeRole(ws);
 
     const selectedModel = s.selectedModel;

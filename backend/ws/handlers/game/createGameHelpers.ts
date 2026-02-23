@@ -1,7 +1,7 @@
 import type { GameState, JsonMap, PlayerState, SocketState } from "../../../types/runtime.js";
 import type { Ctx } from "../../context.types.js";
 
-type TraceLike = { mark?: (name: string, data?: Record<string, unknown>) => void } | null;
+type TraceLike = { mark: (name: string, data?: Record<string, unknown>) => void } | null;
 type CreateGameArgs = { ws: SocketState; ctx: Ctx; gameId: string; game?: GameState | null };
 
 function makePreloadTtsBatcher({
@@ -483,7 +483,8 @@ export async function getBoardDataOrFail({
       const imported = ctx.parseBoardJson(boardJson);
       const v = ctx.validateImportedBoardData(imported);
       if (!v.ok) {
-        ctx.broadcast(gameId, { type: "create-board-failed", message: v.error });
+        const message = "error" in v ? v.error : "Invalid board JSON";
+        ctx.broadcast(gameId, { type: "create-board-failed", message });
         game.isGenerating = false;
         return null;
       }
@@ -491,7 +492,7 @@ export async function getBoardDataOrFail({
       await ctx.ensureBoardNarrationTtsForBoardData({
         ctx,
         game,
-        boardData: imported,
+        boardData: imported as Parameters<typeof ctx.ensureBoardNarrationTtsForBoardData>[0]["boardData"],
         narrationEnabled: Boolean(game?.lobbySettings?.narrationEnabled),
         onTtsReady: (id: string) => ttsBatcher.push(id),
         trace,
@@ -517,7 +518,7 @@ export async function getBoardDataOrFail({
       });
 
       ttsBatcher.flush();
-      return imported;
+      return imported as GameState["boardData"];
     }
 
     game.isGenerating = true;
@@ -528,7 +529,7 @@ export async function getBoardDataOrFail({
       imageProvider: effectiveImageProvider,
       maxVisualCluesPerCategory: 2,
       narrationEnabled: Boolean(game?.lobbySettings?.narrationEnabled),
-      reasoningEffort,
+      reasoningEffort: reasoningEffort as "off" | "low" | "medium" | "high",
       trace,
       onTtsReady: (id: string) => ttsBatcher.push(id),
       onProgress: ({ done, total, progress }: { done: number; total: number; progress: number }) => {
