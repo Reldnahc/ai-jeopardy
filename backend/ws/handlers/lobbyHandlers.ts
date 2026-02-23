@@ -242,7 +242,9 @@ export const lobbyHandlers: Record<string, HandlerFn> = {
     // We only wait on requiredForToken.
     const required = game.preload.requiredForToken;
 
-    const allDone = required.every((id) => game.preload.acksByPlayer?.[id] === finalToken);
+    const allDone = required.every(
+      (id: string) => game.preload.acksByPlayer?.[id] === finalToken,
+    );
     if (!allDone) return;
 
     // Phase 2: everyone is ready → start game
@@ -270,7 +272,7 @@ export const lobbyHandlers: Record<string, HandlerFn> = {
       .filter(Boolean);
 
     game.gameReady = {
-      expected: Object.fromEntries(requiredNow.map((id) => [id, true])),
+      expected: Object.fromEntries(requiredNow.map((id: string) => [id, true])),
       acks: {},
       done: false,
     };
@@ -306,7 +308,7 @@ export const lobbyHandlers: Record<string, HandlerFn> = {
     game.gameReady.acks[stable] = true;
 
     const expectedIds = Object.keys(game.gameReady.expected);
-    const allReady = expectedIds.every((id) => game.gameReady.acks[id]);
+    const allReady = expectedIds.every((id: string) => game.gameReady.acks[id]);
     if (!allReady) return;
 
     game.gameReady.done = true;

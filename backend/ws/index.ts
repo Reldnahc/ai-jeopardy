@@ -63,7 +63,7 @@ export const attachWebSocketServer = (wss: WsServerLike, repos: Record<string, u
     });
 
     const interval = setInterval(() => {
-      wss.clients.forEach((client) => {
+      wss.clients.forEach((client: WebSocket) => {
         const socket = client as SocketState;
         if (socket.isAlive === false) return socket.terminate();
         socket.isAlive = false;
