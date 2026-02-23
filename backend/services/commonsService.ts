@@ -1,14 +1,65 @@
-// services/commonsService.js
+// services/commonsService.ts
 const COMMONS_API = "https://commons.wikimedia.org/w/api.php";
 const UA = "AI-Jeopardy/1.0";
 
-async function fetchJson(url) {
+type CommonsSearchResponse = {
+  query?: {
+    search?: Array<{ title?: string | null }>;
+  };
+};
+
+type CommonsImageInfoResponse = {
+  query?: {
+    pages?: Record<
+      string,
+      {
+        title?: string | null;
+        imageinfo?: Array<{
+          thumburl?: string;
+          url?: string;
+          descriptionurl?: string;
+          mime?: string;
+          width?: number;
+          height?: number;
+          extmetadata?: Record<string, { value?: string | null }>;
+        }>;
+      }
+    >;
+  };
+};
+
+type CommonsImageInfo = {
+  title: string | null;
+  downloadUrl: string | null;
+  sourceUrl: string | null;
+  mime: string | null;
+  width: number | null;
+  height: number | null;
+  description: string | null;
+  license: string | null;
+  licenseUrl: string | null;
+  artist: string | null;
+  credit: string | null;
+};
+
+type TraceLike = { mark?: (name: string, data?: Record<string, unknown>) => void };
+
+type CommonsPickOptions = {
+  searchLimit?: number;
+  thumbWidth?: number;
+  maxQueries?: number;
+  requireImageMime?: boolean;
+  preferPhotos?: boolean;
+  trace?: TraceLike;
+};
+
+async function fetchJson(url: string): Promise<unknown> {
   const r = await fetch(url, { headers: { "User-Agent": UA } });
   if (!r.ok) throw new Error(`Commons API failed: ${r.status}`);
   return r.json();
 }
 
-export async function commonsSearchFiles(query, limit = 5) {
+export async function commonsSearchFiles(query: string, limit = 5): Promise<string[]> {
   const url = new URL(COMMONS_API);
   url.searchParams.set("action", "query");
   url.searchParams.set("format", "json");
@@ -17,11 +68,14 @@ export async function commonsSearchFiles(query, limit = 5) {
   url.searchParams.set("srlimit", String(limit));
   url.searchParams.set("srsearch", query);
 
-  const data = await fetchJson(url.toString());
-  return (data?.query?.search ?? []).map((x) => x.title).filter(Boolean);
+  const data = (await fetchJson(url.toString())) as CommonsSearchResponse;
+  return (data?.query?.search ?? []).map((x) => x.title).filter(Boolean) as string[];
 }
 
-export async function commonsGetImageInfos(fileTitles, thumbWidth = 1600) {
+export async function commonsGetImageInfos(
+  fileTitles: string[],
+  thumbWidth = 1600,
+): Promise<CommonsImageInfo[]> {
   if (!fileTitles?.length) return [];
 
   const url = new URL(COMMONS_API);
@@ -33,7 +87,7 @@ export async function commonsGetImageInfos(fileTitles, thumbWidth = 1600) {
   url.searchParams.set("iiurlwidth", String(thumbWidth));
   url.searchParams.set("titles", fileTitles.join("|"));
 
-  const data = await fetchJson(url.toString());
+  const data = (await fetchJson(url.toString())) as CommonsImageInfoResponse;
 
   return Object.values(data?.query?.pages ?? {})
     .map((p) => {
@@ -58,10 +112,16 @@ export async function commonsGetImageInfos(fileTitles, thumbWidth = 1600) {
         credit: ext?.Credit?.value ?? null,
       };
     })
-    .filter(Boolean);
+    .filter(Boolean) as CommonsImageInfo[];
 }
 
-export function buildCommonsAttribution(meta) {
+export function buildCommonsAttribution(meta: {
+  artist?: string | null;
+  credit?: string | null;
+  license?: string | null;
+  licenseUrl?: string | null;
+  sourceUrl?: string | null;
+}): string | null {
   const parts = [];
   if (meta?.artist) parts.push(`Artist: ${meta.artist}`);
   if (meta?.credit) parts.push(`Credit: ${meta.credit}`);
@@ -73,7 +133,7 @@ export function buildCommonsAttribution(meta) {
 
 // --- scoring helpers (prefer photo-like assets) ---
 
-function mimeScore(mime, preferPhotos) {
+function mimeScore(mime: string | null | undefined, preferPhotos: boolean) {
   const m = String(mime ?? "").toLowerCase();
   if (m === "image/jpeg") return preferPhotos ? 80 : 60;
   if (m === "image/webp") return preferPhotos ? 75 : 55;
@@ -84,7 +144,7 @@ function mimeScore(mime, preferPhotos) {
   return -999;
 }
 
-function textPenalty(title, description) {
+function textPenalty(title: string | null | undefined, description: string | null | undefined) {
   const t = `${title ?? ""} ${description ?? ""}`.toLowerCase();
 
   const bad = [
@@ -119,7 +179,7 @@ function textPenalty(title, description) {
   return score;
 }
 
-function sizeScore(width, height) {
+function sizeScore(width: number | null | undefined, height: number | null | undefined) {
   const w = typeof width === "number" ? width : 0;
   const h = typeof height === "number" ? height : 0;
   if (!w || !h) return 0;
@@ -138,7 +198,7 @@ function sizeScore(width, height) {
   return mpBoost + arBoost;
 }
 
-function scoreCommonsCandidate(info, { preferPhotos }) {
+function scoreCommonsCandidate(info: CommonsImageInfo, { preferPhotos }: { preferPhotos: boolean }) {
   let score = 0;
   score += mimeScore(info?.mime, preferPhotos);
   score += sizeScore(info?.width, info?.height);
@@ -147,7 +207,10 @@ function scoreCommonsCandidate(info, { preferPhotos }) {
   return score;
 }
 
-export async function pickCommonsImageForQueries(queries, opts = {}) {
+export async function pickCommonsImageForQueries(
+  queries: string[],
+  opts: CommonsPickOptions = {},
+) {
   const {
     searchLimit = 8,
     thumbWidth = 1600,
