@@ -39,12 +39,16 @@ export type Category =
     };
 
 type ActiveBoard = "firstBoard" | "secondBoard" | "finalJeopardy";
+type BoardDataLike = {
+  firstBoard?: { categories?: Array<{ values?: Array<{ value?: unknown }> }> };
+  secondBoard?: { categories?: Array<{ values?: Array<{ value?: unknown }> }> };
+};
 
 export type Game = {
   lobbySettings?: { narrationEnabled?: boolean | null } | null;
   players?: Player[] | null;
   categories?: Category[] | null;
-  boardData?: any;
+  boardData?: BoardDataLike;
   aiHostTts?: AiHostTtsBank | null;
   activeBoard?: ActiveBoard;
   ttsProvider?: string | null;
