@@ -8,6 +8,7 @@ import { getProfilePresentation } from "../../utils/profilePresentation";
 import GamePlayerRow from "./GamePlayerRow.tsx";
 import { atLeast } from "../../../shared/roles.ts";
 import { useAlert } from "../../contexts/AlertContext.tsx";
+import Avatar from "../common/Avatar.tsx";
 
 interface SidebarProps {
   players: Player[];
@@ -33,6 +34,56 @@ type RollerMoneyProps = {
   value: number;
   className?: string;
 };
+
+function useAutoShrinkText<T extends HTMLElement>(
+  text: string,
+  minFontSize: number = 11,
+  step: number = 1,
+) {
+  const ref = useRef<T | null>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    el.style.fontSize = "";
+
+    const computed = window.getComputedStyle(el);
+    let currentSize = parseFloat(computed.fontSize);
+
+    while (currentSize > minFontSize && el.scrollWidth > el.clientWidth) {
+      currentSize -= step;
+      el.style.fontSize = `${currentSize}px`;
+    }
+  }, [text, minFontSize, step]);
+
+  return ref;
+}
+
+function FittedStatusName({
+  text,
+  className,
+  style,
+}: {
+  text: string;
+  className?: string;
+  style?: React.CSSProperties;
+}) {
+  const ref = useAutoShrinkText<HTMLSpanElement>(text);
+  return (
+    <span
+      ref={ref}
+      className={["hidden lg:inline text-base truncate leading-none", className ?? ""].join(" ")}
+      style={{
+        whiteSpace: "nowrap",
+        ...style,
+      }}
+      title={text}
+    >
+      {text}
+    </span>
+  );
+}
 
 function RollerMoney({ value, className }: RollerMoneyProps) {
   const prevRef = useRef<number>(value);
@@ -157,6 +208,49 @@ const Sidebar: React.FC<SidebarProps> = ({
     void fetchPublicProfiles(usernames).catch(() => {});
   }, [usernames, fetchPublicProfiles]);
 
+  const selectorPlayer = useMemo(() => {
+    const selector = String(selectorName ?? "").trim();
+    if (!selector) return null;
+    return (
+      players.find(
+        (p) =>
+          String(p.displayname ?? "")
+            .trim()
+            .toLowerCase() === selector.toLowerCase(),
+      ) ?? null
+    );
+  }, [players, selectorName]);
+
+  const buzzedPlayer = useMemo(() => {
+    const buzzed = String(buzzResult ?? "")
+      .trim()
+      .toLowerCase();
+    if (!buzzed) return null;
+    return (
+      players.find(
+        (p) =>
+          String(p.username ?? "")
+            .trim()
+            .toLowerCase() === buzzed,
+      ) ?? null
+    );
+  }, [players, buzzResult]);
+
+  const selectorUsername = String(selectorPlayer?.username ?? "").trim();
+  const buzzedUsername = String(buzzedPlayer?.username ?? "").trim();
+
+  const selectorPres = getProfilePresentation({
+    profile: selectorUsername ? getProfileByUsername(selectorUsername) : null,
+    fallbackName: String((selectorPlayer?.displayname ?? selectorUsername) || "None"),
+    defaultNameColor: undefined,
+  });
+
+  const buzzedPres = getProfilePresentation({
+    profile: buzzedUsername ? getProfileByUsername(buzzedUsername) : null,
+    fallbackName: String((buzzedPlayer?.displayname ?? buzzedUsername) || "None"),
+    defaultNameColor: undefined,
+  });
+
   return (
     <div className="flex-none w-full md:w-64 lg:w-96 flex flex-col gap-5 p-3 overflow-hidden box-border relative h-full">
       <div className="flex flex-col gap-0 w-full" style={{ fontFamily: "'Poppins', sans-serif" }}>
@@ -164,6 +258,60 @@ const Sidebar: React.FC<SidebarProps> = ({
           <h2 className="text-4xl font-extrabold font-swiss911 text-shadow-jeopardy tracking-wider bg-blue-700 text-white px-5 py-5 rounded-lg text-center w-full gap-2.5 shadow-md mb-3">
             CONTESTANTS
           </h2>
+
+          <div className="mb-3 grid grid-cols-2 gap-2">
+            <div className="rounded-md bg-white/85 border border-slate-200 px-2 py-1.5 shadow-sm">
+              <div className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">
+                Selector
+              </div>
+              <div className="mt-1 flex items-center justify-center lg:justify-start gap-2 min-h-8">
+                {selectorPlayer ? (
+                  <>
+                    <Avatar
+                      name={selectorPres.avatar.nameForLetter}
+                      size="7"
+                      color={selectorPres.avatar.bgColor}
+                      textColor={selectorPres.avatar.fgColor}
+                      icon={selectorPres.avatar.icon}
+                    />
+                    <FittedStatusName
+                      text={selectorPres.displayName}
+                      className={selectorPres.nameClassName}
+                      style={selectorPres.nameStyle}
+                    />
+                  </>
+                ) : (
+                  <FittedStatusName text="None" className="font-semibold text-slate-700" />
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-md bg-white/85 border border-slate-200 px-2 py-1.5 shadow-sm">
+              <div className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">
+                Buzzed
+              </div>
+              <div className="mt-1 flex items-center justify-center lg:justify-start gap-2 min-h-8">
+                {buzzedPlayer ? (
+                  <>
+                    <Avatar
+                      name={buzzedPres.avatar.nameForLetter}
+                      size="7"
+                      color={buzzedPres.avatar.bgColor}
+                      textColor={buzzedPres.avatar.fgColor}
+                      icon={buzzedPres.avatar.icon}
+                    />
+                    <FittedStatusName
+                      text={buzzedPres.displayName}
+                      className={buzzedPres.nameClassName}
+                      style={buzzedPres.nameStyle}
+                    />
+                  </>
+                ) : (
+                  <FittedStatusName text="None" className="font-semibold text-slate-700" />
+                )}
+              </div>
+            </div>
+          </div>
 
           <ul className="list-none p-0 m-0">
             {players.map((player) => {
@@ -186,8 +334,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                   username={username}
                   pres={pres}
                   score={score}
-                  buzzResult={buzzResult}
-                  selectorName={selectorName}
                   showScoreButtons={Boolean(me && atLeast(me.role, "admin"))}
                   lastQuestionValue={lastQuestionValue}
                   handleScoreUpdate={handleScoreUpdate}
@@ -200,7 +346,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Fixed Bottom Section */}
-      <div className="absolute bottom-0 left-0 right-0 w-full md:w-64 lg:w-96 flex flex-col items-center gap-5 z-[100]">
+      <div className="absolute bottom-1 lg:bottom-4 left-0 right-0 w-full md:w-64 lg:w-96 flex flex-col items-center gap-5 z-[100]">
         {me && atLeast(me.role, "admin") && activeBoard !== "finalJeopardy" && (
           <>
             <button
@@ -230,12 +376,12 @@ const Sidebar: React.FC<SidebarProps> = ({
           </>
         )}
 
-        <div className="w-full mb-3 flex items-center justify-center relative">
+        <div className="w-full mb-3 lg:mb-4 flex items-center justify-center relative">
           <button
             type="button"
             onClick={() => {
               void showAlert(
-                "Leave Game?",
+                "Leave Game",
                 <span>
                   Leaving means you will quit this game, your score will be wiped and you may not be
                   able to rejoin.
@@ -260,8 +406,8 @@ const Sidebar: React.FC<SidebarProps> = ({
               absolute left-4
               group
               inline-flex items-center justify-center
-              w-9 h-9
-              rounded-xl
+              w-10 h-10 lg:w-12 lg:h-12
+              rounded-lg
               border border-gray-200
               bg-white
               text-gray-500
@@ -274,27 +420,34 @@ const Sidebar: React.FC<SidebarProps> = ({
             title="Leave game"
             aria-label="Leave game"
           >
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <svg
+              className="w-5 h-5 lg:w-6 lg:h-6"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              aria-hidden="true"
+            >
               <path d="M10 17l1.41-1.41L8.83 13H20v-2H8.83l2.58-2.59L10 7l-5 5 5 5z" />
             </svg>
           </button>
 
           {narrationEnabled && (
-            <div className="flex sm:ml-11 lg:ml-0 items-center gap-3 select-none">
-              <MutedIcon className={"-mr-3"} />
+            <div className="w-full pl-14 lg:pl-16 flex justify-center">
+              <div className="flex items-center gap-3 lg:gap-4 select-none">
+                <MutedIcon className={"-mr-3"} />
 
-              <input
-                type="range"
-                min={0}
-                max={200}
-                step={1}
-                value={Math.round(audioVolume * 100)}
-                onChange={(e) => onChangeAudioVolume(Number(e.target.value) / 100)}
-                className="w-32 accent-white cursor-pointer"
-                aria-label="Audio volume"
-              />
+                <input
+                  type="range"
+                  min={0}
+                  max={200}
+                  step={1}
+                  value={Math.round(audioVolume * 100)}
+                  onChange={(e) => onChangeAudioVolume(Number(e.target.value) / 100)}
+                  className="w-28 md:w-32 lg:w-44 h-6 accent-white cursor-pointer"
+                  aria-label="Audio volume"
+                />
 
-              <LoudIcon className={"-ml-2"} />
+                <LoudIcon className={"-ml-2"} />
+              </div>
             </div>
           )}
         </div>

@@ -111,13 +111,17 @@ export default function MainPage() {
               },
             });
           } else {
-            showAlert("Join Failed", <span>Invalid lobby or game already in progress.</span>, [
-              {
-                label: "Okay",
-                actionValue: "okay",
-                styleClass: "bg-green-500 text-white hover:bg-green-600",
-              },
-            ]);
+            showAlert(
+              "Lobby Unavailable",
+              <span>Invalid lobby or game already in progress.</span>,
+              [
+                {
+                  label: "Okay",
+                  actionValue: "okay",
+                  styleClass: "bg-green-500 text-white hover:bg-green-600",
+                },
+              ],
+            );
           }
           return;
         }
@@ -176,7 +180,7 @@ export default function MainPage() {
     }
 
     if (!username || !displayname) {
-      void showAlert("Profile Error", <span>Your profile name is missing.</span>, [
+      void showAlert("Profile Incomplete", <span>Your profile name is missing.</span>, [
         {
           label: "Okay",
           actionValue: "okay",
@@ -218,7 +222,7 @@ export default function MainPage() {
     if (authLoading) return;
 
     if (!user) {
-      const action = await showAlert("Not Logged In", <span>You are not logged in.</span>, [
+      const action = await showAlert("Login Required", <span>You are not logged in.</span>, [
         {
           label: "Go Back",
           actionValue: "return",

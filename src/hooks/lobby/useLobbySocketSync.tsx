@@ -329,15 +329,9 @@ export function useLobbySocketSync({
 
           const m = message as unknown as { message?: string };
 
-          const alertContent = (
-            <span>
-              <span className="text-red-500 font-bold text-xl">Failed to start game</span>
-              <br />
-              <span>{m.message ?? "Unknown error."}</span>
-            </span>
-          );
+          const alertContent = <span>{m.message ?? "Unknown error."}</span>;
 
-          void showAlert("Start Failed", alertContent, [
+          void showAlert("Game Start Failed", alertContent, [
             {
               label: "Okay",
               actionValue: "okay",

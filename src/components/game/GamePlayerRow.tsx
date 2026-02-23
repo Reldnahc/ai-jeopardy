@@ -11,10 +11,6 @@ interface Props {
   pres: ProfilePresentation;
   score: number;
 
-  // game state
-  buzzResult: string | null;
-  selectorName: string | null;
-
   // admin controls
   showScoreButtons: boolean;
   lastQuestionValue: number;
@@ -57,8 +53,6 @@ export default function GamePlayerRow({
   username,
   pres,
   score,
-  buzzResult,
-  selectorName,
   showScoreButtons,
   lastQuestionValue,
   handleScoreUpdate,
@@ -66,20 +60,7 @@ export default function GamePlayerRow({
 }: Props) {
   const displayName = pres.displayName || username;
 
-  // selectorName in your current code compares to player.displayname (not username).
-  // We'll preserve that behavior:
-  const isSelector = selectorName != null && selectorName === player.displayname;
-  const isBuzzWinner = buzzResult != null && buzzResult === username;
-
   const nameRef = useAutoShrinkText<HTMLSpanElement>(displayName);
-
-  // Visual overlays for game-state (without clobbering pres.backgroundColor)
-  // If you want these to tint instead of ring, change to bg-*-*/10
-  const stateRing = isBuzzWinner
-    ? "ring-2 ring-red-500"
-    : isSelector
-      ? "ring-2 ring-blue-500"
-      : "ring-1 ring-black/10";
 
   const offlineClass = player.online === false ? "opacity-50" : "";
 
@@ -92,7 +73,7 @@ export default function GamePlayerRow({
         "rounded-xl mb-3 shadow-sm",
         "transition-transform duration-150 hover:scale-[1.01]",
         "select-none",
-        stateRing,
+        "ring-1 ring-black/10",
         offlineClass,
       ].join(" ")}
       style={{

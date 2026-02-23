@@ -36,7 +36,7 @@ const Header: React.FC = () => {
   const handleLogout = () => {
     const prevent = location.pathname.includes("/game/") || location.pathname.includes("/lobby/");
     if (prevent) {
-      showAlert("Logout Blocked", <span>You cannot log out in a game or lobby.</span>, [
+      showAlert("Logout Unavailable", <span>You cannot log out in a game or lobby.</span>, [
         {
           label: "Okay",
           actionValue: "stay",
