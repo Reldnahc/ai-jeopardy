@@ -33,6 +33,7 @@ interface JeopardyBoardProps {
   buzzResult: string | null;
   buzzResultDisplay: string | null;
   buzzLockedOut: boolean;
+  hasBuzzedCurrentClue: boolean;
 
   timerEndTime: number | null;
   timerDuration: number;
@@ -69,6 +70,7 @@ const JeopardyBoard: React.FC<JeopardyBoardProps> = ({
   buzzResult,
   buzzResultDisplay,
   buzzLockedOut,
+  hasBuzzedCurrentClue,
   timerEndTime,
   timerDuration,
   answerCapture,
@@ -241,6 +243,7 @@ const JeopardyBoard: React.FC<JeopardyBoardProps> = ({
           buzzResult={buzzResult}
           buzzResultDisplay={buzzResultDisplay}
           buzzLockedOut={buzzLockedOut}
+          hasBuzzedCurrentClue={hasBuzzedCurrentClue}
           timerEndTime={timerEndTime}
           timerDuration={timerDuration}
           answerCapture={answerCapture}

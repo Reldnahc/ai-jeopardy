@@ -26,6 +26,7 @@ interface SelectedClueDisplayProps {
   buzzResult: string | null;
   buzzResultDisplay: string | null;
   buzzLockedOut: boolean;
+  hasBuzzedCurrentClue: boolean;
   timerEndTime: number | null;
   timerDuration: number;
   answerCapture: AnswerCaptureStartMsg | null;
@@ -55,6 +56,7 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
   buzzResult,
   buzzResultDisplay,
   buzzLockedOut,
+  hasBuzzedCurrentClue,
   timerEndTime,
   timerDuration,
   answerCapture,
@@ -457,7 +459,7 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
         </div>
 
         {/* Buzz button stays at the bottom */}
-        {!isFinalJeopardy && !showDdModal && !showAnswer && (
+        {!isFinalJeopardy && !showDdModal && !showAnswer && !hasBuzzedCurrentClue && (
           <button
             onClick={handleBuzz}
             disabled={!!buzzResult || buzzLockedOut || !!answerCapture}

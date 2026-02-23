@@ -183,7 +183,9 @@ export function useGameSocketSync({ gameId, username }: UseGameSocketSyncArgs) {
   const [buzzResultDisplay, setBuzzResultDisplay] = useState<string | null>(null);
 
   const [buzzLockedOut, setBuzzLockedOut] = useState(false);
+  const [hasBuzzedCurrentClue, setHasBuzzedCurrentClue] = useState(false);
   const lockoutTimeoutRef = useRef<number | null>(null);
+  const currentClueKeyRef = useRef<string | null>(null);
 
   const [timerEndTime, setTimerEndTime] = useState<number | null>(null);
   const [timerDuration, setTimerDuration] = useState<number>(0);
@@ -233,6 +235,14 @@ export function useGameSocketSync({ gameId, username }: UseGameSocketSyncArgs) {
     setDdWagerLocked(null);
     setDdWagerError(null);
   };
+
+  const getClueKey = useCallback((clue?: Pick<Clue, "value" | "question"> | null) => {
+    if (!clue) return null;
+    const value = String(clue.value ?? "");
+    const question = String(clue.question ?? "").trim();
+    if (!question) return null;
+    return `${value}:${question}`;
+  }, []);
 
   const resetLocalTimerState = useCallback(() => {
     setTimerEndTime(null);
@@ -366,13 +376,24 @@ export function useGameSocketSync({ gameId, username }: UseGameSocketSyncArgs) {
           clearDdWagerUi();
         }
 
-        if (m.selectedClue && m.phase !== "DD_WAGER_CAPTURE") {
-          setSelectedClue({
-            ...(m.selectedClue as Clue),
-            showAnswer: Boolean(m.selectedClue.isAnswerRevealed),
-          });
-        } else {
-          setSelectedClue(null);
+        const selectedFromState =
+          m.selectedClue && m.phase !== "DD_WAGER_CAPTURE"
+            ? ({
+                ...(m.selectedClue as Clue),
+                showAnswer: Boolean(m.selectedClue.isAnswerRevealed),
+              } as Clue)
+            : null;
+
+        setSelectedClue(selectedFromState);
+
+        const clueKey = getClueKey(selectedFromState);
+        if (clueKey !== currentClueKeyRef.current) {
+          currentClueKeyRef.current = clueKey;
+          setHasBuzzedCurrentClue(false);
+        }
+
+        if (m.buzzResult && norm(m.buzzResult) === myUsername) {
+          setHasBuzzedCurrentClue(true);
         }
 
         if (typeof m.timerVersion === "number") timerVersionRef.current = m.timerVersion;
@@ -389,8 +410,9 @@ export function useGameSocketSync({ gameId, username }: UseGameSocketSyncArgs) {
       }
 
       if (message.type === "buzz-denied") {
-        const m = message as unknown as { lockoutUntil: number };
+        const m = message as unknown as { lockoutUntil: number; reason?: string };
         applyLockoutUntil(Number(m.lockoutUntil || 0));
+        if (m.reason === "already-attempted") setHasBuzzedCurrentClue(true);
         return;
       }
 
@@ -525,6 +547,7 @@ export function useGameSocketSync({ gameId, username }: UseGameSocketSyncArgs) {
         const m = message as unknown as { username: string; displayname: string };
         setBuzzResult(m.username);
         setBuzzResultDisplay(m.displayname);
+        if (norm(m.username) === myUsername) setHasBuzzedCurrentClue(true);
         resetLocalTimerState();
         return;
       }
@@ -593,7 +616,13 @@ export function useGameSocketSync({ gameId, username }: UseGameSocketSyncArgs) {
 
       if (message.type === "clue-selected") {
         const m = message as unknown as { clue: SelectedClueFromServer; clearedClues?: string[] };
-        setSelectedClue({ ...(m.clue as Clue), showAnswer: Boolean(m.clue.isAnswerRevealed) });
+        const selected = { ...(m.clue as Clue), showAnswer: Boolean(m.clue.isAnswerRevealed) };
+        setSelectedClue(selected);
+        const clueKey = getClueKey(selected);
+        if (clueKey !== currentClueKeyRef.current) {
+          currentClueKeyRef.current = clueKey;
+          setHasBuzzedCurrentClue(false);
+        }
         if (m.clearedClues) setClearedClues(new Set(m.clearedClues));
         return;
       }
@@ -639,6 +668,8 @@ export function useGameSocketSync({ gameId, username }: UseGameSocketSyncArgs) {
       if (message.type === "returned-to-board") {
         const m = message as { boardSelectionLocked?: boolean };
         setSelectedClue(null);
+        currentClueKeyRef.current = null;
+        setHasBuzzedCurrentClue(false);
         setBuzzResult(null);
         setBuzzResultDisplay(null);
         setAnswerCapture(null);
@@ -690,7 +721,16 @@ export function useGameSocketSync({ gameId, username }: UseGameSocketSyncArgs) {
         return;
       }
     });
-  }, [isSocketReady, subscribe, applyLockoutUntil, resetLocalTimerState, gameId, nowMs]);
+  }, [
+    isSocketReady,
+    subscribe,
+    applyLockoutUntil,
+    resetLocalTimerState,
+    gameId,
+    nowMs,
+    getClueKey,
+    myUsername,
+  ]);
 
   const markAllCluesComplete = useCallback(() => {
     if (!gameId) return;
@@ -736,6 +776,7 @@ export function useGameSocketSync({ gameId, username }: UseGameSocketSyncArgs) {
     buzzResult,
     buzzResultDisplay,
     buzzLockedOut,
+    hasBuzzedCurrentClue,
 
     timerEndTime,
     timerDuration,

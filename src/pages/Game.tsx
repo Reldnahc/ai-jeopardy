@@ -61,6 +61,7 @@ export default function Game() {
     buzzResult,
     buzzResultDisplay,
     buzzLockedOut,
+    hasBuzzedCurrentClue,
     timerEndTime,
     timerDuration,
     isFinalJeopardy,
@@ -429,6 +430,7 @@ export default function Game() {
               buzzResult={buzzResult}
               buzzResultDisplay={buzzResultDisplay}
               buzzLockedOut={buzzLockedOut}
+              hasBuzzedCurrentClue={hasBuzzedCurrentClue}
               timerEndTime={timerEndTime}
               timerDuration={timerDuration}
               answerCapture={answerCapture}
