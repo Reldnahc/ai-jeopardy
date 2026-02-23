@@ -20,6 +20,27 @@ type JoinLobbyData = {
   playerKey?: string;
 };
 type LeaveLobbyData = { gameId?: string; playerKey?: string; username?: string };
+type UpdateLobbySettingsData = { gameId: string; patch?: Record<string, unknown> };
+type CheckLobbyData = { gameId: string };
+type PromoteHostData = { gameId: string; targetUsername?: string };
+type ToggleLockCategoryData = {
+  gameId: string;
+  boardType: "firstBoard" | "secondBoard" | "finalJeopardy";
+  index: number;
+};
+type RandomizeCategoryData = {
+  gameId: string;
+  boardType: "firstBoard" | "secondBoard" | "finalJeopardy";
+  index?: number;
+  candidates?: unknown[];
+};
+type UpdateCategoryData = {
+  gameId: string;
+  boardType: "firstBoard" | "secondBoard" | "finalJeopardy";
+  index?: number;
+  value?: string;
+};
+type UpdateCategoriesData = { gameId: string; categories?: unknown };
 
 function normalizeBgColor(input: unknown, fallback = "bg-blue-500") {
   const s = String(input ?? "").trim();
@@ -643,7 +664,15 @@ export const lobbyHandlers: Record<string, HandlerFn> = {
     ctx.scheduleLobbyCleanupIfEmpty(effectiveGameId);
   },
 
-  "update-lobby-settings": async ({ ws, data, ctx }) => {
+  "update-lobby-settings": async ({
+    ws,
+    data,
+    ctx,
+  }: {
+    ws: SocketState;
+    data: UpdateLobbySettingsData;
+    ctx: Ctx;
+  }) => {
     try {
       const { gameId, patch } = data ?? {};
       if (!gameId) {
@@ -725,7 +754,15 @@ export const lobbyHandlers: Record<string, HandlerFn> = {
     }
   },
 
-  "check-lobby": async ({ ws, data, ctx }) => {
+  "check-lobby": async ({
+    ws,
+    data,
+    ctx,
+  }: {
+    ws: SocketState;
+    data: CheckLobbyData;
+    ctx: Ctx;
+  }) => {
     const { gameId } = data;
 
     let isValid = false;
@@ -736,7 +773,15 @@ export const lobbyHandlers: Record<string, HandlerFn> = {
     ws.send(JSON.stringify({ type: "check-lobby-response", isValid, gameId }));
   },
 
-  "promote-host": async ({ ws, data, ctx }) => {
+  "promote-host": async ({
+    ws,
+    data,
+    ctx,
+  }: {
+    ws: SocketState;
+    data: PromoteHostData;
+    ctx: Ctx;
+  }) => {
     const { gameId, targetUsername } = data ?? {};
     const game = ctx.games?.[gameId];
     if (!game || !game.inLobby) return;
@@ -770,7 +815,15 @@ export const lobbyHandlers: Record<string, HandlerFn> = {
     });
   },
 
-  "toggle-lock-category": async ({ ws, data, ctx }) => {
+  "toggle-lock-category": async ({
+    ws,
+    data,
+    ctx,
+  }: {
+    ws: SocketState;
+    data: ToggleLockCategoryData;
+    ctx: Ctx;
+  }) => {
     const { gameId, boardType, index } = data;
     const game = ctx.games[gameId];
     if (!game) return;
@@ -810,7 +863,15 @@ export const lobbyHandlers: Record<string, HandlerFn> = {
     });
   },
 
-  "randomize-category": async ({ ws, data, ctx }) => {
+  "randomize-category": async ({
+    ws,
+    data,
+    ctx,
+  }: {
+    ws: SocketState;
+    data: RandomizeCategoryData;
+    ctx: Ctx;
+  }) => {
     const { gameId, boardType, index, candidates } = data;
     const game = ctx.games[gameId];
     if (!game) return;
@@ -879,7 +940,15 @@ export const lobbyHandlers: Record<string, HandlerFn> = {
     });
   },
 
-  "update-category": async ({ ws, data, ctx }) => {
+  "update-category": async ({
+    ws,
+    data,
+    ctx,
+  }: {
+    ws: SocketState;
+    data: UpdateCategoryData;
+    ctx: Ctx;
+  }) => {
     try {
       const { gameId, boardType, index, value } = data ?? {};
 
@@ -956,7 +1025,15 @@ export const lobbyHandlers: Record<string, HandlerFn> = {
     }
   },
 
-  "update-categories": async ({ ws, data, ctx }) => {
+  "update-categories": async ({
+    ws,
+    data,
+    ctx,
+  }: {
+    ws: SocketState;
+    data: UpdateCategoriesData;
+    ctx: Ctx;
+  }) => {
     const { gameId, categories } = data;
     const game = ctx.games[gameId];
 
@@ -980,7 +1057,15 @@ export const lobbyHandlers: Record<string, HandlerFn> = {
     }
   },
 
-  "request-lobby-state": async ({ ws, data, ctx }) => {
+  "request-lobby-state": async ({
+    ws,
+    data,
+    ctx,
+  }: {
+    ws: SocketState;
+    data: GameIdData;
+    ctx: Ctx;
+  }) => {
     const gameId = data.gameId;
     const snapshot = ctx.buildLobbyState(gameId, ws);
     if (!snapshot) {

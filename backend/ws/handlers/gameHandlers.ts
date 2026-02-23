@@ -8,6 +8,29 @@ type LeaveGameData = { gameId: string; username?: string };
 type BuzzData = { gameId: string; estimatedServerBuzzAtMs?: number; clientSeq?: number };
 type GameIdData = { gameId: string };
 type UpdateScoreData = { gameId: string; username: string; delta: number };
+type DdSnipeNextData = { gameId: string; enabled?: boolean };
+type AnswerAudioBlobData = {
+  gameId: string;
+  answerSessionId?: string;
+  mimeType?: string;
+  dataBase64?: string;
+};
+type ClueSelectedData = { gameId: string; clue?: Record<string, unknown> };
+type DailyDoubleWagerAudioBlobData = {
+  gameId: string;
+  ddWagerSessionId?: string;
+  mimeType?: string;
+  dataBase64?: string;
+};
+type SubmitWagerData = { gameId: string; player: string; wager: number };
+type SubmitDrawingData = { gameId: string; player: string; drawing: string };
+type TtsEnsureData = {
+  gameId: string;
+  text?: string;
+  textType?: string;
+  voiceId?: string;
+  requestId?: string;
+};
 
 function normUsername(u: unknown): string {
   return String(u ?? "")
@@ -487,7 +510,15 @@ export const gameHandlers: Record<string, HandlerFn> = {
     }
   },
 
-  "dd-snipe-next": async ({ ws, data, ctx }) => {
+  "dd-snipe-next": async ({
+    ws,
+    data,
+    ctx,
+  }: {
+    ws: SocketState;
+    data: DdSnipeNextData;
+    ctx: Ctx;
+  }) => {
     const { gameId, enabled } = data || {};
     const game = ctx.games?.[gameId] as GameState | undefined;
     if (!game) return;
@@ -521,7 +552,15 @@ export const gameHandlers: Record<string, HandlerFn> = {
     }
   },
 
-  "answer-audio-blob": async ({ ws, data, ctx }) => {
+  "answer-audio-blob": async ({
+    ws,
+    data,
+    ctx,
+  }: {
+    ws: SocketState;
+    data: AnswerAudioBlobData;
+    ctx: Ctx;
+  }) => {
     const { gameId, answerSessionId, mimeType, dataBase64 } = data || {};
     const game = ctx.games?.[gameId];
     if (!game) return;
@@ -821,7 +860,15 @@ export const gameHandlers: Record<string, HandlerFn> = {
     ctx.checkBoardTransition(game, gameId, ctx);
   },
 
-  "clue-selected": async ({ ws, data, ctx }) => {
+  "clue-selected": async ({
+    ws,
+    data,
+    ctx,
+  }: {
+    ws: SocketState;
+    data: ClueSelectedData;
+    ctx: Ctx;
+  }) => {
     const { gameId, clue } = data;
     const game = ctx.games?.[gameId];
     if (!game) return;
@@ -983,7 +1030,15 @@ export const gameHandlers: Record<string, HandlerFn> = {
     ctx.doUnlockBuzzerAuthoritative(gameId, game, ctx);
   },
 
-  "daily-double-wager-audio-blob": async ({ ws, data, ctx }) => {
+  "daily-double-wager-audio-blob": async ({
+    ws,
+    data,
+    ctx,
+  }: {
+    ws: SocketState;
+    data: DailyDoubleWagerAudioBlobData;
+    ctx: Ctx;
+  }) => {
     const { gameId, ddWagerSessionId, mimeType, dataBase64 } = data || {};
     const game = ctx.games?.[gameId];
     if (!game) return;
@@ -1158,7 +1213,15 @@ export const gameHandlers: Record<string, HandlerFn> = {
     });
   },
 
-  "reveal-answer": async ({ ws, data, ctx }) => {
+  "reveal-answer": async ({
+    ws,
+    data,
+    ctx,
+  }: {
+    ws: SocketState;
+    data: GameIdData;
+    ctx: Ctx;
+  }) => {
     const { gameId } = data;
     const game = ctx.games[gameId];
     if (!game) return;
@@ -1189,7 +1252,15 @@ export const gameHandlers: Record<string, HandlerFn> = {
       scores: game.scores,
     });
   },
-  "submit-wager": async ({ ws, data, ctx }) => {
+  "submit-wager": async ({
+    ws,
+    data,
+    ctx,
+  }: {
+    ws: SocketState;
+    data: SubmitWagerData;
+    ctx: Ctx;
+  }) => {
     const { gameId, player, wager } = data;
     const game = ctx.games[gameId];
 
@@ -1197,7 +1268,15 @@ export const gameHandlers: Record<string, HandlerFn> = {
       await ctx.submitWager(game, gameId, player, wager, ctx);
     }
   },
-  "submit-drawing": async ({ ws, data, ctx }) => {
+  "submit-drawing": async ({
+    ws,
+    data,
+    ctx,
+  }: {
+    ws: SocketState;
+    data: SubmitDrawingData;
+    ctx: Ctx;
+  }) => {
     const { gameId, player, drawing } = data;
     const game = ctx.games[gameId];
 
@@ -1205,7 +1284,15 @@ export const gameHandlers: Record<string, HandlerFn> = {
       await ctx.submitDrawing(game, gameId, player, drawing, ctx);
     }
   },
-  "tts-ensure": async ({ ws, data, ctx }) => {
+  "tts-ensure": async ({
+    ws,
+    data,
+    ctx,
+  }: {
+    ws: SocketState;
+    data: TtsEnsureData;
+    ctx: Ctx;
+  }) => {
     const { gameId, text, textType, voiceId, requestId } = data ?? {};
     const safeText = typeof text === "string" ? text : "";
 
