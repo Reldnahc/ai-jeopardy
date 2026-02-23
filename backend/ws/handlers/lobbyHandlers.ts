@@ -61,8 +61,8 @@ export const lobbyHandlers: Record<string, WsHandler> = {
     const role = ctx.normalizeRole(ws);
 
     const selectedModel = s.selectedModel;
-    const modelInfo = ctx.resolveModelOrFail({ ws, ctx, gameId, game, selectedModel });
-    if (!modelInfo) return;
+    const modelAllowed = ctx.resolveModelOrFail({ ws, ctx, gameId, game, selectedModel });
+    if (!modelAllowed) return;
 
     const timeToBuzz = s.timeToBuzz;
     const timeToAnswer = s.timeToAnswer;

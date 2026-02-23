@@ -279,17 +279,14 @@ export function resolveModelOrFail({
   gameId,
   game,
   selectedModel,
-}: CreateGameArgs & { game: GameState; selectedModel: string }): {
-  disabled?: boolean;
-  price?: number;
-} | null {
+}: CreateGameArgs & { game: GameState; selectedModel: string }): boolean {
   const m = ctx.modelsByValue?.[selectedModel];
 
   // Unknown model? reject (prevents passing arbitrary provider/model ids)
   if (!m) {
     ws.send(JSON.stringify({ type: "error", message: "Unknown model selected." }));
     ctx.sendLobbySnapshot(ws, gameId);
-    return null;
+    return false;
   }
 
   // Disabled models are never allowed (server authoritative)
@@ -298,7 +295,7 @@ export function resolveModelOrFail({
     // Optional: force lobby setting back to a free default
     game.lobbySettings.selectedModel = ctx.appConfig.ai.defaultModel;
     ctx.sendLobbySnapshot(ws, gameId);
-    return null;
+    return false;
   }
 
   const isPaidModel = Number(m.price ?? 0) > 0;
@@ -315,11 +312,11 @@ export function resolveModelOrFail({
       // Optional: force downgrade
       game.lobbySettings.selectedModel = ctx.appConfig.ai.defaultModel;
       ctx.sendLobbySnapshot(ws, gameId);
-      return null;
+      return false;
     }
   }
 
-  return m;
+  return true;
 }
 
 export function resolveVisualPolicy({
