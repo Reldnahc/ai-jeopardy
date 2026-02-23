@@ -36,6 +36,7 @@ export function rank(role: LadderRole): number {
   return ROLE_RANK[role];
 }
 
-export function atLeast(role: LadderRole, min: LadderRole): boolean {
+export function atLeast(role: Role, min: LadderRole): boolean {
+  if (isBanned(role)) return false;
   return rank(role) >= rank(min);
 }
