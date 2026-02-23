@@ -8,7 +8,41 @@ const MAX_WIDTH = 1024;
 const QUALITY = 50;
 const EFFORT = 3;
 
-export async function ingestImageToDbFromUrl(imageUrl, meta, repos) {
+type ImageMeta = {
+  sourceUrl?: string | null;
+  license?: string | null;
+  licenseUrl?: string | null;
+  attribution?: string | null;
+  [key: string]: unknown;
+};
+
+type ImageRepos = {
+  images?: {
+    getIdBySha256(sha256: string): Promise<string | null>;
+    upsertImageAsset(
+      sha256: string,
+      bytes: Buffer,
+      size: number,
+      width: number | null,
+      height: number | null,
+      sourceUrl: string | null,
+      license: string | null,
+      attribution: string | null,
+    ): Promise<string | null>;
+  };
+};
+
+type BoardLike = {
+  firstBoard?: { categories?: Array<{ values?: Array<{ media?: { type?: string; assetId?: string } }> }> };
+  secondBoard?: { categories?: Array<{ values?: Array<{ media?: { type?: string; assetId?: string } }> }> };
+  finalJeopardy?: { categories?: Array<{ values?: Array<{ media?: { type?: string; assetId?: string } }> }> };
+};
+
+export async function ingestImageToDbFromUrl(
+  imageUrl: string,
+  meta: ImageMeta,
+  repos: ImageRepos,
+): Promise<string> {
   if (!repos?.images) throw new Error("ingestImageToDbFromUrl: missing deps.repos.images");
 
   const r = await fetch(imageUrl, { headers: { "User-Agent": UA } });
@@ -47,10 +81,12 @@ export async function ingestImageToDbFromUrl(imageUrl, meta, repos) {
   return id;
 }
 
-export function collectImageAssetIdsFromBoard(boardData) {
-  const ids = new Set();
+export function collectImageAssetIdsFromBoard(boardData: BoardLike | null | undefined): string[] {
+  const ids = new Set<string>();
 
-  const collect = (categories) => {
+  const collect = (
+    categories: Array<{ values?: Array<{ media?: { type?: string; assetId?: string } }> }> = [],
+  ) => {
     (categories ?? []).forEach((cat) => {
       (cat.values ?? []).forEach((clue) => {
         const media = clue?.media;

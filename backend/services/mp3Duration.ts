@@ -2,19 +2,19 @@
 // durationMs ~= (audioBytes * 8 * 1000) / bitratebps
 // Works well for constant bitrate MP3 (Polly is typically CBR in practice).
 
-function readSynchsafeInt(b0, b1, b2, b3) {
+function readSynchsafeInt(b0: number, b1: number, b2: number, b3: number): number {
   // ID3 uses 7 bits per byte
   return ((b0 & 0x7f) << 21) | ((b1 & 0x7f) << 14) | ((b2 & 0x7f) << 7) | (b3 & 0x7f);
 }
 
-function skipId3(buf) {
+function skipId3(buf: Uint8Array): number {
   if (buf.length < 10) return 0;
   if (buf[0] !== 0x49 || buf[1] !== 0x44 || buf[2] !== 0x33) return 0; // "ID3"
   const size = readSynchsafeInt(buf[6], buf[7], buf[8], buf[9]);
   return 10 + size;
 }
 
-function findFirstFrameHeader(buf, start) {
+function findFirstFrameHeader(buf: Uint8Array, start: number): number {
   for (let i = start; i + 4 <= buf.length; i++) {
     // sync: 11 bits set => 0xFF followed by 0xE0 mask
     if (buf[i] === 0xff && (buf[i + 1] & 0xe0) === 0xe0) return i;
@@ -33,7 +33,10 @@ const BITRATE_KBPS = {
   "2:1": [0, 32, 48, 56, 64, 80, 96, 112, 128, 144, 160, 176, 192, 224, 256, 0], // MPEG2/2.5 Layer I
 };
 
-export function estimateMp3DurationMsFromHeaderBytes(headerBytes, totalBytes) {
+export function estimateMp3DurationMsFromHeaderBytes(
+  headerBytes: Uint8Array | null | undefined,
+  totalBytes: number,
+): number | null {
   if (!headerBytes || headerBytes.length < 16 || !Number.isFinite(totalBytes) || totalBytes <= 0)
     return null;
 
@@ -51,7 +54,7 @@ export function estimateMp3DurationMsFromHeaderBytes(headerBytes, totalBytes) {
 
   // Layer (2 bits): 01=Layer III, 10=Layer II, 11=Layer I
   const layerId = (b1 >> 1) & 0x03;
-  let layer;
+  let layer: 1 | 2 | 3;
   if (layerId === 0x01) layer = 3;
   else if (layerId === 0x02) layer = 2;
   else if (layerId === 0x03) layer = 1;

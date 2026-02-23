@@ -1,21 +1,40 @@
-export const normalizeCategories11 = (arr) => {
-  const next = Array.isArray(arr) ? arr.slice(0, 11) : [];
-  while (next.length < 11) next.push("");
-  return next;
+type JsonMap = Record<string, unknown>;
+type ValidateResult = { ok: true } | { ok: false; error: string };
+type ClueShape = { value: number; question: string; answer: string };
+type CategoryShape = { category: string; values: ClueShape[] };
+type RoundShape = { categories: CategoryShape[] };
+type FinalJeopardyShape = { categories: CategoryShape | CategoryShape[] };
+type BoardShape = {
+  firstBoard: RoundShape;
+  secondBoard: RoundShape;
+  finalJeopardy: FinalJeopardyShape;
 };
 
-const isNonEmptyString = (v) => typeof v === "string" && v.trim().length > 0;
+const isCategoryShape = (value: unknown): value is CategoryShape => {
+  if (!value || typeof value !== "object") return false;
+  const v = value as JsonMap;
+  return isNonEmptyString(v.category) && Array.isArray(v.values);
+};
 
-export const validateImportedBoardData = (boardData) => {
+export const normalizeCategories11 = (arr: unknown): string[] => {
+  const next = Array.isArray(arr) ? arr.slice(0, 11) : [];
+  while (next.length < 11) next.push("");
+  return next.map((v) => String(v ?? ""));
+};
+
+const isNonEmptyString = (v: unknown): v is string =>
+  typeof v === "string" && v.trim().length > 0;
+
+export const validateImportedBoardData = (boardData: unknown): ValidateResult => {
   // Accept either:
   // 1) { firstBoard, secondBoard, finalJeopardy }
   // 2) { version, firstBoard, secondBoard, finalJeopardy }
-  const b = boardData && typeof boardData === "object" ? boardData : null;
+  const b = boardData && typeof boardData === "object" ? (boardData as Partial<BoardShape>) : null;
   if (!b) return { ok: false, error: "Board JSON must be an object." };
 
-  const firstBoard = b.firstBoard;
-  const secondBoard = b.secondBoard;
-  const finalJeopardy = b.finalJeopardy;
+  const firstBoard = b.firstBoard as RoundShape | undefined;
+  const secondBoard = b.secondBoard as RoundShape | undefined;
+  const finalJeopardy = b.finalJeopardy as FinalJeopardyShape | undefined;
 
   if (!firstBoard || !secondBoard || !finalJeopardy) {
     return { ok: false, error: "Missing firstBoard, secondBoard, or finalJeopardy." };
@@ -31,17 +50,17 @@ export const validateImportedBoardData = (boardData) => {
     return { ok: false, error: "secondBoard.categories must be an array of length 5." };
   }
 
-  const validateRoundCategories = (cats, roundName) => {
+  const validateRoundCategories = (cats: unknown[], roundName: string): string | null => {
     for (let i = 0; i < cats.length; i++) {
-      const c = cats[i];
-      if (!c || typeof c !== "object") return `${roundName}.categories[${i}] must be an object.`;
+      const c = cats[i] as JsonMap;
+      if (!isCategoryShape(c)) return `${roundName}.categories[${i}] must be an object.`;
       if (!isNonEmptyString(c.category))
         return `${roundName}.categories[${i}].category must be a non-empty string.`;
       if (!Array.isArray(c.values) || c.values.length !== 5)
         return `${roundName}.categories[${i}].values must be an array of length 5.`;
 
       for (let j = 0; j < c.values.length; j++) {
-        const clue = c.values[j];
+        const clue = c.values[j] as JsonMap;
         if (!clue || typeof clue !== "object")
           return `${roundName}.categories[${i}].values[${j}] must be an object.`;
         if (typeof clue.value !== "number")
@@ -71,7 +90,7 @@ export const validateImportedBoardData = (boardData) => {
     fjCats = fjCats[0];
   }
 
-  if (!fjCats || typeof fjCats !== "object") {
+  if (!isCategoryShape(fjCats)) {
     return { ok: false, error: "finalJeopardy.categories must be an object or an array." };
   }
 
@@ -86,7 +105,7 @@ export const validateImportedBoardData = (boardData) => {
     };
   }
 
-  const fj = fjCats.values[0];
+  const fj = fjCats.values[0] as JsonMap;
   if (!fj || typeof fj !== "object")
     return { ok: false, error: "finalJeopardy.categories.values[0] must be an object." };
   if (!isNonEmptyString(fj.question))
@@ -103,18 +122,16 @@ export const validateImportedBoardData = (boardData) => {
   return { ok: true };
 };
 
-export const parseBoardJson = (raw) => {
-  let parsed;
+export const parseBoardJson = (raw: unknown): unknown => {
+  let parsed: unknown;
   if (typeof raw === "string") parsed = JSON.parse(raw);
   else parsed = raw;
 
-  if (
-    parsed &&
-    typeof parsed === "object" &&
-    parsed.boardData &&
-    typeof parsed.boardData === "object"
-  ) {
-    return parsed.boardData;
+  if (parsed && typeof parsed === "object") {
+    const container = parsed as { boardData?: unknown };
+    if (container.boardData && typeof container.boardData === "object") {
+      return container.boardData;
+    }
   }
   return parsed;
 };
