@@ -61,7 +61,7 @@ function parseRange(rangeHeader: string | undefined, total: number): ByteRange |
 
 type CodedError = Error & { code?: string };
 
-// ✅ Typed params (first option)
+// Typed params (first option)
 type AssetIdParams = { assetId: string };
 
 export function registerHttpRoutes(app: Application, distPath: string, repos: HttpRepos) {
@@ -69,7 +69,7 @@ export function registerHttpRoutes(app: Application, distPath: string, repos: Ht
 
   app.get("/api/images/:assetId", async (req: Request<AssetIdParams>, res: Response) => {
     try {
-      const { assetId } = req.params; // ✅ string
+      const { assetId } = req.params; // string
 
       const row = await repos.images.getImageBinaryById(assetId);
       if (!row?.data) return res.status(404).json({ error: "Image asset not found" });
@@ -86,7 +86,7 @@ export function registerHttpRoutes(app: Application, distPath: string, repos: Ht
 
   app.get("/api/image-assets/:assetId", async (req: Request<AssetIdParams>, res: Response) => {
     try {
-      const { assetId } = req.params; // ✅ string
+      const { assetId } = req.params; // string
 
       const data = await repos.images.getImageMetaById(assetId);
       if (!data) return res.status(404).json({ error: "Image asset not found" });
@@ -99,7 +99,7 @@ export function registerHttpRoutes(app: Application, distPath: string, repos: Ht
   });
 
   app.get("/test/image/:assetId", async (req: Request<AssetIdParams>, res: Response) => {
-    const { assetId } = req.params; // ✅ string
+    const { assetId } = req.params; // string
 
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     return res.send(`
@@ -142,7 +142,7 @@ export function registerHttpRoutes(app: Application, distPath: string, repos: Ht
       res.setHeader("Accept-Ranges", "bytes");
       res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
 
-      // ✅ Strong-ish validator:
+      // Strong-ish validator:
       // If assetId is immutable (new id per new audio), this is enough.
       // If not immutable, include updated_at or a hash.
       const etag = `"tts-${assetId}-${total}"`;
@@ -192,7 +192,7 @@ export function registerHttpRoutes(app: Application, distPath: string, repos: Ht
   });
 
   app.get("/api/tts-assets/:assetId", async (req: Request<AssetIdParams>, res: Response) => {
-    const { assetId } = req.params; // ✅ string
+    const { assetId } = req.params; // string
 
     // 1) Cache hit
     const cached = getCachedTtsMeta(assetId);
@@ -256,7 +256,7 @@ export function registerHttpRoutes(app: Application, distPath: string, repos: Ht
   });
 
   app.get("/test/tts/:assetId", async (req: Request<AssetIdParams>, res: Response) => {
-    const { assetId } = req.params; // ✅ string
+    const { assetId } = req.params; // string
 
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     return res.send(`

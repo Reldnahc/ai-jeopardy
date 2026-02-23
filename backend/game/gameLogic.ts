@@ -70,12 +70,7 @@ function lockBoardSelection(ctx: Ctx, gameId: string, game: GameState): number {
   return game.boardSelectionLockVersion;
 }
 
-function unlockBoardSelection(
-  ctx: Ctx,
-  gameId: string,
-  game: GameState,
-  lockVersion?: number,
-) {
+function unlockBoardSelection(ctx: Ctx, gameId: string, game: GameState, lockVersion?: number) {
   if (!game) return;
 
   // Only unlock if this scheduled unlock is still current
@@ -200,8 +195,8 @@ export async function autoResolveAfterJudgement(
     if (!alive) return;
 
     // Correct player becomes selector
-    game.selectorKey = u; // ✅ username identity
-    game.selectorName = disp; // ✅ displayname presentation
+    game.selectorKey = u; // username identity
+    game.selectorName = disp; // displayname presentation
 
     if (ddActive) {
       game.dailyDouble = null;
@@ -341,47 +336,47 @@ export function doUnlockBuzzerAuthoritative(gameId: string, game: GameState, ctx
     game.timeToBuzz,
     "buzz",
     ({ gameId, game }: { gameId: string; game: GameState }) => {
-    if (!game) return;
-    if (!game.selectedClue) return;
+      if (!game) return;
+      if (!game.selectedClue) return;
 
-    // If still open and nobody buzzed => AI host resolves it
-    if (game.buzzerLocked || game.buzzed) return;
+      // If still open and nobody buzzed => AI host resolves it
+      if (game.buzzerLocked || game.buzzed) return;
 
-    game.buzzerLocked = true;
-    ctx.broadcast(gameId, { type: "buzzer-locked" });
+      game.buzzerLocked = true;
+      ctx.broadcast(gameId, { type: "buzzer-locked" });
 
-    (async () => {
-      const revealAnswer = async () => {
-        game.selectedClue.isAnswerRevealed = true;
-        ctx.broadcast(gameId, { type: "answer-revealed", clue: game.selectedClue });
-      };
+      (async () => {
+        const revealAnswer = async () => {
+          game.selectedClue.isAnswerRevealed = true;
+          ctx.broadcast(gameId, { type: "answer-revealed", clue: game.selectedClue });
+        };
 
-      const finish = async () => {
-        const lockedPlayers = game.clueState?.lockedOut ?? {};
+        const finish = async () => {
+          const lockedPlayers = game.clueState?.lockedOut ?? {};
 
-        for (const player of game.players) {
-          const isLocked = lockedPlayers[player.username] === true;
+          for (const player of game.players) {
+            const isLocked = lockedPlayers[player.username] === true;
 
-          if (!isLocked) {
-            ctx.fireAndForget(
-              ctx.repos.profiles.incrementCluesSkipped(player.username),
-              "incrementCluesSkipped",
-            );
+            if (!isLocked) {
+              ctx.fireAndForget(
+                ctx.repos.profiles.incrementCluesSkipped(player.username),
+                "incrementCluesSkipped",
+              );
+            }
           }
-        }
 
-        await ctx.sleepAndCheckGame(1000, gameId);
-        finishClueAndReturnToBoard(ctx, gameId, game);
-      };
+          await ctx.sleepAndCheckGame(1000, gameId);
+          finishClueAndReturnToBoard(ctx, gameId, game);
+        };
 
-      const clueKey = ctx.getClueKey(game, game.selectedClue);
-      const assetId = game.boardData?.ttsByAnswerKey?.[clueKey] || null;
-      await ctx.aiHostVoiceSequence(ctx, gameId, game, [
-        { slot: "nobody", after: revealAnswer },
-        { slot: "answer_was" },
-        { assetId, after: finish },
-      ]);
-    })();
+        const clueKey = ctx.getClueKey(game, game.selectedClue);
+        const assetId = game.boardData?.ttsByAnswerKey?.[clueKey] || null;
+        await ctx.aiHostVoiceSequence(ctx, gameId, game, [
+          { slot: "nobody", after: revealAnswer },
+          { slot: "answer_was" },
+          { assetId, after: finish },
+        ]);
+      })();
     },
   );
 }
@@ -389,7 +384,12 @@ export function doUnlockBuzzerAuthoritative(gameId: string, game: GameState, ctx
 export function findCategoryForClue(game: GameState, clue: BoardClue | null | undefined) {
   const boardKey = game.activeBoard || "firstBoard";
   const board = game.boardData?.[boardKey] as
-    | { categories?: Array<{ category?: string; values?: Array<{ value?: unknown; question?: string }> }> }
+    | {
+        categories?: Array<{
+          category?: string;
+          values?: Array<{ value?: unknown; question?: string }>;
+        }>;
+      }
     | undefined;
   const cats = board?.categories;
   if (!Array.isArray(cats)) return null;

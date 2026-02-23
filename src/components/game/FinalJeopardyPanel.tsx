@@ -59,7 +59,7 @@ const FinalJeopardyPanel: React.FC<FinalJeopardyPanelProps> = ({
     }
   };
 
-  // ✅ Auto-submit whatever is currently drawn when timer expires
+  // Auto-submit whatever is currently drawn when timer expires
   useEffect(() => {
     if (hasSubmitted) return;
     if (!timerEndTime) return;

@@ -29,7 +29,7 @@ function makePreloadTtsBatcher({
     const batch = buf;
     buf = [];
 
-    // ✅ New protocol (tokened)
+    // New protocol (tokened)
     ctx.broadcastPreloadBatch({
       ctx,
       gameId,

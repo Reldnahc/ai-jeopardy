@@ -258,7 +258,7 @@ export const lobbyHandlers: Record<string, WsHandler> = {
     // Can't finish until final batch has been broadcast
     if (!finalToken) return;
 
-    // ✅ Freeze required set for THIS preload token to avoid "new online player blocks forever"
+    // Freeze required set for THIS preload token to avoid "new online player blocks forever"
     // If missing (older state), initialize it once from current online players.
     if (
       !Array.isArray(game.preload.requiredForToken) ||
@@ -278,9 +278,7 @@ export const lobbyHandlers: Record<string, WsHandler> = {
     // We only wait on requiredForToken.
     const required = game.preload.requiredForToken;
 
-    const allDone = required.every(
-      (id: string) => game.preload.acksByPlayer?.[id] === finalToken,
-    );
+    const allDone = required.every((id: string) => game.preload.acksByPlayer?.[id] === finalToken);
     if (!allDone) return;
 
     // Phase 2: everyone is ready → start game

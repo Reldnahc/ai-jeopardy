@@ -21,7 +21,7 @@ export async function preloadAudioToBlobUrl(
     if (!r.ok) return null;
 
     const ct = r.headers.get("content-type") || "audio/wav";
-    const buf = await r.arrayBuffer(); // ✅ forces FULL download
+    const buf = await r.arrayBuffer(); // Forces full download
 
     const blobUrl = URL.createObjectURL(new Blob([buf], { type: ct }));
     blobUrlByHttpUrl.set(httpUrl, blobUrl);

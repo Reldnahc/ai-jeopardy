@@ -33,7 +33,7 @@ export const kokoroProvider: TtsProvider = {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           text: req.text,
-          voice: req.voiceId, // 👈 Kokoro expects `voice`, not `voiceId`
+          voice: req.voiceId, // Kokoro expects `voice`, not `voiceId`
         }),
         signal: controller.signal,
       });

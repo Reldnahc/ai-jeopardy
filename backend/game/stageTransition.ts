@@ -112,14 +112,14 @@ async function startFinalJeopardy(game: GameState, gameId: string, ctx: Ctx) {
   game.wagers = {};
   game.drawings = {};
 
-  // ✅ cache finalists for this FJ run
+  // Cache finalists for this FJ run
   const finalists = getFinalistNames(game);
 
   const pad = 25;
 
   await ctx.aiHostVoiceSequence(ctx, gameId, game, [
     { slot: "final_jeopardy", pad },
-    // ✅ include finalists so clients can hide wager/draw UI for non-finalists
+    // Include finalists so clients can hide wager/draw UI for non-finalists
     {
       slot: "final_jeopardy2",
       pad,
@@ -181,7 +181,7 @@ async function startFinalJeopardy(game: GameState, gameId: string, ctx: Ctx) {
       type: "clue-selected",
       clue: game.selectedClue,
       clearedClues: Array.from(game.clearedClues || []),
-      // ✅ include finalists here too (some clients key off clue-selected)
+      // Include finalists here too (some clients key off clue-selected)
       finalists: getFinalistNames(game),
     });
 

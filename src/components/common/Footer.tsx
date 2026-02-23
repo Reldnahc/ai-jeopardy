@@ -38,7 +38,7 @@ export default function Footer() {
         {/* Footer Bottom Section */}
         <div className="mt-8 text-center border-t border-gray-200 pt-4">
           <p className="text-xs text-gray-100 font-light">
-            © {new Date().getFullYear()} AI Jeopardy. All rights reserved.
+            (c) {new Date().getFullYear()} AI Jeopardy. All rights reserved.
           </p>
         </div>
       </div>
