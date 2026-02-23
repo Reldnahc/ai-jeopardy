@@ -1,6 +1,4 @@
 import type { JsonMap, PlayerState } from "../../types/runtime.js";
-import type { SocketState } from "../../types/runtime.js";
-import type { Ctx } from "../context.types.js";
 import type { WsHandler, WsHandlerArgs } from "./types.js";
 
 type GameIdData = { gameId: string };
@@ -41,20 +39,6 @@ type UpdateCategoryData = {
 };
 type UpdateCategoriesData = { gameId: string; categories?: unknown };
 
-function normalizeBgColor(input: unknown, fallback = "bg-blue-500") {
-  const s = String(input ?? "").trim();
-  if (/^bg-[a-z]+-\d{3}$/.test(s)) return s; // tailwind class
-  if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(s)) return s; // allow hex if you support it
-  return fallback;
-}
-
-function normalizeTextColor(input: unknown, fallback = "text-white") {
-  const s = String(input ?? "").trim();
-  if (/^text-[a-z]+-\d{3}$/.test(s)) return s;
-  if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(s)) return s;
-  return fallback;
-}
-
 export const lobbyHandlers: Record<string, WsHandler> = {
   "create-game": async ({ ws, data, ctx }: WsHandlerArgs<GameIdData>) => {
     const { gameId } = data ?? {};
@@ -77,7 +61,7 @@ export const lobbyHandlers: Record<string, WsHandler> = {
     const role = ctx.normalizeRole(ws);
 
     const selectedModel = s.selectedModel;
-    const modelInfo = ctx.resolveModelOrFail({ ws, ctx, gameId, game, selectedModel, role });
+    const modelInfo = ctx.resolveModelOrFail({ ws, ctx, gameId, game, selectedModel });
     if (!modelInfo) return;
 
     const timeToBuzz = s.timeToBuzz;
@@ -233,7 +217,7 @@ export const lobbyHandlers: Record<string, WsHandler> = {
     trace.end({ success: true });
   },
 
-  "preload-done": async ({ ws, data, ctx }: WsHandlerArgs<PreloadDoneData>) => {
+  "preload-done": async ({ data, ctx }: WsHandlerArgs<PreloadDoneData>) => {
     const { gameId, username, token, playerKey } = data ?? {};
     if (!gameId || !ctx.games?.[gameId]) return;
 
@@ -243,7 +227,7 @@ export const lobbyHandlers: Record<string, WsHandler> = {
     // Username-only identity (normalize)
     // Back-compat: if some old client still sends playerKey, accept it as a stable id,
     // but prefer username going forward.
-    const stableRaw = String(username ?? "").trim();
+    const stableRaw = String(username ?? playerKey ?? "").trim();
 
     const stable = stableRaw.toLowerCase();
     if (!stable) return; // don't allow "" keys
@@ -321,7 +305,7 @@ export const lobbyHandlers: Record<string, WsHandler> = {
     });
   },
 
-  "game-ready": async ({ ws, data, ctx }: WsHandlerArgs<GameReadyData>) => {
+  "game-ready": async ({ data, ctx }: WsHandlerArgs<GameReadyData>) => {
     const { gameId, username } = data ?? {};
     if (!gameId || !ctx.games?.[gameId]) return;
 
@@ -817,7 +801,7 @@ export const lobbyHandlers: Record<string, WsHandler> = {
       };
     }
 
-    const nextLocked = !Boolean(game.lockedCategories[bt][idx]);
+    const nextLocked = !game.lockedCategories[bt][idx];
     game.lockedCategories[bt][idx] = nextLocked;
 
     ctx.broadcast(gameId, {

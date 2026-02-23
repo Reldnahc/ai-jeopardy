@@ -60,32 +60,6 @@ function makePreloadTtsBatcher({
   };
 }
 
-function collectNarrationTextsFromBoard(boardData: GameState["boardData"]) {
-  const texts: string[] = [];
-
-  const boards = [
-    boardData?.firstBoard?.categories ?? [],
-    boardData?.secondBoard?.categories ?? [],
-    boardData?.finalJeopardy?.categories ?? [],
-  ];
-
-  for (const cats of boards) {
-    for (const cat of cats) {
-      for (const clue of cat.values ?? []) {
-        const v = typeof clue.value === "number" ? clue.value : null;
-        const q = String(clue.question ?? "").trim();
-        if (!q) continue;
-
-        const prefix = v ? `For ${v} dollars. ` : "";
-        texts.push(`${prefix}${q}`.trim());
-      }
-    }
-  }
-
-  // Dedupe so we don't waste DB lookups
-  return Array.from(new Set(texts));
-}
-
 // --- NEW ---
 // Call once at start of create-game so clients can begin preloading ASAP.
 export function initPreloadState({
@@ -305,8 +279,7 @@ export function resolveModelOrFail({
   gameId,
   game,
   selectedModel,
-  role,
-}: CreateGameArgs & { game: GameState; selectedModel: string; role: string }): {
+}: CreateGameArgs & { game: GameState; selectedModel: string }): {
   disabled?: boolean;
   price?: number;
 } | null {
