@@ -111,21 +111,13 @@ export default function MainPage() {
               },
             });
           } else {
-            showAlert(
-              <span>
-                <span className="text-red-500 font-bold text-xl">
-                  Invalid lobby or game already in progress.
-                </span>
-                <br />
-              </span>,
-              [
-                {
-                  label: "Okay",
-                  actionValue: "okay",
-                  styleClass: "bg-green-500 text-white hover:bg-green-600",
-                },
-              ],
-            );
+            showAlert("Join Failed", <span>Invalid lobby or game already in progress.</span>, [
+              {
+                label: "Okay",
+                actionValue: "okay",
+                styleClass: "bg-green-500 text-white hover:bg-green-600",
+              },
+            ]);
           }
           return;
         }
@@ -157,20 +149,13 @@ export default function MainPage() {
   };
 
   function sendErrorAlert() {
-    void showAlert(
-      <span>
-        <span className="text-red-500 font-bold text-xl">Connection to Websockets failed.</span>
-        <br />
-        <span className="text-gray-900 font-semibold">Please refresh the page and try again.</span>
-      </span>,
-      [
-        {
-          label: "Okay",
-          actionValue: "okay",
-          styleClass: "bg-green-500 text-white hover:bg-green-600",
-        },
-      ],
-    );
+    void showAlert("Connection Error", <span>Please refresh the page and try again.</span>, [
+      {
+        label: "Okay",
+        actionValue: "okay",
+        styleClass: "bg-green-500 text-white hover:bg-green-600",
+      },
+    ]);
   }
 
   const handleCreateGame = async () => {
@@ -180,36 +165,24 @@ export default function MainPage() {
     if (authLoading) return;
 
     if (!user) {
-      void showAlert(
-        <span>
-          <span className="text-red-500 font-bold text-xl">Please log in to create a game.</span>
-          <br />
-        </span>,
-        [
-          {
-            label: "Okay",
-            actionValue: "okay",
-            styleClass: "bg-green-500 text-white hover:bg-green-600",
-          },
-        ],
-      );
+      void showAlert("Login Required", <span>Please log in to create a game.</span>, [
+        {
+          label: "Okay",
+          actionValue: "okay",
+          styleClass: "bg-green-500 text-white hover:bg-green-600",
+        },
+      ]);
       return;
     }
 
     if (!username || !displayname) {
-      void showAlert(
-        <span>
-          <span className="text-red-500 font-bold text-xl">Your profile name is missing.</span>
-          <br />
-        </span>,
-        [
-          {
-            label: "Okay",
-            actionValue: "okay",
-            styleClass: "bg-green-500 text-white hover:bg-green-600",
-          },
-        ],
-      );
+      void showAlert("Profile Error", <span>Your profile name is missing.</span>, [
+        {
+          label: "Okay",
+          actionValue: "okay",
+          styleClass: "bg-green-500 text-white hover:bg-green-600",
+        },
+      ]);
       return;
     }
 
@@ -231,19 +204,13 @@ export default function MainPage() {
     if (isCreatingLobby) return;
 
     if (!gameId.trim()) {
-      await showAlert(
-        <span>
-          <span className="text-red-500 font-bold text-xl">Please enter a valid Game ID.</span>
-          <br />
-        </span>,
-        [
-          {
-            label: "Okay",
-            actionValue: "okay",
-            styleClass: "bg-green-500 text-white hover:bg-green-600",
-          },
-        ],
-      );
+      await showAlert("Invalid Game ID", <span>Please enter a valid Game ID.</span>, [
+        {
+          label: "Okay",
+          actionValue: "okay",
+          styleClass: "bg-green-500 text-white hover:bg-green-600",
+        },
+      ]);
       return;
     }
 
@@ -251,19 +218,13 @@ export default function MainPage() {
     if (authLoading) return;
 
     if (!user) {
-      const action = await showAlert(
-        <span>
-          <span className="text-red-500 font-bold text-xl">You are not logged in.</span>
-          <br />
-        </span>,
-        [
-          {
-            label: "Go Back",
-            actionValue: "return",
-            styleClass: "bg-red-500 text-white hover:bg-red-600",
-          },
-        ],
-      );
+      const action = await showAlert("Not Logged In", <span>You are not logged in.</span>, [
+        {
+          label: "Go Back",
+          actionValue: "return",
+          styleClass: "bg-red-500 text-white hover:bg-red-600",
+        },
+      ]);
       if (action === "return") return;
     }
 

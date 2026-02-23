@@ -157,13 +157,11 @@ export default function Game() {
       return;
     }
 
-    if (isSocketReady) {
-      sendJson({
-        type: "leave-game",
-        gameId,
-        username: myUsername || null,
-      });
-    }
+    sendJson({
+      type: "leave-game",
+      gameId,
+      username: myUsername,
+    });
 
     clearSession();
     navigate("/");

@@ -26,7 +26,11 @@ type UseLobbySocketSyncArgs = {
   playerKey: string | null;
   username: string | null;
   displayname: string | null;
-  showAlert: (node: React.ReactNode, actions: AlertButton[]) => Promise<string>;
+  showAlert: (
+    header: React.ReactNode,
+    node: React.ReactNode,
+    actions: AlertButton[],
+  ) => Promise<string>;
 };
 
 export function useLobbySocketSync({
@@ -333,7 +337,7 @@ export function useLobbySocketSync({
             </span>
           );
 
-          void showAlert(alertContent, [
+          void showAlert("Start Failed", alertContent, [
             {
               label: "Okay",
               actionValue: "okay",

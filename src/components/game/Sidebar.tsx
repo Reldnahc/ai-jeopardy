@@ -7,6 +7,7 @@ import LoudIcon from "../../icons/LoudIcon.tsx";
 import { getProfilePresentation } from "../../utils/profilePresentation";
 import GamePlayerRow from "./GamePlayerRow.tsx";
 import { atLeast } from "../../../shared/roles.ts";
+import { useAlert } from "../../contexts/AlertContext.tsx";
 
 interface SidebarProps {
   players: Player[];
@@ -137,6 +138,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   onToggleDailyDoubleSnipe,
 }) => {
   const { profile: me, getProfileByUsername, fetchPublicProfiles } = useProfile();
+  const { showAlert } = useAlert();
   const [ddSnipeEnabled, setDdSnipeEnabled] = useState(false);
 
   // Dedup usernames so we don't spam fetches
@@ -232,10 +234,27 @@ const Sidebar: React.FC<SidebarProps> = ({
           <button
             type="button"
             onClick={() => {
-              const ok = window.confirm(
-                "Leave the game?\n\nLeaving means you will quit this game and may not be able to rejoin.",
-              );
-              if (ok) onLeaveGame();
+              void showAlert(
+                "Leave Game?",
+                <span>
+                  Leaving means you will quit this game, your score will be wiped and you may not be
+                  able to rejoin.
+                </span>,
+                [
+                  {
+                    label: "Leave",
+                    actionValue: "leave",
+                    styleClass: "bg-red-600 text-white hover:bg-red-700",
+                  },
+                  {
+                    label: "Cancel",
+                    actionValue: "cancel",
+                    styleClass: "bg-gray-300 text-black hover:bg-gray-400",
+                  },
+                ],
+              ).then((action) => {
+                if (action === "leave") onLeaveGame();
+              });
             }}
             className="
               absolute left-4

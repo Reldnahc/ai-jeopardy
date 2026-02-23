@@ -143,19 +143,13 @@ const JeopardyBoard: React.FC<JeopardyBoardProps> = ({
 
     // Only enforce max-wager rule when score > 0
     if (score > 0 && normalizedWager > score) {
-      showAlert(
-        <span>
-          <span className="text-red-500 font-bold text-xl">Wager cannot exceed current score!</span>
-          <br />
-        </span>,
-        [
-          {
-            label: "Okay",
-            actionValue: "okay",
-            styleClass: "bg-green-500 text-white hover:bg-green-600",
-          },
-        ],
-      );
+      showAlert("Invalid Wager", <span>Wager cannot exceed current score!</span>, [
+        {
+          label: "Okay",
+          actionValue: "okay",
+          styleClass: "bg-green-500 text-white hover:bg-green-600",
+        },
+      ]);
       return;
     }
 

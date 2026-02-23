@@ -8,7 +8,7 @@ export type AlertButton = {
 };
 
 export type AlertContextValue = {
-  showAlert: (text: ReactNode, buttons: AlertButton[]) => Promise<string>;
+  showAlert: (header: ReactNode, text: ReactNode, buttons: AlertButton[]) => Promise<string>;
   closeAlert: () => void;
 };
 
@@ -24,11 +24,17 @@ export const useAlert = () => {
 
 export const AlertProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [alertHeader, setAlertHeader] = useState<ReactNode>("");
   const [alertText, setAlertText] = useState<ReactNode>("");
   const [alertButtons, setAlertButtons] = useState<AlertButton[]>([]);
   const [resolver, setResolver] = useState<((value: string) => void) | null>(null);
 
-  const showAlert = (text: ReactNode, buttons: AlertButton[]): Promise<string> => {
+  const showAlert = (
+    header: ReactNode,
+    text: ReactNode,
+    buttons: AlertButton[],
+  ): Promise<string> => {
+    setAlertHeader(header);
     setAlertText(text);
     setAlertButtons(buttons);
     setIsOpen(true);
@@ -41,6 +47,7 @@ export const AlertProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const closeAlert = () => {
     setIsOpen(false);
+    setAlertHeader("");
     setAlertText("");
     setAlertButtons([]);
   };
@@ -55,6 +62,7 @@ export const AlertProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       {children}
       <Alert
         isOpen={isOpen}
+        header={alertHeader}
         text={alertText}
         buttons={alertButtons.map((button) => ({
           label: button.label,

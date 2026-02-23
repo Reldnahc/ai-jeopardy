@@ -1,5 +1,4 @@
-import type { GameState, PlayerState, SocketState } from "../../types/runtime.js";
-import type { Ctx } from "../context.types.js";
+import type { GameState, PlayerState } from "../../types/runtime.js";
 import type { WsHandler, WsHandlerArgs } from "./types.js";
 
 type JoinGameData = { gameId: string; username?: string; displayname?: string };
@@ -221,13 +220,10 @@ export const gameHandlers: Record<string, WsHandler> = {
     if (game.scores) delete game.scores[leavingUsername];
     if (game.buzzLockouts) delete game.buzzLockouts[leavingUsername];
 
-    // If host left, reassign (or delete if empty)
-    if (normUsername(game.host) === leavingUsername) {
-      if (game.players.length === 0) {
-        delete ctx.games[gameId];
-        return;
-      }
-      game.host = normUsername(game.players[0].username); // host = username
+    //if game is empty delete it.
+    if (game.players.length === 0) {
+      delete ctx.games[gameId];
+      return;
     }
 
     ws.gameId = null;
@@ -361,7 +357,9 @@ export const gameHandlers: Record<string, WsHandler> = {
         if (g.buzzed || g.buzzerLocked) {
           try {
             if (g.pendingBuzz.timer) clearTimeout(g.pendingBuzz.timer);
-          } catch {}
+          } catch {
+            console.error("error clearing buzz timeout.");
+          }
           g.pendingBuzz = null;
           return;
         }
@@ -376,13 +374,13 @@ export const gameHandlers: Record<string, WsHandler> = {
             a: { est: number; arrival: number; msgSeq?: number },
             b: { est: number; arrival: number; msgSeq?: number },
           ) => {
-          const dt = a.est - b.est;
-          if (Math.abs(dt) <= EPS_MS) {
-            const da = a.arrival - b.arrival;
-            if (da !== 0) return da;
-            return (a.msgSeq || 0) - (b.msgSeq || 0);
-          }
-          return dt;
+            const dt = a.est - b.est;
+            if (Math.abs(dt) <= EPS_MS) {
+              const da = a.arrival - b.arrival;
+              if (da !== 0) return da;
+              return (a.msgSeq || 0) - (b.msgSeq || 0);
+            }
+            return dt;
           },
         );
 
@@ -509,7 +507,7 @@ export const gameHandlers: Record<string, WsHandler> = {
     }
   },
 
-  "dd-snipe-next": async ({ ws, data, ctx }: WsHandlerArgs<DdSnipeNextData>) => {
+  "dd-snipe-next": async ({ data, ctx }: WsHandlerArgs<DdSnipeNextData>) => {
     const { gameId, enabled } = data || {};
     const game = ctx.games?.[gameId] as GameState | undefined;
     if (!game) return;
@@ -740,7 +738,9 @@ export const gameHandlers: Record<string, WsHandler> = {
 
       return ctx
         .autoResolveAfterJudgement(ctx, gameId, game, playerUsername, "incorrect")
-        .catch((err: unknown) => console.error("[answer-audio-blob-error] autoResolve failed:", err));
+        .catch((err: unknown) =>
+          console.error("[answer-audio-blob-error] autoResolve failed:", err),
+        );
     }
 
     ctx.broadcast(gameId, {
@@ -819,7 +819,7 @@ export const gameHandlers: Record<string, WsHandler> = {
     }); // client now clears on reset-buzzer anyway
   },
 
-  "mark-all-complete": async ({ ws, data, ctx }: WsHandlerArgs<GameIdData>) => {
+  "mark-all-complete": async ({ data, ctx }: WsHandlerArgs<GameIdData>) => {
     const { gameId } = data;
     const game = ctx.games[gameId];
     if (!game) return;
@@ -850,7 +850,9 @@ export const gameHandlers: Record<string, WsHandler> = {
     const game = ctx.games?.[gameId];
     if (!game) return;
     const clueObj =
-      clue && typeof clue === "object" ? (clue as Record<string, unknown>) : ({} as Record<string, unknown>);
+      clue && typeof clue === "object"
+        ? (clue as Record<string, unknown>)
+        : ({} as Record<string, unknown>);
 
     const norm = (v: unknown) =>
       String(v ?? "")
@@ -898,7 +900,8 @@ export const gameHandlers: Record<string, WsHandler> = {
 
     ctx.fireAndForget(ctx.repos.profiles.incrementCluesSelected(callerStable), "Increment Clues");
 
-    const category = String(clueObj.category ?? "").trim() || ctx.findCategoryForClue(game, clueObj);
+    const category =
+      String(clueObj.category ?? "").trim() || ctx.findCategoryForClue(game, clueObj);
 
     game.selectedClue = {
       ...clueObj,
@@ -1202,7 +1205,7 @@ export const gameHandlers: Record<string, WsHandler> = {
     }
   },
 
-  "update-score": async ({ ws, data, ctx }: WsHandlerArgs<UpdateScoreData>) => {
+  "update-score": async ({ data, ctx }: WsHandlerArgs<UpdateScoreData>) => {
     const { gameId, username, delta } = data;
     const game = ctx.games[gameId];
     if (!game) return;
@@ -1215,7 +1218,7 @@ export const gameHandlers: Record<string, WsHandler> = {
       scores: game.scores,
     });
   },
-  "submit-wager": async ({ ws, data, ctx }: WsHandlerArgs<SubmitWagerData>) => {
+  "submit-wager": async ({ data, ctx }: WsHandlerArgs<SubmitWagerData>) => {
     const { gameId, player, wager } = data;
     const game = ctx.games[gameId];
 
@@ -1223,7 +1226,7 @@ export const gameHandlers: Record<string, WsHandler> = {
       await ctx.submitWager(game, gameId, player, wager, ctx);
     }
   },
-  "submit-drawing": async ({ ws, data, ctx }: WsHandlerArgs<SubmitDrawingData>) => {
+  "submit-drawing": async ({ data, ctx }: WsHandlerArgs<SubmitDrawingData>) => {
     const { gameId, player, drawing } = data;
     const game = ctx.games[gameId];
 

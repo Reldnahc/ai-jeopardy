@@ -232,21 +232,13 @@ const Lobby: React.FC = () => {
 
   const handleCreateGame = async () => {
     if (!profile) {
-      await showAlert(
-        <span>
-          <span className="text-red-500 font-bold text-xl">
-            You need to be logged in to do this.
-          </span>
-          <br />
-        </span>,
-        [
-          {
-            label: "Okay",
-            actionValue: "okay",
-            styleClass: "bg-green-500 text-white hover:bg-green-600",
-          },
-        ],
-      );
+      await showAlert("Login Required", <span>You need to be logged in to do this.</span>, [
+        {
+          label: "Okay",
+          actionValue: "okay",
+          styleClass: "bg-green-500 text-white hover:bg-green-600",
+        },
+      ]);
       return;
     }
 
@@ -255,9 +247,8 @@ const Lobby: React.FC = () => {
 
     if (usingImportedBoard && localJsonError) {
       await showAlert(
+        "Invalid Board JSON",
         <span>
-          <span className="text-red-500 font-bold text-xl">Invalid board JSON</span>
-          <br />
           <span>{localJsonError}</span>
         </span>,
         [
@@ -277,21 +268,13 @@ const Lobby: React.FC = () => {
         categories.firstBoard.some((c) => !c.trim()) ||
         categories.secondBoard.some((c) => !c.trim())
       ) {
-        await showAlert(
-          <span>
-            <span className="text-red-500 font-bold text-xl">
-              Please fill in all the categories
-            </span>
-            <br />
-          </span>,
-          [
-            {
-              label: "Okay",
-              actionValue: "okay",
-              styleClass: "bg-green-500 text-white hover:bg-green-600",
-            },
-          ],
-        );
+        await showAlert("Missing Categories", <span>Please fill in all the categories.</span>, [
+          {
+            label: "Okay",
+            actionValue: "okay",
+            styleClass: "bg-green-500 text-white hover:bg-green-600",
+          },
+        ]);
         return;
       }
     }
@@ -309,7 +292,17 @@ const Lobby: React.FC = () => {
       });
     } catch (error) {
       console.error("Failed to generate board data:", error);
-      alert("Failed to generate board data. Please try again.");
+      await showAlert(
+        "Generation Failed",
+        <span>Failed to generate board data. Please try again.</span>,
+        [
+          {
+            label: "Okay",
+            actionValue: "okay",
+            styleClass: "bg-green-500 text-white hover:bg-green-600",
+          },
+        ],
+      );
     }
   };
 
