@@ -12,7 +12,7 @@ import {
   prettyRoleLabel,
   useProfilePageController,
 } from "../hooks/profile/useProfilePageController";
-import type { Role } from "../../shared/roles.ts";
+import type { LadderRole } from "../../shared/roles.ts";
 
 interface RouteParams extends Record<string, string | undefined> {
   username: string;
@@ -179,7 +179,7 @@ const Profile: React.FC = () => {
             promoteOpen={c.promoteOpen}
             setPromoteOpen={c.setPromoteOpen}
             promoteDraft={String(c.promoteDraft)}
-            setPromoteDraft={(v) => c.setPromoteDraft(v as Role)}
+            setPromoteDraft={(v) => c.setPromoteDraft(v as LadderRole)}
             promotableRolesFiltered={c.promotableRolesFiltered}
             prettyRoleLabel={prettyRoleLabel}
             doPromote={c.doPromote}
