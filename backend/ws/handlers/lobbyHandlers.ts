@@ -166,7 +166,7 @@ export const lobbyHandlers: Record<string, HandlerFn> = {
 
     // --- AI authority bootstrapping (selector + welcome audio) ---
     // Pick a starting selector (random online player; fallback to first player)
-    const online = (game.players ?? []).filter((p) => p?.online !== false);
+    const online = (game.players ?? []).filter((p: PlayerState) => p?.online !== false);
     const pool = online.length > 0 ? online : (game.players ?? []);
     const pick = pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : null;
 
@@ -229,8 +229,8 @@ export const lobbyHandlers: Record<string, HandlerFn> = {
       game.preload.requiredForToken.length === 0
     ) {
       game.preload.requiredForToken = (game.players ?? [])
-        .filter((p) => p.online)
-        .map((p) =>
+        .filter((p: PlayerState) => p.online)
+        .map((p: PlayerState) =>
           String(ctx.playerStableId(p) ?? "")
             .trim()
             .toLowerCase(),
@@ -261,8 +261,8 @@ export const lobbyHandlers: Record<string, HandlerFn> = {
 
     // Now that we're transitioning phases, expected acks should reflect who is online NOW.
     const requiredNow = (game.players ?? [])
-      .filter((p) => p.online)
-      .map((p) =>
+      .filter((p: PlayerState) => p.online)
+      .map((p: PlayerState) =>
         String(ctx.playerStableId(p) ?? "")
           .trim()
           .toLowerCase(),
@@ -457,7 +457,7 @@ export const lobbyHandlers: Record<string, HandlerFn> = {
       type: "lobby-created",
       gameId: newGameId,
       categories: ctx.games[newGameId].categories,
-      players: ctx.games[newGameId].players.map((p) => ({
+      players: ctx.games[newGameId].players.map((p: PlayerState) => ({
         username: p.username,
         displayname: p.displayname,
         online: Boolean(p.online),
@@ -498,12 +498,12 @@ export const lobbyHandlers: Record<string, HandlerFn> = {
 
     // 1) Reconnect by playerKey when available
     const existingByKey = stableKey
-      ? game.players.find((p) => p.playerKey && p.playerKey === stableKey)
+      ? game.players.find((p: PlayerState) => p.playerKey && p.playerKey === stableKey)
       : null;
 
     // 2) Fallback reconnect by username
     const existingByUsername = game.players.find(
-      (p) =>
+      (p: PlayerState) =>
         String(p.username ?? "")
           .trim()
           .toLowerCase() === u,
@@ -527,9 +527,9 @@ export const lobbyHandlers: Record<string, HandlerFn> = {
     } else {
       // NEW PLAYER (but still protect against race)
       const race = stableKey
-        ? game.players.find((p) => p.playerKey === stableKey)
+        ? game.players.find((p: PlayerState) => p.playerKey === stableKey)
         : game.players.find(
-            (p) =>
+            (p: PlayerState) =>
               String(p.username ?? "")
                 .trim()
                 .toLowerCase() === u,
@@ -557,7 +557,7 @@ export const lobbyHandlers: Record<string, HandlerFn> = {
     // Broadcast a minimal list (UI will fetch cosmetics by username)
     ctx.broadcast(gameId, {
       type: "player-list-update",
-      players: game.players.map((p) => ({
+      players: game.players.map((p: PlayerState) => ({
         username: p.username,
         displayname: p.displayname,
         online: Boolean(p.online),
@@ -587,7 +587,7 @@ export const lobbyHandlers: Record<string, HandlerFn> = {
 
     const before = game.players.length;
 
-    game.players = game.players.filter((p) => {
+    game.players = game.players.filter((p: PlayerState) => {
       const pid = ctx.playerStableId(p); // must match your stable-id logic
       return pid !== stable;
     });
@@ -614,7 +614,7 @@ export const lobbyHandlers: Record<string, HandlerFn> = {
 
     ctx.broadcast(effectiveGameId, {
       type: "player-list-update",
-      players: game.players.map((p) => ({
+      players: game.players.map((p: PlayerState) => ({
         username: p.username,
         displayname: p.displayname,
         online: Boolean(p.online),
@@ -730,7 +730,7 @@ export const lobbyHandlers: Record<string, HandlerFn> = {
     if (!targetU) return;
 
     const targetPlayer = (game.players || []).find(
-      (p) =>
+      (p: PlayerState) =>
         String(p.username ?? "")
           .trim()
           .toLowerCase() === targetU,
@@ -743,7 +743,7 @@ export const lobbyHandlers: Record<string, HandlerFn> = {
 
     ctx.broadcast(gameId, {
       type: "player-list-update",
-      players: game.players.map((p) => ({
+      players: game.players.map((p: PlayerState) => ({
         username: p.username,
         displayname: p.displayname,
         online: Boolean(p.online),

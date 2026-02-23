@@ -333,7 +333,13 @@ export function doUnlockBuzzerAuthoritative(gameId: string, game: GameState, ctx
 
   if (game.timeToBuzz === -1) return;
 
-  ctx.startGameTimer(gameId, game, ctx, game.timeToBuzz, "buzz", ({ gameId, game }) => {
+  ctx.startGameTimer(
+    gameId,
+    game,
+    ctx,
+    game.timeToBuzz,
+    "buzz",
+    ({ gameId, game }: { gameId: string; game: GameState }) => {
     if (!game) return;
     if (!game.selectedClue) return;
 
@@ -375,7 +381,8 @@ export function doUnlockBuzzerAuthoritative(gameId: string, game: GameState, ctx
         { assetId, after: finish },
       ]);
     })();
-  });
+    },
+  );
 }
 
 export function findCategoryForClue(game: GameState, clue: BoardClue | null | undefined) {

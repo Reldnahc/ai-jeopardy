@@ -1,4 +1,4 @@
-import type { SocketState } from "../../types/runtime.js";
+import type { GameState, PlayerState, SocketState } from "../../types/runtime.js";
 import type { Ctx } from "../context.types.js";
 
 type HandlerArgs = { ws: SocketState; data: Record<string, any>; ctx: Ctx };
@@ -30,10 +30,10 @@ export const gameHandlers: Record<string, HandlerFn> = {
       return;
     }
 
-    const game = ctx.games[gameId];
+    const game = ctx.games[gameId] as GameState;
 
     // Find by username (canonical identity)
-    let player = (game.players ?? []).find((p) => normUsername(p.username) === u);
+    let player = (game.players ?? []).find((p: PlayerState) => normUsername(p.username) === u);
 
     if (player) {
       // Reconnect
@@ -52,7 +52,7 @@ export const gameHandlers: Record<string, HandlerFn> = {
       const profile = await ctx.repos.profiles.getPublicProfileByUsername(u);
 
       // Race condition check (still by username)
-      player = (game.players ?? []).find((p) => normUsername(p.username) === u);
+      player = (game.players ?? []).find((p: PlayerState) => normUsername(p.username) === u);
       if (player) {
         player.id = ws.id;
         player.online = true;
@@ -75,8 +75,8 @@ export const gameHandlers: Record<string, HandlerFn> = {
     }
 
     const me =
-      game.players.find((p) => p.id === ws.id) ||
-      game.players.find((p) => normUsername(p.username) === u) ||
+      game.players.find((p: PlayerState) => p.id === ws.id) ||
+      game.players.find((p: PlayerState) => normUsername(p.username) === u) ||
       null;
 
     const myUsername = normUsername(me?.username);
@@ -101,7 +101,7 @@ export const gameHandlers: Record<string, HandlerFn> = {
         type: "game-state",
         gameId,
 
-        players: game.players.map((p) => ({
+        players: game.players.map((p: PlayerState) => ({
           username: p.username,
           displayname: p.displayname,
           online: p?.online !== false,
@@ -158,7 +158,7 @@ export const gameHandlers: Record<string, HandlerFn> = {
     // Notify others (consistent payload)
     ctx.broadcast(gameId, {
       type: "player-list-update",
-      players: game.players.map((p) => ({
+      players: game.players.map((p: PlayerState) => ({
         username: p.username,
         displayname: p.displayname,
         online: p?.online !== false,
@@ -171,20 +171,22 @@ export const gameHandlers: Record<string, HandlerFn> = {
     const { gameId, username } = data ?? {};
     if (!gameId || !ctx.games?.[gameId]) return;
 
-    const game = ctx.games[gameId];
+    const game = ctx.games[gameId] as GameState;
 
     const u = normUsername(username);
 
     const leavingPlayer =
-      (u && game.players.find((p) => normUsername(p.username) === u)) ||
-      game.players.find((p) => p.id === ws.id);
+      (u && game.players.find((p: PlayerState) => normUsername(p.username) === u)) ||
+      game.players.find((p: PlayerState) => p.id === ws.id);
 
     if (!leavingPlayer) return;
 
     const leavingUsername = normUsername(leavingPlayer.username);
 
     // HARD REMOVE from players
-    game.players = game.players.filter((p) => normUsername(p.username) !== leavingUsername);
+    game.players = game.players.filter(
+      (p: PlayerState) => normUsername(p.username) !== leavingUsername,
+    );
 
     // PURGE per-player state
     if (game.wagers) delete game.wagers[leavingUsername];
@@ -205,7 +207,7 @@ export const gameHandlers: Record<string, HandlerFn> = {
 
     ctx.broadcast(gameId, {
       type: "player-list-update",
-      players: game.players.map((p) => ({
+      players: game.players.map((p: PlayerState) => ({
         username: p.username,
         displayname: p.displayname,
         online: p?.online !== false,
@@ -219,10 +221,10 @@ export const gameHandlers: Record<string, HandlerFn> = {
 
   buzz: async ({ ws, data, ctx }) => {
     const { gameId } = data;
-    const game = ctx.games?.[gameId];
+    const game = ctx.games?.[gameId] as GameState | undefined;
     if (!game) return;
 
-    const player = game.players.find((p) => p.id === ws.id);
+    const player = game.players.find((p: PlayerState) => p.id === ws.id);
     if (!player?.username) return;
 
     const stable = ctx.playerStableId(player); // should be normalized username
@@ -342,7 +344,11 @@ export const gameHandlers: Record<string, HandlerFn> = {
 
         if (candidates.length === 0) return;
 
-        candidates.sort((a, b) => {
+        candidates.sort(
+          (
+            a: { est: number; arrival: number; msgSeq?: number },
+            b: { est: number; arrival: number; msgSeq?: number },
+          ) => {
           const dt = a.est - b.est;
           if (Math.abs(dt) <= EPS_MS) {
             const da = a.arrival - b.arrival;
@@ -350,7 +356,8 @@ export const gameHandlers: Record<string, HandlerFn> = {
             return (a.msgSeq || 0) - (b.msgSeq || 0);
           }
           return dt;
-        });
+          },
+        );
 
         const winner = candidates[0];
         if (!winner?.playerUsername) return;
@@ -460,7 +467,9 @@ export const gameHandlers: Record<string, HandlerFn> = {
     const clientSeq = Number(data?.clientSeq || 0);
 
     // Dedupe: avoid multiple from same player
-    const already = game.pendingBuzz.candidates.find((c) => c.playerUsername === stable);
+    const already = game.pendingBuzz.candidates.find(
+      (c: { playerUsername: string }) => c.playerUsername === stable,
+    );
     if (!already) {
       game.pendingBuzz.candidates.push({
         playerUsername: stable,
@@ -475,7 +484,7 @@ export const gameHandlers: Record<string, HandlerFn> = {
 
   "dd-snipe-next": async ({ ws, data, ctx }) => {
     const { gameId, enabled } = data || {};
-    const game = ctx.games?.[gameId];
+    const game = ctx.games?.[gameId] as GameState | undefined;
     if (!game) return;
 
     game.ddSnipeNext = Boolean(enabled);
@@ -515,7 +524,7 @@ export const gameHandlers: Record<string, HandlerFn> = {
       String(v ?? "")
         .trim()
         .toLowerCase();
-    const player = game.players?.find((p) => p.id === ws.id);
+    const player = game.players?.find((p: PlayerState) => p.id === ws.id);
     const playerDisplayname = String(player?.displayname ?? "").trim() || null;
     const playerUsername = norm(player?.username);
 
@@ -1006,7 +1015,7 @@ export const gameHandlers: Record<string, HandlerFn> = {
     }
 
     // Only the DD player may submit (username-based)
-    const player = game.players?.find((p) => p.id === ws.id);
+    const player = game.players?.find((p: PlayerState) => p.id === ws.id);
     const playerUsername = norm(player?.username);
     const playerDisplayname = String(player?.displayname ?? "").trim() || null;
 

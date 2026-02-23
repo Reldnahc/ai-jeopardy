@@ -69,7 +69,7 @@ export async function commonsSearchFiles(query: string, limit = 5): Promise<stri
   url.searchParams.set("srsearch", query);
 
   const data = (await fetchJson(url.toString())) as CommonsSearchResponse;
-  return (data?.query?.search ?? []).map((x) => x.title).filter(Boolean) as string[];
+  return (data?.query?.search ?? []).map((x: { title?: string | null }) => x.title).filter(Boolean) as string[];
 }
 
 export async function commonsGetImageInfos(
@@ -90,7 +90,7 @@ export async function commonsGetImageInfos(
   const data = (await fetchJson(url.toString())) as CommonsImageInfoResponse;
 
   return Object.values(data?.query?.pages ?? {})
-    .map((p) => {
+    .map((p: CommonsImageInfoResponse["query"]["pages"][string]) => {
       const ii = p?.imageinfo?.[0];
       if (!ii) return null;
 
@@ -231,7 +231,7 @@ export async function pickCommonsImageForQueries(
     trace?.mark("commons_imageinfo_start", { q });
     const infos = await commonsGetImageInfos(titles, thumbWidth);
     trace?.mark("commons_imageinfo_end", { q, infos: infos.length });
-    const imageInfos = infos.filter((x) => {
+    const imageInfos = infos.filter((x: CommonsImageInfo) => {
       if (!x?.downloadUrl) return false;
       if (!requireImageMime) return true;
       return String(x.mime ?? "").startsWith("image/");
