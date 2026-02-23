@@ -19,8 +19,8 @@ function makePreloadTtsBatcher({
   maxBatch?: number;
   trace?: TraceLike;
 }) {
-  let buf = [];
-  let timer = null;
+  let buf: string[] = [];
+  let timer: NodeJS.Timeout | null = null;
 
   const flush = () => {
     timer = null;
@@ -43,7 +43,7 @@ function makePreloadTtsBatcher({
   };
 
   return {
-    push(id) {
+    push(id: string) {
       const v = String(id ?? "").trim();
       if (!v) return;
 
@@ -207,7 +207,7 @@ export async function setupPreloadHandshake({
   ctx: Ctx;
   gameId: string;
   game: GameState;
-  boardData: Record<string, unknown>;
+  boardData: GameState["boardData"];
   trace?: TraceLike;
 }) {
   trace?.mark?.("preload_handshake_start", {
@@ -245,7 +245,7 @@ export async function setupPreloadHandshake({
   return { imageAssetIds, ttsAssetIds };
 }
 
-export function getGameOrFail({ ws, ctx, gameId }: CreateGameArgs) {
+export function getGameOrFail({ ws, ctx, gameId }: CreateGameArgs): GameState | null {
   if (!gameId) {
     ws.send(JSON.stringify({ type: "error", message: "create-game missing gameId" }));
     return null;
@@ -265,7 +265,7 @@ export function ensureHostOrFail({
   ctx,
   gameId,
   game,
-}: CreateGameArgs & { game: GameState }) {
+}: CreateGameArgs & { game: GameState }): boolean {
   if (!ctx.isHostSocket(game, ws)) {
     ws.send(JSON.stringify({ type: "error", message: "Only the host can start the game." }));
     ctx.sendLobbySnapshot(ws, gameId);
@@ -278,7 +278,7 @@ export function ensureLobbySettings(
   ctx: Ctx,
   game: GameState,
   appConfig: { ai: { defaultModel: string } },
-) {
+): NonNullable<GameState["lobbySettings"]> {
   if (game.lobbySettings) return game.lobbySettings;
 
   game.lobbySettings = {
@@ -306,7 +306,10 @@ export function resolveModelOrFail({
   game,
   selectedModel,
   role,
-}: CreateGameArgs & { game: GameState; selectedModel: string; role: string }) {
+}: CreateGameArgs & { game: GameState; selectedModel: string; role: string }): {
+  disabled?: boolean;
+  price?: number;
+} | null {
   const m = ctx.modelsByValue?.[selectedModel];
 
   // Unknown model? reject (prevents passing arbitrary provider/model ids)
@@ -354,7 +357,13 @@ export function resolveVisualPolicy({
   role: string;
   boardJson: string;
   visualMode: string;
-}) {
+}): {
+  usingImportedBoard: boolean;
+  effectiveIncludeVisuals: boolean;
+  requestedProvider: string;
+  canUseBrave: boolean;
+  effectiveImageProvider?: string;
+} {
   const usingImportedBoard = Boolean(boardJson && boardJson.trim());
 
   // Visual policy:
@@ -422,7 +431,7 @@ export function applyNewGameState({
   timeToAnswer,
 }: {
   game: GameState;
-  boardData: Record<string, unknown>;
+  boardData: GameState["boardData"];
   timeToBuzz: number;
   timeToAnswer: number;
 }) {
@@ -465,7 +474,7 @@ export async function getBoardDataOrFail({
   effectiveImageProvider?: string;
   reasoningEffort: string;
   trace?: TraceLike;
-}) {
+}): Promise<GameState["boardData"] | null> {
   const usingImportedBoard = Boolean(boardJson && boardJson.trim());
   const ttsBatcher = makePreloadTtsBatcher({ ctx, gameId, game, trace });
 
@@ -522,7 +531,7 @@ export async function getBoardDataOrFail({
       reasoningEffort,
       trace,
       onTtsReady: (id) => ttsBatcher.push(id),
-      onProgress: ({ done, total, progress }) => {
+      onProgress: ({ done, total, progress }: { done: number; total: number; progress: number }) => {
         const g = ctx.games?.[gameId];
         if (!g) return;
 

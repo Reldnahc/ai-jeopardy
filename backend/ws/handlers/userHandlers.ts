@@ -1,4 +1,10 @@
-export const userHandlers = {
+import type { SocketState } from "../../types/runtime.js";
+import type { Ctx } from "../context.types.js";
+
+type HandlerArgs = { ws: SocketState; data: Record<string, any>; ctx: Ctx };
+type HandlerFn = (args: HandlerArgs) => Promise<unknown> | unknown;
+
+export const userHandlers: Record<string, HandlerFn> = {
   ping: async ({ ws }) => {
     ws.send(JSON.stringify({ type: "pong", t: Date.now() }));
   },

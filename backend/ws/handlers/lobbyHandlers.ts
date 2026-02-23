@@ -1,4 +1,9 @@
 import type { JsonMap, PlayerState } from "../../types/runtime.js";
+import type { SocketState } from "../../types/runtime.js";
+import type { Ctx } from "../context.types.js";
+
+type HandlerArgs = { ws: SocketState; data: Record<string, any>; ctx: Ctx };
+type HandlerFn = (args: HandlerArgs) => Promise<unknown> | unknown;
 
 function normalizeBgColor(input: unknown, fallback = "bg-blue-500") {
   const s = String(input ?? "").trim();
@@ -14,7 +19,7 @@ function normalizeTextColor(input: unknown, fallback = "text-white") {
   return fallback;
 }
 
-export const lobbyHandlers = {
+export const lobbyHandlers: Record<string, HandlerFn> = {
   "create-game": async ({ ws, data, ctx }) => {
     const { gameId } = data ?? {};
 

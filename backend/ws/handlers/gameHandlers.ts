@@ -1,3 +1,9 @@
+import type { SocketState } from "../../types/runtime.js";
+import type { Ctx } from "../context.types.js";
+
+type HandlerArgs = { ws: SocketState; data: Record<string, any>; ctx: Ctx };
+type HandlerFn = (args: HandlerArgs) => Promise<unknown> | unknown;
+
 function normUsername(u: unknown): string {
   return String(u ?? "")
     .trim()
@@ -9,7 +15,7 @@ function pickDisplayname(d: unknown, fallbackUsername: string): string {
   return s || fallbackUsername;
 }
 
-export const gameHandlers = {
+export const gameHandlers: Record<string, HandlerFn> = {
   "join-game": async ({ ws, data, ctx }) => {
     const { gameId, username, displayname } = data ?? {};
     const u = normUsername(username);
