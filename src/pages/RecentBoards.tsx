@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import GameCard from "../components/recentboards/GameCard";
+import PageCardContainer from "../components/common/PageCardContainer.tsx";
 import { Board } from "../types/Board.ts";
 import { models } from "../../shared/models.js";
 import { getApiBase, fetchJson } from "../utils/utils.ts";
@@ -65,7 +66,7 @@ const RecentBoards = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-r from-indigo-400 to-blue-700 flex flex-col items-center p-6">
-      <div className="bg-white rounded-xl shadow-2xl overflow-hidden w-full max-w-6xl">
+      <PageCardContainer>
         <div className="p-10">
           <h1 className="text-6xl font-swiss911 tracking-wider text-shadow-jeopardy text-yellow-400 mb-8 text-center">
             <div> Recent Boards</div>
@@ -108,7 +109,7 @@ const RecentBoards = () => {
 
           <div ref={loadMoreRef} className="h-12"></div>
         </div>
-      </div>
+      </PageCardContainer>
     </div>
   );
 };

@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useWebSocket } from "../contexts/WebSocketContext.tsx";
 import LobbySidebar from "../components/lobby/LobbySidebar.tsx";
 import LoadingScreen from "../components/common/LoadingScreen.tsx";
+import PageCardContainer from "../components/common/PageCardContainer.tsx";
 import HostControls from "../components/lobby/HostControls.tsx";
 import CategoryBoard, { LobbyBoardType } from "../components/lobby/CategoryBoard.tsx";
 import { useProfile } from "../contexts/ProfileContext.tsx";
@@ -310,10 +311,10 @@ const Lobby: React.FC = () => {
     <LoadingScreen message={loadingMessage} progress={loadingProgress ?? 0} />
   ) : (
     <div className="min-h-[calc(100vh-5.5rem)] bg-gradient-to-r from-indigo-400 to-blue-700 p-6">
-      <div className="bg-white rounded-xl shadow-2xl overflow-hidden w-full max-w-6xl mx-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-4">
+      <PageCardContainer className="mx-auto">
+        <div className="grid grid-cols-1 lg:grid-cols-[20rem_minmax(0,1fr)] xl:grid-cols-[23rem_minmax(0,1fr)]">
           {/* Sidebar Column */}
-          <div className="lg:col-span-1 border-r border-gray-200 bg-gray-50 p-6">
+          <div className="border-r border-gray-200 bg-gray-50 p-6">
             <LobbySidebar
               gameId={gameId}
               host={host}
@@ -326,7 +327,7 @@ const Lobby: React.FC = () => {
           </div>
 
           {/* Main Content Column */}
-          <div className="lg:col-span-3 p-8">
+          <div className="p-8">
             {/* Category Boards */}
             <div className="space-y-8">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 ">
@@ -384,7 +385,7 @@ const Lobby: React.FC = () => {
             )}
           </div>
         </div>
-      </div>
+      </PageCardContainer>
     </div>
   );
 };

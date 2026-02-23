@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import Avatar from "../components/common/Avatar";
+import PageCardContainer from "../components/common/PageCardContainer.tsx";
 import { getProfilePresentation } from "../utils/profilePresentation";
 import type { Profile } from "../contexts/ProfileContext";
 import { LeaderboardRow } from "../../backend/repositories/profile/profile.types.ts";
@@ -252,7 +253,7 @@ const Leaderboard: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-r from-indigo-400 to-blue-700 flex flex-col items-center p-6">
-      <div className="bg-white rounded-xl shadow-2xl overflow-hidden w-full max-w-6xl">
+      <PageCardContainer>
         <div className="p-10">
           <h1 className="text-6xl font-swiss911 tracking-wider text-shadow-jeopardy text-yellow-400 mb-8 text-center">
             <div>Leaderboard</div>
@@ -436,7 +437,7 @@ const Leaderboard: React.FC = () => {
 
           <div ref={loadMoreRef} className="h-12" />
         </div>
-      </div>
+      </PageCardContainer>
     </div>
   );
 };

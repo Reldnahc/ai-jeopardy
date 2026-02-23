@@ -4,6 +4,7 @@ import { useWebSocket } from "../contexts/WebSocketContext.tsx";
 import { useAuth } from "../contexts/AuthContext.tsx";
 import { useAlert } from "../contexts/AlertContext.tsx";
 import PlayerSearch from "../components/main/PlayerSearch.tsx";
+import PageCardContainer from "../components/common/PageCardContainer.tsx";
 import { Player } from "../types/Lobby.ts";
 import { getUniqueCategories } from "../categories/getUniqueCategories.ts";
 import { useGameSession } from "../hooks/useGameSession.ts";
@@ -242,7 +243,7 @@ export default function MainPage() {
   return (
     <div className="min-h-screen bg-gradient-to-r from-indigo-400 to-blue-700 flex items-center justify-center p-6 ">
       {/* Animated container for the main card */}
-      <div className="bg-white rounded-xl shadow-2xl overflow-hidden w-full max-w-6xl p-20 pt-4">
+      <PageCardContainer className="p-12 pt-4 md:p-16 md:pt-5 lg:p-20 lg:pt-8">
         {/* Main Content (spans two columns on medium+ screens) */}
         <div className="col-span-2 p-10">
           <h1 className="text-5xl font-extrabold text-gray-900 text-center">
@@ -416,7 +417,7 @@ export default function MainPage() {
             </details>
           </div>
         </div>
-      </div>
+      </PageCardContainer>
     </div>
   );
 }
