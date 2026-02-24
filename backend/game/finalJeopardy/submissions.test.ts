@@ -3,22 +3,24 @@ import type { GameState } from "../../types/runtime.js";
 import { createCtx, fireAndForget } from "../../test/createCtx.js";
 import { submitDrawing, submitWager, submitWagerDrawing } from "./submissions.js";
 
-const checkAllWagersSubmitted = vi.fn();
-const checkAllDrawingsSubmitted = vi.fn();
-const parseFinalWagerImage = vi.fn(async () => ({
-  wager: 9999,
-  transcript: "9999",
-  confidence: 0.9,
-  reason: "ok",
+const { checkAllWagersSubmitted, checkAllDrawingsSubmitted, parseFinalWagerImage } = vi.hoisted(() => ({
+  checkAllWagersSubmitted: vi.fn(),
+  checkAllDrawingsSubmitted: vi.fn(),
+  parseFinalWagerImage: vi.fn(async () => ({
+    wager: 9999,
+    transcript: "9999",
+    confidence: 0.9,
+    reason: "ok",
+  })),
 }));
 
 vi.mock("./phases.js", () => ({
-  checkAllWagersSubmitted: (...args: unknown[]) => checkAllWagersSubmitted(...args),
-  checkAllDrawingsSubmitted: (...args: unknown[]) => checkAllDrawingsSubmitted(...args),
+  checkAllWagersSubmitted,
+  checkAllDrawingsSubmitted,
 }));
 
 vi.mock("../../services/ai/judge/wagerImage.js", () => ({
-  parseFinalWagerImage: (...args: unknown[]) => parseFinalWagerImage(...args),
+  parseFinalWagerImage,
 }));
 
 function buildGame(overrides: Partial<GameState> = {}): GameState {

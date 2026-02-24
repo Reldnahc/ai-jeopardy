@@ -205,7 +205,12 @@ describe("answerHandlers", () => {
   it("uses daily double wager as result delta when active on clue", async () => {
     const ws = makeWs();
     const game = makeGame({
-      dailyDouble: { clueKey: "firstBoard:400:Capital of France?", wager: 1200 },
+      dailyDouble: {
+        clueKey: "firstBoard:400:Capital of France?",
+        playerUsername: "alice",
+        playerDisplayname: "Alice",
+        wager: 1200,
+      },
     });
     const ctx = makeCtx(game, {
       judgeClueAnswerFast: vi.fn(async () => ({ verdict: "incorrect" })),

@@ -11,7 +11,7 @@ function setRequiredBaseEnv() {
 
 async function loadEnvModule() {
   vi.resetModules();
-  return import("./env.ts");
+  return import("./env.js");
 }
 
 afterEach(() => {
