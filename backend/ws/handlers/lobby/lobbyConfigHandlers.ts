@@ -1,4 +1,5 @@
 import type { PlayerState } from "../../../types/runtime.js";
+import type { CtxDeps } from "../../context.types.js";
 import type { WsHandler } from "../types.js";
 
 type GameIdData = { gameId: string };
@@ -6,8 +7,18 @@ type UpdateLobbySettingsData = { gameId: string; patch?: Record<string, unknown>
 type CheckLobbyData = { gameId: string };
 type PromoteHostData = { gameId: string; targetUsername?: string };
 
+type LobbyConfigCtx = CtxDeps<
+  | "games"
+  | "isHostSocket"
+  | "appConfig"
+  | "broadcast"
+  | "requireHost"
+  | "buildLobbyState"
+>;
+
 export const lobbyConfigHandlers: Record<string, WsHandler> = {
   "update-lobby-settings": async ({ ws, data, ctx }) => {
+    const hctx = ctx as LobbyConfigCtx;
     try {
       const { gameId, patch } = (data ?? {}) as UpdateLobbySettingsData;
       if (!gameId) {
@@ -15,13 +26,13 @@ export const lobbyConfigHandlers: Record<string, WsHandler> = {
         return;
       }
 
-      const game = ctx.games?.[gameId];
+      const game = hctx.games?.[gameId];
       if (!game) {
         ws.send(JSON.stringify({ type: "error", message: `Game ${gameId} not found.` }));
         return;
       }
 
-      if (!ctx.isHostSocket(game, ws)) {
+      if (!hctx.isHostSocket(game, ws)) {
         ws.send(
           JSON.stringify({ type: "error", message: "Only the host can update lobby settings." }),
         );
@@ -32,7 +43,7 @@ export const lobbyConfigHandlers: Record<string, WsHandler> = {
         game.lobbySettings = {
           timeToBuzz: 10,
           timeToAnswer: 10,
-          selectedModel: ctx.appConfig.ai.defaultModel,
+          selectedModel: hctx.appConfig.ai.defaultModel,
           reasoningEffort: "off",
           visualMode: "off",
           narrationEnabled: true,
@@ -70,7 +81,7 @@ export const lobbyConfigHandlers: Record<string, WsHandler> = {
         game.lobbySettings.narrationEnabled = p.narrationEnabled;
       }
 
-      ctx.broadcast(gameId, {
+      hctx.broadcast(gameId, {
         type: "lobby-settings-updated",
         gameId,
         lobbySettings: game.lobbySettings,
@@ -82,10 +93,11 @@ export const lobbyConfigHandlers: Record<string, WsHandler> = {
   },
 
   "check-lobby": async ({ ws, data, ctx }) => {
+    const hctx = ctx as LobbyConfigCtx;
     const { gameId } = data as CheckLobbyData;
 
     let isValid = false;
-    if (ctx.games[gameId] && ctx.games[gameId].inLobby === true) {
+    if (hctx.games[gameId] && hctx.games[gameId].inLobby === true) {
       isValid = true;
     }
 
@@ -93,10 +105,11 @@ export const lobbyConfigHandlers: Record<string, WsHandler> = {
   },
 
   "promote-host": async ({ ws, data, ctx }) => {
+    const hctx = ctx as LobbyConfigCtx;
     const { gameId, targetUsername } = (data ?? {}) as PromoteHostData;
-    const game = ctx.games?.[gameId];
+    const game = hctx.games?.[gameId];
     if (!game || !game.inLobby) return;
-    if (!ctx.requireHost(game, ws)) return;
+    if (!hctx.requireHost(game, ws)) return;
 
     const targetU = String(targetUsername ?? "")
       .trim()
@@ -114,7 +127,7 @@ export const lobbyConfigHandlers: Record<string, WsHandler> = {
 
     game.host = targetU;
 
-    ctx.broadcast(gameId, {
+    hctx.broadcast(gameId, {
       type: "player-list-update",
       players: game.players.map((p: PlayerState) => ({
         username: p.username,
@@ -126,8 +139,9 @@ export const lobbyConfigHandlers: Record<string, WsHandler> = {
   },
 
   "request-lobby-state": async ({ ws, data, ctx }) => {
+    const hctx = ctx as LobbyConfigCtx;
     const gameId = (data as GameIdData).gameId;
-    const snapshot = ctx.buildLobbyState(gameId, ws);
+    const snapshot = hctx.buildLobbyState(gameId, ws);
     if (!snapshot) {
       ws.send(JSON.stringify({ type: "error", message: "Lobby does not exist!" }));
       return;

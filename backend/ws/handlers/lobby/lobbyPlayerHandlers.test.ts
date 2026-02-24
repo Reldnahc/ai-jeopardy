@@ -1,0 +1,116 @@
+import { describe, expect, it, vi } from "vitest";
+import type { GameState, SocketState } from "../../../types/runtime.js";
+import { createCtx } from "../../../test/createCtx.js";
+import { lobbyPlayerHandlers } from "./lobbyPlayerHandlers.js";
+
+function makeWs(id = "ws-1"): SocketState {
+  return { id, send: vi.fn(), gameId: null } as unknown as SocketState;
+}
+
+function makeCtx(overrides: Record<string, unknown> = {}) {
+  return createCtx(
+    {
+      games: {},
+      normalizeCategories11: vi.fn(() => Array(11).fill("Category")),
+      appConfig: { ai: { defaultModel: "gpt-4o-mini", defaultSttProvider: "openai" } },
+      buildLobbyState: vi.fn((gameId: string) => ({ type: "lobby-state", gameId })),
+      cancelLobbyCleanup: vi.fn(),
+      scheduleLobbyCleanupIfEmpty: vi.fn(),
+      broadcast: vi.fn(),
+      playerStableId: vi.fn((p: { playerKey?: string; username?: string }) => p.playerKey || p.username),
+    },
+    overrides,
+  );
+}
+
+describe("lobbyPlayerHandlers", () => {
+  it("create-lobby rejects invalid username", async () => {
+    const ws = makeWs();
+    const ctx = makeCtx();
+
+    await lobbyPlayerHandlers["create-lobby"]({ ws, data: { username: " " }, ctx });
+
+    expect(ws.send).toHaveBeenCalledWith(JSON.stringify({ type: "error", message: "Invalid username." }));
+  });
+
+  it("create-lobby creates game, assigns host and sends initial snapshots", async () => {
+    const ws = makeWs();
+    const ctx = makeCtx();
+
+    await lobbyPlayerHandlers["create-lobby"]({
+      ws,
+      data: { username: "alice", displayname: "Alice", categories: ["A"] },
+      ctx,
+    });
+
+    const gameId = ws.gameId as string;
+    const game = ctx.games[gameId] as GameState;
+    expect(game).toBeTruthy();
+    expect(game.host).toBe("alice");
+    expect(game.inLobby).toBe(true);
+    expect(game.players[0]).toMatchObject({ username: "alice", displayname: "Alice" });
+    expect(ws.send).toHaveBeenCalledWith(expect.stringContaining("\"type\":\"lobby-created\""));
+    expect(ws.send).toHaveBeenCalledWith(expect.stringContaining("\"type\":\"lobby-state\""));
+  });
+
+  it("join-lobby rejects unknown lobby", async () => {
+    const ws = makeWs();
+    const ctx = makeCtx();
+
+    await lobbyPlayerHandlers["join-lobby"]({ ws, data: { gameId: "NOPE", username: "alice" }, ctx });
+
+    expect(ws.send).toHaveBeenCalledWith(JSON.stringify({ type: "error", message: "Lobby does not exist!" }));
+  });
+
+  it("join-lobby reconnects existing username and broadcasts update", async () => {
+    const ws = makeWs("ws-new");
+    const game: GameState = {
+      inLobby: true,
+      host: "alice",
+      players: [{ id: "old", username: "alice", displayname: "Alice", online: false }],
+      categories: Array(11).fill("Category"),
+    };
+    const ctx = makeCtx({ games: { G1: game } });
+
+    await lobbyPlayerHandlers["join-lobby"]({
+      ws,
+      data: { gameId: "G1", username: "alice", displayname: "Alice" },
+      ctx,
+    });
+
+    expect(game.players[0]).toMatchObject({ id: "ws-new", online: true });
+    expect(ws.send).toHaveBeenCalledWith(expect.stringContaining("\"type\":\"lobby-state\""));
+    expect(ctx.broadcast).toHaveBeenCalledWith(
+      "G1",
+      expect.objectContaining({ type: "player-list-update" }),
+    );
+  });
+
+  it("leave-lobby removes player and reassigns host when current host leaves", async () => {
+    const ws = makeWs("ws-1");
+    const game: GameState = {
+      inLobby: true,
+      host: "alice",
+      players: [
+        { id: "ws-1", username: "alice", displayname: "Alice", playerKey: "pk1", online: true },
+        { id: "ws-2", username: "bob", displayname: "Bob", playerKey: "pk2", online: true },
+      ],
+      categories: Array(11).fill("Category"),
+    };
+    const ctx = makeCtx({ games: { G1: game } });
+
+    await lobbyPlayerHandlers["leave-lobby"]({
+      ws,
+      data: { gameId: "G1", username: "alice", playerKey: "pk1" },
+      ctx,
+    });
+
+    expect(game.players.map((p) => p.username)).toEqual(["bob"]);
+    expect(game.host).toBe("bob");
+    expect(ctx.broadcast).toHaveBeenCalledWith(
+      "G1",
+      expect.objectContaining({ type: "player-list-update", host: "bob" }),
+    );
+    expect(ctx.scheduleLobbyCleanupIfEmpty).toHaveBeenCalledWith("G1");
+  });
+});

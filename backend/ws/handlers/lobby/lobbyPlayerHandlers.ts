@@ -1,4 +1,5 @@
 import type { JsonMap, PlayerState } from "../../../types/runtime.js";
+import type { CtxDeps } from "../../context.types.js";
 import type { WsHandler } from "../types.js";
 
 type CreateLobbyData = {
@@ -15,8 +16,20 @@ type JoinLobbyData = {
 };
 type LeaveLobbyData = { gameId?: string; playerKey?: string; username?: string };
 
+type LobbyPlayerCtx = CtxDeps<
+  | "games"
+  | "normalizeCategories11"
+  | "appConfig"
+  | "buildLobbyState"
+  | "cancelLobbyCleanup"
+  | "scheduleLobbyCleanupIfEmpty"
+  | "broadcast"
+  | "playerStableId"
+>;
+
 export const lobbyPlayerHandlers: Record<string, WsHandler> = {
   "create-lobby": async ({ ws, data, ctx }) => {
+    const hctx = ctx as LobbyPlayerCtx;
     const startedAt = Date.now();
     const reqId = `${startedAt}-${Math.random().toString(16).slice(2, 6)}`;
 
@@ -49,11 +62,11 @@ export const lobbyPlayerHandlers: Record<string, WsHandler> = {
     let newGameId;
     do {
       newGameId = Math.random().toString(36).substr(2, 5).toUpperCase();
-    } while (ctx.games[newGameId]);
+    } while (hctx.games[newGameId]);
 
     ws.gameId = newGameId;
 
-    ctx.games[newGameId] = {
+    hctx.games[newGameId] = {
       host: u,
       players: [
         {
@@ -66,16 +79,16 @@ export const lobbyPlayerHandlers: Record<string, WsHandler> = {
       ],
       inLobby: true,
       createdAt: Date.now(),
-      categories: ctx.normalizeCategories11(categories),
+      categories: hctx.normalizeCategories11(categories),
       lobbySettings: {
         timeToBuzz: 10,
         timeToAnswer: 10,
-        selectedModel: ctx.appConfig.ai.defaultModel,
+        selectedModel: hctx.appConfig.ai.defaultModel,
         reasoningEffort: "off",
         visualMode: "off",
         narrationEnabled: true,
         boardJson: "",
-        sttProviderName: ctx.appConfig.ai.defaultSttProvider,
+        sttProviderName: hctx.appConfig.ai.defaultSttProvider,
       },
       lockedCategories: {
         firstBoard: Array(5).fill(false),
@@ -92,8 +105,8 @@ export const lobbyPlayerHandlers: Record<string, WsHandler> = {
     sendTimed("lobby-created", {
       type: "lobby-created",
       gameId: newGameId,
-      categories: ctx.games[newGameId].categories,
-      players: ctx.games[newGameId].players.map((p: PlayerState) => ({
+      categories: hctx.games[newGameId].categories,
+      players: hctx.games[newGameId].players.map((p: PlayerState) => ({
         username: p.username,
         displayname: p.displayname,
         online: Boolean(p.online),
@@ -101,7 +114,7 @@ export const lobbyPlayerHandlers: Record<string, WsHandler> = {
       host: u,
     });
 
-    sendTimed("lobby-state", ctx.buildLobbyState(newGameId, ws));
+    sendTimed("lobby-state", hctx.buildLobbyState(newGameId, ws));
 
     const total = Date.now() - startedAt;
     if (total > 1000) {
@@ -110,9 +123,10 @@ export const lobbyPlayerHandlers: Record<string, WsHandler> = {
   },
 
   "join-lobby": async ({ ws, data, ctx }) => {
+    const hctx = ctx as LobbyPlayerCtx;
     const { gameId, username, displayname, playerKey } = (data ?? {}) as JoinLobbyData;
 
-    if (!gameId || !ctx.games?.[gameId]) {
+    if (!gameId || !hctx.games?.[gameId]) {
       ws.send(JSON.stringify({ type: "error", message: "Lobby does not exist!" }));
       return;
     }
@@ -128,8 +142,8 @@ export const lobbyPlayerHandlers: Record<string, WsHandler> = {
     const dnRaw = String(displayname ?? "").trim();
     const dn = dnRaw.length ? dnRaw : u;
 
-    const game = ctx.games[gameId];
-    ctx.cancelLobbyCleanup(game);
+    const game = hctx.games[gameId];
+    hctx.cancelLobbyCleanup(game);
 
     const stableKey = typeof playerKey === "string" && playerKey.trim() ? playerKey.trim() : null;
 
@@ -181,13 +195,13 @@ export const lobbyPlayerHandlers: Record<string, WsHandler> = {
         });
 
         ws.gameId = gameId;
-        ctx.scheduleLobbyCleanupIfEmpty(gameId);
+        hctx.scheduleLobbyCleanupIfEmpty(gameId);
       }
     }
 
-    ws.send(JSON.stringify(ctx.buildLobbyState(gameId, ws)));
+    ws.send(JSON.stringify(hctx.buildLobbyState(gameId, ws)));
 
-    ctx.broadcast(gameId, {
+    hctx.broadcast(gameId, {
       type: "player-list-update",
       players: game.players.map((p: PlayerState) => ({
         username: p.username,
@@ -199,15 +213,16 @@ export const lobbyPlayerHandlers: Record<string, WsHandler> = {
   },
 
   "leave-lobby": async ({ ws, data, ctx }) => {
+    const hctx = ctx as LobbyPlayerCtx;
     const { gameId, playerKey, username } = (data ?? {}) as LeaveLobbyData;
 
     const effectiveGameId =
-      (gameId && ctx.games?.[gameId] ? gameId : null) ??
-      (ws.gameId && ctx.games?.[ws.gameId] ? ws.gameId : null);
+      (gameId && hctx.games?.[gameId] ? gameId : null) ??
+      (ws.gameId && hctx.games?.[ws.gameId] ? ws.gameId : null);
 
-    if (!effectiveGameId || !ctx.games[effectiveGameId]) return;
+    if (!effectiveGameId || !hctx.games[effectiveGameId]) return;
 
-    const game = ctx.games[effectiveGameId];
+    const game = hctx.games[effectiveGameId];
     if (!game.inLobby) return;
 
     const stable =
@@ -220,7 +235,7 @@ export const lobbyPlayerHandlers: Record<string, WsHandler> = {
     const before = game.players.length;
 
     game.players = game.players.filter((p: PlayerState) => {
-      const pid = ctx.playerStableId(p);
+      const pid = hctx.playerStableId(p);
       return pid !== stable;
     });
 
@@ -235,7 +250,7 @@ export const lobbyPlayerHandlers: Record<string, WsHandler> = {
         .toLowerCase()
     ) {
       if (game.players.length === 0) {
-        ctx.scheduleLobbyCleanupIfEmpty(effectiveGameId);
+        hctx.scheduleLobbyCleanupIfEmpty(effectiveGameId);
         return;
       }
       game.host = String(game.players[0].username ?? "")
@@ -243,7 +258,7 @@ export const lobbyPlayerHandlers: Record<string, WsHandler> = {
         .toLowerCase();
     }
 
-    ctx.broadcast(effectiveGameId, {
+    hctx.broadcast(effectiveGameId, {
       type: "player-list-update",
       players: game.players.map((p: PlayerState) => ({
         username: p.username,
@@ -253,6 +268,6 @@ export const lobbyPlayerHandlers: Record<string, WsHandler> = {
       host: game.host,
     });
 
-    ctx.scheduleLobbyCleanupIfEmpty(effectiveGameId);
+    hctx.scheduleLobbyCleanupIfEmpty(effectiveGameId);
   },
 };

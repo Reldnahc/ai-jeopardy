@@ -1,3 +1,4 @@
+import type { CtxDeps } from "../../context.types.js";
 import type { WsHandler } from "../types.js";
 
 type ToggleLockCategoryData = {
@@ -19,17 +20,26 @@ type UpdateCategoryData = {
 };
 type UpdateCategoriesData = { gameId: string; categories?: unknown };
 
+type LobbyCategoryCtx = CtxDeps<
+  | "games"
+  | "isHostSocket"
+  | "sendLobbySnapshot"
+  | "broadcast"
+  | "normalizeCategories11"
+>;
+
 export const lobbyCategoryHandlers: Record<string, WsHandler> = {
   "toggle-lock-category": async ({ ws, data, ctx }) => {
+    const hctx = ctx as LobbyCategoryCtx;
     const { gameId, boardType, index } = data as ToggleLockCategoryData;
-    const game = ctx.games[gameId];
+    const game = hctx.games[gameId];
     if (!game) return;
 
-    if (!ctx.isHostSocket(game, ws)) {
+    if (!hctx.isHostSocket(game, ws)) {
       ws.send(
         JSON.stringify({ type: "error", message: "Only the host can toggle category locks." }),
       );
-      ctx.sendLobbySnapshot(ws, gameId);
+      hctx.sendLobbySnapshot(ws, gameId);
       return;
     }
 
@@ -52,7 +62,7 @@ export const lobbyCategoryHandlers: Record<string, WsHandler> = {
     const nextLocked = !game.lockedCategories[bt][idx];
     game.lockedCategories[bt][idx] = nextLocked;
 
-    ctx.broadcast(gameId, {
+    hctx.broadcast(gameId, {
       type: "category-lock-updated",
       boardType: bt,
       index: idx,
@@ -61,8 +71,9 @@ export const lobbyCategoryHandlers: Record<string, WsHandler> = {
   },
 
   "randomize-category": async ({ ws, data, ctx }) => {
+    const hctx = ctx as LobbyCategoryCtx;
     const { gameId, boardType, index, candidates } = data as RandomizeCategoryData;
-    const game = ctx.games[gameId];
+    const game = hctx.games[gameId];
     if (!game) return;
 
     const bt = boardType;
@@ -74,16 +85,16 @@ export const lobbyCategoryHandlers: Record<string, WsHandler> = {
 
     if ((bt === "firstBoard" || bt === "secondBoard") && game.lockedCategories?.[bt]?.[idx]) {
       ws.send(JSON.stringify({ type: "error", message: "That category is locked." }));
-      ctx.sendLobbySnapshot(ws, gameId);
+      hctx.sendLobbySnapshot(ws, gameId);
       return;
     }
     if (bt === "finalJeopardy" && game.lockedCategories?.finalJeopardy?.[0]) {
       ws.send(JSON.stringify({ type: "error", message: "That category is locked." }));
-      ctx.sendLobbySnapshot(ws, gameId);
+      hctx.sendLobbySnapshot(ws, gameId);
       return;
     }
 
-    game.categories = ctx.normalizeCategories11(game.categories);
+    game.categories = hctx.normalizeCategories11(game.categories);
 
     let globalIndex = -1;
     if (bt === "firstBoard") globalIndex = idx;
@@ -113,13 +124,13 @@ export const lobbyCategoryHandlers: Record<string, WsHandler> = {
 
     if (!chosen) {
       ws.send(JSON.stringify({ type: "error", message: "No unique random category available." }));
-      ctx.sendLobbySnapshot(ws, gameId);
+      hctx.sendLobbySnapshot(ws, gameId);
       return;
     }
 
     game.categories[globalIndex] = chosen;
 
-    ctx.broadcast(gameId, {
+    hctx.broadcast(gameId, {
       type: "category-updated",
       boardType: bt,
       index: bt === "finalJeopardy" ? 0 : idx,
@@ -128,6 +139,7 @@ export const lobbyCategoryHandlers: Record<string, WsHandler> = {
   },
 
   "update-category": async ({ ws, data, ctx }) => {
+    const hctx = ctx as LobbyCategoryCtx;
     try {
       const { gameId, boardType, index, value } = (data ?? {}) as UpdateCategoryData;
 
@@ -136,7 +148,7 @@ export const lobbyCategoryHandlers: Record<string, WsHandler> = {
         return;
       }
 
-      const game = ctx.games?.[gameId];
+      const game = hctx.games?.[gameId];
       if (!game) {
         ws.send(JSON.stringify({ type: "error", message: `Game ${gameId} not found.` }));
         return;
@@ -145,31 +157,31 @@ export const lobbyCategoryHandlers: Record<string, WsHandler> = {
       const bt = boardType;
       if (bt !== "firstBoard" && bt !== "secondBoard" && bt !== "finalJeopardy") {
         ws.send(JSON.stringify({ type: "error", message: `Invalid boardType: ${String(bt)}` }));
-        ctx.sendLobbySnapshot(ws, gameId);
+        hctx.sendLobbySnapshot(ws, gameId);
         return;
       }
 
       const idx = bt === "finalJeopardy" ? 0 : Number(index);
       if (!Number.isFinite(idx)) {
         ws.send(JSON.stringify({ type: "error", message: `Invalid index: ${String(index)}` }));
-        ctx.sendLobbySnapshot(ws, gameId);
+        hctx.sendLobbySnapshot(ws, gameId);
         return;
       }
 
       if ((bt === "firstBoard" || bt === "secondBoard") && (idx < 0 || idx > 4)) {
         ws.send(JSON.stringify({ type: "error", message: `Index out of range for ${bt}.` }));
-        ctx.sendLobbySnapshot(ws, gameId);
+        hctx.sendLobbySnapshot(ws, gameId);
         return;
       }
 
       if ((bt === "firstBoard" || bt === "secondBoard") && game.lockedCategories?.[bt]?.[idx]) {
         ws.send(JSON.stringify({ type: "error", message: "That category is locked." }));
-        ctx.sendLobbySnapshot(ws, gameId);
+        hctx.sendLobbySnapshot(ws, gameId);
         return;
       }
       if (bt === "finalJeopardy" && game.lockedCategories?.finalJeopardy?.[0]) {
         ws.send(JSON.stringify({ type: "error", message: "That category is locked." }));
-        ctx.sendLobbySnapshot(ws, gameId);
+        hctx.sendLobbySnapshot(ws, gameId);
         return;
       }
 
@@ -188,7 +200,7 @@ export const lobbyCategoryHandlers: Record<string, WsHandler> = {
 
       console.log("[update-category]", gameId, bt, idx, "->", nextVal.slice(0, 60));
 
-      ctx.broadcast(gameId, {
+      hctx.broadcast(gameId, {
         type: "category-updated",
         boardType: bt,
         index: bt === "finalJeopardy" ? 0 : idx,
@@ -201,14 +213,15 @@ export const lobbyCategoryHandlers: Record<string, WsHandler> = {
   },
 
   "update-categories": async ({ ws, data, ctx }) => {
+    const hctx = ctx as LobbyCategoryCtx;
     const { gameId, categories } = data as UpdateCategoriesData;
-    const game = ctx.games[gameId];
+    const game = hctx.games[gameId];
 
     if (game) {
-      const next = ctx.normalizeCategories11(categories);
+      const next = hctx.normalizeCategories11(categories);
       game.categories = next;
 
-      ctx.broadcast(gameId, {
+      hctx.broadcast(gameId, {
         type: "categories-updated",
         categories: next,
       });
