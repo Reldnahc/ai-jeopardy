@@ -1,38 +1,39 @@
 import { useState } from "react";
 import QuestionItem from "./QuestionItem.tsx";
-import { BoardValue } from "../../types/Board.ts"; // Adjust the import path as needed
+import { BoardValue } from "../../types/Board.ts";
 
 type CollapsibleCategoryProps = {
-  category: string; // The name of the category
-  values: BoardValue[]; // The list of values under this category
+  category: string;
+  values: BoardValue[];
 };
 
 const CollapsibleCategory = ({ category, values }: CollapsibleCategoryProps) => {
-  const [open, setOpen] = useState(false); // Collapsed by default
+  const [open, setOpen] = useState(false);
 
   return (
-    <div className="mb-2">
-      {/* Toggle button */}
+    <div className="mb-3 overflow-hidden rounded-xl border border-slate-200 bg-white/90 shadow-sm">
       <button
+        type="button"
         onClick={() => setOpen(!open)}
-        className={`w-full text-left font-bold text-lg focus:outline-none flex justify-between items-center
-          ${open ? "text-blue-700" : "text-gray-900"}
-          hover:bg-gray-200 hover:rounded-lg py-1 px-2 transition-all duration-300`}
+        aria-expanded={open}
+        className={`flex w-full items-center justify-between px-4 py-3 text-left transition-colors duration-200 ${
+          open ? "bg-slate-100 text-slate-900" : "text-slate-800 hover:bg-slate-50"
+        }`}
       >
-        <span>{category}</span>
+        <span className="pr-3 text-base font-semibold tracking-[0.01em] md:text-lg">{category}</span>
         <span
-          className={`ml-2 text-xl transform transition-transform duration-300 ${
+          className={`ml-2 text-sm font-semibold text-blue-700 transition-transform duration-200 ${
             open ? "rotate-180" : "rotate-0"
           }`}
         >
-          {open ? "▲" : "▼"}
+          v
         </span>
       </button>
 
-      {/* Collapsible content */}
       <div
-        className={`ml-3 overflow-hidden transition-all duration-500 ease-out ${open ? "max-h-[1000px]" : "max-h-0"}`}
-        style={{ opacity: open ? 1 : 0 }}
+        className={`overflow-hidden border-t border-slate-200 bg-slate-50/60 transition-all duration-300 ease-out ${
+          open ? "max-h-[1400px] opacity-100" : "max-h-0 opacity-0"
+        }`}
       >
         {values.map((val, idx) => (
           <QuestionItem key={idx} value={val.value} question={val.question} answer={val.answer} />
