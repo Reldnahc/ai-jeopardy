@@ -27,6 +27,7 @@ export type AnswerUiState = {
 
 export type FinalUiState = {
   finalWagers: Record<string, number>;
+  finalWagerDrawings: Record<string, string>;
   selectedFinalist: string;
   showWager: boolean;
   finalists: string[];

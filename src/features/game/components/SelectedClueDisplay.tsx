@@ -401,6 +401,7 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                 drawingSubmitted={drawingSubmitted}
                 setDrawingSubmitted={setDrawingSubmitted}
                 finalWagers={finalUi.finalWagers}
+                finalWagerDrawings={finalUi.finalWagerDrawings}
                 selectedFinalist={finalUi.selectedFinalist}
                 timerEndTime={timerUi.timerEndTime}
                 showWager={finalUi.showWager}

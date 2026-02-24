@@ -42,12 +42,14 @@ export function routeSnapshotMessage(message: SocketMessage, d: GameSocketRouter
 
     d.setFinalists(Array.isArray(m.finalists) ? m.finalists : [""]);
     if (submitted) d.setFinalWagers(snapWagers);
+    d.setFinalWagerDrawings(m.finalWagerDrawings ?? {});
     d.setDrawings(m.drawings ?? null);
   } else {
     d.setIsGameOver(false);
     d.setAllWagersSubmitted(false);
     d.setWagers({});
     d.setFinalWagers({});
+    d.setFinalWagerDrawings({});
     d.setFinalists([""]);
     d.setDrawings(null);
   }

@@ -63,6 +63,7 @@ export default function Game() {
     allWagersSubmitted,
     wagers,
     finalWagers,
+    finalWagerDrawings,
     drawings,
     isGameOver,
     markAllCluesComplete,
@@ -151,6 +152,7 @@ export default function Game() {
   };
   const finalUi: FinalUiState = {
     finalWagers,
+    finalWagerDrawings,
     selectedFinalist,
     showWager,
     finalists,

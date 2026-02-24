@@ -11,6 +11,7 @@ type FinalJeopardyPanelProps = {
   canvasRef: React.RefObject<ReactSketchCanvas>;
   drawings: Record<string, string> | null;
   finalWagers: Record<string, number>;
+  finalWagerDrawings: Record<string, string>;
   drawingSubmitted: Record<string, boolean>;
   setDrawingSubmitted: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
   selectedFinalist: string;
@@ -27,6 +28,7 @@ const FinalJeopardyPanel: React.FC<FinalJeopardyPanelProps> = ({
   drawingSubmitted,
   setDrawingSubmitted,
   finalWagers,
+  finalWagerDrawings,
   selectedFinalist,
   timerEndTime,
   showWager,
@@ -35,8 +37,21 @@ const FinalJeopardyPanel: React.FC<FinalJeopardyPanelProps> = ({
   const { sendJson, nowMs } = useWebSocket();
   const { deviceType } = useDeviceContext();
   const hasSubmitted = !!drawingSubmitted[currentPlayer];
+  const norm = (v: unknown) =>
+    String(v ?? "")
+      .trim()
+      .toLowerCase();
 
   const shouldShowDrawings = !!drawings && !Array.isArray(drawings);
+  const selectedFinalistNorm = norm(selectedFinalist);
+  const selectedWagerDrawing =
+    finalWagerDrawings?.[selectedFinalist] ??
+    Object.entries(finalWagerDrawings || {}).find(([k]) => norm(k) === selectedFinalistNorm)?.[1] ??
+    "";
+  const selectedWagerValue =
+    finalWagers?.[selectedFinalist] ??
+    Object.entries(finalWagers || {}).find(([k]) => norm(k) === selectedFinalistNorm)?.[1] ??
+    0;
 
   const submitNow = async () => {
     try {
@@ -147,11 +162,27 @@ const FinalJeopardyPanel: React.FC<FinalJeopardyPanelProps> = ({
                     {selectedFinalist}&apos;s answer:
                   </h2>
                   {showWager && (
-                    <div className="mb-3 text-center text-2xl text-white/90">
-                      Wager:{" "}
-                      <span className="font-semibold">
-                        ${Number(finalWagers?.[selectedFinalist] ?? 0).toLocaleString()}
-                      </span>
+                    <div className="mb-3 flex flex-col items-center">
+                      <div className="mb-2 text-center text-xl text-white/90">Wager:</div>
+                      {selectedWagerDrawing ? (
+                        <img
+                          src={selectedWagerDrawing}
+                          alt={`${selectedFinalist} final jeopardy wager`}
+                          className="max-h-[20vh] max-w-[45vw] object-contain rounded-lg shadow-2xl border border-white/20 bg-white"
+                          loading="lazy"
+                          decoding="async"
+                          draggable={false}
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).style.display = "none";
+                          }}
+                        />
+                      ) : (
+                        <div className="text-center text-2xl text-white/90">
+                          <span className="font-semibold">
+                            ${Number(selectedWagerValue ?? 0).toLocaleString()}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   )}
                   {drawings[selectedFinalist] ? (

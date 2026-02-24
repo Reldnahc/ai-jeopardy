@@ -13,10 +13,13 @@ export function routeBoardMessage(message: SocketMessage, d: GameSocketRouterDep
   }
 
   if (message.type === "final-jeopardy") {
+    const m = message as { finalists?: string[] };
     d.setActiveBoard("finalJeopardy");
     d.setIsFinalJeopardy(true);
     d.setAllWagersSubmitted(false);
     d.setWagers({});
+    d.setFinalWagerDrawings({});
+    d.setFinalists(Array.isArray(m.finalists) ? m.finalists : [""]);
     d.setSelectedClue(null);
     d.setBuzzResult(null);
     d.setBuzzResultDisplay(null);
@@ -43,10 +46,15 @@ export function routeBoardMessage(message: SocketMessage, d: GameSocketRouterDep
   }
 
   if (message.type === "all-wagers-submitted") {
-    const m = message as { wagers: Record<string, number>; finalists: string[] };
+    const m = message as {
+      wagers: Record<string, number>;
+      finalists: string[];
+      wagerDrawings?: Record<string, string>;
+    };
     d.setAllWagersSubmitted(true);
     d.setWagers(m.wagers);
     d.setFinalWagers(m.wagers);
+    d.setFinalWagerDrawings(m.wagerDrawings ?? {});
     d.setFinalists(m.finalists);
     return true;
   }

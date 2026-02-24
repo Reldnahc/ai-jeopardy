@@ -1,12 +1,12 @@
-﻿import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Category, Clue } from "../../../../shared/types/board.ts";
+import { ReactSketchCanvas } from "react-sketch-canvas";
 import JeopardyGrid from "./JeopardyGrid.tsx"; // Import the grid component
-import WagerInput from "./WagerInput.tsx"; // Import the wager input component
 import SelectedClueDisplay from "./SelectedClueDisplay.tsx";
 import { useWebSocket } from "../../../contexts/WebSocketContext.tsx";
 import { Player } from "../../../types/Lobby.ts";
-import { useAlert } from "../../../contexts/AlertContext.tsx";
 import DailyDoubleWagerOverlay from "./DailyDoubleWagerOverlay.tsx";
+import { useDeviceContext } from "../../../contexts/DeviceContext.tsx";
 import type {
   AnswerUiState,
   BuzzUiState,
@@ -59,11 +59,10 @@ const JeopardyBoard: React.FC<JeopardyBoardProps> = ({
 }) => {
   const [localSelectedClue, setLocalSelectedClue] = useState<Clue | null>(null);
   const [showClue, setShowClue] = useState(false);
-  const [wagers, setWagers] = useState<Record<string, number>>({});
-  const [wagerSubmitted, setWagerSubmitted] = useState<string[]>([]);
+  const [wagerDrawingSubmitted, setWagerDrawingSubmitted] = useState<Record<string, boolean>>({});
   const [drawingSubmitted, setDrawingSubmitted] = useState<Record<string, boolean>>({});
-  const { sendJson } = useWebSocket();
-  const { showAlert } = useAlert();
+  const { sendJson, nowMs } = useWebSocket();
+  const { deviceType } = useDeviceContext();
   const showAnswer = Boolean(localSelectedClue?.showAnswer);
 
   // @ts-expect-error works better this way
@@ -88,66 +87,74 @@ const JeopardyBoard: React.FC<JeopardyBoardProps> = ({
     }
   };
 
-  const handleWagerChange = (player: string, wager: number) => {
-    setWagers((prev) => ({ ...prev, [player]: wager }));
-  };
-
-  const submitWager = useCallback(
-    (player: string) => {
-      const score = scores[player] ?? 0;
-
-      // If score is <= 0 in Final Jeopardy, wager MUST be 0.
-      const rawWager = wagers[player];
-      const normalizedWager =
-        score <= 0 ? 0 : Math.max(0, Number.isFinite(rawWager) ? rawWager : 0);
-
-      // Only enforce max-wager rule when score > 0
-      if (score > 0 && normalizedWager > score) {
-        showAlert("Invalid Wager", <span>Wager cannot exceed current score!</span>, [
-          {
-            label: "Okay",
-            actionValue: "okay",
-            styleClass: "bg-green-500 text-white hover:bg-green-600",
-          },
-        ]);
-        return;
-      }
-
-      // Persist the wager locally (so UI shows 0 too)
-      setWagers((prev) => ({ ...prev, [player]: normalizedWager }));
-
-      // Prevent duplicate submits
-      setWagerSubmitted((prev) => (prev.includes(player) ? prev : [...prev, player]));
-
-      if (normalizedWager > 0) {
-        sendJson({
-          type: "submit-wager",
-          gameId,
-          player,
-          wager: normalizedWager,
-        });
-      }
-    },
-    [scores, wagers, sendJson, gameId, showAlert],
-  );
-
-  // Automatically submit $0 wager upfront if the player has $0 or less
-  useEffect(() => {
-    if (canSelectClue) return;
-    console.log(isFinalJeopardy);
-    console.log(scores[currentPlayer]);
-    if (
-      isFinalJeopardy &&
-      (scores[currentPlayer] <= 0 || !scores[currentPlayer]) &&
-      !wagerSubmitted.includes(currentPlayer)
-    ) {
-      submitWager(currentPlayer);
+  const exportWagerDrawing = useCallback(async (): Promise<string> => {
+    const pngDataUrl = await canvasRef.current?.exportImage("png");
+    if (typeof pngDataUrl === "string" && pngDataUrl.startsWith("data:image/")) {
+      return pngDataUrl;
     }
-  }, [canSelectClue, currentPlayer, scores, wagerSubmitted, isFinalJeopardy, submitWager]);
+
+    try {
+      const svgData = await canvasRef.current?.exportSvg();
+      if (typeof svgData === "string" && svgData.trim()) {
+        const svgBase64 = window.btoa(unescape(encodeURIComponent(svgData)));
+        return `data:image/svg+xml;base64,${svgBase64}`;
+      }
+    } catch {
+      // ignore, fall through to empty
+    }
+
+    return "";
+  }, []);
+
+  const submitWagerDrawing = useCallback(async () => {
+    let drawing = "";
+    try {
+      drawing = await exportWagerDrawing();
+    } catch {
+      drawing = "";
+    } finally {
+      sendJson({
+        type: "submit-final-wager-drawing",
+        gameId,
+        player: currentPlayer,
+        drawing,
+      });
+      setWagerDrawingSubmitted((prev) => ({ ...prev, [currentPlayer]: true }));
+    }
+  }, [currentPlayer, exportWagerDrawing, gameId, sendJson]);
+
+  useEffect(() => {
+    if (!isFinalJeopardy || allWagersSubmitted) return;
+    if (!timerUi.timerEndTime) return;
+    if (!finalUi.finalists.includes(currentPlayer)) return;
+    if (wagerDrawingSubmitted[currentPlayer]) return;
+
+    const BUFFER_MS = 200;
+    const msUntil = Math.max(0, timerUi.timerEndTime - nowMs() - BUFFER_MS);
+    const t = window.setTimeout(() => {
+      if (!wagerDrawingSubmitted[currentPlayer]) {
+        void submitWagerDrawing();
+      }
+    }, msUntil);
+
+    return () => window.clearTimeout(t);
+  }, [
+    allWagersSubmitted,
+    currentPlayer,
+    finalUi.finalists,
+    isFinalJeopardy,
+    nowMs,
+    submitWagerDrawing,
+    timerUi.timerEndTime,
+    wagerDrawingSubmitted,
+  ]);
 
   if (!boardData || boardData.length === 0) {
     return <p>No board data available.</p>; // Handle invalid board data
   }
+
+  const isFinalist = finalUi.finalists.includes(currentPlayer);
+  const hasSubmittedWager = Boolean(wagerDrawingSubmitted[currentPlayer]);
 
   return (
     <div className="relative w-full h-full m-0 overflow-hidden">
@@ -160,16 +167,50 @@ const JeopardyBoard: React.FC<JeopardyBoardProps> = ({
             <Timer endTime={timerUi.timerEndTime} duration={timerUi.timerDuration} />
           </div>
 
-          <h2 className="text-2xl">Place Your Wager!</h2>
-          <WagerInput
-            players={players}
-            currentPlayer={currentPlayer}
-            scores={scores}
-            wagers={wagers}
-            wagerSubmitted={wagerSubmitted}
-            handleWagerChange={handleWagerChange}
-            submitWager={submitWager}
-          />
+          <h2 className="text-2xl mt-6">Write Your Wager</h2>
+
+          {!isFinalist && (
+            <p className="mt-2 text-lg text-white/85">Waiting for finalists to submit wagers...</p>
+          )}
+
+          {isFinalist && hasSubmittedWager && (
+            <p className="mt-2 text-lg text-white/85">Wager submitted. Waiting for others...</p>
+          )}
+
+          {isFinalist && !hasSubmittedWager && (
+            <>
+              <p className="mt-2 mb-4 text-sm text-white/80">
+                Max wager: ${Math.max(0, Math.floor(Number(scores[currentPlayer] ?? 0))).toLocaleString()}
+              </p>
+
+              <div className="flex items-start gap-4">
+                <ReactSketchCanvas
+                  ref={canvasRef}
+                  className="border-2 border-white rounded-lg bg-white"
+                  width={deviceType === "mobile" ? "60vw" : "600px"}
+                  height="180px"
+                  strokeWidth={4}
+                  strokeColor="black"
+                />
+
+                <div className="flex flex-col gap-3">
+                  <button
+                    onClick={() => canvasRef.current?.clearCanvas()}
+                    className="px-5 py-2 rounded-lg bg-red-500 text-white cursor-pointer hover:bg-red-600 transition-colors duration-200 shadow-lg"
+                  >
+                    Clear
+                  </button>
+
+                  <button
+                    onClick={() => void submitWagerDrawing()}
+                    className="px-5 py-2 rounded-lg bg-blue-500 text-white cursor-pointer hover:bg-blue-600 transition-colors duration-200 shadow-lg"
+                  >
+                    Submit
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -221,4 +262,3 @@ const JeopardyBoard: React.FC<JeopardyBoardProps> = ({
 };
 
 export default JeopardyBoard;
-

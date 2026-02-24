@@ -62,6 +62,7 @@ export type GameSocketRouterDeps = {
   setAllWagersSubmitted: (value: boolean) => void;
   setWagers: (value: Record<string, number>) => void;
   setFinalWagers: (value: Record<string, number>) => void;
+  setFinalWagerDrawings: (value: Record<string, string>) => void;
   setSelectedFinalist: (value: string) => void;
   setFinalists: (value: string[]) => void;
   setDrawings: (value: Record<string, string> | null) => void;

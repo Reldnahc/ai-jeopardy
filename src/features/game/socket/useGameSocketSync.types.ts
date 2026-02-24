@@ -112,6 +112,7 @@ export type GameStateMessage = {
   isFinalJeopardy?: boolean;
   finalJeopardyStage?: string | null;
   wagers?: Record<string, number>;
+  finalWagerDrawings?: Record<string, string>;
   finalists?: string[] | null;
   drawings?: Record<string, string> | null;
   timerEndTime?: number | null;
