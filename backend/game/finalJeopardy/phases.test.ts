@@ -148,4 +148,36 @@ describe("finalJeopardy phases", () => {
 
     expect(ctx.clearGameTimer).not.toHaveBeenCalled();
   });
+
+  it("checkAllWagersSubmitted does not advance until every finalist has wagered", () => {
+    const game = buildGame({
+      isFinalJeopardy: true,
+      finalJeopardyStage: "wager",
+      wagers: { alice: 100 },
+      finalJeopardyFinalists: ["alice", "bob"],
+    });
+    const { ctx } = buildCtx();
+
+    checkAllWagersSubmitted(game, "g1", ctx);
+
+    expect(game.finalJeopardyStage).toBe("wager");
+  });
+
+  it("checkAllDrawingsSubmitted does not finish until every finalist has drawn", () => {
+    const game = buildGame({
+      isFinalJeopardy: true,
+      finalJeopardyStage: "drawing",
+      drawings: { alice: "a" },
+      finalJeopardyFinalists: ["alice", "bob"],
+    });
+    const { ctx } = buildCtx();
+
+    checkAllDrawingsSubmitted(game, "g1", ctx);
+
+    expect(game.finalJeopardyStage).toBe("drawing");
+    expect(ctx.broadcast).not.toHaveBeenCalledWith(
+      "g1",
+      expect.objectContaining({ type: "all-drawings-submitted" }),
+    );
+  });
 });

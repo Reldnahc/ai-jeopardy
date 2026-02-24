@@ -255,4 +255,41 @@ describe("buzzHandlers", () => {
       vi.useRealTimers();
     }
   });
+
+  it("resolves tied candidates by arrival order when timestamps are effectively equal", async () => {
+    vi.useFakeTimers();
+    try {
+      const wsAlice = makeWs("ws-1");
+      const wsBob = makeWs("ws-2");
+      const game = makeGame({
+        players: [
+          { id: "ws-1", username: "alice", displayname: "Alice" },
+          { id: "ws-2", username: "bob", displayname: "Bob" },
+        ],
+        clueState: { clueKey: "firstBoard:400:Q", lockedOut: {}, buzzOpenAtMs: Date.now() - 10 },
+      });
+      const ctx = makeCtx(game);
+
+      await buzzHandlers.buzz({
+        ws: wsBob,
+        data: { gameId: "g1", estimatedServerBuzzAtMs: Date.now(), clientSeq: 1 },
+        ctx,
+      });
+      await buzzHandlers.buzz({
+        ws: wsAlice,
+        data: { gameId: "g1", estimatedServerBuzzAtMs: Date.now(), clientSeq: 2 },
+        ctx,
+      });
+
+      await vi.advanceTimersByTimeAsync(70);
+
+      expect(game.buzzed).toBe("bob");
+      expect(ctx.broadcast).toHaveBeenCalledWith(
+        "g1",
+        expect.objectContaining({ type: "buzz-result", username: "bob" }),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

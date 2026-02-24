@@ -98,6 +98,20 @@ describe("lobbyCategoryHandlers", () => {
     );
   });
 
+  it("toggle-lock-category no-ops for out-of-range indexes", async () => {
+    const ws = makeWs();
+    const game = makeGame();
+    const ctx = makeCtx(game);
+
+    await lobbyCategoryHandlers["toggle-lock-category"]({
+      ws,
+      data: { gameId: "g1", boardType: "firstBoard", index: 9 },
+      ctx,
+    });
+
+    expect(ctx.broadcast).not.toHaveBeenCalled();
+  });
+
   it("randomize-category rejects when slot is locked", async () => {
     const ws = makeWs();
     const game = makeGame({
@@ -219,6 +233,46 @@ describe("lobbyCategoryHandlers", () => {
 
     expect(ws.send).toHaveBeenCalledWith(
       JSON.stringify({ type: "error", message: "That category is locked." }),
+    );
+    expect(ctx.sendLobbySnapshot).toHaveBeenCalledWith(ws, "g1");
+  });
+
+  it("update-category rejects locked final jeopardy category", async () => {
+    const ws = makeWs();
+    const game = makeGame({
+      lockedCategories: {
+        firstBoard: [false, false, false, false, false],
+        secondBoard: [false, false, false, false, false],
+        finalJeopardy: [true],
+      },
+    });
+    const ctx = makeCtx(game);
+
+    await lobbyCategoryHandlers["update-category"]({
+      ws,
+      data: { gameId: "g1", boardType: "finalJeopardy", index: 0, value: "X" },
+      ctx,
+    });
+
+    expect(ws.send).toHaveBeenCalledWith(
+      JSON.stringify({ type: "error", message: "That category is locked." }),
+    );
+    expect(ctx.sendLobbySnapshot).toHaveBeenCalledWith(ws, "g1");
+  });
+
+  it("update-category errors when categories state is invalid", async () => {
+    const ws = makeWs();
+    const game = makeGame({ categories: undefined });
+    const ctx = makeCtx(game);
+
+    await lobbyCategoryHandlers["update-category"]({
+      ws,
+      data: { gameId: "g1", boardType: "firstBoard", index: 0, value: "X" },
+      ctx,
+    });
+
+    expect(ws.send).toHaveBeenCalledWith(
+      JSON.stringify({ type: "error", message: "Server error: invalid categories state." }),
     );
     expect(ctx.sendLobbySnapshot).toHaveBeenCalledWith(ws, "g1");
   });
