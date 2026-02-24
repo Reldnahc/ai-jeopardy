@@ -14,7 +14,7 @@ import type {
   submitDrawing,
   submitWager,
   submitWagerDrawing,
-} from "../game/finalJeopardy.js";
+} from "../game/finalJeopardy/finalJeopardy.js";
 import type { checkBoardTransition, isBoardFullyCleared } from "../game/stageTransition.js";
 import type { getCOTD } from "../state/cotdStore.js";
 import type { collectImageAssetIdsFromBoard } from "../services/imageAssetService.js";

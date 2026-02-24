@@ -21,7 +21,7 @@ import {
   submitDrawing,
   submitWager,
   submitWagerDrawing,
-} from "../game/finalJeopardy.js";
+} from "../game/finalJeopardy/finalJeopardy.js";
 import { checkBoardTransition, isBoardFullyCleared } from "../game/stageTransition.js";
 import { getCOTD } from "../state/cotdStore.js";
 import { collectImageAssetIdsFromBoard } from "../services/imageAssetService.js";

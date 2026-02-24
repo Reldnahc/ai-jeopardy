@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import type { GameState } from "../types/runtime.js";
-import type { Ctx } from "../ws/context.types.js";
+import type { GameState } from "../../types/runtime.js";
+import type { Ctx } from "../../ws/context.types.js";
 import {
   checkAllDrawingsSubmitted,
   checkAllWagersSubmitted,
@@ -8,8 +8,13 @@ import {
   submitWagerDrawing,
 } from "./finalJeopardy.js";
 
-vi.mock("../services/ai/judge/wagerImage.js", () => ({
-  parseFinalWagerImage: vi.fn(async () => ({ wager: 0 })),
+vi.mock("../../services/ai/judge/wagerImage.js", () => ({
+  parseFinalWagerImage: vi.fn(async () => ({
+    wager: 0,
+    transcript: "0",
+    confidence: 1,
+    reason: "ok",
+  })),
 }));
 
 type ProfilesRepoFns = {
@@ -63,14 +68,16 @@ function buildCtx() {
     broadcast: vi.fn(),
     clearGameTimer: vi.fn(),
     startGameTimer: vi.fn(),
-    aiHostVoiceSequence: vi.fn(async (_ctx: Ctx, _gameId: string, _game: GameState, steps: any[]) => {
-      for (const step of steps) {
-        if (typeof step?.after === "function") {
-          await step.after();
+    aiHostVoiceSequence: vi.fn(
+      async (_ctx: Ctx, _gameId: string, _game: GameState, steps: Array<{ after?: () => unknown }>) => {
+        for (const step of steps) {
+          if (typeof step?.after === "function") {
+            await step.after();
+          }
         }
-      }
-      return true;
-    }),
+        return true;
+      },
+    ),
     judgeImage: vi.fn(async () => ({ verdict: "incorrect", transcript: "" })),
     ensureFinalJeopardyAnswer: vi.fn(async () => {}),
     ensureFinalJeopardyWager: vi.fn(async () => {}),
@@ -112,8 +119,13 @@ describe("finalJeopardy", () => {
     const game = buildGame();
     const { ctx } = buildCtx();
 
-    const wagerImage = await import("../services/ai/judge/wagerImage.js");
-    vi.mocked(wagerImage.parseFinalWagerImage).mockResolvedValueOnce({ wager: -99999, confidence: 0.9 });
+    const wagerImage = await import("../../services/ai/judge/wagerImage.js");
+    vi.mocked(wagerImage.parseFinalWagerImage).mockResolvedValueOnce({
+      wager: -99999,
+      transcript: "-99999",
+      confidence: 0.9,
+      reason: "ok",
+    });
 
     await submitWagerDrawing(game, "g1", "bob", "data:image/png;base64,abc", ctx);
 
