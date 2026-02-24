@@ -50,7 +50,7 @@ import {
   doUnlockBuzzerAuthoritative,
   findCategoryForClue,
   parseClueValue,
-} from "../game/gameLogic.js";
+} from "../game/gameLogic/gameLogic.js";
 import {
   aiHostSayAsset,
   aiHostSayByKey,

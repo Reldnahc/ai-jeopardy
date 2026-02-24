@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import type { GameState } from "../types/runtime.js";
-import type { Ctx } from "../ws/context.types.js";
+import type { GameState } from "../../types/runtime.js";
+import type { Ctx } from "../../ws/context.types.js";
 import {
   autoResolveAfterJudgement,
   cancelAutoUnlock,

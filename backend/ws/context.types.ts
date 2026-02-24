@@ -42,7 +42,7 @@ import type {
   doUnlockBuzzerAuthoritative,
   findCategoryForClue,
   parseClueValue,
-} from "../game/gameLogic.js";
+} from "../game/gameLogic/gameLogic.js";
 import type {
   aiHostSayAsset,
   aiHostSayByKey,
