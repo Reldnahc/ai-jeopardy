@@ -10,11 +10,15 @@ const RecentBoards = () => {
   const [loading, setLoading] = useState(false);
   const [hasMoreBoards, setHasMoreBoards] = useState(true);
   const [filterModel, setFilterModel] = useState<string | null>(null);
-  const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const loadingRef = useRef(false);
+  const hasMoreRef = useRef(true);
+  const lastRequestedOffsetRef = useRef<number | null>(null);
+  const canTriggerAtBottomRef = useRef(true);
 
   const fetchBoards = useCallback(
     async (offset: number = 0, limit: number = 10) => {
-      if (loading || !hasMoreBoards) return;
+      if (loadingRef.current || !hasMoreRef.current) return;
+      loadingRef.current = true;
       setLoading(true);
 
       try {
@@ -31,20 +35,30 @@ const RecentBoards = () => {
         const newBoards = data.boards ?? [];
         setBoards((prev) => [...prev, ...newBoards]);
 
-        if (newBoards.length < limit) setHasMoreBoards(false);
+        if (newBoards.length < limit) {
+          hasMoreRef.current = false;
+          setHasMoreBoards(false);
+        }
       } catch (e) {
         console.error("Error fetching boards:", e);
+        hasMoreRef.current = false;
         setHasMoreBoards(false);
       } finally {
+        loadingRef.current = false;
         setLoading(false);
       }
     },
-    [loading, hasMoreBoards, filterModel],
+    [filterModel],
   );
 
   useEffect(() => {
     setBoards([]);
+    loadingRef.current = false;
+    hasMoreRef.current = true;
+    setLoading(false);
     setHasMoreBoards(true);
+    lastRequestedOffsetRef.current = null;
+    canTriggerAtBottomRef.current = true;
   }, [filterModel]);
 
   useEffect(() => {
@@ -53,17 +67,28 @@ const RecentBoards = () => {
   }, [filterModel, fetchBoards]);
 
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasMoreBoards && !loading) {
-          fetchBoards(boards.length, 10);
-        }
-      },
-      { threshold: 1.0 },
-    );
+    const handleScroll = () => {
+      if (loading || !hasMoreBoards) return;
 
-    if (loadMoreRef.current) observer.observe(loadMoreRef.current);
-    return () => observer.disconnect();
+      const doc = document.documentElement;
+      const nearBottom = window.innerHeight + window.scrollY >= doc.scrollHeight - 8;
+
+      // Must scroll away from the bottom before another bottom-trigger can fire.
+      if (!nearBottom) {
+        canTriggerAtBottomRef.current = true;
+        return;
+      }
+      if (!canTriggerAtBottomRef.current) return;
+
+      const offset = boards.length;
+      if (lastRequestedOffsetRef.current === offset) return;
+      canTriggerAtBottomRef.current = false;
+      lastRequestedOffsetRef.current = offset;
+      void fetchBoards(offset, 10);
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
   }, [boards.length, loading, hasMoreBoards, fetchBoards]);
 
   return (
@@ -108,8 +133,7 @@ const RecentBoards = () => {
           {!hasMoreBoards && !loading && (
             <div className="text-center text-gray-700 my-4 italic">No more boards to load.</div>
           )}
-
-          <div ref={loadMoreRef} className="h-12"></div>
+          <div className="h-12"></div>
         </div>
       </PageCardContainer>
     </div>
