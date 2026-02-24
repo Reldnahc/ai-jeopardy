@@ -16,6 +16,26 @@ vi.mock("../services/profanityService.js", () => ({
 
 import { registerProfileRoutes } from "./profileRoutes.js";
 
+type FnMock = ReturnType<typeof vi.fn>;
+type TestProfileRepos = {
+  profiles: {
+    getMeProfile: FnMock;
+    searchProfiles: FnMock;
+    getPublicProfilesByUsernames: FnMock;
+    getPublicProfileByUsername: FnMock;
+    updateCustomization: FnMock;
+    getRoleById: FnMock;
+    setRoleById: FnMock;
+  };
+  boards: {
+    listBoardsByUsername: FnMock;
+  };
+};
+
+function registerTestRoutes(app: express.Express, repos: TestProfileRepos) {
+  registerProfileRoutes(app, repos as unknown as Parameters<typeof registerProfileRoutes>[1]);
+}
+
 async function request(
   app: express.Express,
   method: "GET" | "PATCH",
@@ -39,7 +59,7 @@ async function request(
   return { status: res.status, json };
 }
 
-function makeRepos(overrides: Record<string, unknown> = {}) {
+function makeRepos(overrides: Partial<TestProfileRepos["profiles"]> = {}): TestProfileRepos {
   return {
     profiles: {
       getMeProfile: vi.fn(async () => ({ username: "alice" })),
@@ -54,7 +74,7 @@ function makeRepos(overrides: Record<string, unknown> = {}) {
     boards: {
       listBoardsByUsername: vi.fn(async () => [{ id: 1 }]),
     },
-  } as never;
+  };
 }
 
 describe("profileRoutes", () => {
@@ -67,7 +87,7 @@ describe("profileRoutes", () => {
     const app = express();
     app.use(express.json());
     const repos = makeRepos();
-    registerProfileRoutes(app, repos);
+    registerTestRoutes(app, repos);
 
     const blank = await request(app, "GET", "/api/profile/search?q=");
     expect(blank.status).toBe(200);
@@ -83,7 +103,7 @@ describe("profileRoutes", () => {
     const app = express();
     app.use(express.json());
     const repos = makeRepos({ getMeProfile: vi.fn(async () => null) });
-    registerProfileRoutes(app, repos);
+    registerTestRoutes(app, repos);
 
     const unauthorized = await request(app, "GET", "/api/profile/me");
     expect(unauthorized.status).toBe(401);
@@ -97,7 +117,7 @@ describe("profileRoutes", () => {
     const app = express();
     app.use(express.json());
     const repos = makeRepos();
-    registerProfileRoutes(app, repos);
+    registerTestRoutes(app, repos);
 
     containsProfanity.mockReturnValueOnce(true);
     verifyJwt.mockReturnValueOnce({ sub: "u1" });
@@ -123,7 +143,7 @@ describe("profileRoutes", () => {
     const app = express();
     app.use(express.json());
     const repos = makeRepos();
-    registerProfileRoutes(app, repos);
+    registerTestRoutes(app, repos);
 
     const unauthorized = await request(app, "PATCH", "/api/profile/me", {
       auth: "Bearer tok",
@@ -154,7 +174,7 @@ describe("profileRoutes", () => {
     const app = express();
     app.use(express.json());
     const repos = makeRepos();
-    registerProfileRoutes(app, repos);
+    registerTestRoutes(app, repos);
 
     const boards = await request(app, "GET", "/api/profile/ Alice /boards?limit=500&offset=-9");
     expect(boards.status).toBe(200);
@@ -173,7 +193,7 @@ describe("profileRoutes", () => {
     const app = express();
     app.use(express.json());
     const repos = makeRepos();
-    registerProfileRoutes(app, repos);
+    registerTestRoutes(app, repos);
 
     const missingUsername = await request(app, "GET", "/api/profile/%20/boards");
     expect(missingUsername.status).toBe(400);
@@ -186,7 +206,7 @@ describe("profileRoutes", () => {
   it("public profile route validates username", async () => {
     const app = express();
     app.use(express.json());
-    registerProfileRoutes(app, makeRepos());
+    registerTestRoutes(app, makeRepos());
 
     const out = await request(app, "GET", "/api/profile/%20");
     expect(out.status).toBe(400);
@@ -196,7 +216,7 @@ describe("profileRoutes", () => {
     const app = express();
     app.use(express.json());
     const repos = makeRepos({ getPublicProfileByUsername: vi.fn(async () => null) });
-    registerProfileRoutes(app, repos);
+    registerTestRoutes(app, repos);
 
     const out = await request(app, "GET", "/api/profile/alice");
     expect(out.status).toBe(404);
@@ -211,7 +231,7 @@ describe("profileRoutes", () => {
       getPublicProfileByUsername: vi.fn(async () => Promise.reject(new Error("boom"))),
     });
     repos.boards.listBoardsByUsername = vi.fn(async () => Promise.reject(new Error("boom")));
-    registerProfileRoutes(app, repos);
+    registerTestRoutes(app, repos);
 
     verifyJwt.mockReturnValueOnce({ sub: "u1" });
     repos.profiles.getMeProfile = vi.fn(async () => Promise.reject(new Error("boom")));
@@ -237,7 +257,7 @@ describe("profileRoutes", () => {
     const repos = makeRepos({
       getRoleById: vi.fn(async (id: string) => (id === "actor" ? "banned" : "default")),
     });
-    registerProfileRoutes(app, repos);
+    registerTestRoutes(app, repos);
 
     verifyJwt.mockReturnValueOnce({ sub: "actor" });
     const banned = await request(app, "PATCH", "/api/profile/alice", {
@@ -273,7 +293,7 @@ describe("profileRoutes", () => {
     const repos = makeRepos({
       getRoleById: vi.fn(async (id: string) => (id === "actor" ? "moderator" : "default")),
     });
-    registerProfileRoutes(app, repos);
+    registerTestRoutes(app, repos);
 
     verifyJwt.mockReturnValueOnce({ sub: "actor" });
     const forbidGrant = await request(app, "PATCH", "/api/profile/alice", {
@@ -307,7 +327,7 @@ describe("profileRoutes", () => {
     const repos = makeRepos({
       getRoleById: vi.fn(async (id: string) => (id === "actor" ? "moderator" : "default")),
     });
-    registerProfileRoutes(app, repos);
+    registerTestRoutes(app, repos);
 
     containsProfanity.mockReturnValueOnce(true);
     verifyJwt.mockReturnValueOnce({ sub: "actor" });
@@ -335,7 +355,7 @@ describe("profileRoutes", () => {
         .mockResolvedValueOnce({ id: "", username: "alice" })
         .mockRejectedValueOnce(new Error("boom")),
     });
-    registerProfileRoutes(app, repos);
+    registerTestRoutes(app, repos);
 
     verifyJwt.mockReturnValueOnce({ sub: "actor" });
     const missingId = await request(app, "PATCH", "/api/profile/alice", {
@@ -356,7 +376,7 @@ describe("profileRoutes", () => {
     const app = express();
     app.use(express.json());
     const repos = makeRepos();
-    registerProfileRoutes(app, repos);
+    registerTestRoutes(app, repos);
 
     verifyJwt.mockReturnValueOnce({ sub: "actor" });
     (repos.profiles.getRoleById as ReturnType<typeof vi.fn>)
