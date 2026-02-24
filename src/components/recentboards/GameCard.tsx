@@ -35,6 +35,18 @@ async function copyTextToClipboard(text: string): Promise<boolean> {
 const GameCard = ({ game }: GameCardProps) => {
   const [copied, setCopied] = useState(false);
   const modelLabel = modelsByValue[String(game.model)]?.label ?? String(game.model ?? "");
+  const createdAtDate =
+    typeof game.createdAt === "string" && game.createdAt.trim() ? new Date(game.createdAt) : null;
+  const createdAtValid = createdAtDate instanceof Date && !Number.isNaN(createdAtDate.getTime());
+  const createdAtLabel = createdAtValid
+    ? createdAtDate.toLocaleString([], {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      })
+    : null;
 
   const onCopyJson = async () => {
     const ok = await copyTextToClipboard(JSON.stringify(game, null, 2));
@@ -62,6 +74,11 @@ const GameCard = ({ game }: GameCardProps) => {
           <p className="text-xl font-semibold text-slate-800">
             Model: <span className="font-normal text-slate-700">{modelLabel}</span>
           </p>
+          {createdAtLabel && (
+            <p className="text-sm font-medium text-slate-600">
+              Created: <span className="font-normal">{createdAtLabel}</span>
+            </p>
+          )}
         </div>
 
         <button

@@ -27,9 +27,9 @@ export function createBoardRepository(pool: Pool) {
     const o = clampInt(offset, 0, 1_000_000, 0);
     const m = typeof model === "string" && model.trim() ? model.trim() : null;
 
-    const { rows } = await pool.query<{ board: unknown }>(
+    const { rows } = await pool.query<{ board: unknown; created_at: Date | string }>(
       `
-      select board
+      select board, created_at
       from jeopardy_boards
       where ($3::text is null or board->>'model' = $3::text)
       order by created_at desc
@@ -39,7 +39,15 @@ export function createBoardRepository(pool: Pool) {
       [l, o, m],
     );
 
-    return rows?.map((r) => r.board) ?? [];
+    return (
+      rows?.map((r) => ({
+        ...(typeof r.board === "object" && r.board !== null ? (r.board as Record<string, unknown>) : {}),
+        createdAt:
+          r.created_at instanceof Date
+            ? r.created_at.toISOString()
+            : String(r.created_at || ""),
+      })) ?? []
+    );
   }
 
   async function listBoardsByUsername(
@@ -50,9 +58,9 @@ export function createBoardRepository(pool: Pool) {
     const l = clampInt(limit, 1, 50, 10);
     const o = clampInt(offset, 0, 1_000_000, 0);
 
-    const { rows } = await pool.query<{ board: unknown }>(
+    const { rows } = await pool.query<{ board: unknown; created_at: Date | string }>(
       `
-      select jb.board
+      select jb.board, jb.created_at
       from jeopardy_boards jb
       join profiles p on p.id = jb.owner
       where p.username = $1
@@ -69,7 +77,15 @@ export function createBoardRepository(pool: Pool) {
       ],
     );
 
-    return rows?.map((r) => r.board) ?? [];
+    return (
+      rows?.map((r) => ({
+        ...(typeof r.board === "object" && r.board !== null ? (r.board as Record<string, unknown>) : {}),
+        createdAt:
+          r.created_at instanceof Date
+            ? r.created_at.toISOString()
+            : String(r.created_at || ""),
+      })) ?? []
+    );
   }
 
   return { insertBoard, listRecentBoards, listBoardsByUsername };

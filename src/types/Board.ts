@@ -22,6 +22,7 @@ type FinalJeopardy = {
 export interface Board {
   host: string;
   model: string;
+  createdAt?: string;
   firstBoard: GameBoard;
   secondBoard: GameBoard;
   finalJeopardy: {
