@@ -33,7 +33,7 @@ import type {
   resolveVisualPolicy,
   safeAbortGeneration,
   setupPreloadHandshake,
-} from "./handlers/game/createGameHelpers.js";
+} from "./handlers/lobby/createGame/index.js";
 import type { clearAnswerWindow, startAnswerWindow } from "../game/answerWindow.js";
 import type {
   autoResolveAfterJudgement,
