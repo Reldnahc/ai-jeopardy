@@ -119,6 +119,37 @@ describe("profileRoutes", () => {
     );
   });
 
+  it("me patch handles unauthorized, no supported fields, and repository errors", async () => {
+    const app = express();
+    app.use(express.json());
+    const repos = makeRepos();
+    registerProfileRoutes(app, repos);
+
+    const unauthorized = await request(app, "PATCH", "/api/profile/me", {
+      auth: "Bearer tok",
+      body: { bio: "hello" },
+    });
+    expect(unauthorized.status).toBe(401);
+
+    verifyJwt.mockReturnValueOnce({ sub: "u1" });
+    (repos.profiles.updateCustomization as ReturnType<typeof vi.fn>).mockResolvedValueOnce(null);
+    const unsupported = await request(app, "PATCH", "/api/profile/me", {
+      auth: "Bearer tok",
+      body: { unsupported: true },
+    });
+    expect(unsupported.status).toBe(400);
+
+    verifyJwt.mockReturnValueOnce({ sub: "u1" });
+    (repos.profiles.updateCustomization as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new Error("boom"),
+    );
+    const crashed = await request(app, "PATCH", "/api/profile/me", {
+      auth: "Bearer tok",
+      body: { bio: "x" },
+    });
+    expect(crashed.status).toBe(500);
+  });
+
   it("boards and batch routes normalize inputs", async () => {
     const app = express();
     app.use(express.json());
@@ -136,6 +167,29 @@ describe("profileRoutes", () => {
     const emptyBatch = await request(app, "GET", "/api/profile/batch");
     expect(emptyBatch.status).toBe(200);
     expect(emptyBatch.json).toEqual({ profiles: [] });
+  });
+
+  it("boards route validates username and defaults invalid pagination", async () => {
+    const app = express();
+    app.use(express.json());
+    const repos = makeRepos();
+    registerProfileRoutes(app, repos);
+
+    const missingUsername = await request(app, "GET", "/api/profile/%20/boards");
+    expect(missingUsername.status).toBe(400);
+
+    const out = await request(app, "GET", "/api/profile/alice/boards?limit=abc&offset=def");
+    expect(out.status).toBe(200);
+    expect(repos.boards.listBoardsByUsername).toHaveBeenCalledWith("alice", 10, 0);
+  });
+
+  it("public profile route validates username", async () => {
+    const app = express();
+    app.use(express.json());
+    registerProfileRoutes(app, makeRepos());
+
+    const out = await request(app, "GET", "/api/profile/%20");
+    expect(out.status).toBe(400);
   });
 
   it("public profile route returns not found when missing", async () => {
@@ -296,5 +350,52 @@ describe("profileRoutes", () => {
       body: { role: "default" },
     });
     expect(crashed.status).toBe(500);
+  });
+
+  it("admin patch handles target-role-missing and additional forbidden branches", async () => {
+    const app = express();
+    app.use(express.json());
+    const repos = makeRepos();
+    registerProfileRoutes(app, repos);
+
+    verifyJwt.mockReturnValueOnce({ sub: "actor" });
+    (repos.profiles.getRoleById as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce("admin")
+      .mockResolvedValueOnce(null);
+    const targetMissingRole = await request(app, "PATCH", "/api/profile/alice", {
+      auth: "Bearer tok",
+      body: { role: "default" },
+    });
+    expect(targetMissingRole.status).toBe(404);
+
+    verifyJwt.mockReturnValueOnce({ sub: "actor" });
+    (repos.profiles.getRoleById as ReturnType<typeof vi.fn>).mockImplementation(
+      async (id: string) => (id === "actor" ? "default" : "default"),
+    );
+    const forbidBio = await request(app, "PATCH", "/api/profile/alice", {
+      auth: "Bearer tok",
+      body: { bio: "clean" },
+    });
+    expect(forbidBio.status).toBe(403);
+
+    verifyJwt.mockReturnValueOnce({ sub: "actor" });
+    (repos.profiles.getRoleById as ReturnType<typeof vi.fn>).mockImplementation(
+      async (id: string) => (id === "actor" ? "default" : "user"),
+    );
+    const forbidBan = await request(app, "PATCH", "/api/profile/alice", {
+      auth: "Bearer tok",
+      body: { role: "banned" },
+    });
+    expect(forbidBan.status).toBe(403);
+
+    verifyJwt.mockReturnValueOnce({ sub: "actor" });
+    (repos.profiles.getRoleById as ReturnType<typeof vi.fn>).mockImplementation(
+      async (id: string) => (id === "actor" ? "moderator" : "default"),
+    );
+    const forbidLadder = await request(app, "PATCH", "/api/profile/alice", {
+      auth: "Bearer tok",
+      body: { role: "default" },
+    });
+    expect(forbidLadder.status).toBe(403);
   });
 });

@@ -100,5 +100,39 @@ describe("dailyDouble finalize", () => {
     );
     expect(ctx.autoResolveAfterJudgement).toHaveBeenCalledWith(ctx, "g1", game, undefined, "incorrect");
   });
-});
 
+  it("falls back to default answer timer when configured time is non-positive", async () => {
+    const game = buildGame({ timeToAnswer: 0 });
+    const { ctx } = buildCtx(game);
+
+    await finalizeDailyDoubleWagerAndStartClue("g1", game, ctx, { wager: 500 });
+
+    expect(ctx.startGameTimer).toHaveBeenCalledWith("g1", game, ctx, 9, "answer");
+  });
+
+  it("timeout callback uses clue value when DD wager is not active and respects early returns", async () => {
+    const game = buildGame();
+    const { ctx, getTimeoutCb } = buildCtx(game, { parseClueValue: vi.fn(() => 600) });
+
+    await finalizeDailyDoubleWagerAndStartClue("g1", game, ctx, { wager: 700 });
+    const cb = getTimeoutCb();
+    expect(typeof cb).toBe("function");
+
+    game.dailyDouble = {
+      ...game.dailyDouble!,
+      clueKey: "other-clue",
+      wager: Number.NaN,
+    };
+    cb?.();
+
+    expect(ctx.broadcast).toHaveBeenCalledWith(
+      "g1",
+      expect.objectContaining({ type: "answer-result", verdict: "incorrect", suggestedDelta: -600 }),
+    );
+
+    const callsBefore = (ctx.broadcast as ReturnType<typeof vi.fn>).mock.calls.length;
+    game.answerSessionId = null;
+    cb?.();
+    expect((ctx.broadcast as ReturnType<typeof vi.fn>).mock.calls.length).toBe(callsBefore);
+  });
+});

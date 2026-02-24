@@ -65,6 +65,15 @@ function buildCtx(game: GameState, overrides: Record<string, unknown> = {}) {
 }
 
 describe("dailyDouble capture", () => {
+  it("reprompt is a no-op when daily double state is missing", async () => {
+    const game = buildGame({ dailyDouble: undefined });
+    const ctx = buildCtx(game);
+
+    await repromptDdWager("g1", game, ctx, { reason: "timeout" });
+
+    expect(ctx.broadcast).not.toHaveBeenCalled();
+  });
+
   it("clearDdWagerTimer clears timeout and broadcasts timer-end with current version", () => {
     vi.useFakeTimers();
     const game = buildGame({
@@ -141,5 +150,28 @@ describe("dailyDouble capture", () => {
       "g1",
       expect.objectContaining({ type: "daily-double-wager-parse-failed" }),
     );
+  });
+
+  it("timer expiry does nothing for stale capture state", async () => {
+    vi.useFakeTimers();
+    const game = buildGame();
+    const ctx = buildCtx(game);
+
+    startDdWagerCapture("g1", game, ctx);
+    const staleSessionId = game.ddWagerSessionId;
+
+    game.phase = "clue";
+    await vi.advanceTimersByTimeAsync(10260);
+    expect(game.dailyDouble?.attempts).toBe(0);
+
+    game.phase = "DD_WAGER_CAPTURE";
+    game.ddWagerSessionId = `${staleSessionId}-new`;
+    await vi.advanceTimersByTimeAsync(10260);
+    expect(game.dailyDouble?.attempts).toBe(0);
+
+    game.ddWagerSessionId = staleSessionId;
+    if (game.dailyDouble) game.dailyDouble.wager = 400;
+    await vi.advanceTimersByTimeAsync(10260);
+    expect(game.dailyDouble?.attempts).toBe(0);
   });
 });
