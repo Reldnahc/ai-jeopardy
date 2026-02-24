@@ -1,8 +1,10 @@
-import type { Trace, AiHostTtsBank, Game, Ctx } from "../../ws/context.types.js";
+import type { Trace, AiHostTtsBank, Game, CtxDeps } from "../../ws/context.types.js";
 import { AI_HOST_VARIANTS, collectBoardValues, nameCalloutText } from "./variants.js";
 
+export type HostTtsCtx = CtxDeps<"ensureTtsAsset" | "repos" | "broadcast" | "numberToWords">;
+
 export async function ensureAiHostValueTts(opts: {
-  ctx: Ctx;
+  ctx: HostTtsCtx;
   game: Game;
   trace?: Trace;
 }): Promise<void> {
@@ -66,7 +68,7 @@ export async function ensureAiHostValueTts(opts: {
 }
 
 export async function ensureFinalJeopardyAnswer(
-  ctx: Ctx,
+  ctx: HostTtsCtx,
   game: Game,
   gameId: string,
   playerName: string,
@@ -88,7 +90,7 @@ export async function ensureFinalJeopardyAnswer(
 }
 
 export async function ensureFinalJeopardyWager(
-  ctx: Ctx,
+  ctx: HostTtsCtx,
   game: Game,
   gameId: string,
   playerName: string,
@@ -110,7 +112,7 @@ export async function ensureFinalJeopardyWager(
 }
 
 export async function ensureAiHostTtsBank(opts: {
-  ctx: Ctx;
+  ctx: HostTtsCtx;
   game: Game;
   trace?: Trace;
 }): Promise<void> {

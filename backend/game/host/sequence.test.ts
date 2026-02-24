@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Ctx, Game } from "../../ws/context.types.js";
+import { createCtx } from "../../test/createCtx.js";
 import { aiHostVoiceSequence } from "./sequence.js";
 import * as playback from "./playback.js";
 
@@ -9,10 +10,14 @@ vi.mock("./playback.js", () => ({
 }));
 
 function makeCtx(overrides: Partial<Ctx> = {}) {
-  const ctx = {
-    sleepAndCheckGame: vi.fn(async () => true),
-  } as unknown as Ctx;
-  return { ctx: { ...ctx, ...overrides } as Ctx };
+  return {
+    ctx: createCtx(
+      {
+        sleepAndCheckGame: vi.fn(async () => true),
+      },
+      overrides,
+    ),
+  };
 }
 
 describe("sequence", () => {

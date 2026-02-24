@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Ctx, Game, Trace } from "../../ws/context.types.js";
+import { createCtx } from "../../test/createCtx.js";
 import { AI_HOST_VARIANTS } from "./variants.js";
 import {
   ensureAiHostTtsBank,
@@ -10,17 +11,20 @@ import {
 
 function makeCtx(overrides: Partial<Ctx> = {}) {
   let seq = 0;
-  const ctx = {
-    repos: {},
-    ensureTtsAsset: vi.fn(async () => {
-      seq += 1;
-      return { id: `asset-${seq}` };
-    }),
-    numberToWords: vi.fn((n: number) => `${n} words`),
-    broadcast: vi.fn(),
-  } as unknown as Ctx;
-
-  return { ctx: { ...ctx, ...overrides } as Ctx };
+  return {
+    ctx: createCtx(
+      {
+        repos: {},
+        ensureTtsAsset: vi.fn(async () => {
+          seq += 1;
+          return { id: `asset-${seq}` };
+        }),
+        numberToWords: vi.fn((n: number) => `${n} words`),
+        broadcast: vi.fn(),
+      },
+      overrides,
+    ),
+  };
 }
 
 describe("ttsBank", () => {

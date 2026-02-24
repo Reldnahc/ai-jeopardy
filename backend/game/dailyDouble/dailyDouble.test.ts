@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { GameState } from "../../types/runtime.js";
 import type { Ctx } from "../../ws/context.types.js";
+import { createCtx, fireAndForget } from "../../test/createCtx.js";
 import {
   computeDailyDoubleMaxWager,
   finalizeDailyDoubleWagerAndStartClue,
@@ -48,7 +49,7 @@ function buildCtx(game: GameState) {
     incrementTrueDailyDoubles: vi.fn(async () => {}),
   };
 
-  const ctx = {
+  const ctx = createCtx({
     games: { g1: game },
     repos: { profiles },
     broadcast: vi.fn(),
@@ -59,10 +60,8 @@ function buildCtx(game: GameState) {
     aiHostVoiceSequence: vi.fn(async () => true),
     parseClueValue: vi.fn((v: unknown) => Number(String(v ?? 0).replace(/[^0-9]/g, "")) || 0),
     autoResolveAfterJudgement: vi.fn(async () => {}),
-    fireAndForget: (p: PromiseLike<unknown>) => {
-      void p;
-    },
-  } as unknown as Ctx;
+    fireAndForget,
+  });
 
   return { ctx, profiles };
 }

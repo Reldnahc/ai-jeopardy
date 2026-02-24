@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { GameState } from "../../types/runtime.js";
 import type { Ctx } from "../../ws/context.types.js";
+import { createCtx, fireAndForget } from "../../test/createCtx.js";
 import {
   autoResolveAfterJudgement,
   cancelAutoUnlock,
@@ -21,31 +22,35 @@ function buildCtx(overrides: Partial<Ctx> = {}) {
     incrementWrongAnswers: vi.fn(async () => {}),
   };
 
-  const ctx = {
-    repos: { profiles },
-    broadcast: vi.fn(),
-    fireAndForget: (p: PromiseLike<unknown>) => {
-      void p;
-    },
-    aiHostVoiceSequence: vi.fn(async (_ctx: Ctx, _gameId: string, _game: GameState, steps: Array<{ after?: () => unknown }>) => {
-      for (const step of steps) {
-        if (typeof step?.after === "function") {
-          await step.after();
-        }
-      }
-      return true;
-    }),
-    sleep: vi.fn(async () => {}),
-    clearAnswerWindow: vi.fn(),
-    clearGameTimer: vi.fn(),
-    checkBoardTransition: vi.fn(() => true),
-    doUnlockBuzzerAuthoritative: vi.fn(),
-    getClueKey: vi.fn(() => "firstBoard:400:Q"),
-    startGameTimer: vi.fn(),
-    sleepAndCheckGame: vi.fn(async () => true),
-  } as unknown as Ctx;
-
-  return { ctx: { ...ctx, ...overrides } as Ctx, profiles };
+  return {
+    ctx: createCtx(
+      {
+        repos: { profiles },
+        broadcast: vi.fn(),
+        fireAndForget,
+        aiHostVoiceSequence: vi.fn(
+          async (_ctx: Ctx, _gameId: string, _game: GameState, steps: Array<{ after?: () => unknown }>) => {
+            for (const step of steps) {
+              if (typeof step?.after === "function") {
+                await step.after();
+              }
+            }
+            return true;
+          },
+        ),
+        sleep: vi.fn(async () => {}),
+        clearAnswerWindow: vi.fn(),
+        clearGameTimer: vi.fn(),
+        checkBoardTransition: vi.fn(() => true),
+        doUnlockBuzzerAuthoritative: vi.fn(),
+        getClueKey: vi.fn(() => "firstBoard:400:Q"),
+        startGameTimer: vi.fn(),
+        sleepAndCheckGame: vi.fn(async () => true),
+      },
+      overrides,
+    ),
+    profiles,
+  };
 }
 
 describe("gameLogic", () => {

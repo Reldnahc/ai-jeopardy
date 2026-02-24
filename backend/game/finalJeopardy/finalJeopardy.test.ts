@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { GameState } from "../../types/runtime.js";
 import type { Ctx } from "../../ws/context.types.js";
+import { createCtx, fireAndForget } from "../../test/createCtx.js";
 import {
   checkAllDrawingsSubmitted,
   checkAllWagersSubmitted,
@@ -63,7 +64,7 @@ function buildCtx() {
     getIdByUsername: vi.fn(async (username: string) => username),
   };
 
-  const ctx = {
+  const ctx = createCtx({
     repos: { profiles },
     broadcast: vi.fn(),
     clearGameTimer: vi.fn(),
@@ -82,10 +83,8 @@ function buildCtx() {
     ensureFinalJeopardyAnswer: vi.fn(async () => {}),
     ensureFinalJeopardyWager: vi.fn(async () => {}),
     normalizeName: (name: unknown) => String(name ?? "").trim().toLowerCase(),
-    fireAndForget: (p: PromiseLike<unknown>) => {
-      void p;
-    },
-  } as unknown as Ctx;
+    fireAndForget,
+  });
 
   return { ctx, profiles };
 }

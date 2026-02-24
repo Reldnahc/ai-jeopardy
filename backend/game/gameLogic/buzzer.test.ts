@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { GameState } from "../../types/runtime.js";
 import type { Ctx } from "../../ws/context.types.js";
+import { createCtx, fireAndForget } from "../../test/createCtx.js";
 import { cancelAutoUnlock, doUnlockBuzzerAuthoritative } from "./buzzer.js";
 import { finishClueAndReturnToBoard } from "./boardFlow.js";
 
@@ -13,29 +14,31 @@ function makeCtx(overrides: Partial<Ctx> = {}) {
     incrementCluesSkipped: vi.fn(async () => {}),
   };
 
-  const ctx = {
-    repos: { profiles },
-    clearGameTimer: vi.fn(),
-    broadcast: vi.fn(),
-    startGameTimer: vi.fn(),
-    aiHostVoiceSequence: vi.fn(
-      async (_ctx: Ctx, _gameId: string, _game: GameState, steps: Array<{ after?: () => unknown }>) => {
-        for (const step of steps) {
-          if (typeof step.after === "function") {
-            await step.after();
-          }
-        }
-        return true;
+  return {
+    ctx: createCtx(
+      {
+        repos: { profiles },
+        clearGameTimer: vi.fn(),
+        broadcast: vi.fn(),
+        startGameTimer: vi.fn(),
+        aiHostVoiceSequence: vi.fn(
+          async (_ctx: Ctx, _gameId: string, _game: GameState, steps: Array<{ after?: () => unknown }>) => {
+            for (const step of steps) {
+              if (typeof step.after === "function") {
+                await step.after();
+              }
+            }
+            return true;
+          },
+        ),
+        getClueKey: vi.fn(() => "firstBoard:400:Q"),
+        sleepAndCheckGame: vi.fn(async () => true),
+        fireAndForget,
       },
+      overrides,
     ),
-    getClueKey: vi.fn(() => "firstBoard:400:Q"),
-    sleepAndCheckGame: vi.fn(async () => true),
-    fireAndForget: (p: PromiseLike<unknown>) => {
-      void p;
-    },
-  } as unknown as Ctx;
-
-  return { ctx: { ...ctx, ...overrides } as Ctx, profiles };
+    profiles,
+  };
 }
 
 describe("buzzer", () => {

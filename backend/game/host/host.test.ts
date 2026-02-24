@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Ctx, Game } from "../../ws/context.types.js";
+import { createCtx } from "../../test/createCtx.js";
 import {
   aiHostSayAsset,
   aiHostSayByKey,
@@ -10,19 +11,22 @@ import {
 
 function makeCtx(overrides: Partial<Ctx> = {}) {
   let idSeq = 0;
-  const ctx = {
-    repos: {},
-    ensureTtsAsset: vi.fn(async ({ text }: { text: string }) => {
-      idSeq += 1;
-      const safe = String(text).replace(/\s+/g, "_").toLowerCase();
-      return { id: `tts-${safe}-${idSeq}` };
-    }),
-    broadcast: vi.fn(),
-    getTtsDurationMs: vi.fn(async () => 321),
-    sleepAndCheckGame: vi.fn(async () => true),
-  } as unknown as Ctx;
-
-  return { ctx: { ...ctx, ...overrides } as Ctx };
+  return {
+    ctx: createCtx(
+      {
+        repos: {},
+        ensureTtsAsset: vi.fn(async ({ text }: { text: string }) => {
+          idSeq += 1;
+          const safe = String(text).replace(/\s+/g, "_").toLowerCase();
+          return { id: `tts-${safe}-${idSeq}` };
+        }),
+        broadcast: vi.fn(),
+        getTtsDurationMs: vi.fn(async () => 321),
+        sleepAndCheckGame: vi.fn(async () => true),
+      },
+      overrides,
+    ),
+  };
 }
 
 describe("host", () => {

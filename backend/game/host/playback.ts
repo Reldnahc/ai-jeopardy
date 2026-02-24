@@ -1,4 +1,6 @@
-import type { Ctx, Game } from "../../ws/context.types.js";
+import type { CtxDeps, Game } from "../../ws/context.types.js";
+
+export type HostPlaybackCtx = CtxDeps<"broadcast" | "getTtsDurationMs">;
 
 const AI_HOST_PLAYBACK_GRACE_MS = 250;
 
@@ -8,7 +10,7 @@ function clearAiHostPlaybackTimer(game: Game) {
 }
 
 export function aiHostSayAsset(
-  ctx: Ctx,
+  ctx: HostPlaybackCtx,
   gameId: string,
   game: Game,
   assetId: string | null | undefined,
@@ -69,7 +71,7 @@ const withTimeout = async <T>(p: Promise<T>, ms: number, fallback: T): Promise<T
 };
 
 export async function aiHostSayByAsset(
-  ctx: Ctx,
+  ctx: HostPlaybackCtx,
   gameId: string,
   game: Game,
   assetId: string,
@@ -82,7 +84,7 @@ export async function aiHostSayByAsset(
 }
 
 export async function aiHostSayByKey(
-  ctx: Ctx,
+  ctx: HostPlaybackCtx,
   gameId: string,
   game: Game,
   key: string,

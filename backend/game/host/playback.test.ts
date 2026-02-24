@@ -1,14 +1,18 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Ctx, Game } from "../../ws/context.types.js";
+import { createCtx } from "../../test/createCtx.js";
 import { aiHostSayAsset, aiHostSayByAsset, aiHostSayByKey } from "./playback.js";
 
 function makeCtx(overrides: Partial<Ctx> = {}) {
-  const ctx = {
-    broadcast: vi.fn(),
-    getTtsDurationMs: vi.fn(async () => 321),
-  } as unknown as Ctx;
-
-  return { ctx: { ...ctx, ...overrides } as Ctx };
+  return {
+    ctx: createCtx(
+      {
+        broadcast: vi.fn(),
+        getTtsDurationMs: vi.fn(async () => 321),
+      },
+      overrides,
+    ),
+  };
 }
 
 describe("playback", () => {

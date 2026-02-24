@@ -1,8 +1,10 @@
-import type { Ctx, Game, VoiceStep } from "../../ws/context.types.js";
-import { aiHostSayByAsset, aiHostSayByKey } from "./playback.js";
+import type { CtxDeps, Game, VoiceStep } from "../../ws/context.types.js";
+import { aiHostSayByAsset, aiHostSayByKey, type HostPlaybackCtx } from "./playback.js";
+
+export type HostSequenceCtx = HostPlaybackCtx & CtxDeps<"sleepAndCheckGame">;
 
 export async function aiHostVoiceSequence(
-  ctx: Ctx,
+  ctx: HostSequenceCtx,
   gameId: string,
   game: Game,
   steps: VoiceStep[],

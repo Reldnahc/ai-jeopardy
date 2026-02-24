@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import type { GameState } from "../types/runtime.js";
-import type { Ctx } from "../ws/context.types.js";
+import { createCtx } from "../test/createCtx.js";
 import { clearGameTimer, startGameTimer } from "./timer.js";
 
 afterEach(() => {
@@ -8,9 +8,9 @@ afterEach(() => {
 });
 
 function buildCtx() {
-  return {
+  return createCtx({
     broadcast: vi.fn(),
-  } as unknown as Ctx;
+  });
 }
 
 describe("timer", () => {

@@ -1,25 +1,31 @@
 import { describe, expect, it, vi } from "vitest";
 import type { GameState, PlayerState } from "../types/runtime.js";
 import type { Ctx } from "../ws/context.types.js";
+import { createCtx } from "../test/createCtx.js";
 import { checkBoardTransition, isBoardFullyCleared } from "./stageTransition.js";
 
 function makeCtx(overrides: Partial<Ctx> = {}) {
-  const ctx = {
-    isBoardFullyCleared,
-    checkAllWagersSubmitted: vi.fn(),
-    startGameTimer: vi.fn(),
-    broadcast: vi.fn(),
-    aiHostVoiceSequence: vi.fn(async (_ctx: Ctx, _gameId: string, _game: GameState, steps: Array<{ after?: () => unknown }>) => {
-      for (const step of steps) {
-        if (typeof step?.after === "function") {
-          await step.after();
-        }
-      }
-      return true;
-    }),
-  } as unknown as Ctx;
-
-  return { ctx: { ...ctx, ...overrides } as Ctx };
+  return {
+    ctx: createCtx(
+      {
+        isBoardFullyCleared,
+        checkAllWagersSubmitted: vi.fn(),
+        startGameTimer: vi.fn(),
+        broadcast: vi.fn(),
+        aiHostVoiceSequence: vi.fn(
+          async (_ctx: Ctx, _gameId: string, _game: GameState, steps: Array<{ after?: () => unknown }>) => {
+            for (const step of steps) {
+              if (typeof step?.after === "function") {
+                await step.after();
+              }
+            }
+            return true;
+          },
+        ),
+      },
+      overrides,
+    ),
+  };
 }
 
 describe("stageTransition", () => {

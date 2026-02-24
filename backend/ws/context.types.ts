@@ -330,6 +330,8 @@ export type Ctx = Omit<
   ensureFinalJeopardyWager: typeof ensureFinalJeopardyWager;
 };
 
+export type CtxDeps<K extends keyof Ctx> = Pick<Ctx, K>;
+
 export type SayResult = { assetId: string; ms: number };
 
 export type VoiceStep = {
