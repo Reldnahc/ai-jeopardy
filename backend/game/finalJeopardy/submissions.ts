@@ -1,15 +1,21 @@
 import type { GameState } from "../../types/runtime.js";
-import type { Ctx } from "../../ws/context.types.js";
+import type { CtxDeps } from "../../ws/context.types.js";
 import { parseFinalWagerImage } from "../../services/ai/judge/wagerImage.js";
+import type { HostTtsCtx } from "../host/ttsBank.js";
 import { ensureFinalResponseStores, getFinalistUsernames, normalizeFinalWager } from "./helpers.js";
 import { checkAllDrawingsSubmitted, checkAllWagersSubmitted } from "./phases.js";
+import type { FinalJeopardyPhasesCtx } from "./phases.js";
+
+export type FinalJeopardySubmissionsCtx = FinalJeopardyPhasesCtx &
+  HostTtsCtx &
+  CtxDeps<"judgeImage" | "ensureFinalJeopardyAnswer" | "ensureFinalJeopardyWager">;
 
 export async function submitDrawing(
   game: GameState,
   gameId: string,
   player: string,
   drawing: string,
-  ctx: Ctx,
+  ctx: FinalJeopardySubmissionsCtx,
 ) {
   const expected = getFinalistUsernames(game);
   if (!expected.includes(player)) return;
@@ -30,7 +36,7 @@ export function submitWager(
   gameId: string,
   player: string,
   wager: number,
-  ctx: Ctx,
+  ctx: FinalJeopardySubmissionsCtx,
 ) {
   const expected = getFinalistUsernames(game);
   if (!expected.includes(player)) return;
@@ -59,7 +65,7 @@ export async function submitWagerDrawing(
   gameId: string,
   player: string,
   drawing: string,
-  ctx: Ctx,
+  ctx: FinalJeopardySubmissionsCtx,
 ) {
   if (game.finalJeopardyStage !== "wager") return;
 

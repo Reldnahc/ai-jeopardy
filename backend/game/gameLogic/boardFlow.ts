@@ -1,7 +1,10 @@
 import type { GameState } from "../../types/runtime.js";
-import type { Ctx } from "../../ws/context.types.js";
+import type { CtxDeps } from "../../ws/context.types.js";
+import type { StageTransitionCtx } from "../stageTransition.js";
 
-function lockBoardSelection(ctx: Ctx, gameId: string, game: GameState): number {
+export type BoardFlowCtx = StageTransitionCtx & CtxDeps<"fireAndForget" | "checkBoardTransition">;
+
+function lockBoardSelection(ctx: BoardFlowCtx, gameId: string, game: GameState): number {
   if (!game) return 0;
 
   game.boardSelectionLocked = true;
@@ -15,7 +18,7 @@ function lockBoardSelection(ctx: Ctx, gameId: string, game: GameState): number {
   return game.boardSelectionLockVersion;
 }
 
-function unlockBoardSelection(ctx: Ctx, gameId: string, game: GameState, lockVersion?: number) {
+function unlockBoardSelection(ctx: BoardFlowCtx, gameId: string, game: GameState, lockVersion?: number) {
   if (!game) return;
 
   if (typeof lockVersion === "number" && lockVersion > 0) {
@@ -33,7 +36,7 @@ function unlockBoardSelection(ctx: Ctx, gameId: string, game: GameState, lockVer
   });
 }
 
-function returnToBoard(game: GameState, gameId: string, ctx: Ctx, transitioned = false) {
+function returnToBoard(game: GameState, gameId: string, ctx: BoardFlowCtx, transitioned = false) {
   game.selectedClue = null;
   game.buzzed = null;
   game.buzzerLocked = true;
@@ -70,7 +73,7 @@ function returnToBoard(game: GameState, gameId: string, ctx: Ctx, transitioned =
   }
 }
 
-export function finishClueAndReturnToBoard(ctx: Ctx, gameId: string, game: GameState) {
+export function finishClueAndReturnToBoard(ctx: BoardFlowCtx, gameId: string, game: GameState) {
   if (!game) return;
 
   if (game.selectedClue) {

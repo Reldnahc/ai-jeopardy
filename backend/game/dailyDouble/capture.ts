@@ -1,12 +1,15 @@
 import type { GameState } from "../../types/runtime.js";
-import type { Ctx } from "../../ws/context.types.js";
+import type { CtxDeps } from "../../ws/context.types.js";
 import { finalizeDailyDoubleWagerAndStartClue } from "./finalize.js";
+import type { DailyDoubleFinalizeCtx } from "./finalize.js";
+
+export type DailyDoubleCaptureCtx = DailyDoubleFinalizeCtx & CtxDeps<"clearDdWagerTimer">;
 
 function makeSessionId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-export function clearDdWagerTimer(ctx: Ctx, gameId: string, game: GameState) {
+export function clearDdWagerTimer(ctx: DailyDoubleCaptureCtx, gameId: string, game: GameState) {
   if (game._ddWagerTimer) {
     clearTimeout(game._ddWagerTimer);
   }
@@ -20,7 +23,7 @@ export function clearDdWagerTimer(ctx: Ctx, gameId: string, game: GameState) {
 function armDdWagerTimer(
   gameId: string,
   game: GameState,
-  ctx: Ctx,
+  ctx: DailyDoubleCaptureCtx,
   ddWagerSessionId: string,
   durationMs: number,
 ) {
@@ -46,7 +49,7 @@ function armDdWagerTimer(
 export async function repromptDdWager(
   gameId: string,
   game: GameState,
-  ctx: Ctx,
+  ctx: DailyDoubleCaptureCtx,
   args: { reason?: string } | null,
 ) {
   const dd = game.dailyDouble;
@@ -102,7 +105,7 @@ export async function repromptDdWager(
   startDdWagerCapture(gameId, game, ctx);
 }
 
-export function startDdWagerCapture(gameId: string, game: GameState, ctx: Ctx) {
+export function startDdWagerCapture(gameId: string, game: GameState, ctx: DailyDoubleCaptureCtx) {
   const dd = game.dailyDouble;
   if (!dd) return;
 

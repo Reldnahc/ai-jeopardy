@@ -1,5 +1,7 @@
 import type { GameState, PlayerState } from "../../types/runtime.js";
-import type { Ctx } from "../../ws/context.types.js";
+import type { CtxDeps } from "../../ws/context.types.js";
+
+export type FinalHelpersCtx = CtxDeps<"fireAndForget" | "repos">;
 
 function getExpectedFinalists(game: GameState): PlayerState[] {
   const players = Array.isArray(game?.players) ? game.players : [];
@@ -30,7 +32,7 @@ export function ensureFinalResponseStores(game: GameState) {
   if (!game.finalTranscripts) game.finalTranscripts = {};
 }
 
-export function applyFinalJeopardyScoring(game: GameState, finalists: string[], ctx: Ctx) {
+export function applyFinalJeopardyScoring(game: GameState, finalists: string[], ctx: FinalHelpersCtx) {
   const verdicts = game.finalVerdicts || {};
   const wagers = game.wagers || {};
   const scores = game.scores || {};

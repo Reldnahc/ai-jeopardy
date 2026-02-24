@@ -1,6 +1,6 @@
 import { appConfig } from "../../config/appConfig.js";
 import type { GameState } from "../../types/runtime.js";
-import type { Ctx } from "../../ws/context.types.js";
+import type { CtxDeps } from "../../ws/context.types.js";
 import {
   applyFinalJeopardyScoring,
   buildPodiumPayoutScores,
@@ -9,11 +9,24 @@ import {
   getFinalistUsernames,
 } from "./helpers.js";
 
+export type FinalJeopardyPhasesCtx = CtxDeps<
+  | "clearGameTimer"
+  | "broadcast"
+  | "aiHostVoiceSequence"
+  | "startGameTimer"
+  | "checkAllDrawingsSubmitted"
+  | "normalizeName"
+  | "repos"
+  | "fireAndForget"
+  | "getTtsDurationMs"
+  | "sleepAndCheckGame"
+>;
+
 export async function advanceToDrawingPhase(
   game: GameState,
   gameId: string,
   wagers: Record<string, number>,
-  ctx: Ctx,
+  ctx: FinalJeopardyPhasesCtx,
 ) {
   ctx.clearGameTimer(game, gameId, ctx);
 
@@ -96,7 +109,7 @@ export async function finishGame(
   game: GameState,
   gameId: string,
   drawings: Record<string, string>,
-  ctx: Ctx,
+  ctx: FinalJeopardyPhasesCtx,
 ) {
   ctx.clearGameTimer(game, gameId, ctx);
 
@@ -213,7 +226,7 @@ export async function finishGame(
   });
 }
 
-export function checkAllWagersSubmitted(game: GameState, gameId: string, ctx: Ctx) {
+export function checkAllWagersSubmitted(game: GameState, gameId: string, ctx: FinalJeopardyPhasesCtx) {
   if (!game?.isFinalJeopardy) return;
   if (game.finalJeopardyStage !== "wager") return;
 
@@ -229,7 +242,7 @@ export function checkAllWagersSubmitted(game: GameState, gameId: string, ctx: Ct
   }
 }
 
-export function checkAllDrawingsSubmitted(game: GameState, gameId: string, ctx: Ctx) {
+export function checkAllDrawingsSubmitted(game: GameState, gameId: string, ctx: FinalJeopardyPhasesCtx) {
   if (!game?.isFinalJeopardy) return null;
   if (game.finalJeopardyStage !== "drawing") return null;
 

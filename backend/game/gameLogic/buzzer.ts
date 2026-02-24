@@ -1,6 +1,7 @@
 import type { GameState } from "../../types/runtime.js";
-import type { Ctx } from "../../ws/context.types.js";
+import type { CtxDeps } from "../../ws/context.types.js";
 import { finishClueAndReturnToBoard } from "./boardFlow.js";
+import type { BoardFlowCtx } from "./boardFlow.js";
 
 export function cancelAutoUnlock(game: GameState) {
   if (game?.autoUnlockTimer) {
@@ -10,7 +11,10 @@ export function cancelAutoUnlock(game: GameState) {
   game.autoUnlockClueKey = null;
 }
 
-export function doUnlockBuzzerAuthoritative(gameId: string, game: GameState, ctx: Ctx) {
+export type BuzzerCtx = BoardFlowCtx &
+  CtxDeps<"clearGameTimer" | "startGameTimer" | "getClueKey" | "repos" | "sleepAndCheckGame">;
+
+export function doUnlockBuzzerAuthoritative(gameId: string, game: GameState, ctx: BuzzerCtx) {
   if (!game) return;
 
   ctx.clearGameTimer(game, gameId, ctx);

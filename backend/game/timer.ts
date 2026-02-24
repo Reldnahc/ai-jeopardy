@@ -1,10 +1,12 @@
 import type { GameState, TimerKind } from "../types/runtime.js";
-import type { Ctx } from "../ws/context.types.js";
+import type { CtxDeps } from "../ws/context.types.js";
+
+export type TimerCtx = CtxDeps<"broadcast">;
 
 type TimerExpireArgs = {
   gameId: string;
   game: GameState;
-  broadcast: Ctx["broadcast"];
+  broadcast: TimerCtx["broadcast"];
   timerVersion: number;
   timerKind: TimerKind | null;
 };
@@ -12,7 +14,7 @@ type TimerExpireArgs = {
 export const clearGameTimer = (
   game: GameState | null | undefined,
   gameId: string,
-  ctx: Ctx,
+  ctx: TimerCtx,
 ) => {
   if (!game) return;
   if (game.timerTimeout) {
@@ -32,7 +34,7 @@ export const clearGameTimer = (
 export const startGameTimer = (
   gameId: string,
   game: GameState | null | undefined,
-  ctx: Ctx,
+  ctx: TimerCtx,
   durationSeconds: number,
   kind?: TimerKind | null,
   onExpire?: ((args: TimerExpireArgs) => void) | null,

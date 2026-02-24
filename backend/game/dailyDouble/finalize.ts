@@ -1,10 +1,14 @@
 import type { GameState } from "../../types/runtime.js";
-import type { Ctx } from "../../ws/context.types.js";
+import type { CtxDeps } from "../../ws/context.types.js";
+import type { ResolverCtx } from "../gameLogic/resolver.js";
+
+export type DailyDoubleFinalizeCtx = ResolverCtx &
+  CtxDeps<"clearDdWagerTimer" | "startAnswerWindow" | "games" | "parseClueValue" | "autoResolveAfterJudgement">;
 
 export async function finalizeDailyDoubleWagerAndStartClue(
   gameId: string,
   game: GameState,
-  ctx: Ctx,
+  ctx: DailyDoubleFinalizeCtx,
   args: {
     wager?: number;
     fallback?: boolean;

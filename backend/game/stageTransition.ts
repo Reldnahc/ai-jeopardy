@@ -1,6 +1,21 @@
 import type { GameState, PlayerState } from "../types/runtime.js";
-import type { Ctx } from "../ws/context.types.js";
+import type { CtxDeps } from "../ws/context.types.js";
 import { appConfig } from "../config/appConfig.js";
+
+export type StageTransitionCtx = CtxDeps<
+  | "isBoardFullyCleared"
+  | "aiHostVoiceSequence"
+  | "broadcast"
+  | "startGameTimer"
+  | "checkAllWagersSubmitted"
+  | "checkAllDrawingsSubmitted"
+  | "clearGameTimer"
+  | "repos"
+  | "normalizeName"
+  | "fireAndForget"
+  | "getTtsDurationMs"
+  | "sleepAndCheckGame"
+>;
 
 export function isBoardFullyCleared(game: GameState, boardKey: string): boolean {
   const board = game?.boardData?.[boardKey] as
@@ -17,7 +32,7 @@ export function isBoardFullyCleared(game: GameState, boardKey: string): boolean 
   return true;
 }
 
-export function checkBoardTransition(game: GameState, gameId: string, ctx: Ctx): boolean {
+export function checkBoardTransition(game: GameState, gameId: string, ctx: StageTransitionCtx): boolean {
   if (game.activeBoard === "firstBoard") {
     if (!ctx.isBoardFullyCleared(game, "firstBoard")) return false;
 
@@ -35,7 +50,7 @@ export function checkBoardTransition(game: GameState, gameId: string, ctx: Ctx):
   return false;
 }
 
-async function startDoubleJeopardy(game: GameState, gameId: string, ctx: Ctx) {
+async function startDoubleJeopardy(game: GameState, gameId: string, ctx: StageTransitionCtx) {
   ctx.broadcast(gameId, {
     type: "phase-changed",
     phase: "transition",
@@ -105,7 +120,7 @@ function getFinalistNames(game: GameState): string[] {
   return names;
 }
 
-async function startFinalJeopardy(game: GameState, gameId: string, ctx: Ctx) {
+async function startFinalJeopardy(game: GameState, gameId: string, ctx: StageTransitionCtx) {
   game.activeBoard = "finalJeopardy";
   game.isFinalJeopardy = true;
   game.finalJeopardyStage = "wager";

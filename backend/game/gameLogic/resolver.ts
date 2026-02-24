@@ -1,6 +1,7 @@
 import type { GameState, PlayerState } from "../../types/runtime.js";
-import type { Ctx } from "../../ws/context.types.js";
+import type { CtxDeps } from "../../ws/context.types.js";
 import { finishClueAndReturnToBoard } from "./boardFlow.js";
+import type { BuzzerCtx } from "./buzzer.js";
 import {
   applyScore,
   displaynameFor,
@@ -9,8 +10,10 @@ import {
   normUsername,
 } from "./helpers.js";
 
+export type ResolverCtx = BuzzerCtx & CtxDeps<"clearAnswerWindow" | "sleep" | "doUnlockBuzzerAuthoritative">;
+
 export async function autoResolveAfterJudgement(
-  ctx: Ctx,
+  ctx: ResolverCtx,
   gameId: string,
   game: GameState,
   username: string,
