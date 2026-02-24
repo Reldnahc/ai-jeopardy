@@ -16,9 +16,10 @@ export const appConfig = Object.freeze({
   },
 
   gameplay: {
-    buzzLockoutMs: 1,
-    clueAnswerTimeoutMs: 10000,
-    drawSeconds: 30,
+    buzzLockoutMs: env.BUZZ_LOCKOUT_MS,
+    clueAnswerTimeoutMs: env.CLUE_ANSWER_TIMEOUT_MS,
+    drawSeconds: env.FINAL_DRAW_SECONDS,
+    finalWagerSeconds: env.FINAL_WAGER_SECONDS,
   },
 
   judging: {
