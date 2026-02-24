@@ -14,6 +14,17 @@ function buildCtx() {
 }
 
 describe("timer", () => {
+  it("no-ops when game is missing", () => {
+    const ctx = buildCtx();
+    const onExpire = vi.fn();
+
+    startGameTimer("g1", null, ctx, 2, "buzz", onExpire);
+    clearGameTimer(undefined, "g1", ctx);
+
+    expect(ctx.broadcast).not.toHaveBeenCalled();
+    expect(onExpire).not.toHaveBeenCalled();
+  });
+
   it("startGameTimer sets timer state and expires with callback", () => {
     vi.useFakeTimers();
 
@@ -63,6 +74,27 @@ describe("timer", () => {
     expect(ctx.broadcast).toHaveBeenCalledWith(
       "g1",
       expect.objectContaining({ type: "timer-end", timerVersion: 3, timerKind: "answer" }),
+    );
+  });
+
+  it("ignores stale timer callback after restart", () => {
+    vi.useFakeTimers();
+
+    const game = { timerVersion: 0 } as GameState;
+    const ctx = buildCtx();
+    const onExpire = vi.fn();
+
+    startGameTimer("g1", game, ctx, 1, "buzz", onExpire);
+    startGameTimer("g1", game, ctx, 2, "answer", onExpire);
+    expect(game.timerVersion).toBe(2);
+
+    vi.advanceTimersByTime(1000);
+    expect(onExpire).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(1000);
+    expect(onExpire).toHaveBeenCalledTimes(1);
+    expect(onExpire).toHaveBeenCalledWith(
+      expect.objectContaining({ gameId: "g1", timerVersion: 2, timerKind: "answer" }),
     );
   });
 });

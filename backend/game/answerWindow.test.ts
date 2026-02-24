@@ -7,6 +7,17 @@ afterEach(() => {
 });
 
 describe("answerWindow", () => {
+  it("no-ops when game is missing", () => {
+    const broadcast = vi.fn();
+    const onExpire = vi.fn();
+
+    startAnswerWindow("g1", null, broadcast, 500, onExpire);
+    clearAnswerWindow(undefined);
+
+    expect(broadcast).not.toHaveBeenCalled();
+    expect(onExpire).not.toHaveBeenCalled();
+  });
+
   it("startAnswerWindow sets state and emits start/end", () => {
     vi.useFakeTimers();
 
@@ -54,5 +65,23 @@ describe("answerWindow", () => {
     expect(game.answerDeadlineAt).toBeNull();
     expect(game.answerWindowMs).toBeNull();
     expect(game.answerWindowVersion).toBeNull();
+  });
+
+  it("ignores stale answer-window timeout when version changes", () => {
+    vi.useFakeTimers();
+
+    const game = {} as GameState;
+    const broadcast = vi.fn();
+    const onExpire = vi.fn();
+
+    startAnswerWindow("g1", game, broadcast, 100, onExpire);
+    game.answerWindowVersion = 99;
+
+    vi.advanceTimersByTime(100);
+    expect(onExpire).not.toHaveBeenCalled();
+    expect(broadcast).not.toHaveBeenCalledWith(
+      "g1",
+      expect.objectContaining({ type: "answer-window-end" }),
+    );
   });
 });
