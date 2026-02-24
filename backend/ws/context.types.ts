@@ -51,7 +51,7 @@ import type {
   ensureAiHostValueTts,
   ensureFinalJeopardyAnswer,
   ensureFinalJeopardyWager,
-} from "../game/host.js";
+} from "../game/host/host.js";
 import type { verifyJwt } from "../auth/jwt.js";
 import type { getBearerToken, playerStableId, verifyAccessToken } from "../services/userService.js";
 import type { ensureTtsAsset } from "../services/tts/ensureTtsAsset.js";

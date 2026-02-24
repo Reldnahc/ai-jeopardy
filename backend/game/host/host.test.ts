@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { Ctx, Game } from "../ws/context.types.js";
+import type { Ctx, Game } from "../../ws/context.types.js";
 import {
   aiHostSayAsset,
   aiHostSayByKey,
