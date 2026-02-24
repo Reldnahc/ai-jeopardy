@@ -1,5 +1,6 @@
 import { useState } from "react";
 import QuestionItem from "./QuestionItem.tsx";
+import OutlinedChevron from "../../icons/OutlinedChevron.tsx";
 import { BoardValue } from "../../types/Board.ts";
 
 type CollapsibleCategoryProps = {
@@ -21,13 +22,7 @@ const CollapsibleCategory = ({ category, values }: CollapsibleCategoryProps) => 
         }`}
       >
         <span className="pr-3 text-base font-semibold tracking-[0.01em] md:text-lg">{category}</span>
-        <span
-          className={`ml-2 text-sm font-semibold text-blue-700 transition-transform duration-200 ${
-            open ? "rotate-180" : "rotate-0"
-          }`}
-        >
-          v
-        </span>
+        <OutlinedChevron color="#2563eb" rotated={open} className="h-5 w-5" />
       </button>
 
       <div

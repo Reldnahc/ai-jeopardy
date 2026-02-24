@@ -18,7 +18,7 @@ const QuestionItem = ({ value, question, answer }: QuestionItemProps) => {
         className="flex w-full items-start justify-between gap-3 text-left transition-colors duration-200 hover:text-blue-700"
       >
         <span className="text-sm leading-6 text-slate-800 md:text-[0.95rem]">
-          <span className="mr-1.5 font-semibold text-blue-700">${value}</span>
+          <span className="mr-1.5 font-semibold text-yellow-400">${value}</span>
           <span className="font-medium">{question}</span>
         </span>
         <span
