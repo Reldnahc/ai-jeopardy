@@ -1,7 +1,7 @@
 import { callOpenAiJson, parseOpenAiJson } from "../openaiClient.js";
 import type { JudgeTextResult, Verdict } from "./types.js";
 import { normalizeJeopardyText } from "./normalize.js";
-import { inferAnswerType, isTooGeneric } from "./heuristics.js";
+import { inferAnswerType, isLikelyEquivalentFast, isTooGeneric } from "./heuristics.js";
 import { buildJudgePrompt } from "./prompt.js";
 import { appConfig } from "../../../config/appConfig.js";
 
@@ -16,8 +16,8 @@ export async function judgeClueAnswerFast(
   const normT = normalizeJeopardyText(transcriptRaw);
   const normA = normalizeJeopardyText(expectedRaw);
 
-  // Fast deterministic accept
-  if (normT && normA && normT === normA) {
+  // Fast deterministic accept (exact, article-insensitive, conservative typo tolerance)
+  if (isLikelyEquivalentFast(normT, normA)) {
     return { verdict: "correct" };
   }
 

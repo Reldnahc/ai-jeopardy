@@ -1,8 +1,12 @@
 export function normalizeJeopardyText(s: unknown) {
   return String(s || "")
     .toLowerCase()
-    .replace(/^\s*(what|who|where|when)\s+(is|are|was|were)\s+/i, "")
-    .replace(/^\s*(it'?s|it is|they are|that'?s|that is)\s+/i, "")
+    .replace(/^\s*(what|who|where|when)\s+(is|are|was|were)(?:\s+|[^a-z0-9]+)+/i, "")
+    .replace(
+      /^\s*(there'?s|there is|the answer is|answer is|i think (it'?s|it is))(?:\s+|[^a-z0-9]+)+/i,
+      "",
+    )
+    .replace(/^\s*(it'?s|it is|they are|that'?s|that is)(?:\s+|[^a-z0-9]+)+/i, "")
     .replace(/[^a-z0-9\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
