@@ -77,7 +77,7 @@ import {
   repromptDdWager,
   clearDdWagerTimer,
   finalizeDailyDoubleWagerAndStartClue,
-} from "../game/dailyDouble.js";
+} from "../game/dailyDouble/dailyDouble.js";
 import { numberToWords } from "../services/numberToWords.js";
 import { ensureBoardNarrationTtsForBoardData } from "../services/ai/board/boardTts.js";
 import { PermissionManager } from "../auth/permissionManager.js";
