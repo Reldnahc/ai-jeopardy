@@ -36,6 +36,20 @@ function makeCtx(game: GameState, overrides: Record<string, unknown> = {}) {
 }
 
 describe("answerHandlers", () => {
+  it("no-ops when game is missing", async () => {
+    const ws = makeWs();
+    const game = makeGame();
+    const ctx = makeCtx(game, { games: {} });
+
+    await answerHandlers["answer-audio-blob"]({
+      ws,
+      data: { gameId: "missing", answerSessionId: "sess-1", dataBase64: Buffer.from("a").toString("base64") },
+      ctx,
+    });
+
+    expect(ws.send).not.toHaveBeenCalled();
+  });
+
   it("returns error and auto-resolves when phase is not answer capture", async () => {
     const ws = makeWs();
     const game = makeGame({ phase: "clue" });
@@ -110,6 +124,25 @@ describe("answerHandlers", () => {
 
     expect(ws.send).toHaveBeenCalledWith(expect.stringContaining("Audio too large"));
     expect(ctx.autoResolveAfterJudgement).toHaveBeenCalledWith(ctx, "g1", game, "alice", "incorrect");
+  });
+
+  it("rejects invalid base64 when decode throws", async () => {
+    const ws = makeWs();
+    const game = makeGame();
+    const ctx = makeCtx(game);
+    const bufferFromSpy = vi.spyOn(Buffer, "from").mockImplementationOnce(() => {
+      throw new Error("decode failed");
+    });
+
+    await answerHandlers["answer-audio-blob"]({
+      ws,
+      data: { gameId: "g1", answerSessionId: "sess-1", dataBase64: "bad-base64" },
+      ctx,
+    });
+
+    expect(ws.send).toHaveBeenCalledWith(expect.stringContaining("Invalid base64 audio"));
+    expect(ctx.autoResolveAfterJudgement).toHaveBeenCalledWith(ctx, "g1", game, "alice", "incorrect");
+    bufferFromSpy.mockRestore();
   });
 
   it("broadcasts transcript and result on successful judging", async () => {
@@ -220,5 +253,56 @@ describe("answerHandlers", () => {
       expect.objectContaining({ type: "answer-result", verdict: "incorrect", suggestedDelta: -400 }),
     );
     expect(ctx.autoResolveAfterJudgement).toHaveBeenCalledWith(ctx, "g1", game, "alice", "incorrect");
+  });
+
+  it("handles STT failure as incorrect result", async () => {
+    const ws = makeWs();
+    const game = makeGame();
+    const ctx = makeCtx(game, {
+      transcribeAnswerAudio: vi.fn(async () => {
+        throw new Error("stt failed");
+      }),
+    });
+
+    await answerHandlers["answer-audio-blob"]({
+      ws,
+      data: {
+        gameId: "g1",
+        answerSessionId: "sess-1",
+        mimeType: "audio/webm",
+        dataBase64: Buffer.from("audio").toString("base64"),
+      },
+      ctx,
+    });
+
+    expect(ctx.broadcast).toHaveBeenCalledWith(
+      "g1",
+      expect.objectContaining({ type: "answer-result", verdict: "incorrect", suggestedDelta: -400 }),
+    );
+    expect(ctx.autoResolveAfterJudgement).toHaveBeenCalledWith(ctx, "g1", game, "alice", "incorrect");
+  });
+
+  it("sets suggestedDelta to 0 for neutral judge verdict", async () => {
+    const ws = makeWs();
+    const game = makeGame();
+    const ctx = makeCtx(game, {
+      judgeClueAnswerFast: vi.fn(async () => ({ verdict: "pass" })),
+    });
+
+    await answerHandlers["answer-audio-blob"]({
+      ws,
+      data: {
+        gameId: "g1",
+        answerSessionId: "sess-1",
+        mimeType: "audio/webm",
+        dataBase64: Buffer.from("audio").toString("base64"),
+      },
+      ctx,
+    });
+
+    expect(ctx.broadcast).toHaveBeenCalledWith(
+      "g1",
+      expect.objectContaining({ type: "answer-result", verdict: "pass", suggestedDelta: 0 }),
+    );
   });
 });

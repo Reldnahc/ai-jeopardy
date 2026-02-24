@@ -46,6 +46,16 @@ function makeCtx(game: GameState, overrides: Record<string, unknown> = {}) {
 }
 
 describe("miscHandlers", () => {
+  it("dd-snipe-next no-ops for missing game", async () => {
+    const ws = makeWs();
+    const game = makeGame();
+    const ctx = makeCtx(game, { games: {} });
+
+    await miscHandlers["dd-snipe-next"]({ ws, data: { gameId: "missing", enabled: true }, ctx });
+
+    expect(ctx.broadcast).not.toHaveBeenCalled();
+  });
+
   it("dd-snipe-next toggles flag and broadcasts state", async () => {
     const ws = makeWs();
     const game = makeGame();
@@ -83,6 +93,17 @@ describe("miscHandlers", () => {
     expect(ctx.doUnlockBuzzerAuthoritative).toHaveBeenCalledWith("g1", game, ctx);
   });
 
+  it("unlock-buzzer no-ops when caller is not host", async () => {
+    const ws = makeWs();
+    const game = makeGame();
+    const ctx = makeCtx(game, { requireHost: vi.fn(() => false) });
+
+    await miscHandlers["unlock-buzzer"]({ ws, data: { gameId: "g1" }, ctx });
+
+    expect(ctx.cancelAutoUnlock).not.toHaveBeenCalled();
+    expect(ctx.doUnlockBuzzerAuthoritative).not.toHaveBeenCalled();
+  });
+
   it("lock-buzzer toggles lock and broadcasts for host", async () => {
     const ws = makeWs();
     const game = makeGame({ buzzerLocked: false });
@@ -92,6 +113,17 @@ describe("miscHandlers", () => {
 
     expect(game.buzzerLocked).toBe(true);
     expect(ctx.broadcast).toHaveBeenCalledWith("g1", { type: "buzzer-locked" });
+  });
+
+  it("lock-buzzer no-ops when caller is not host", async () => {
+    const ws = makeWs();
+    const game = makeGame({ buzzerLocked: false });
+    const ctx = makeCtx(game, { requireHost: vi.fn(() => false) });
+
+    await miscHandlers["lock-buzzer"]({ ws, data: { gameId: "g1" }, ctx });
+
+    expect(game.buzzerLocked).toBe(false);
+    expect(ctx.broadcast).not.toHaveBeenCalled();
   });
 
   it("reset-buzzer clears buzz state and broadcasts reset events", async () => {
@@ -131,6 +163,19 @@ describe("miscHandlers", () => {
       expect.objectContaining({ type: "cleared-clues-sync" }),
     );
     expect(ctx.checkBoardTransition).toHaveBeenCalledWith(game, "g1", ctx);
+  });
+
+  it("mark-all-complete no-ops when active board has no categories", async () => {
+    const ws = makeWs();
+    const game = makeGame({ boardData: { firstBoard: {} } });
+    const ctx = makeCtx(game);
+
+    await miscHandlers["mark-all-complete"]({ ws, data: { gameId: "g1" }, ctx });
+
+    expect(ctx.broadcast).not.toHaveBeenCalledWith(
+      "g1",
+      expect.objectContaining({ type: "cleared-clues-sync" }),
+    );
   });
 
   it("reveal-answer marks clue revealed and resets answer capture state", async () => {
@@ -174,6 +219,24 @@ describe("miscHandlers", () => {
     expect(ctx.submitWager).toHaveBeenCalledWith(game, "g1", "alice", 500, ctx);
     expect(ctx.submitDrawing).toHaveBeenCalledWith(game, "g1", "alice", "img", ctx);
     expect(ctx.submitWagerDrawing).toHaveBeenCalledWith(game, "g1", "alice", "wager-img", ctx);
+  });
+
+  it("submit handlers no-op when game is missing", async () => {
+    const ws = makeWs();
+    const game = makeGame();
+    const ctx = makeCtx(game, { games: {} });
+
+    await miscHandlers["submit-wager"]({ ws, data: { gameId: "missing", player: "alice", wager: 500 }, ctx });
+    await miscHandlers["submit-drawing"]({ ws, data: { gameId: "missing", player: "alice", drawing: "img" }, ctx });
+    await miscHandlers["submit-final-wager-drawing"]({
+      ws,
+      data: { gameId: "missing", player: "alice", drawing: "wager-img" },
+      ctx,
+    });
+
+    expect(ctx.submitWager).not.toHaveBeenCalled();
+    expect(ctx.submitDrawing).not.toHaveBeenCalled();
+    expect(ctx.submitWagerDrawing).not.toHaveBeenCalled();
   });
 
   it("tts-ensure sends tts-ready with generated asset", async () => {
@@ -234,5 +297,17 @@ describe("miscHandlers", () => {
     expect(ws.send).toHaveBeenCalledWith(
       JSON.stringify({ type: "tts-error", requestId: "r2", message: "Failed to generate narration" }),
     );
+  });
+
+  it("tts-ensure no-ops when input text is blank or game is missing", async () => {
+    const ws = makeWs();
+    const game = makeGame({ lobbySettings: { narrationEnabled: true } });
+    const ctx = makeCtx(game);
+
+    await miscHandlers["tts-ensure"]({ ws, data: { gameId: "g1", text: "   " }, ctx });
+    await miscHandlers["tts-ensure"]({ ws, data: { gameId: "missing", text: "hello" }, ctx });
+
+    expect(ctx.ensureTtsAsset).not.toHaveBeenCalled();
+    expect(ws.send).not.toHaveBeenCalled();
   });
 });

@@ -46,6 +46,36 @@ function makeCtx(game: GameState, overrides: Record<string, unknown> = {}) {
 }
 
 describe("buzzHandlers", () => {
+  it("no-ops when no game exists", async () => {
+    const ws = makeWs();
+    const game = makeGame();
+    const ctx = makeCtx(game, { games: {} });
+
+    await buzzHandlers.buzz({ ws, data: { gameId: "missing" }, ctx });
+
+    expect(ws.send).not.toHaveBeenCalled();
+  });
+
+  it("no-ops when socket has no mapped player", async () => {
+    const ws = makeWs("ws-2");
+    const game = makeGame();
+    const ctx = makeCtx(game);
+
+    await buzzHandlers.buzz({ ws, data: { gameId: "g1" }, ctx });
+
+    expect(game.pendingBuzz).toBeFalsy();
+  });
+
+  it("no-ops when stable id cannot be derived", async () => {
+    const ws = makeWs();
+    const game = makeGame();
+    const ctx = makeCtx(game, { playerStableId: vi.fn(() => "") });
+
+    await buzzHandlers.buzz({ ws, data: { gameId: "g1" }, ctx });
+
+    expect(game.pendingBuzz).toBeFalsy();
+  });
+
   it("denies buzz if player already attempted current clue", async () => {
     const ws = makeWs();
     const game = makeGame({ clueState: { clueKey: "firstBoard:400:Q", lockedOut: { alice: true } } });
@@ -172,5 +202,57 @@ describe("buzzHandlers", () => {
     await buzzHandlers.buzz({ ws, data: { gameId: "g1", clientSeq: 2 }, ctx });
 
     expect(game.pendingBuzz?.candidates).toHaveLength(1);
+  });
+
+  it("cancels pending buzz resolution if buzzer becomes locked before timer fires", async () => {
+    vi.useFakeTimers();
+    try {
+      const ws = makeWs();
+      const game = makeGame();
+      const ctx = makeCtx(game);
+
+      await buzzHandlers.buzz({ ws, data: { gameId: "g1", clientSeq: 1 }, ctx });
+      game.buzzerLocked = true;
+      await vi.advanceTimersByTimeAsync(60);
+
+      expect(game.pendingBuzz).toBeNull();
+      expect(ctx.broadcast).not.toHaveBeenCalledWith("g1", expect.objectContaining({ type: "buzz-result" }));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("answer timeout callback emits incorrect result and auto-resolves", async () => {
+    vi.useFakeTimers();
+    try {
+      const ws = makeWs();
+      const game = makeGame({
+        clueState: { clueKey: "firstBoard:400:Q", lockedOut: {}, buzzOpenAtMs: Date.now() - 10 },
+      });
+      let capturedOnTimeout: (() => void) | null = null;
+      const ctx = makeCtx(game, {
+        startAnswerWindow: vi.fn((_gid, _g, _broadcast, _ms, onTimeout: () => void) => {
+          capturedOnTimeout = onTimeout;
+        }),
+      });
+
+      await buzzHandlers.buzz({
+        ws,
+        data: { gameId: "g1", estimatedServerBuzzAtMs: Date.now(), clientSeq: 1 },
+        ctx,
+      });
+
+      await vi.advanceTimersByTimeAsync(70);
+      expect(typeof capturedOnTimeout).toBe("function");
+      capturedOnTimeout?.();
+
+      expect(ctx.broadcast).toHaveBeenCalledWith(
+        "g1",
+        expect.objectContaining({ type: "answer-result", verdict: "incorrect", suggestedDelta: -400 }),
+      );
+      expect(ctx.autoResolveAfterJudgement).toHaveBeenCalledWith(ctx, "g1", game, "alice", "incorrect");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

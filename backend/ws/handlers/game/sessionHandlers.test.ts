@@ -129,6 +129,30 @@ describe("sessionHandlers", () => {
     expect(ws.send).toHaveBeenCalledWith(expect.stringContaining("\"type\":\"ai-host-say\""));
   });
 
+  it("join-game handles profile-fetch race where player is inserted before await resumes", async () => {
+    const ws = makeWs("ws-race");
+    const game = makeGame({ players: [] });
+    const ctx = makeCtx({ g1: game }, {
+      repos: {
+        profiles: {
+          getPublicProfileByUsername: vi.fn(async (u: string) => {
+            game.players.push({ id: "old", username: u, displayname: "Race", online: false });
+            return { displayname: "Race", color: "bg-red-500", text_color: "text-white" };
+          }),
+        },
+      },
+    });
+
+    await sessionHandlers["join-game"]({
+      ws,
+      data: { gameId: "g1", username: "alice", displayname: "Alice" },
+      ctx,
+    });
+
+    expect(game.players).toHaveLength(1);
+    expect(game.players[0]).toMatchObject({ id: "ws-race", username: "alice", online: true });
+  });
+
   it("leave-game removes last player and deletes game", async () => {
     const ws = makeWs("ws-1");
     const game = makeGame({

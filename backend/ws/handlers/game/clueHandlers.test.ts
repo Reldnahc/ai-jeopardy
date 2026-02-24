@@ -82,6 +82,31 @@ describe("clueHandlers", () => {
     expect(ctx.broadcast).not.toHaveBeenCalled();
   });
 
+  it("blocks clue selection when board selection is locked", async () => {
+    const ws = makeWs();
+    const game = makeGame({ boardSelectionLocked: true, boardSelectionLockReason: "animating" });
+    const ctx = makeCtx(game);
+
+    await clueHandlers["clue-selected"]({ ws, data: { gameId: "g1", clue: { value: 400, question: "Q" } }, ctx });
+
+    expect(game.selectedClue).toBeUndefined();
+    expect(ctx.broadcast).not.toHaveBeenCalled();
+  });
+
+  it("blocks clue selection when caller stable id is unavailable", async () => {
+    const ws = makeWs();
+    const game = makeGame();
+    const ctx = makeCtx(game, {
+      getPlayerForSocket: vi.fn(() => game.players?.[0] ?? null),
+      playerStableId: vi.fn(() => ""),
+    });
+
+    await clueHandlers["clue-selected"]({ ws, data: { gameId: "g1", clue: { value: 400, question: "Q" } }, ctx });
+
+    expect(game.selectedClue).toBeUndefined();
+    expect(ctx.broadcast).not.toHaveBeenCalled();
+  });
+
   it("starts daily double wager capture for DD clue", async () => {
     const ws = makeWs();
     const game = makeGame();
@@ -123,5 +148,47 @@ describe("clueHandlers", () => {
     expect(game.clueState?.clueKey).toBe("firstBoard:400:Q");
     expect(ctx.broadcast).toHaveBeenCalledWith("g1", expect.objectContaining({ type: "clue-selected" }));
     expect(ctx.doUnlockBuzzerAuthoritative).toHaveBeenCalledWith("g1", game, ctx);
+  });
+
+  it("consumes dd snipe and starts DD flow even on non-natural DD clue", async () => {
+    const ws = makeWs();
+    const game = makeGame({
+      ddSnipeNext: true,
+      boardData: {
+        ttsByClueKey: { "firstBoard:400:Q": "asset-1" },
+        dailyDoubleClueKeys: { firstBoard: [] },
+      },
+    });
+    const ctx = makeCtx(game);
+
+    await clueHandlers["clue-selected"]({
+      ws,
+      data: { gameId: "g1", clue: { value: 400, question: "Q" } },
+      ctx,
+    });
+
+    expect(game.ddSnipeNext).toBe(false);
+    expect(ctx.broadcast).toHaveBeenCalledWith("g1", expect.objectContaining({ type: "dd-snipe-consumed" }));
+    expect(ctx.startDdWagerCapture).toHaveBeenCalledWith("g1", game, ctx);
+  });
+
+  it("fills clue category from fallback finder when category is missing", async () => {
+    const ws = makeWs();
+    const game = makeGame({
+      boardData: {
+        ttsByClueKey: { "firstBoard:200:QX": "asset-2" },
+        dailyDoubleClueKeys: { firstBoard: [] },
+      },
+    });
+    const ctx = makeCtx(game, { findCategoryForClue: vi.fn(() => "Fallback Category") });
+
+    await clueHandlers["clue-selected"]({
+      ws,
+      data: { gameId: "g1", clue: { value: 200, question: "QX" } },
+      ctx,
+    });
+
+    expect(game.selectedClue?.category).toBe("Fallback Category");
+    expect(ctx.doUnlockBuzzerAuthoritative).toHaveBeenCalled();
   });
 });

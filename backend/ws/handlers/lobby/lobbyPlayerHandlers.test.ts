@@ -86,6 +86,66 @@ describe("lobbyPlayerHandlers", () => {
     );
   });
 
+  it("join-lobby rejects invalid username for existing lobby", async () => {
+    const ws = makeWs();
+    const game: GameState = {
+      inLobby: true,
+      host: "alice",
+      players: [],
+      categories: Array(11).fill("Category"),
+    };
+    const ctx = makeCtx({ games: { G1: game } });
+
+    await lobbyPlayerHandlers["join-lobby"]({ ws, data: { gameId: "G1", username: " " }, ctx });
+
+    expect(ws.send).toHaveBeenCalledWith(JSON.stringify({ type: "error", message: "Invalid username." }));
+  });
+
+  it("join-lobby reconnects existing player by stable playerKey", async () => {
+    const ws = makeWs("ws-join");
+    const game: GameState = {
+      inLobby: true,
+      host: "alice",
+      players: [{ id: "old", username: "old-name", displayname: "Old", playerKey: "pk1", online: false }],
+      categories: Array(11).fill("Category"),
+    };
+    const ctx = makeCtx({ games: { G1: game } });
+
+    await lobbyPlayerHandlers["join-lobby"]({
+      ws,
+      data: { gameId: "G1", username: "alice", displayname: "Alice", playerKey: "pk1" },
+      ctx,
+    });
+
+    expect(game.players[0]).toMatchObject({
+      id: "ws-join",
+      username: "alice",
+      displayname: "Alice",
+      playerKey: "pk1",
+      online: true,
+    });
+  });
+
+  it("join-lobby adds brand new player and schedules empty-lobby cleanup watchdog", async () => {
+    const ws = makeWs("ws-new-player");
+    const game: GameState = {
+      inLobby: true,
+      host: "alice",
+      players: [{ id: "h1", username: "alice", displayname: "Alice", online: true }],
+      categories: Array(11).fill("Category"),
+    };
+    const ctx = makeCtx({ games: { G1: game } });
+
+    await lobbyPlayerHandlers["join-lobby"]({
+      ws,
+      data: { gameId: "G1", username: "bob", displayname: "Bob" },
+      ctx,
+    });
+
+    expect(game.players.map((p) => p.username)).toEqual(["alice", "bob"]);
+    expect(ctx.scheduleLobbyCleanupIfEmpty).toHaveBeenCalledWith("G1");
+  });
+
   it("leave-lobby removes player and reassigns host when current host leaves", async () => {
     const ws = makeWs("ws-1");
     const game: GameState = {
@@ -112,5 +172,43 @@ describe("lobbyPlayerHandlers", () => {
       expect.objectContaining({ type: "player-list-update", host: "bob" }),
     );
     expect(ctx.scheduleLobbyCleanupIfEmpty).toHaveBeenCalledWith("G1");
+  });
+
+  it("leave-lobby uses ws.gameId fallback and no-ops if player id is missing", async () => {
+    const ws = makeWs("unknown");
+    ws.gameId = "G1";
+    const game: GameState = {
+      inLobby: true,
+      host: "alice",
+      players: [{ id: "ws-1", username: "alice", displayname: "Alice", playerKey: "pk1", online: true }],
+      categories: Array(11).fill("Category"),
+    };
+    const ctx = makeCtx({ games: { G1: game } });
+
+    await lobbyPlayerHandlers["leave-lobby"]({ ws, data: {}, ctx });
+
+    expect(game.players).toHaveLength(1);
+    expect(ctx.broadcast).not.toHaveBeenCalled();
+  });
+
+  it("leave-lobby cleans up immediately when host leaves and lobby becomes empty", async () => {
+    const ws = makeWs("ws-1");
+    const game: GameState = {
+      inLobby: true,
+      host: "alice",
+      players: [{ id: "ws-1", username: "alice", displayname: "Alice", playerKey: "pk1", online: true }],
+      categories: Array(11).fill("Category"),
+    };
+    const ctx = makeCtx({ games: { G1: game } });
+
+    await lobbyPlayerHandlers["leave-lobby"]({
+      ws,
+      data: { gameId: "G1", username: "alice", playerKey: "pk1" },
+      ctx,
+    });
+
+    expect(game.players).toHaveLength(0);
+    expect(ctx.scheduleLobbyCleanupIfEmpty).toHaveBeenCalledWith("G1");
+    expect(ctx.broadcast).not.toHaveBeenCalled();
   });
 });
