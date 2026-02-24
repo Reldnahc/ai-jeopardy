@@ -9,7 +9,7 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ message = "Loading", prog
   const pct = Math.max(0, Math.min(1, progress)) * 100;
 
   return (
-    <div className="flex flex-col items-center justify-center h-[calc(100vh-5.5rem)] w-screen bg-gradient-to-r from-indigo-400 to-blue-700 text-white text-center">
+    <div className="flex flex-col items-center justify-center h-[calc(100vh-5.5rem)] w-screen text-white text-center">
       {/* Spinner */}
       <div className="relative w-16 h-16 mb-8">
         <div className="w-full h-full border-4 border-white border-t-transparent rounded-full animate-spin"></div>

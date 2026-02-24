@@ -78,7 +78,7 @@ const Profile: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-r from-indigo-400 to-blue-700 flex items-center justify-center p-6">
+    <div className="min-h-screen flex items-center justify-center p-6">
       <div className="max-w-3xl w-full bg-white rounded-xl shadow-2xl overflow-hidden p-6">
         <div className="space-y-6">
           {/* Tabs only on your own profile */}

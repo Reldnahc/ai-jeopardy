@@ -189,7 +189,7 @@ export default function UserHistory() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-r from-indigo-400 to-blue-700 flex flex-col items-center p-6">
+    <div className="min-h-screen flex flex-col items-center p-6">
       <div className="bg-white rounded-xl shadow-2xl overflow-hidden w-full max-w-3xl">
         <div className="p-6">
           {/* Header */}

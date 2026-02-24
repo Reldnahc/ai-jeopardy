@@ -314,7 +314,7 @@ const Lobby: React.FC = () => {
   return isLoading ? (
     <LoadingScreen message={loadingMessage} progress={loadingProgress ?? 0} />
   ) : (
-    <div className="min-h-[calc(100vh-5.5rem)] bg-gradient-to-r from-indigo-400 to-blue-700 p-6">
+    <div className="min-h-[calc(100vh-5.5rem)] p-6">
       <PageCardContainer className="mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-[20rem_minmax(0,1fr)] xl:grid-cols-[23rem_minmax(0,1fr)]">
           {/* Sidebar Column */}

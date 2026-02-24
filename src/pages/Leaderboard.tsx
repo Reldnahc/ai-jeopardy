@@ -252,7 +252,7 @@ const Leaderboard: React.FC = () => {
   if (error) console.error(error);
 
   return (
-    <div className="min-h-screen bg-gradient-to-r from-indigo-400 to-blue-700 flex flex-col items-center p-6">
+    <div className="min-h-screen flex flex-col items-center p-6">
       <PageCardContainer>
         <div className="p-10">
           <h1 className="text-6xl font-swiss911 tracking-wider text-shadow-jeopardy text-yellow-400 mb-8 text-center">

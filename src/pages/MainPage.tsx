@@ -241,7 +241,7 @@ export default function MainPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-r from-indigo-400 to-blue-700 flex items-center justify-center p-6 ">
+    <div className="min-h-screen flex items-center justify-center p-6 ">
       {/* Animated container for the main card */}
       <PageCardContainer className="p-12 pt-4 md:p-16 md:pt-5 lg:p-20 lg:pt-8">
         {/* Main Content (spans two columns on medium+ screens) */}

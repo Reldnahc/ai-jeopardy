@@ -97,7 +97,7 @@ const Header: React.FC = () => {
   }, [user, handleLogout]);
 
   return (
-    <header className="bg-gradient-to-r from-indigo-400 to-blue-700 text-white w-full h-[5.5rem] shadow-md">
+    <header className="bg-transparent text-white w-full h-[5.5rem]">
       <div className="container mx-auto flex items-center py-4 px-6 justify-between h-full">
         {/* Left: Logo + Desktop nav */}
         <div className="flex items-center space-x-6">
