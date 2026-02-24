@@ -89,6 +89,32 @@ describe("authRoutes", () => {
     expect(insertProfile).toHaveBeenCalled();
   });
 
+  it("signup handles duplicate and generic failures", async () => {
+    const app = express();
+    app.use(express.json());
+    const insertProfile = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("duplicate key value violates unique"))
+      .mockResolvedValueOnce(null)
+      .mockRejectedValueOnce(new Error("boom"));
+    registerAuthRoutes(app, { profiles: { insertProfile } } as never);
+
+    const duplicate = await request(app, "POST", "/api/auth/signup", {
+      body: { username: "alice", password: "pw" },
+    });
+    expect(duplicate.status).toBe(409);
+
+    const nullUser = await request(app, "POST", "/api/auth/signup", {
+      body: { username: "alice", password: "pw" },
+    });
+    expect(nullUser.status).toBe(500);
+
+    const generic = await request(app, "POST", "/api/auth/signup", {
+      body: { username: "alice", password: "pw" },
+    });
+    expect(generic.status).toBe(500);
+  });
+
   it("login handles invalid credentials and success", async () => {
     const app = express();
     app.use(express.json());
@@ -128,6 +154,25 @@ describe("authRoutes", () => {
     expect(good.json.token).toBe("token-123");
   });
 
+  it("login validates payload and handles exceptions", async () => {
+    const app = express();
+    app.use(express.json());
+    const getLoginRowByUsername = vi.fn(async () => {
+      throw new Error("db");
+    });
+    registerAuthRoutes(app, { profiles: { getLoginRowByUsername } } as never);
+
+    const missing = await request(app, "POST", "/api/auth/login", {
+      body: { username: "", password: "" },
+    });
+    expect(missing.status).toBe(400);
+
+    const err = await request(app, "POST", "/api/auth/login", {
+      body: { username: "alice", password: "pw" },
+    });
+    expect(err.status).toBe(500);
+  });
+
   it("me endpoint validates token and resolves user", async () => {
     const app = express();
     app.use(express.json());
@@ -148,5 +193,23 @@ describe("authRoutes", () => {
     const ok = await request(app, "GET", "/api/auth/me", { auth: "Bearer tok" });
     expect(ok.status).toBe(200);
     expect(ok.json.user.username).toBe("alice");
+  });
+
+  it("me endpoint handles invalid payload and verify errors", async () => {
+    const app = express();
+    app.use(express.json());
+    registerAuthRoutes(app, { profiles: { getPublicUserById: vi.fn(async () => null) } } as never);
+
+    verifyJwt.mockReturnValueOnce({});
+    const invalidPayload = await request(app, "GET", "/api/auth/me", { auth: "Bearer tok" });
+    expect(invalidPayload.status).toBe(401);
+    expect(invalidPayload.json.error).toBe("Invalid token payload");
+
+    verifyJwt.mockImplementationOnce(() => {
+      throw new Error("bad");
+    });
+    const invalidToken = await request(app, "GET", "/api/auth/me", { auth: "Bearer tok" });
+    expect(invalidToken.status).toBe(401);
+    expect(invalidToken.json.error).toBe("Invalid token");
   });
 });

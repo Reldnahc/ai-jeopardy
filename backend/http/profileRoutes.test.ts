@@ -132,6 +132,10 @@ describe("profileRoutes", () => {
     const batch = await request(app, "GET", "/api/profile/batch?u=Alice,bob");
     expect(batch.status).toBe(200);
     expect(repos.profiles.getPublicProfilesByUsernames).toHaveBeenCalledWith(["alice", "bob"]);
+
+    const emptyBatch = await request(app, "GET", "/api/profile/batch");
+    expect(emptyBatch.status).toBe(200);
+    expect(emptyBatch.json).toEqual({ profiles: [] });
   });
 
   it("public profile route returns not found when missing", async () => {
@@ -142,6 +146,35 @@ describe("profileRoutes", () => {
 
     const out = await request(app, "GET", "/api/profile/alice");
     expect(out.status).toBe(404);
+  });
+
+  it("route handlers return 500 on repository exceptions", async () => {
+    const app = express();
+    app.use(express.json());
+    const repos = makeRepos({
+      searchProfiles: vi.fn(async () => Promise.reject(new Error("boom"))),
+      getPublicProfilesByUsernames: vi.fn(async () => Promise.reject(new Error("boom"))),
+      getPublicProfileByUsername: vi.fn(async () => Promise.reject(new Error("boom"))),
+    });
+    repos.boards.listBoardsByUsername = vi.fn(async () => Promise.reject(new Error("boom")));
+    registerProfileRoutes(app, repos);
+
+    verifyJwt.mockReturnValueOnce({ sub: "u1" });
+    repos.profiles.getMeProfile = vi.fn(async () => Promise.reject(new Error("boom")));
+    const me = await request(app, "GET", "/api/profile/me", { auth: "Bearer tok" });
+    expect(me.status).toBe(500);
+
+    const search = await request(app, "GET", "/api/profile/search?q=x");
+    expect(search.status).toBe(500);
+
+    const boards = await request(app, "GET", "/api/profile/alice/boards");
+    expect(boards.status).toBe(500);
+
+    const batch = await request(app, "GET", "/api/profile/batch?u=alice");
+    expect(batch.status).toBe(500);
+
+    const pub = await request(app, "GET", "/api/profile/alice");
+    expect(pub.status).toBe(500);
   });
 
   it("admin patch blocks peer/superior and banned actor", async () => {
@@ -168,6 +201,16 @@ describe("profileRoutes", () => {
       body: { role: "default" },
     });
     expect(peer.status).toBe(403);
+
+    (repos.profiles.getRoleById as ReturnType<typeof vi.fn>).mockImplementation(
+      async (id: string) => (id === "actor" ? null : "default"),
+    );
+    verifyJwt.mockReturnValueOnce({ sub: "actor" });
+    const noActorRole = await request(app, "PATCH", "/api/profile/alice", {
+      auth: "Bearer tok",
+      body: { role: "default" },
+    });
+    expect(noActorRole.status).toBe(403);
   });
 
   it("admin patch enforces role rules and supports successful role change", async () => {
@@ -195,5 +238,63 @@ describe("profileRoutes", () => {
     });
     expect(ok.status).toBe(200);
     expect(repos.profiles.setRoleById).toHaveBeenCalledWith("target-1", "moderator");
+
+    verifyJwt.mockReturnValueOnce({ sub: "actor" });
+    const noChanges = await request(app, "PATCH", "/api/profile/alice", {
+      auth: "Bearer tok",
+      body: {},
+    });
+    expect(noChanges.status).toBe(400);
+  });
+
+  it("admin patch covers bio moderation and ban branch", async () => {
+    const app = express();
+    app.use(express.json());
+    const repos = makeRepos({
+      getRoleById: vi.fn(async (id: string) => (id === "actor" ? "moderator" : "default")),
+    });
+    registerProfileRoutes(app, repos);
+
+    containsProfanity.mockReturnValueOnce(true);
+    verifyJwt.mockReturnValueOnce({ sub: "actor" });
+    const badBio = await request(app, "PATCH", "/api/profile/alice", {
+      auth: "Bearer tok",
+      body: { bio: "bad bio" },
+    });
+    expect(badBio.status).toBe(400);
+
+    verifyJwt.mockReturnValueOnce({ sub: "actor" });
+    const ban = await request(app, "PATCH", "/api/profile/alice", {
+      auth: "Bearer tok",
+      body: { role: "banned" },
+    });
+    expect(ban.status).toBe(200);
+    expect(repos.profiles.setRoleById).toHaveBeenCalledWith("target-1", "banned");
+  });
+
+  it("admin patch returns 500 when target profile has no id or throws", async () => {
+    const app = express();
+    app.use(express.json());
+    const repos = makeRepos({
+      getPublicProfileByUsername: vi
+        .fn()
+        .mockResolvedValueOnce({ id: "", username: "alice" })
+        .mockRejectedValueOnce(new Error("boom")),
+    });
+    registerProfileRoutes(app, repos);
+
+    verifyJwt.mockReturnValueOnce({ sub: "actor" });
+    const missingId = await request(app, "PATCH", "/api/profile/alice", {
+      auth: "Bearer tok",
+      body: { role: "default" },
+    });
+    expect(missingId.status).toBe(500);
+
+    verifyJwt.mockReturnValueOnce({ sub: "actor" });
+    const crashed = await request(app, "PATCH", "/api/profile/alice", {
+      auth: "Bearer tok",
+      body: { role: "default" },
+    });
+    expect(crashed.status).toBe(500);
   });
 });
