@@ -136,6 +136,7 @@ export const sessionHandlers: Record<string, WsHandler> = {
         isFinalJeopardy: Boolean(game.isFinalJeopardy),
         finalJeopardyStage: game.finalJeopardyStage || null,
         wagers: game.wagers || {},
+        finalWagerDrawings: game.finalWagerDrawings || {},
         finalists,
         drawings: fjDrawings,
         dailyDouble: dd,
@@ -201,6 +202,7 @@ export const sessionHandlers: Record<string, WsHandler> = {
     );
 
     if (game.wagers) delete game.wagers[leavingUsername];
+    if (game.finalWagerDrawings) delete game.finalWagerDrawings[leavingUsername];
     if (game.drawings) delete game.drawings[leavingUsername];
     if (game.scores) delete game.scores[leavingUsername];
     if (game.buzzLockouts) delete game.buzzLockouts[leavingUsername];

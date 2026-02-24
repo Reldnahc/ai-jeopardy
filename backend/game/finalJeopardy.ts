@@ -1,6 +1,7 @@
 import { appConfig } from "../config/appConfig.js";
 import type { GameState, PlayerState } from "../types/runtime.js";
 import type { Ctx } from "../ws/context.types.js";
+import { parseFinalWagerImage } from "../services/ai/judge/wagerImage.js";
 
 function getExpectedFinalists(game: GameState): PlayerState[] {
   const players = Array.isArray(game?.players) ? game.players : [];
@@ -32,7 +33,12 @@ async function advanceToDrawingPhase(
 
   // include finalists so clients can hide drawing UI for non-finalists
   const finalists = getFinalistUsernames(game);
-  ctx.broadcast(gameId, { type: "all-wagers-submitted", wagers, finalists });
+  ctx.broadcast(gameId, {
+    type: "all-wagers-submitted",
+    wagers,
+    finalists,
+    wagerDrawings: game.finalWagerDrawings || {},
+  });
 
   // Reveal the final clue immediately after wagers are locked in
   const fjCat = game.boardData?.finalJeopardy?.categories?.[0] || null;
@@ -320,6 +326,12 @@ export function submitWager(
   const expected = getFinalistUsernames(game);
   if (!expected.includes(player)) return;
 
+  const maxWager = Math.max(0, Math.floor(Number(game.scores?.[player] ?? 0)));
+  const normalizedWager = Math.min(
+    maxWager,
+    Math.max(0, Math.abs(Math.trunc(Number(wager) || 0))),
+  );
+
   ctx.fireAndForget(
     ctx.repos.profiles.incrementFinalJeopardyParticipations(player),
     "Increment final jeopardy Participation",
@@ -328,9 +340,47 @@ export function submitWager(
   if (!game.wagers) {
     game.wagers = {};
   }
-  game.wagers[player] = wager;
+  game.wagers[player] = normalizedWager;
   ctx.fireAndForget(
-    ctx.ensureFinalJeopardyWager(ctx, game, gameId, player, Number(wager)),
+    ctx.ensureFinalJeopardyWager(ctx, game, gameId, player, Number(normalizedWager)),
+    "Ensuring final jeopardy wager",
+  );
+
+  checkAllWagersSubmitted(game, gameId, ctx);
+}
+
+export async function submitWagerDrawing(
+  game: GameState,
+  gameId: string,
+  player: string,
+  drawing: string,
+  ctx: Ctx,
+) {
+  if (game.finalJeopardyStage !== "wager") return;
+
+  const expected = getFinalistUsernames(game);
+  if (!expected.includes(player)) return;
+
+  const score = Number(game.scores?.[player] ?? 0);
+  const maxWager = Math.max(0, Math.floor(score));
+
+  const parsed = await parseFinalWagerImage(drawing, maxWager);
+  const normalizedWager = Math.min(
+    maxWager,
+    Math.max(0, Math.abs(Math.trunc(Number(parsed.wager ?? 0) || 0))),
+  );
+
+  if (!game.wagers) game.wagers = {};
+  game.wagers[player] = normalizedWager;
+  if (!game.finalWagerDrawings) game.finalWagerDrawings = {};
+  game.finalWagerDrawings[player] = drawing;
+
+  ctx.fireAndForget(
+    ctx.repos.profiles.incrementFinalJeopardyParticipations(player),
+    "Increment final jeopardy Participation",
+  );
+  ctx.fireAndForget(
+    ctx.ensureFinalJeopardyWager(ctx, game, gameId, player, Number(normalizedWager)),
     "Ensuring final jeopardy wager",
   );
 

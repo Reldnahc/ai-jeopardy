@@ -13,6 +13,7 @@ import type {
   checkAllWagersSubmitted,
   submitDrawing,
   submitWager,
+  submitWagerDrawing,
 } from "../game/finalJeopardy.js";
 import type { checkBoardTransition, isBoardFullyCleared } from "../game/stageTransition.js";
 import type { getCOTD } from "../state/cotdStore.js";
@@ -214,6 +215,7 @@ export type Ctx = Omit<
   | "createBoardData"
   | "submitWager"
   | "submitDrawing"
+  | "submitWagerDrawing"
   | "checkAllWagersSubmitted"
   | "checkAllDrawingsSubmitted"
   | "isBoardFullyCleared"
@@ -284,6 +286,7 @@ export type Ctx = Omit<
   createBoardData: typeof createBoardData;
   submitWager: typeof submitWager;
   submitDrawing: typeof submitDrawing;
+  submitWagerDrawing: typeof submitWagerDrawing;
   checkAllWagersSubmitted: typeof checkAllWagersSubmitted;
   checkAllDrawingsSubmitted: typeof checkAllDrawingsSubmitted;
   isBoardFullyCleared: typeof isBoardFullyCleared;

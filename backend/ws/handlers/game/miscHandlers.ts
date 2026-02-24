@@ -6,6 +6,7 @@ type UpdateScoreData = { gameId: string; username: string; delta: number };
 type DdSnipeNextData = { gameId: string; enabled?: boolean };
 type SubmitWagerData = { gameId: string; player: string; wager: number };
 type SubmitDrawingData = { gameId: string; player: string; drawing: string };
+type SubmitFinalWagerDrawingData = { gameId: string; player: string; drawing: string };
 type TtsEnsureData = {
   gameId: string;
   text?: string;
@@ -129,6 +130,12 @@ export const miscHandlers: Record<string, WsHandler> = {
     const { gameId, player, drawing } = data as SubmitDrawingData;
     const game = ctx.games[gameId];
     if (game) await ctx.submitDrawing(game, gameId, player, drawing, ctx);
+  },
+
+  "submit-final-wager-drawing": async ({ data, ctx }) => {
+    const { gameId, player, drawing } = data as SubmitFinalWagerDrawingData;
+    const game = ctx.games[gameId];
+    if (game) await ctx.submitWagerDrawing(game, gameId, player, drawing, ctx);
   },
 
   "tts-ensure": async ({ ws, data, ctx }) => {

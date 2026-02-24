@@ -118,6 +118,7 @@ export type GameState = {
   isFinalJeopardy?: boolean;
   finalJeopardyStage?: string | null;
   wagers?: Record<string, number>;
+  finalWagerDrawings?: Record<string, string>;
   drawings?: Record<string, string>;
   finalVerdicts?: Record<string, string>;
   finalTranscripts?: Record<string, string>;
@@ -235,6 +236,7 @@ export type WsContext = {
   createBoardData: UnknownFn;
   submitWager: UnknownFn;
   submitDrawing: UnknownFn;
+  submitWagerDrawing: UnknownFn;
   checkAllWagersSubmitted: UnknownFn;
   checkAllDrawingsSubmitted: UnknownFn;
   isBoardFullyCleared: UnknownFn;

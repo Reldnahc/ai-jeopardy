@@ -20,6 +20,7 @@ import {
   checkAllWagersSubmitted,
   submitDrawing,
   submitWager,
+  submitWagerDrawing,
 } from "../game/finalJeopardy.js";
 import { checkBoardTransition, isBoardFullyCleared } from "../game/stageTransition.js";
 import { getCOTD } from "../state/cotdStore.js";
@@ -189,6 +190,7 @@ export const createWsContext = (wss: WsServerLike, repos: Repos): Ctx => {
     createBoardData,
     submitWager,
     submitDrawing,
+    submitWagerDrawing,
     checkAllWagersSubmitted,
     checkAllDrawingsSubmitted,
     isBoardFullyCleared,

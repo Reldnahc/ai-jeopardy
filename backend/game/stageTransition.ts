@@ -1,5 +1,6 @@
 import type { GameState, PlayerState } from "../types/runtime.js";
 import type { Ctx } from "../ws/context.types.js";
+import { appConfig } from "../config/appConfig.js";
 
 export function isBoardFullyCleared(game: GameState, boardKey: string): boolean {
   const board = game?.boardData?.[boardKey] as
@@ -110,6 +111,7 @@ async function startFinalJeopardy(game: GameState, gameId: string, ctx: Ctx) {
   game.finalJeopardyStage = "wager";
 
   game.wagers = {};
+  game.finalWagerDrawings = {};
   game.drawings = {};
 
   // Cache finalists for this FJ run
@@ -128,85 +130,27 @@ async function startFinalJeopardy(game: GameState, gameId: string, ctx: Ctx) {
     { slot: "all_wager", pad },
   ]);
 
-  const WAGER_SECONDS = 30;
+  const WAGER_SECONDS = Math.max(1, Math.floor(appConfig.gameplay.finalWagerSeconds));
 
   ctx.startGameTimer(gameId, game, ctx, WAGER_SECONDS, "final-wager", () => {
-    // Only act if we’re still in FJ wager stage
+    // Only act if we're still in FJ wager stage
     if (!game?.isFinalJeopardy) return;
     if (game.finalJeopardyStage !== "wager") return;
 
     const expected = getFinalistNames(game);
     if (!game.wagers) game.wagers = {};
+    if (!game.finalWagerDrawings) game.finalWagerDrawings = {};
 
     // If player didn't submit, wager defaults to 0
     for (const name of expected) {
       if (!Object.prototype.hasOwnProperty.call(game.wagers, name)) {
         game.wagers[name] = 0;
       }
-    }
-
-    // Broadcast what the clients already handle, but include finalists
-    ctx.broadcast(gameId, {
-      type: "all-wagers-submitted",
-      wagers: game.wagers,
-      finalists: expected,
-    });
-    game.finalJeopardyStage = "drawing";
-
-    const fjCat = game.boardData?.finalJeopardy?.categories?.[0] || null;
-    const fjClueRaw = fjCat?.values?.[0] || null;
-
-    if (!fjClueRaw) {
-      console.error("[FinalJeopardy] Missing final clue in boardData");
-      return;
-    }
-
-    game.selectedClue = {
-      value: typeof fjClueRaw.value === "number" ? fjClueRaw.value : 0,
-      question: String(fjClueRaw.question || ""),
-      answer: String(fjClueRaw.answer || ""),
-      isAnswerRevealed: false,
-      media: fjClueRaw.media || undefined,
-      category: String(fjCat?.category || "").trim() || undefined,
-    };
-
-    game.phase = "clue";
-    game.buzzerLocked = true;
-    game.buzzed = null;
-    game.buzzLockouts = {};
-    ctx.broadcast(gameId, { type: "buzzer-locked" });
-    ctx.broadcast(gameId, { type: "buzzer-ui-reset" });
-
-    ctx.broadcast(gameId, {
-      type: "clue-selected",
-      clue: game.selectedClue,
-      clearedClues: Array.from(game.clearedClues || []),
-      // Include finalists here too (some clients key off clue-selected)
-      finalists: getFinalistNames(game),
-    });
-
-    // Start the 30s drawing timer now (same as finalJeopardy.js will do)
-    const DRAW_SECONDS = 30;
-    ctx.startGameTimer(gameId, game, ctx, DRAW_SECONDS, "final-draw", () => {
-      if (!game?.isFinalJeopardy) return;
-      if (game.finalJeopardyStage !== "drawing") return;
-
-      const expected2 = getFinalistNames(game);
-      if (!game.drawings) game.drawings = {};
-      if (!game.finalVerdicts) game.finalVerdicts = {};
-      if (!game.finalTranscripts) game.finalTranscripts = {};
-
-      for (const name of expected2) {
-        if (!Object.prototype.hasOwnProperty.call(game.drawings, name)) {
-          game.drawings[name] = "";
-          game.finalVerdicts[name] = "incorrect";
-          game.finalTranscripts[name] = "";
-        }
+      if (!Object.prototype.hasOwnProperty.call(game.finalWagerDrawings, name)) {
+        game.finalWagerDrawings[name] = "";
       }
+    }
 
-      // If everyone is now “submitted”, let the normal finish path run by broadcasting:
-      ctx.broadcast(gameId, { type: "all-drawings-submitted", drawings: game.drawings });
-      game.finalJeopardyStage = "finale";
-    });
+    ctx.checkAllWagersSubmitted(game, gameId, ctx);
   });
 }
