@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { BoardData, Category, Clue } from "../../../shared/types/board.ts";
-import { preloadAudioToBlobUrl } from "../../audio/audioCache"; // adjust path
+import { preloadAudioToBlobUrl } from "../../audio/audioCache";
 
 export function preloadAudio(url: string) {
   return new Promise<void>((resolve) => {
@@ -91,7 +91,7 @@ async function preloadOne(url: string, signal: AbortSignal): Promise<void> {
 
     img.onload = async () => {
       cleanup();
-      // decode() helps ensure it’s actually decoded & cached when supported
+      // decode() helps ensure it is actually decoded and cached when supported
       try {
         if (typeof img.decode === "function") await img.decode();
       } catch {
@@ -161,6 +161,7 @@ export function usePreload(boardData: BoardData | null | undefined, enabled: boo
     };
   }, [boardData, enabled]);
 }
+
 async function preloadAudioOne(url: string, signal: AbortSignal): Promise<void> {
   const MAX_ATTEMPTS = 7;
 
@@ -177,11 +178,17 @@ async function preloadAudioOne(url: string, signal: AbortSignal): Promise<void> 
   throw new Error(`preload failed: ${url}`);
 }
 
-export function usePreloadAudioAssetIds(
-  assetIds: string[] | null | undefined,
-  enabled: boolean,
-  onDone?: () => void,
-) {
+type QueueLoadResult = "done" | "retry";
+
+type PreloadQueueOptions = {
+  assetIds: string[] | null | undefined;
+  enabled: boolean;
+  onDone?: () => void;
+  toUrl: (id: string) => string;
+  loadUrl: (url: string) => Promise<QueueLoadResult>;
+};
+
+function usePreloadUrlQueue({ assetIds, enabled, onDone, toUrl, loadUrl }: PreloadQueueOptions) {
   const requestedRef = useRef(new Set<string>());
   const pendingRef = useRef<string[]>([]);
   const inFlightRef = useRef(0);
@@ -193,30 +200,6 @@ export function usePreloadAudioAssetIds(
   useEffect(() => {
     onDoneRef.current = onDone;
   }, [onDone]);
-
-  // Add new ids to pending queue (DO NOT abort old work)
-  useEffect(() => {
-    if (!enabled) return;
-
-    const next = Array.isArray(assetIds) ? assetIds : [];
-    for (const id of next) {
-      const url = ttsUrl(String(id).trim());
-      if (!url.trim()) continue;
-      if (requestedRef.current.has(url)) continue;
-      if (pendingRef.current.includes(url)) continue;
-      pendingRef.current.push(url);
-    }
-
-    // New work => allow onDone again
-    doneCalledRef.current = false;
-
-    // Kick worker
-    if (!runningRef.current) {
-      runningRef.current = true;
-      void pump();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [assetIds, enabled]);
 
   async function wait(ms: number) {
     await new Promise((r) => setTimeout(r, ms));
@@ -242,137 +225,8 @@ export function usePreloadAudioAssetIds(
 
         void (async () => {
           try {
-            // Create a per-request controller; we won't abort it on batch updates.
-            const controller = new AbortController();
-            await preloadAudioOne(url, controller.signal);
-
-            requestedRef.current.add(url);
-            retryRef.current.delete(url);
-          } catch {
-            // Retry later
-            const attempt = retryRef.current.get(url) ?? 0;
-            retryRef.current.set(url, attempt + 1);
-
-            await wait(computeBackoffMs(attempt) + Math.round(Math.random() * 80));
-            pendingRef.current.push(url);
-          } finally {
-            inFlightRef.current--;
-          }
-        })();
-      }
-
-      // If nothing pending and nothing in-flight, we’re “done for now”
-      if (pendingRef.current.length === 0 && inFlightRef.current === 0) {
-        if (!doneCalledRef.current) {
-          doneCalledRef.current = true;
-          onDoneRef.current?.();
-        }
-        runningRef.current = false;
-        return;
-      }
-
-      await wait(50);
-    }
-
-    runningRef.current = false;
-  }
-
-  // If component unmounts, stop pumping new work (don’t cancel in-flight fetches)
-  useEffect(() => {
-    return () => {
-      runningRef.current = false;
-    };
-  }, []);
-}
-
-export function usePreloadImageAssetIds(
-  assetIds: string[] | null | undefined,
-  enabled: boolean,
-  onDone?: () => void,
-) {
-  const requestedRef = useRef(new Set<string>());
-  const pendingRef = useRef<string[]>([]);
-  const inFlightRef = useRef(0);
-  const runningRef = useRef(false);
-  const retryRef = useRef(new Map<string, number>());
-  const doneCalledRef = useRef(false);
-  const onDoneRef = useRef(onDone);
-
-  useEffect(() => {
-    onDoneRef.current = onDone;
-  }, [onDone]);
-
-  // Add new ids to pending queue (DO NOT abort old work)
-  useEffect(() => {
-    if (!enabled) return;
-
-    // empty batch should still allow "done" if nothing pending
-    const next = Array.isArray(assetIds) ? assetIds : [];
-    for (const id of next) {
-      const url = imageUrl(id);
-      if (!url.trim()) continue;
-      if (requestedRef.current.has(url)) continue;
-      if (pendingRef.current.includes(url)) continue;
-      pendingRef.current.push(url);
-    }
-
-    // New work => allow onDone again
-    doneCalledRef.current = false;
-
-    // Kick worker
-    if (!runningRef.current) {
-      runningRef.current = true;
-      void pump();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [assetIds, enabled]);
-
-  async function wait(ms: number) {
-    await new Promise((r) => setTimeout(r, ms));
-  }
-
-  function computeBackoffMs(attempt: number) {
-    // 200, 320, 520, 840, 1350... capped
-    return Math.min(2500, Math.round(200 * Math.pow(1.6, attempt)));
-  }
-
-  async function imageReadyProbe(url: string) {
-    // Use fetch() instead of Image() as a readiness probe.
-    // This avoids spammy console errors and lets us treat 202/404 as retry.
-    const r = await fetch(url, { cache: "force-cache" });
-
-    if (r.status === 202) return { ready: false as const };
-    if (r.status === 404) return { ready: false as const };
-
-    if (!r.ok) throw new Error(`probe failed ${r.status}`);
-
-    const ct = r.headers.get("content-type") || "";
-    if (!ct.startsWith("image/")) throw new Error(`probe got non-image (${ct})`);
-
-    // We don’t need full body; but consuming it helps cache in some browsers
-    await r.arrayBuffer();
-    return { ready: true as const };
-  }
-
-  async function pump() {
-    if (!enabled) {
-      runningRef.current = false;
-      return;
-    }
-
-    const CONCURRENCY = 10;
-
-    while (enabled) {
-      // Start more work if possible
-      while (inFlightRef.current < CONCURRENCY && pendingRef.current.length > 0) {
-        const url = pendingRef.current.shift()!;
-        inFlightRef.current++;
-
-        void (async () => {
-          try {
-            // Probe readiness first (handles “too early”)
-            const probe = await imageReadyProbe(url);
-            if (!probe.ready) {
+            const result = await loadUrl(url);
+            if (result === "retry") {
               const attempt = retryRef.current.get(url) ?? 0;
               retryRef.current.set(url, attempt + 1);
               await wait(computeBackoffMs(attempt) + Math.round(Math.random() * 80));
@@ -380,8 +234,6 @@ export function usePreloadImageAssetIds(
               return;
             }
 
-            // Now load via Image() so it lands in the image cache
-            await preloadOne(url, new AbortController().signal);
             requestedRef.current.add(url);
             retryRef.current.delete(url);
           } catch {
@@ -396,7 +248,7 @@ export function usePreloadImageAssetIds(
         })();
       }
 
-      // If nothing pending and nothing in-flight, we’re “done for now”
+      // If nothing pending and nothing in-flight, we are done for now
       if (pendingRef.current.length === 0 && inFlightRef.current === 0) {
         if (!doneCalledRef.current) {
           doneCalledRef.current = true;
@@ -406,17 +258,103 @@ export function usePreloadImageAssetIds(
         return;
       }
 
-      // Avoid tight loop
       await wait(50);
     }
 
     runningRef.current = false;
   }
 
-  // If component unmounts, just stop pumping (don’t abort fetches mid-flight).
+  // Add new ids to pending queue (do not abort old work)
+  useEffect(() => {
+    if (!enabled) return;
+
+    const next = Array.isArray(assetIds) ? assetIds : [];
+    for (const id of next) {
+      const url = toUrl(String(id).trim());
+      if (!url.trim()) continue;
+      if (requestedRef.current.has(url)) continue;
+      if (pendingRef.current.includes(url)) continue;
+      pendingRef.current.push(url);
+    }
+
+    // New work => allow onDone again
+    doneCalledRef.current = false;
+
+    // Kick worker
+    if (!runningRef.current) {
+      runningRef.current = true;
+      void pump();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assetIds, enabled, toUrl, loadUrl]);
+
+  // If component unmounts, stop pumping new work (do not cancel in-flight requests)
   useEffect(() => {
     return () => {
       runningRef.current = false;
     };
   }, []);
+}
+
+async function preloadAudioUrl(url: string): Promise<QueueLoadResult> {
+  // Create a per-request controller; we won't abort it on batch updates.
+  const controller = new AbortController();
+  await preloadAudioOne(url, controller.signal);
+  return "done";
+}
+
+async function imageReadyProbe(url: string) {
+  // Use fetch() instead of Image() as a readiness probe.
+  // This avoids spammy console errors and lets us treat 202/404 as retry.
+  const r = await fetch(url, { cache: "force-cache" });
+
+  if (r.status === 202) return { ready: false as const };
+  if (r.status === 404) return { ready: false as const };
+
+  if (!r.ok) throw new Error(`probe failed ${r.status}`);
+
+  const ct = r.headers.get("content-type") || "";
+  if (!ct.startsWith("image/")) throw new Error(`probe got non-image (${ct})`);
+
+  // We do not need full body; but consuming it helps cache in some browsers
+  await r.arrayBuffer();
+  return { ready: true as const };
+}
+
+async function preloadImageUrl(url: string): Promise<QueueLoadResult> {
+  // Probe readiness first (handles too-early image requests)
+  const probe = await imageReadyProbe(url);
+  if (!probe.ready) return "retry";
+
+  // Now load via Image() so it lands in the image cache
+  await preloadOne(url, new AbortController().signal);
+  return "done";
+}
+
+export function usePreloadAudioAssetIds(
+  assetIds: string[] | null | undefined,
+  enabled: boolean,
+  onDone?: () => void,
+) {
+  usePreloadUrlQueue({
+    assetIds,
+    enabled,
+    onDone,
+    toUrl: ttsUrl,
+    loadUrl: preloadAudioUrl,
+  });
+}
+
+export function usePreloadImageAssetIds(
+  assetIds: string[] | null | undefined,
+  enabled: boolean,
+  onDone?: () => void,
+) {
+  usePreloadUrlQueue({
+    assetIds,
+    enabled,
+    onDone,
+    toUrl: imageUrl,
+    loadUrl: preloadImageUrl,
+  });
 }
