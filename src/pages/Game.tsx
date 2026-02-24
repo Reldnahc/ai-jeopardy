@@ -1,18 +1,8 @@
-// frontend/pages/Game.tsx
-import { useCallback, useEffect, useRef, useState } from "react";
+﻿import { useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import FinalScoreScreen from "../components/game/FinalScoreScreen.tsx";
 import JeopardyBoard from "../components/game/JeopardyBoard.tsx";
 import Sidebar from "../components/game/Sidebar.tsx";
-import FinalScoreScreen from "../components/game/FinalScoreScreen.tsx";
-import { useWebSocket } from "../contexts/WebSocketContext.tsx";
-import { useGameSession } from "../hooks/useGameSession.ts";
-import { useGameSocketSync } from "../features/game/socket/useGameSocketSync.ts";
-import { usePlayerIdentity } from "../hooks/usePlayerIdentity.ts";
-import { usePreload } from "../hooks/game/usePreload.ts";
-import { useEarlyMicPermission } from "../hooks/earlyMicPermission.ts";
-import { Clue } from "../../shared/types/board.ts";
-import { getCachedAudioBlobUrl } from "../audio/audioCache.ts";
-import { BuzzPayload } from "../types/Game.ts";
 import type {
   AnswerUiState,
   BuzzUiState,
@@ -20,15 +10,15 @@ import type {
   FinalUiState,
   TimerUiState,
 } from "../components/game/gameViewModels.ts";
-
-function getApiBase() {
-  if (import.meta.env.DEV) return import.meta.env.VITE_API_BASE || "http://localhost:3002";
-  return "";
-}
-
-function ttsUrl(id: string) {
-  return `${getApiBase()}/api/tts/${encodeURIComponent(id)}`;
-}
+import { useWebSocket } from "../contexts/WebSocketContext.tsx";
+import { useEarlyMicPermission } from "../hooks/earlyMicPermission.ts";
+import { usePreload } from "../hooks/game/usePreload.ts";
+import { useGameSession } from "../hooks/useGameSession.ts";
+import { usePlayerIdentity } from "../hooks/usePlayerIdentity.ts";
+import { useGameAudioPlayback } from "../features/game/page/useGameAudioPlayback.ts";
+import { useGameCommands } from "../features/game/page/useGameCommands.ts";
+import { useGameSessionSync } from "../features/game/page/useGameSessionSync.ts";
+import { useGameSocketSync } from "../features/game/socket/useGameSocketSync.ts";
 
 function norm(v: unknown) {
   return String(v ?? "")
@@ -41,10 +31,8 @@ export default function Game() {
   const location = useLocation();
   const navigate = useNavigate();
   const { session, saveSession, clearSession } = useGameSession();
-
   const [lastQuestionValue, setLastQuestionValue] = useState<number>(100);
 
-  // NOTE: your hook expects `locationState`, not `locationStatePlayerName`
   const { username, displayname, playerKey } = usePlayerIdentity({
     gameId,
     locationState: location.state ?? null,
@@ -95,452 +83,58 @@ export default function Game() {
     answerProcessing,
   } = useGameSocketSync({ gameId, username: myUsername });
 
-  // Persistent WebSocket connection
   const { sendJson, nowMs, nowFromPerfMs, perfNowMs, lastSyncAgeMs } = useWebSocket();
 
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const gainNodeRef = useRef<GainNode | null>(null);
-  const compressorRef = useRef<DynamicsCompressorNode | null>(null);
-  const [isAudioReady, setIsAudioReady] = useState(false);
-  const [audioUnlockTick, setAudioUnlockTick] = useState(0);
-  const [audioBlockedByPolicy, setAudioBlockedByPolicy] = useState(false);
-  const [audioContextState, setAudioContextState] = useState<AudioContextState>("suspended");
-  const [micPermission, setMicPermission] = useState<"granted" | "prompt" | "denied" | "unknown">(
-    "unknown",
-  );
+  const { audioVolume, setAudioVolume, micPermission, requestMicPermission, showAutoplayReminder } =
+    useGameAudioPlayback({
+      aiHostAsset,
+      narrationEnabled,
+      nowMs,
+    });
 
-  const buzzSeqRef = useRef(0);
-
-  const AUDIO_VOLUME_KEY = "aj_audioVolume";
-  const AUDIO_LAST_NONZERO_KEY = "aj_audioLastNonZeroVolume";
-
-  const [audioVolume, setAudioVolume] = useState<number>(() => {
-    try {
-      const raw = localStorage.getItem(AUDIO_VOLUME_KEY);
-      const v = raw == null ? 1 : Number(raw);
-      if (!Number.isFinite(v)) return 1;
-      return Math.min(1, Math.max(0, v));
-    } catch {
-      return 1;
-    }
+  useGameSessionSync({
+    gameId,
+    isSocketReady,
+    host,
+    myUsername,
+    myDisplayname,
+    username,
+    playerKey,
+    isHost,
+    session,
+    saveSession,
+    sendJson,
   });
-
-  const audioMuted = audioVolume <= 0;
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(AUDIO_VOLUME_KEY, String(audioVolume));
-      if (audioVolume > 0) localStorage.setItem(AUDIO_LAST_NONZERO_KEY, String(audioVolume));
-    } catch {
-      // ignore
-    }
-  }, [audioVolume]);
 
   const isSelectorOnBoard = Boolean(
     phase === "board" && myUsername && selectorKey && norm(selectorKey) === myUsername,
   );
-
   const canSelectClue = Boolean(isSelectorOnBoard && !boardSelectionLocked);
 
-  const narratedKeysRef = useRef<Set<string>>(new Set());
-  const lastRequestedKeyRef = useRef<string | null>(null);
-  const prevSocketReadyRef = useRef<boolean>(false);
-
-  const boardDataRef = useRef(boardData);
-
-  const handleScoreUpdate = (playerUsername: string, delta: number) => {
-    if (!gameId) return;
-
-    const u = norm(playerUsername);
-    if (!u) return;
-
-    // Final Jeopardy: host buttons mean +wager / -wager, not +/- lastQuestionValue.
-    if (isFinalJeopardy && allWagersSubmitted) {
-      const w = Math.abs(wagers[u] ?? 0);
-      delta = delta < 0 ? -w : w;
-    }
-
-    sendJson({ type: "update-score", gameId, username: u, delta });
-  };
-
-  const leaveGame = useCallback(() => {
-    if (!gameId) {
-      clearSession();
-      navigate("/");
-      return;
-    }
-
-    sendJson({
-      type: "leave-game",
-      gameId,
-      username: myUsername,
-    });
-
-    clearSession();
-    navigate("/");
-  }, [gameId, myUsername, sendJson, clearSession, navigate]);
-
-  const playAudioUrl = useCallback(
-    async (httpUrl: string, offsetMs: number = 0): Promise<boolean> => {
-      const a = audioRef.current;
-      if (!a) return false;
-
-      try {
-        a.pause();
-
-        // Volume-based “mute”
-        a.muted = false;
-        const gain = gainNodeRef.current;
-        if (gain) gain.gain.value = audioVolume;
-
-        // If we preloaded this URL, use the blob URL so there is NO network on play.
-        const blobUrl = getCachedAudioBlobUrl(httpUrl);
-        a.src = blobUrl || httpUrl;
-
-        const seekSec = Math.max(0, offsetMs / 1000);
-        const seekToOffset = () => {
-          try {
-            a.currentTime = seekSec;
-          } catch {
-            // ignore seek errors; playback will start at 0
-          }
-        };
-
-        if (seekSec > 0) {
-          if (a.readyState >= 1) {
-            seekToOffset();
-          } else {
-            a.addEventListener("loadedmetadata", seekToOffset, { once: true });
-          }
-        } else {
-          a.currentTime = 0;
-        }
-
-        if (audioVolume <= 0) return false;
-        await a.play();
-        setAudioBlockedByPolicy(false);
-        return true;
-      } catch (e) {
-        console.debug("TTS play blocked:", e);
-        setAudioBlockedByPolicy(true);
-        return false;
-      }
-    },
-    [audioVolume],
-  );
-
-  const lastAiHostAssetPlayedRef = useRef<string | null>(null);
-  const gameReadySentRef = useRef(false);
-
-  useEffect(() => {
-    if (gameReadySentRef.current) return;
-    if (!isSocketReady) return;
-    if (!gameId) return;
-
-    // IMPORTANT: identity is username now
-    if (!myUsername) return;
-
-    // Wait until we’ve received at least one game-state
-    if (!host) return;
-
-    gameReadySentRef.current = true;
-
-    sendJson({
-      type: "game-ready",
-      gameId,
-      username: myUsername,
-    });
-  }, [isSocketReady, gameId, myUsername, host, sendJson]);
-
-  useEffect(() => {
-    if (!aiHostAsset) return;
-    if (lastAiHostAssetPlayedRef.current === aiHostAsset) return;
-
-    const parts = aiHostAsset.split("::");
-    const assetId = String(parts[1] ?? aiHostAsset).trim();
-    const startedAtMs = Math.max(0, Number(parts[2] ?? 0) || 0);
-    const baseOffsetMs = Math.max(0, Number(parts[3] ?? 0) || 0);
-    const receivedAtMs = Math.max(0, Number(parts[4] ?? 0) || 0);
-    if (!assetId) return;
-
-    if (!isAudioReady) return;
-    if (!narrationEnabled) return;
-    if (audioMuted) return;
-
-    const computedOffsetMs = (() => {
-      if (startedAtMs > 0) {
-        // Recompute against server-synced clock so delayed user gesture still seeks correctly.
-        return Math.max(baseOffsetMs, Math.round(nowMs() - startedAtMs));
-      }
-      if (receivedAtMs > 0) {
-        return Math.max(baseOffsetMs, Math.round(baseOffsetMs + (Date.now() - receivedAtMs)));
-      }
-      return baseOffsetMs;
-    })();
-
-    let cancelled = false;
-    void playAudioUrl(ttsUrl(assetId), computedOffsetMs).then((played) => {
-      if (cancelled) return;
-      if (played) {
-        lastAiHostAssetPlayedRef.current = aiHostAsset;
-      }
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    aiHostAsset,
-    narrationEnabled,
-    audioMuted,
-    isAudioReady,
-    audioUnlockTick,
-    nowMs,
-    playAudioUrl,
-  ]);
-
-  useEffect(() => {
-    const audio = new Audio();
-    audio.preload = "auto";
-    audio.crossOrigin = "anonymous";
-
-    const ctx = new AudioContext();
-    const source = ctx.createMediaElementSource(audio);
-
-    const gain = ctx.createGain();
-    const compressor = ctx.createDynamicsCompressor();
-
-    compressor.threshold.value = -18;
-    compressor.knee.value = 12;
-    compressor.ratio.value = 3;
-    compressor.attack.value = 0.003;
-    compressor.release.value = 0.25;
-
-    source.connect(gain);
-    gain.connect(compressor);
-    compressor.connect(ctx.destination);
-
-    audioRef.current = audio;
-    audioCtxRef.current = ctx;
-    gainNodeRef.current = gain;
-    compressorRef.current = compressor;
-    setAudioContextState(ctx.state);
-    ctx.onstatechange = () => {
-      setAudioContextState(ctx.state);
-    };
-    setIsAudioReady(true);
-
-    return () => {
-      audio.pause();
-      audio.src = "";
-
-      source.disconnect();
-      gain.disconnect();
-      compressor.disconnect();
-
-      void ctx.close();
-      ctx.onstatechange = null;
-
-      audioRef.current = null;
-      audioCtxRef.current = null;
-      gainNodeRef.current = null;
-      compressorRef.current = null;
-      setIsAudioReady(false);
-      setAudioContextState("closed");
-    };
-  }, []);
-
-  useEffect(() => {
-    const gain = gainNodeRef.current;
-    if (!gain) return;
-    gain.gain.value = audioVolume;
-  }, [audioVolume]);
-
-  useEffect(() => {
-    const unlockAudio = () => {
-      const ctx = audioCtxRef.current;
-      if (ctx && ctx.state !== "running") {
-        void ctx.resume().catch(() => {});
-      }
-      setAudioUnlockTick((v) => v + 1);
-    };
-
-    window.addEventListener("pointerdown", unlockAudio, { passive: true });
-    window.addEventListener("keydown", unlockAudio);
-    window.addEventListener("touchstart", unlockAudio, { passive: true });
-
-    return () => {
-      window.removeEventListener("pointerdown", unlockAudio);
-      window.removeEventListener("keydown", unlockAudio);
-      window.removeEventListener("touchstart", unlockAudio);
-    };
-  }, []);
-
-  useEffect(() => {
-    let mounted = true;
-    let status: PermissionStatus | null = null;
-
-    const mapState = (state: PermissionState) => {
-      if (state === "granted" || state === "prompt" || state === "denied") return state;
-      return "unknown";
-    };
-
-    if (!("permissions" in navigator) || !navigator.permissions?.query) {
-      setMicPermission("unknown");
-      return;
-    }
-
-    void navigator.permissions
-      .query({ name: "microphone" as PermissionName })
-      .then((s) => {
-        if (!mounted) return;
-        status = s;
-        setMicPermission(mapState(s.state));
-        s.onchange = () => {
-          if (!mounted) return;
-          setMicPermission(mapState(s.state));
-        };
-      })
-      .catch(() => {
-        if (mounted) setMicPermission("unknown");
-      });
-
-    return () => {
-      mounted = false;
-      if (status) status.onchange = null;
-    };
-  }, []);
-
-  const requestMicPermission = useCallback(async () => {
-    if (!navigator.mediaDevices?.getUserMedia) {
-      setMicPermission("unknown");
-      return;
-    }
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      stream.getTracks().forEach((track) => track.stop());
-      setMicPermission("granted");
-    } catch (e) {
-      const name = e instanceof DOMException ? e.name : "";
-      if (name === "NotAllowedError" || name === "SecurityError") {
-        setMicPermission("denied");
-      } else {
-        setMicPermission("prompt");
-      }
-    }
-  }, []);
-
-  const showAutoplayReminder = Boolean(
-    narrationEnabled &&
-    !audioMuted &&
-    isAudioReady &&
-    (audioBlockedByPolicy || audioContextState !== "running"),
-  );
-
-  useEffect(() => {
-    const wasReady = prevSocketReadyRef.current;
-    const nowReady = Boolean(isSocketReady);
-    prevSocketReadyRef.current = nowReady;
-
-    if (!wasReady && nowReady) {
-      lastRequestedKeyRef.current = null;
-      narratedKeysRef.current.clear();
-    }
-  }, [isSocketReady]);
-
-  // Persist session as username + displayname
-  useEffect(() => {
-    if (!gameId) return;
-
-    // You at least need a displayname (guests have one)
-    if (!myDisplayname) return;
-
-    // Only write if different
-    const same =
-      session?.gameId === gameId &&
-      String(session?.playerKey ?? "") === String(playerKey ?? "") &&
-      (session?.username ?? null) === (username ?? null) &&
-      String(session?.displayname ?? "") === myDisplayname &&
-      session?.isHost === isHost;
-
-    if (same) return;
-
-    saveSession({
-      gameId,
-      playerKey: String(playerKey ?? ""),
-      username: username ?? null,
-      displayname: myDisplayname,
-      isHost: Boolean(isHost),
-    });
-  }, [gameId, playerKey, username, myDisplayname, isHost, saveSession, session]);
-
-  // Join game (username identity)
-  useEffect(() => {
-    if (!isSocketReady) return;
-    if (!gameId) return;
-
-    // If user is not logged in (username null), you need a guest username strategy.
-    // For now, only join when username exists.
-    if (!myUsername) return;
-
-    sendJson({
-      type: "join-game",
-      gameId,
-      username: myUsername,
-      displayname: myDisplayname || null,
-      // keep temporarily if server still expects it somewhere (but should be removed soon)
-      playerKey,
-    });
-  }, [gameId, myUsername, myDisplayname, playerKey, sendJson, isSocketReady]);
-
-  useEffect(() => {
-    boardDataRef.current = boardData;
-  }, [boardData]);
+  const { handleScoreUpdate, leaveGame, handleBuzz, onClueSelected } = useGameCommands({
+    gameId,
+    myUsername,
+    sendJson,
+    clearSession,
+    navigate,
+    isFinalJeopardy,
+    allWagersSubmitted,
+    wagers,
+    canSelectClue,
+    buzzResult,
+    buzzLockedOut,
+    perfNowMs,
+    nowFromPerfMs,
+    lastSyncAgeMs,
+    setLastQuestionValue,
+  });
 
   usePreload(boardData, Boolean(boardData));
-
-  const handleBuzz = () => {
-    if (!gameId) return;
-    if (buzzResult || buzzLockedOut) return;
-
-    const clientBuzzPerfMs = perfNowMs();
-    const clientSeq = ++buzzSeqRef.current;
-
-    const syncAge = lastSyncAgeMs?.() ?? Number.POSITIVE_INFINITY;
-
-    const payload: BuzzPayload = {
-      type: "buzz",
-      gameId,
-      clientBuzzPerfMs,
-      clientSeq,
-      syncAgeMs: syncAge,
-    };
-
-    if (Number.isFinite(syncAge) && syncAge <= 20_000) {
-      payload.estimatedServerBuzzAtMs = nowFromPerfMs();
-    }
-
-    sendJson(payload);
-  };
-
-  const onClueSelected = useCallback(
-    (clue: Clue) => {
-      if (!canSelectClue || !clue) return;
-      if (!gameId) return;
-
-      sendJson({ type: "clue-selected", gameId, clue });
-
-      if (clue.value !== undefined) setLastQuestionValue(clue.value);
-    },
-    [canSelectClue, gameId, sendJson],
-  );
-
   useEarlyMicPermission();
 
   const safeActiveBoard = activeBoard || "firstBoard";
   const safeCategories = boardData?.[safeActiveBoard]?.categories;
+
   const buzzUi: BuzzUiState = {
     buzzerLocked,
     buzzResult,
@@ -548,10 +142,7 @@ export default function Game() {
     buzzLockedOut,
     hasBuzzedCurrentClue,
   };
-  const timerUi: TimerUiState = {
-    timerEndTime,
-    timerDuration,
-  };
+  const timerUi: TimerUiState = { timerEndTime, timerDuration };
   const answerUi: AnswerUiState = {
     answerCapture,
     answerError,
@@ -599,28 +190,26 @@ export default function Game() {
         {isGameOver ? (
           <FinalScoreScreen scores={scores} />
         ) : (
-          <>
-            <JeopardyBoard
-              boardData={safeCategories || []}
-              canSelectClue={canSelectClue}
-              onClueSelected={onClueSelected}
-              selectedClue={selectedClue || null}
-              gameId={gameId || ""}
-              clearedClues={clearedClues}
-              players={players}
-              scores={scores}
-              currentPlayer={myUsername}
-              allWagersSubmitted={allWagersSubmitted}
-              isFinalJeopardy={isFinalJeopardy}
-              drawings={drawings}
-              handleBuzz={handleBuzz}
-              buzzUi={buzzUi}
-              timerUi={timerUi}
-              answerUi={answerUi}
-              finalUi={finalUi}
-              ddUi={ddUi}
-            />
-          </>
+          <JeopardyBoard
+            boardData={safeCategories || []}
+            canSelectClue={canSelectClue}
+            onClueSelected={onClueSelected}
+            selectedClue={selectedClue || null}
+            gameId={gameId || ""}
+            clearedClues={clearedClues}
+            players={players}
+            scores={scores}
+            currentPlayer={myUsername}
+            allWagersSubmitted={allWagersSubmitted}
+            isFinalJeopardy={isFinalJeopardy}
+            drawings={drawings}
+            handleBuzz={handleBuzz}
+            buzzUi={buzzUi}
+            timerUi={timerUi}
+            answerUi={answerUi}
+            finalUi={finalUi}
+            ddUi={ddUi}
+          />
         )}
       </div>
     </div>
