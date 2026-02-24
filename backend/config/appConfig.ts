@@ -4,6 +4,7 @@ import { env } from "./env.js";
 export const appConfig = Object.freeze({
   server: {
     port: env.PORT,
+    corsOrigins: env.CORS_ORIGINS,
   },
 
   ai: {

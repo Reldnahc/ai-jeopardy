@@ -23,6 +23,15 @@ function optionalNumber(name: string, fallback: number): number {
   return n;
 }
 
+function optionalCsv(name: string, fallback: string[]): string[] {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  return raw
+    .split(",")
+    .map((v) => v.trim())
+    .filter(Boolean);
+}
+
 export const env = Object.freeze({
   // required core
   DATABASE_URL: requireEnv("DATABASE_URL"),
@@ -47,6 +56,7 @@ export const env = Object.freeze({
 
   // server
   PORT: optionalNumber("PORT", 3002),
+  CORS_ORIGINS: optionalCsv("CORS_ORIGINS", ["http://localhost:5173"]),
 
   // gameplay
   BUZZ_LOCKOUT_MS: optionalNumber("BUZZ_LOCKOUT_MS", 1),
