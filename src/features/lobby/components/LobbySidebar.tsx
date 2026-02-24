@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect } from "react";
 import type { Player } from "../../../types/Lobby";
 import { useProfile } from "../../../contexts/ProfileContext";
 import { getProfilePresentation } from "../../../utils/profilePresentation";
+import { useUniqueUsernames } from "../../../hooks/useUniqueUsernames";
 import LobbyPlayerRow from "./LobbyPlayerRow";
 
 interface LobbySidebarProps {
@@ -32,15 +33,7 @@ const LobbySidebar: React.FC<LobbySidebarProps> = ({
 
   const { getProfileByUsername, fetchPublicProfiles } = useProfile();
 
-  // Dedup usernames so we don't spam fetches
-  const usernames = useMemo(() => {
-    const set = new Set<string>();
-    for (const p of players) {
-      const u = String(p.username ?? "").trim();
-      if (u) set.add(u);
-    }
-    return Array.from(set);
-  }, [players]);
+  const usernames = useUniqueUsernames(players);
 
   useEffect(() => {
     if (usernames.length === 0) return;
