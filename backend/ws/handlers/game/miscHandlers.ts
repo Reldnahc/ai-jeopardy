@@ -142,7 +142,7 @@ export const miscHandlers: Record<string, WsHandler> = {
   "submit-wager": async ({ data, ctx }) => {
     const { gameId, player, wager } = data as SubmitWagerData;
     const game = ctx.games[gameId];
-    if (game) await ctx.submitWager(game, gameId, player, wager, ctx);
+    if (game) ctx.submitWager(game, gameId, player, wager, ctx);
   },
 
   "submit-drawing": async ({ data, ctx }) => {
