@@ -18,6 +18,7 @@ export function routeBoardMessage(message: SocketMessage, d: GameSocketRouterDep
     d.setIsFinalJeopardy(true);
     d.setAllWagersSubmitted(false);
     d.setWagers({});
+    d.setFinalPlacements([]);
     d.setFinalWagerDrawings({});
     d.setFinalists(Array.isArray(m.finalists) ? m.finalists : [""]);
     d.setSelectedClue(null);
@@ -188,6 +189,8 @@ export function routeBoardMessage(message: SocketMessage, d: GameSocketRouterDep
   }
 
   if (message.type === "final-score-screen") {
+    const m = message as { finalPlacements?: string[] };
+    d.setFinalPlacements(Array.isArray(m.finalPlacements) ? m.finalPlacements : []);
     d.setIsGameOver(true);
     return true;
   }

@@ -120,6 +120,7 @@ export type GameState = {
   wagers?: Record<string, number>;
   finalWagerDrawings?: Record<string, string>;
   drawings?: Record<string, string>;
+  finalPlacements?: string[];
   finalVerdicts?: Record<string, string>;
   finalTranscripts?: Record<string, string>;
   ddSnipeNext?: boolean;

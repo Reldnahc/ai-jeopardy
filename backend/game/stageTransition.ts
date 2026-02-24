@@ -113,6 +113,7 @@ async function startFinalJeopardy(game: GameState, gameId: string, ctx: Ctx) {
   game.wagers = {};
   game.finalWagerDrawings = {};
   game.drawings = {};
+  game.finalPlacements = [];
 
   // Cache finalists for this FJ run
   const finalists = getFinalistNames(game);

@@ -136,6 +136,7 @@ export const sessionHandlers: Record<string, WsHandler> = {
         isFinalJeopardy: Boolean(game.isFinalJeopardy),
         finalJeopardyStage: game.finalJeopardyStage || null,
         wagers: game.wagers || {},
+        finalPlacements: game.finalPlacements || [],
         finalWagerDrawings: game.finalWagerDrawings || {},
         finalists,
         drawings: fjDrawings,

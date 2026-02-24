@@ -75,6 +75,7 @@ export function useGameSocketSync({ gameId, username }: UseGameSocketSyncArgs) {
   const [isFinalJeopardy, setIsFinalJeopardy] = useState(false);
   const [allWagersSubmitted, setAllWagersSubmitted] = useState(false);
   const [wagers, setWagers] = useState<Record<string, number>>({});
+  const [finalPlacements, setFinalPlacements] = useState<string[]>([]);
   const [finalWagers, setFinalWagers] = useState<Record<string, number>>({});
   const [finalWagerDrawings, setFinalWagerDrawings] = useState<Record<string, string>>({});
   const [selectedFinalist, setSelectedFinalist] = useState("");
@@ -206,6 +207,7 @@ export function useGameSocketSync({ gameId, username }: UseGameSocketSyncArgs) {
         setIsFinalJeopardy,
         setAllWagersSubmitted,
         setWagers,
+        setFinalPlacements,
         setFinalWagers,
         setFinalWagerDrawings,
         setSelectedFinalist,
@@ -295,6 +297,7 @@ export function useGameSocketSync({ gameId, username }: UseGameSocketSyncArgs) {
     isFinalJeopardy,
     allWagersSubmitted,
     wagers,
+    finalPlacements,
     finalWagers,
     finalWagerDrawings,
     selectedFinalist,

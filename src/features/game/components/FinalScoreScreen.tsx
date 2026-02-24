@@ -6,6 +6,7 @@ import { getProfilePresentation } from "../../../utils/profilePresentation";
 
 interface FinalScoreScreenProps {
   scores: Record<string, number>;
+  finalPlacements?: string[];
 }
 
 type ScoreEntry = {
@@ -13,15 +14,32 @@ type ScoreEntry = {
   score: number;
 };
 
-const FinalScoreScreen = ({ scores }: FinalScoreScreenProps) => {
+const FinalScoreScreen = ({ scores, finalPlacements = [] }: FinalScoreScreenProps) => {
   const navigate = useNavigate();
   const { getProfileByUsername, fetchPublicProfiles } = useProfile();
+  const norm = (v: unknown) =>
+    String(v ?? "")
+      .trim()
+      .toLowerCase();
 
   const sortedScores = useMemo<ScoreEntry[]>(() => {
+    const placementOrder = new Map(
+      (finalPlacements || []).map((username, idx) => [norm(username), idx] as const),
+    );
+
     return Object.entries(scores)
       .map(([username, score]) => ({ username, score }))
-      .sort((a, b) => b.score - a.score);
-  }, [scores]);
+      .sort((a, b) => {
+        const ar = placementOrder.get(norm(a.username));
+        const br = placementOrder.get(norm(b.username));
+        const aHasRank = typeof ar === "number";
+        const bHasRank = typeof br === "number";
+        if (aHasRank && bHasRank) return ar - br;
+        if (aHasRank) return -1;
+        if (bHasRank) return 1;
+        return b.score - a.score;
+      });
+  }, [finalPlacements, scores]);
 
   const usernames = useMemo(
     () =>
@@ -35,7 +53,10 @@ const FinalScoreScreen = ({ scores }: FinalScoreScreenProps) => {
   }, [fetchPublicProfiles, usernames]);
 
   const topScore = sortedScores[0]?.score ?? 0;
-  const winnerCount = sortedScores.filter((entry) => entry.score === topScore).length;
+  const hasExplicitPlacements = finalPlacements.length > 0;
+  const winnerCount = hasExplicitPlacements
+    ? Math.min(1, sortedScores.length)
+    : sortedScores.filter((entry) => entry.score === topScore).length;
 
   const rankTone = (index: number) => {
     if (index === 0) return "from-amber-300/60 to-yellow-400/60 border-amber-200/90";
@@ -53,7 +74,11 @@ const FinalScoreScreen = ({ scores }: FinalScoreScreenProps) => {
               Final Results
             </h1>
             <p className="mt-1 text-sm md:text-base text-blue-100/90">
-              {winnerCount > 1 ? `${winnerCount} players tied for first` : "Champion crowned"}
+              {hasExplicitPlacements
+                ? "Champion crowned"
+                : winnerCount > 1
+                  ? `${winnerCount} players tied for first`
+                  : "Champion crowned"}
             </p>
           </div>
 

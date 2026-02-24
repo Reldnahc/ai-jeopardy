@@ -62,6 +62,7 @@ export default function Game() {
     isFinalJeopardy,
     allWagersSubmitted,
     wagers,
+    finalPlacements,
     finalWagers,
     finalWagerDrawings,
     drawings,
@@ -190,7 +191,7 @@ export default function Game() {
 
       <div className="flex flex-1 justify-center items-center overflow-hidden p-0">
         {isGameOver ? (
-          <FinalScoreScreen scores={scores} />
+          <FinalScoreScreen scores={scores} finalPlacements={finalPlacements} />
         ) : (
           <JeopardyBoard
             boardData={safeCategories || []}

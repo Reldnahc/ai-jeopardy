@@ -61,6 +61,7 @@ export type GameSocketRouterDeps = {
   setIsFinalJeopardy: (value: boolean) => void;
   setAllWagersSubmitted: (value: boolean) => void;
   setWagers: (value: Record<string, number>) => void;
+  setFinalPlacements: (value: string[]) => void;
   setFinalWagers: (value: Record<string, number>) => void;
   setFinalWagerDrawings: (value: Record<string, string>) => void;
   setSelectedFinalist: (value: string) => void;

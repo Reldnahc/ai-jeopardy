@@ -34,6 +34,7 @@ export function routeSnapshotMessage(message: SocketMessage, d: GameSocketRouter
   if (fj) {
     const snapWagers = m.wagers ?? {};
     d.setWagers(snapWagers);
+    d.setFinalPlacements(Array.isArray(m.finalPlacements) ? m.finalPlacements : []);
 
     const stage = m.finalJeopardyStage ?? null;
     d.setIsGameOver(stage === "finale");
@@ -48,6 +49,7 @@ export function routeSnapshotMessage(message: SocketMessage, d: GameSocketRouter
     d.setIsGameOver(false);
     d.setAllWagersSubmitted(false);
     d.setWagers({});
+    d.setFinalPlacements([]);
     d.setFinalWagers({});
     d.setFinalWagerDrawings({});
     d.setFinalists([""]);

@@ -163,6 +163,7 @@ async function finishGame(
     })
     .sort((a: { score: number }, b: { score: number }) => b.score - a.score)
     .slice(0, 3);
+  game.finalPlacements = top.map((p) => p.username);
 
   console.log(top);
 
@@ -235,7 +236,8 @@ async function finishGame(
     (game.players || []).map((p: PlayerState) => [p.username, 0]),
   );
 
-  if (top[0]) finalScores[top[0].username] = top[0].score > 3000 ? top[0].score : 3000;
+  // Jeopardy rule: winner keeps their actual final score, even if below 2nd-place payout.
+  if (top[0]) finalScores[top[0].username] = top[0].score;
   if (top[1]) finalScores[top[1].username] = 3000;
   if (top[2]) finalScores[top[2].username] = 2000;
 
@@ -282,7 +284,10 @@ async function finishGame(
   }
 
   ctx.broadcast(gameId, { type: "update-scores", scores: game.scores });
-  ctx.broadcast(gameId, { type: "final-score-screen" });
+  ctx.broadcast(gameId, {
+    type: "final-score-screen",
+    finalPlacements: game.finalPlacements || [],
+  });
 }
 
 export async function submitDrawing(
