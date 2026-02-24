@@ -55,7 +55,7 @@ async function saveBoardAsync(ctx: Ctx, host: string, board: Board) {
     if (!ownerId) return;
 
     await ctx.repos.boards.insertBoard(ownerId, board);
-    await ctx.repos.profiles.incrementBoardsGenerated(ownerId);
+    await ctx.repos.profiles.incrementBoardsGenerated(normalizedHost);
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("[Board] saveBoardAsync failed:", msg);
