@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo } from "react";
-import type { Player } from "../../types/Lobby";
-import { useProfile } from "../../contexts/ProfileContext";
-import { getProfilePresentation } from "../../utils/profilePresentation";
+import type { Player } from "../../../types/Lobby";
+import { useProfile } from "../../../contexts/ProfileContext";
+import { getProfilePresentation } from "../../../utils/profilePresentation";
 import LobbyPlayerRow from "./LobbyPlayerRow";
 
 interface LobbySidebarProps {

@@ -1,9 +1,9 @@
-import { models } from "../../../shared/models.js";
-import { useProfile } from "../../contexts/ProfileContext.tsx";
+import { models } from "../../../../shared/models.js";
+import { useProfile } from "../../../contexts/ProfileContext.tsx";
 import React from "react";
-import type { LobbySettings } from "../../features/lobby/socket/useLobbySocketSync.tsx";
-import type { LadderRole, Role } from "../../../shared/roles.js";
-import { atLeast, normalizeRole } from "../../../shared/roles.js";
+import type { LobbySettings } from "../socket/useLobbySocketSync.tsx";
+import type { LadderRole, Role } from "../../../../shared/roles.js";
+import { atLeast, normalizeRole } from "../../../../shared/roles.js";
 
 type ReasoningEffortSetting = "off" | "low" | "medium" | "high";
 type ModelDef = (typeof models)[number];

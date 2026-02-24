@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useRef } from "react";
-import LockIcon from "../../icons/LockIcon.tsx";
-import RedoIcon from "../../icons/RedoIcon.tsx";
+import LockIcon from "../../../icons/LockIcon.tsx";
+import RedoIcon from "../../../icons/RedoIcon.tsx";
 
 export type LobbyBoardType = "firstBoard" | "secondBoard" | "finalJeopardy";
 

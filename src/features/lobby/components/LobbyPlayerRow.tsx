@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
-import Avatar from "../common/Avatar";
-import type { Player } from "../../types/Lobby";
-import type { ProfilePresentation } from "../../utils/profilePresentation";
+import Avatar from "../../../components/common/Avatar";
+import type { Player } from "../../../types/Lobby";
+import type { ProfilePresentation } from "../../../utils/profilePresentation";
 
 interface Props {
   player: Player;

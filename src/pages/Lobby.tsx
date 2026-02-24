@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useWebSocket } from "../contexts/WebSocketContext.tsx";
-import LobbySidebar from "../components/lobby/LobbySidebar.tsx";
+import LobbySidebar from "../features/lobby/components/LobbySidebar.tsx";
 import LoadingScreen from "../components/common/LoadingScreen.tsx";
 import PageCardContainer from "../components/common/PageCardContainer.tsx";
-import HostControls from "../components/lobby/HostControls.tsx";
-import CategoryBoard, { LobbyBoardType } from "../components/lobby/CategoryBoard.tsx";
+import HostControls from "../features/lobby/components/HostControls.tsx";
+import CategoryBoard, { LobbyBoardType } from "../features/lobby/components/CategoryBoard.tsx";
 import { useProfile } from "../contexts/ProfileContext.tsx";
 import { useAlert } from "../contexts/AlertContext.tsx";
 import { motion } from "framer-motion";

@@ -1,7 +1,7 @@
 ﻿import { useCallback, useEffect, useRef, useState } from "react";
 import { useWebSocket } from "../../../contexts/WebSocketContext";
 import type { Player } from "../../../types/Lobby";
-import type { LobbyBoardType } from "../../../components/lobby/CategoryBoard";
+import type { LobbyBoardType } from "../components/CategoryBoard";
 import { type BoardType, CATEGORY_SECTIONS, unflattenBySections } from "../../../utils/lobbySections";
 import { routeLobbySocketMessage } from "./useLobbySocketSync.router.ts";
 import type { LobbySettings, LockedCategories, UseLobbySocketSyncArgs } from "./useLobbySocketSync.types.ts";
