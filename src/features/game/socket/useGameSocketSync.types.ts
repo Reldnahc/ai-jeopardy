@@ -1,5 +1,5 @@
 import type { BoardData, Clue } from "../../../../shared/types/board.ts";
-import type { LobbySettings } from "../../../hooks/lobby/useLobbySocketSync.tsx";
+import type { LobbySettings } from "../../lobby/socket/useLobbySocketSync.tsx";
 import type { Player } from "../../../types/Lobby.ts";
 
 export type ActiveBoard = "firstBoard" | "secondBoard" | "finalJeopardy";

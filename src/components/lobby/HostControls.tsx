@@ -1,7 +1,7 @@
 import { models } from "../../../shared/models.js";
 import { useProfile } from "../../contexts/ProfileContext.tsx";
 import React from "react";
-import type { LobbySettings } from "../../hooks/lobby/useLobbySocketSync.tsx";
+import type { LobbySettings } from "../../features/lobby/socket/useLobbySocketSync.tsx";
 import type { LadderRole, Role } from "../../../shared/roles.js";
 import { atLeast, normalizeRole } from "../../../shared/roles.js";
 

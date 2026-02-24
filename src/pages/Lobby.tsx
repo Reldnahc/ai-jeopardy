@@ -11,7 +11,7 @@ import { useAlert } from "../contexts/AlertContext.tsx";
 import { motion } from "framer-motion";
 import { getUniqueCategories } from "../categories/getUniqueCategories.ts";
 import { useGameSession } from "../hooks/useGameSession.ts";
-import { useLobbySocketSync } from "../hooks/lobby/useLobbySocketSync";
+import { useLobbySocketSync } from "../features/lobby/socket/useLobbySocketSync";
 import { usePlayerIdentity } from "../hooks/usePlayerIdentity.ts";
 import { usePreloadAudioAssetIds, usePreloadImageAssetIds } from "../hooks/game/usePreload.ts";
 
