@@ -2,10 +2,13 @@ import type { PlayerState } from "../../types/runtime.js";
 import { normalizeRole } from "../../../shared/roles.js";
 import type { Role } from "../../../shared/roles.js";
 import type { WsHandler, WsHandlerArgs } from "./types.js";
+import type { CtxDeps } from "../context.types.js";
 
 type RequestTimeSyncData = { clientSentAt?: number };
 type AuthData = { token?: string };
 type RequestPlayerListData = { gameId: string };
+
+type UserHandlersCtx = CtxDeps<"verifyJwt" | "repos" | "getCOTD" | "games">;
 
 export const userHandlers: Record<string, WsHandler> = {
   ping: async ({ ws }: WsHandlerArgs) => {
@@ -22,6 +25,7 @@ export const userHandlers: Record<string, WsHandler> = {
     );
   },
   auth: async ({ ws, data, ctx }: WsHandlerArgs<AuthData>) => {
+    const hctx = ctx as UserHandlersCtx;
     const token = data?.token;
 
     if (!token) {
@@ -31,7 +35,7 @@ export const userHandlers: Record<string, WsHandler> = {
     }
 
     try {
-      const payload = ctx.verifyJwt(token);
+      const payload = hctx.verifyJwt(token);
       const userId = payload?.sub;
 
       const toRole = (value: unknown): Role | "default" => normalizeRole(value);
@@ -40,7 +44,7 @@ export const userHandlers: Record<string, WsHandler> = {
 
       // Prefer DB role (prevents stale tokens)
       if (userId) {
-        const dbRole = await ctx.repos.profiles.getRoleById(userId);
+        const dbRole = await hctx.repos.profiles.getRoleById(userId);
         if (dbRole) role = toRole(dbRole);
       }
 
@@ -52,25 +56,27 @@ export const userHandlers: Record<string, WsHandler> = {
     }
   },
   "check-cotd": async ({ ws, ctx }: WsHandlerArgs) => {
+    const hctx = ctx as UserHandlersCtx;
     ws.send(
       JSON.stringify({
         type: "category-of-the-day",
-        cotd: ctx.getCOTD(),
+        cotd: hctx.getCOTD(),
       }),
     );
   },
   "request-player-list": async ({ ws, data, ctx }: WsHandlerArgs<RequestPlayerListData>) => {
+    const hctx = ctx as UserHandlersCtx;
     const { gameId } = data;
     ws.send(
       JSON.stringify({
         type: "player-list-update",
         gameId,
-        players: ctx.games[gameId].players.map((p: PlayerState) => ({
+        players: hctx.games[gameId].players.map((p: PlayerState) => ({
           username: p.username,
           displayname: p.displayname,
           online: p?.online,
         })),
-        host: ctx.games[gameId].host,
+        host: hctx.games[gameId].host,
       }),
     );
   },
