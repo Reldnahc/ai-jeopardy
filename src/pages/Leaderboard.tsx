@@ -278,10 +278,10 @@ const Leaderboard: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col items-center px-4 py-6 md:px-6">
-      <PageCardContainer className="border border-white/60 bg-white/95 shadow-[0_28px_70px_-32px_rgba(15,23,42,0.55)]">
-        <div className="p-6 md:p-10">
-          <div className="mb-8 rounded-2xl border border-blue-300/40 bg-gradient-to-br from-[#11336d] via-[#1f4f9b] to-[#143a7c] p-5 text-white shadow-[0_20px_40px_rgba(16,42,92,0.35)]">
-            <div className="h-16 w-full md:h-20">
+      <PageCardContainer className="border border-white/60 bg-white/95 shadow-[0_26px_62px_-30px_rgba(15,23,42,0.55)]">
+        <div className="mx-auto w-full max-w-5xl p-6 md:p-10">
+          <div className="mb-8 rounded-2xl border border-blue-200/45 bg-gradient-to-br from-[#214a8d] via-[#2d66ba] to-[#1e4f95] p-5 md:p-6 text-white shadow-[0_16px_30px_rgba(16,42,92,0.3)]">
+            <div className="h-20 w-full md:h-24 lg:h-28">
               <SvgOutlinedText
                 text="Leaderboard"
                 className="h-full w-full"
@@ -291,7 +291,7 @@ const Leaderboard: React.FC = () => {
                 uppercase
               />
             </div>
-            <p className="mt-1 text-center text-sm text-blue-100 md:text-base">
+            <p className="mt-2 text-center text-sm text-blue-100 md:text-base">
               Ranked by <span className="font-semibold text-white">{selectedStat.label}</span>
             </p>
           </div>

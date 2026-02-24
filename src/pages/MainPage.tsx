@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useWebSocket } from "../contexts/WebSocketContext.tsx";
 import { useAuth } from "../contexts/AuthContext.tsx";
 import { useAlert } from "../contexts/AlertContext.tsx";
@@ -244,13 +244,13 @@ export default function MainPage() {
   return (
     <div className="min-h-screen flex items-center justify-center p-4 md:p-6">
       {/* Animated container for the main card */}
-      <PageCardContainer className="relative overflow-hidden border border-white/30 bg-white/95 p-6 md:p-10 lg:p-12">
-        <div className="pointer-events-none absolute -top-28 -right-20 h-64 w-64 rounded-full bg-blue-300/35 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-24 -left-16 h-56 w-56 rounded-full bg-cyan-200/35 blur-3xl" />
-        <div className="pointer-events-none absolute top-40 left-1/2 h-40 w-40 -translate-x-1/2 rounded-full bg-indigo-200/25 blur-3xl" />
+      <PageCardContainer className="relative overflow-hidden border border-white/50 bg-white/94 p-5 md:p-8 lg:p-10 shadow-[0_20px_48px_-28px_rgba(15,23,42,0.45)]">
+        <div className="pointer-events-none absolute -top-24 -right-16 h-60 w-60 rounded-full bg-blue-200/25 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-20 -left-14 h-52 w-52 rounded-full bg-cyan-100/25 blur-3xl" />
+        <div className="pointer-events-none absolute top-40 left-1/2 h-36 w-36 -translate-x-1/2 rounded-full bg-indigo-100/20 blur-3xl" />
         {/* Main Content (spans two columns on medium+ screens) */}
-        <div className="relative col-span-2">
-          <div className="h-24 md:h-28 lg:h-32 w-full">
+        <div className="relative col-span-2 mx-auto w-full max-w-5xl">
+          <div className="h-20 md:h-24 lg:h-28 w-full">
             <SvgOutlinedText
               text={`Artificially ${randomAdjective} Jeopardy`}
               className="w-full h-full md:hidden"
@@ -270,20 +270,20 @@ export default function MainPage() {
               uppercase
             />
           </div>
-          <p className="text-lg md:text-xl text-slate-700 text-center -mt-1">
+          <p className="text-base md:text-lg text-slate-700 text-center mt-1">
             Race to buzz in and answer clues by voice.
           </p>
 
           {/* Featured Category Card */}
-          <div className="mt-8 md:mt-10">
-            <div className="p-6 md:p-8 bg-gradient-to-br from-[#11336d] via-[#1f4f9b] to-[#143a7c] rounded-2xl border border-blue-300/40 shadow-[0_20px_40px_rgba(16,42,92,0.35)]">
+          <div className="mt-6 md:mt-8">
+            <div className="p-4 md:p-5 bg-gradient-to-br from-[#214a8d] via-[#2d66ba] to-[#1e4f95] rounded-2xl border border-blue-200/45 shadow-[0_14px_28px_rgba(16,42,92,0.26)]">
               <div className="text-center mb-4 md:mb-5">
                 <span className="inline-block text-sm md:text-base uppercase tracking-[0.2em] text-blue-100/85 font-semibold">
                   Featured Category
                 </span>
               </div>
 
-              <div className="h-24 md:h-28 lg:h-32 w-full mb-3">
+              <div className="h-16 md:h-20 lg:h-24 w-full mb-2">
                 <SvgOutlinedText
                   text={cotd.category}
                   className="w-full h-full md:hidden"
@@ -304,14 +304,35 @@ export default function MainPage() {
                 />
               </div>
 
-              <p className="text-base md:text-lg text-blue-50 text-center max-w-2xl mx-auto leading-relaxed">
+              <p className="text-xs md:text-sm text-blue-50 text-center max-w-2xl mx-auto leading-relaxed">
                 {cotd.description}
               </p>
             </div>
           </div>
 
+          <div className="mt-6 md:mt-8 grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+            <Link
+              to="/recent-boards"
+              className="rounded-2xl border border-slate-200 bg-white/85 p-5 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+            >
+              <p className="text-xs uppercase tracking-[0.2em] text-slate-500 font-semibold">
+                Explore
+              </p>
+              <p className="mt-2 text-2xl font-semibold text-slate-900">Recent Boards</p>
+              <p className="mt-1 text-slate-600">Browse newly generated games and categories.</p>
+            </Link>
+            <Link
+              to="/leaderboards"
+              className="rounded-2xl border border-slate-200 bg-white/85 p-5 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+            >
+              <p className="text-xs uppercase tracking-[0.2em] text-slate-500 font-semibold">Rank</p>
+              <p className="mt-2 text-2xl font-semibold text-slate-900">Leaderboards</p>
+              <p className="mt-1 text-slate-600">See top players across wins, money, and more.</p>
+            </Link>
+          </div>
+
           {/* Create & Join Game Section */}
-          <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
             {/* Create Game Box */}
             <div className="flex flex-col justify-center items-center bg-gradient-to-br from-emerald-50 to-green-50 p-5 md:p-6 rounded-2xl border border-emerald-200/80 shadow-sm">
               <div className="mb-3 w-full text-left text-sm font-semibold uppercase tracking-wide text-emerald-700">
