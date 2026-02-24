@@ -97,6 +97,11 @@ export default function Game() {
   const compressorRef = useRef<DynamicsCompressorNode | null>(null);
   const [isAudioReady, setIsAudioReady] = useState(false);
   const [audioUnlockTick, setAudioUnlockTick] = useState(0);
+  const [audioBlockedByPolicy, setAudioBlockedByPolicy] = useState(false);
+  const [audioContextState, setAudioContextState] = useState<AudioContextState>("suspended");
+  const [micPermission, setMicPermission] = useState<"granted" | "prompt" | "denied" | "unknown">(
+    "unknown",
+  );
 
   const buzzSeqRef = useRef(0);
 
@@ -207,9 +212,11 @@ export default function Game() {
 
         if (audioVolume <= 0) return false;
         await a.play();
+        setAudioBlockedByPolicy(false);
         return true;
       } catch (e) {
         console.debug("TTS play blocked:", e);
+        setAudioBlockedByPolicy(true);
         return false;
       }
     },
@@ -276,7 +283,15 @@ export default function Game() {
     return () => {
       cancelled = true;
     };
-  }, [aiHostAsset, narrationEnabled, audioMuted, isAudioReady, audioUnlockTick, nowMs, playAudioUrl]);
+  }, [
+    aiHostAsset,
+    narrationEnabled,
+    audioMuted,
+    isAudioReady,
+    audioUnlockTick,
+    nowMs,
+    playAudioUrl,
+  ]);
 
   useEffect(() => {
     const audio = new Audio();
@@ -303,6 +318,10 @@ export default function Game() {
     audioCtxRef.current = ctx;
     gainNodeRef.current = gain;
     compressorRef.current = compressor;
+    setAudioContextState(ctx.state);
+    ctx.onstatechange = () => {
+      setAudioContextState(ctx.state);
+    };
     setIsAudioReady(true);
 
     return () => {
@@ -314,12 +333,14 @@ export default function Game() {
       compressor.disconnect();
 
       void ctx.close();
+      ctx.onstatechange = null;
 
       audioRef.current = null;
       audioCtxRef.current = null;
       gainNodeRef.current = null;
       compressorRef.current = null;
       setIsAudioReady(false);
+      setAudioContextState("closed");
     };
   }, []);
 
@@ -348,6 +369,68 @@ export default function Game() {
       window.removeEventListener("touchstart", unlockAudio);
     };
   }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    let status: PermissionStatus | null = null;
+
+    const mapState = (state: PermissionState) => {
+      if (state === "granted" || state === "prompt" || state === "denied") return state;
+      return "unknown";
+    };
+
+    if (!("permissions" in navigator) || !navigator.permissions?.query) {
+      setMicPermission("unknown");
+      return;
+    }
+
+    void navigator.permissions
+      .query({ name: "microphone" as PermissionName })
+      .then((s) => {
+        if (!mounted) return;
+        status = s;
+        setMicPermission(mapState(s.state));
+        s.onchange = () => {
+          if (!mounted) return;
+          setMicPermission(mapState(s.state));
+        };
+      })
+      .catch(() => {
+        if (mounted) setMicPermission("unknown");
+      });
+
+    return () => {
+      mounted = false;
+      if (status) status.onchange = null;
+    };
+  }, []);
+
+  const requestMicPermission = useCallback(async () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setMicPermission("unknown");
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach((track) => track.stop());
+      setMicPermission("granted");
+    } catch (e) {
+      const name = e instanceof DOMException ? e.name : "";
+      if (name === "NotAllowedError" || name === "SecurityError") {
+        setMicPermission("denied");
+      } else {
+        setMicPermission("prompt");
+      }
+    }
+  }, []);
+
+  const showAutoplayReminder = Boolean(
+    narrationEnabled &&
+    !audioMuted &&
+    isAudioReady &&
+    (audioBlockedByPolicy || audioContextState !== "running"),
+  );
 
   useEffect(() => {
     const wasReady = prevSocketReadyRef.current;
@@ -467,6 +550,11 @@ export default function Game() {
         markAllCluesComplete={markAllCluesComplete}
         onLeaveGame={leaveGame}
         selectorName={selectorName}
+        micPermission={micPermission}
+        showAutoplayReminder={showAutoplayReminder}
+        onRequestMicPermission={() => {
+          void requestMicPermission();
+        }}
         onToggleDailyDoubleSnipe={(enabled) => {
           sendJson({ type: "dd-snipe-next", gameId, enabled });
         }}

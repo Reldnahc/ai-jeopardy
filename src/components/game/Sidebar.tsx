@@ -4,6 +4,8 @@ import { useProfile } from "../../contexts/ProfileContext.tsx";
 import { Player } from "../../types/Lobby.ts";
 import MutedIcon from "../../icons/MutedIcon.tsx";
 import LoudIcon from "../../icons/LoudIcon.tsx";
+import MicIcon from "../../icons/MicIcon.tsx";
+import SpeakerIcon from "../../icons/SpeakerIcon.tsx";
 import { getProfilePresentation } from "../../utils/profilePresentation";
 import GamePlayerRow from "./GamePlayerRow.tsx";
 import { atLeast } from "../../../shared/roles.ts";
@@ -21,6 +23,9 @@ interface SidebarProps {
   narrationEnabled: boolean;
   onLeaveGame: () => void;
   selectorName: string | null;
+  micPermission: "granted" | "prompt" | "denied" | "unknown";
+  showAutoplayReminder: boolean;
+  onRequestMicPermission: () => void;
   audioVolume: number; // 0..1
   onChangeAudioVolume: (v: number) => void;
   onToggleDailyDoubleSnipe: (enabled: boolean) => void;
@@ -184,6 +189,9 @@ const Sidebar: React.FC<SidebarProps> = ({
   narrationEnabled,
   onLeaveGame,
   selectorName,
+  micPermission,
+  showAutoplayReminder,
+  onRequestMicPermission,
   audioVolume,
   onChangeAudioVolume,
   onToggleDailyDoubleSnipe,
@@ -347,6 +355,39 @@ const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Fixed Bottom Section */}
       <div className="absolute bottom-1 lg:bottom-4 left-0 right-0 w-full md:w-64 lg:w-96 flex flex-col items-center gap-5 z-[100]">
+        {(micPermission !== "granted" || showAutoplayReminder) && (
+          <div className="w-[92%] flex flex-col gap-1">
+            {micPermission !== "granted" && (
+              <div className="rounded-md border border-amber-200/80 bg-amber-50 px-2.5 py-2 shadow-sm">
+                <div className="text-[11px] text-amber-900 leading-tight flex items-center justify-between gap-2">
+                  <span className="inline-flex items-center gap-1.5">
+                    <MicIcon className="h-3.5 w-3.5" />
+                    Mic permission is needed for voice answers.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={onRequestMicPermission}
+                    className="shrink-0 rounded-md bg-blue-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-blue-700"
+                  >
+                    Allow
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {showAutoplayReminder && (
+              <div className="rounded-md border border-amber-200/80 bg-amber-50 px-2.5 py-2 shadow-sm">
+                <div className="text-[11px] text-amber-900 leading-tight">
+                  <span className="inline-flex items-center gap-1.5">
+                    <SpeakerIcon className="h-3.5 w-3.5" />
+                    Audio blocked. Click anywhere to enable.
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {me && atLeast(me.role, "admin") && activeBoard !== "finalJeopardy" && (
           <>
             <button
