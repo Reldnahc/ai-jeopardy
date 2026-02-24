@@ -8,6 +8,7 @@ import ProfileCustomizationPanel from "../components/profile/ProfileCustomizatio
 import ProfileStatsGrid from "../components/profile/ProfileStatsGrid";
 import RecentBoards from "../components/profile/RecentBoards";
 import ModerationAlerts from "../components/profile/ModerationAlerts";
+import LinkArrowIcon from "../icons/LinkArrowIcon";
 import {
   prettyRoleLabel,
   useProfilePageController,
@@ -125,9 +126,12 @@ const Profile: React.FC = () => {
 
                   <Link
                     to={`/profile/${c.routeProfile.username}/stats`}
-                    className="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors"
+                    className="inline-flex items-center gap-1 text-sm font-semibold text-blue-700 transition-colors hover:text-blue-900"
                   >
-                    View full stats
+                    <span className="underline decoration-blue-300 underline-offset-4 hover:decoration-blue-500">
+                      View full stats
+                    </span>
+                    <LinkArrowIcon className="h-4 w-4" />
                   </Link>
                 </div>
 
@@ -147,9 +151,12 @@ const Profile: React.FC = () => {
 
                   <Link
                     to={`/profile/${c.routeProfile.username}/history`}
-                    className="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors"
+                    className="inline-flex items-center gap-1 text-sm font-semibold text-blue-700 transition-colors hover:text-blue-900"
                   >
-                    View full history
+                    <span className="underline decoration-blue-300 underline-offset-4 hover:decoration-blue-500">
+                      View full history
+                    </span>
+                    <LinkArrowIcon className="h-4 w-4" />
                   </Link>
                 </div>
 
