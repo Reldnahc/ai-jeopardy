@@ -6,13 +6,20 @@ import Sidebar from "../components/game/Sidebar.tsx";
 import FinalScoreScreen from "../components/game/FinalScoreScreen.tsx";
 import { useWebSocket } from "../contexts/WebSocketContext.tsx";
 import { useGameSession } from "../hooks/useGameSession.ts";
-import { useGameSocketSync } from "../hooks/game/useGameSocketSync.ts";
+import { useGameSocketSync } from "../features/game/socket/useGameSocketSync.ts";
 import { usePlayerIdentity } from "../hooks/usePlayerIdentity.ts";
 import { usePreload } from "../hooks/game/usePreload.ts";
 import { useEarlyMicPermission } from "../hooks/earlyMicPermission.ts";
 import { Clue } from "../../shared/types/board.ts";
 import { getCachedAudioBlobUrl } from "../audio/audioCache.ts";
 import { BuzzPayload } from "../types/Game.ts";
+import type {
+  AnswerUiState,
+  BuzzUiState,
+  DailyDoubleUiState,
+  FinalUiState,
+  TimerUiState,
+} from "../components/game/gameViewModels.ts";
 
 function getApiBase() {
   if (import.meta.env.DEV) return import.meta.env.VITE_API_BASE || "http://localhost:3002";
@@ -534,6 +541,34 @@ export default function Game() {
 
   const safeActiveBoard = activeBoard || "firstBoard";
   const safeCategories = boardData?.[safeActiveBoard]?.categories;
+  const buzzUi: BuzzUiState = {
+    buzzerLocked,
+    buzzResult,
+    buzzResultDisplay,
+    buzzLockedOut,
+    hasBuzzedCurrentClue,
+  };
+  const timerUi: TimerUiState = {
+    timerEndTime,
+    timerDuration,
+  };
+  const answerUi: AnswerUiState = {
+    answerCapture,
+    answerError,
+    answerProcessing,
+    myUsername,
+  };
+  const finalUi: FinalUiState = {
+    finalWagers,
+    selectedFinalist,
+    showWager,
+    finalists,
+  };
+  const ddUi: DailyDoubleUiState = {
+    ddWagerCapture,
+    ddWagerError,
+    showDdModal,
+  };
 
   return (
     <div className="flex h-screen w-screen overflow-hidden font-sans bg-gradient-to-b from-[#183a75] via-[#2a5fb3] to-[#1c4a96]">
@@ -579,24 +614,11 @@ export default function Game() {
               isFinalJeopardy={isFinalJeopardy}
               drawings={drawings}
               handleBuzz={handleBuzz}
-              buzzerLocked={buzzerLocked}
-              buzzResult={buzzResult}
-              buzzResultDisplay={buzzResultDisplay}
-              buzzLockedOut={buzzLockedOut}
-              hasBuzzedCurrentClue={hasBuzzedCurrentClue}
-              timerEndTime={timerEndTime}
-              timerDuration={timerDuration}
-              answerCapture={answerCapture}
-              answerError={answerError}
-              myUsername={myUsername}
-              finalWagers={finalWagers}
-              selectedFinalist={selectedFinalist}
-              ddWagerCapture={ddWagerCapture}
-              ddWagerError={ddWagerError}
-              showDdModal={showDdModal}
-              showWager={showWager}
-              finalists={finalists}
-              answerProcessing={answerProcessing}
+              buzzUi={buzzUi}
+              timerUi={timerUi}
+              answerUi={answerUi}
+              finalUi={finalUi}
+              ddUi={ddUi}
             />
           </>
         )}

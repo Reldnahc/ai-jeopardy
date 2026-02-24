@@ -4,7 +4,7 @@ import Timer from "./Timer.tsx";
 import {
   DailyDoubleShowModalMsg,
   DailyDoubleWagerCaptureStartMsg,
-} from "../../hooks/game/useGameSocketSync.ts";
+} from "../../features/game/socket/useGameSocketSync.ts";
 
 type Props = {
   gameId: string;

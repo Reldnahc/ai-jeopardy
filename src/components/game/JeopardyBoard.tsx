@@ -7,12 +7,13 @@ import { useWebSocket } from "../../contexts/WebSocketContext.tsx";
 import { Player } from "../../types/Lobby.ts";
 import { useAlert } from "../../contexts/AlertContext.tsx";
 import DailyDoubleWagerOverlay from "./DailyDoubleWagerOverlay.tsx";
-import {
-  AnswerCaptureStartMsg,
-  AnswerProcessingMsg,
-  DailyDoubleShowModalMsg,
-  DailyDoubleWagerCaptureStartMsg,
-} from "../../hooks/game/useGameSocketSync.ts";
+import type {
+  AnswerUiState,
+  BuzzUiState,
+  DailyDoubleUiState,
+  FinalUiState,
+  TimerUiState,
+} from "./gameViewModels.ts";
 import Timer from "./Timer.tsx"; // Import the selected clue component
 
 interface JeopardyBoardProps {
@@ -29,27 +30,11 @@ interface JeopardyBoardProps {
   isFinalJeopardy: boolean;
   drawings: Record<string, string> | null;
   handleBuzz: () => void;
-  buzzerLocked: boolean;
-  buzzResult: string | null;
-  buzzResultDisplay: string | null;
-  buzzLockedOut: boolean;
-  hasBuzzedCurrentClue: boolean;
-
-  timerEndTime: number | null;
-  timerDuration: number;
-  answerCapture: AnswerCaptureStartMsg | null;
-
-  answerError: string | null;
-  myUsername: string | null;
-  finalWagers: Record<string, number>;
-  selectedFinalist: string;
-  ddWagerCapture: DailyDoubleWagerCaptureStartMsg | null;
-
-  ddWagerError: string | null;
-  showDdModal: DailyDoubleShowModalMsg | null;
-  showWager: boolean;
-  finalists: string[];
-  answerProcessing: AnswerProcessingMsg | null;
+  buzzUi: BuzzUiState;
+  timerUi: TimerUiState;
+  answerUi: AnswerUiState;
+  finalUi: FinalUiState;
+  ddUi: DailyDoubleUiState;
 }
 
 const JeopardyBoard: React.FC<JeopardyBoardProps> = ({
@@ -66,24 +51,11 @@ const JeopardyBoard: React.FC<JeopardyBoardProps> = ({
   isFinalJeopardy,
   drawings,
   handleBuzz,
-  buzzerLocked,
-  buzzResult,
-  buzzResultDisplay,
-  buzzLockedOut,
-  hasBuzzedCurrentClue,
-  timerEndTime,
-  timerDuration,
-  answerCapture,
-  answerError,
-  myUsername,
-  finalWagers,
-  selectedFinalist,
-  ddWagerCapture,
-  ddWagerError,
-  showDdModal,
-  showWager,
-  finalists,
-  answerProcessing,
+  buzzUi,
+  timerUi,
+  answerUi,
+  finalUi,
+  ddUi,
 }) => {
   const [localSelectedClue, setLocalSelectedClue] = useState<Clue | null>(null);
   const [showClue, setShowClue] = useState(false);
@@ -185,7 +157,7 @@ const JeopardyBoard: React.FC<JeopardyBoardProps> = ({
           <h1 className="text-6xl">{boardData[0].category}</h1>
 
           <div className="mt-6">
-            <Timer endTime={timerEndTime} duration={timerDuration} />
+            <Timer endTime={timerUi.timerEndTime} duration={timerUi.timerDuration} />
           </div>
 
           <h2 className="text-2xl">Place Your Wager!</h2>
@@ -201,15 +173,15 @@ const JeopardyBoard: React.FC<JeopardyBoardProps> = ({
         </div>
       )}
 
-      {showDdModal && !isFinalJeopardy && !showClue && (
+      {ddUi.showDdModal && !isFinalJeopardy && !showClue && (
         <DailyDoubleWagerOverlay
           gameId={gameId}
-          myUsername={myUsername}
-          ddWagerCapture={ddWagerCapture}
-          showDdModal={showDdModal}
-          ddWagerError={ddWagerError}
-          timerEndTime={timerEndTime}
-          timerDuration={timerDuration}
+          myUsername={answerUi.myUsername}
+          ddWagerCapture={ddUi.ddWagerCapture}
+          showDdModal={ddUi.showDdModal}
+          ddWagerError={ddUi.ddWagerError}
+          timerEndTime={timerUi.timerEndTime}
+          timerDuration={timerUi.timerDuration}
         />
       )}
 
@@ -237,22 +209,11 @@ const JeopardyBoard: React.FC<JeopardyBoardProps> = ({
           drawingSubmitted={drawingSubmitted}
           setDrawingSubmitted={setDrawingSubmitted}
           handleBuzz={handleBuzz}
-          buzzerLocked={buzzerLocked}
-          buzzResult={buzzResult}
-          buzzResultDisplay={buzzResultDisplay}
-          buzzLockedOut={buzzLockedOut}
-          hasBuzzedCurrentClue={hasBuzzedCurrentClue}
-          timerEndTime={timerEndTime}
-          timerDuration={timerDuration}
-          answerCapture={answerCapture}
-          answerError={answerError}
-          myUsername={myUsername}
-          finalWagers={finalWagers}
-          selectedFinalist={selectedFinalist}
-          showDdModal={showDdModal}
-          showWager={showWager}
-          finalists={finalists}
-          answerProcessing={answerProcessing}
+          buzzUi={buzzUi}
+          timerUi={timerUi}
+          answerUi={answerUi}
+          finalUi={finalUi}
+          ddUi={ddUi}
         />
       )}
     </div>

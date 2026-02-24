@@ -1,14 +1,16 @@
-import React, { useEffect } from "react";
+﻿import React, { useEffect } from "react";
 import { Clue } from "../../../shared/types/board.ts";
 import { useWebSocket } from "../../contexts/WebSocketContext.tsx";
 import BuzzAnimation from "./BuzzAnimation.tsx";
 import Timer from "./Timer.tsx";
 import FinalJeopardyPanel from "./FinalJeopardyPanel.tsx";
-import {
-  AnswerCaptureStartMsg,
-  AnswerProcessingMsg,
-  DailyDoubleShowModalMsg,
-} from "../../hooks/game/useGameSocketSync.ts";
+import type {
+  AnswerUiState,
+  BuzzUiState,
+  DailyDoubleUiState,
+  FinalUiState,
+  TimerUiState,
+} from "./gameViewModels.ts";
 
 interface SelectedClueDisplayProps {
   localSelectedClue: Clue;
@@ -22,23 +24,11 @@ interface SelectedClueDisplayProps {
   drawingSubmitted: Record<string, boolean>;
   setDrawingSubmitted: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
   handleBuzz: () => void;
-  buzzerLocked: boolean;
-  buzzResult: string | null;
-  buzzResultDisplay: string | null;
-  buzzLockedOut: boolean;
-  hasBuzzedCurrentClue: boolean;
-  timerEndTime: number | null;
-  timerDuration: number;
-  answerCapture: AnswerCaptureStartMsg | null;
-
-  answerError: string | null;
-  myUsername: string | null;
-  finalWagers: Record<string, number>;
-  selectedFinalist: string;
-  showDdModal: DailyDoubleShowModalMsg | null;
-  showWager: boolean;
-  finalists: string[];
-  answerProcessing: AnswerProcessingMsg | null;
+  buzzUi: BuzzUiState;
+  timerUi: TimerUiState;
+  answerUi: AnswerUiState;
+  finalUi: FinalUiState;
+  ddUi: DailyDoubleUiState;
 }
 
 const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
@@ -52,22 +42,11 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
   drawingSubmitted,
   setDrawingSubmitted,
   handleBuzz,
-  buzzerLocked,
-  buzzResult,
-  buzzResultDisplay,
-  buzzLockedOut,
-  hasBuzzedCurrentClue,
-  timerEndTime,
-  timerDuration,
-  answerCapture,
-  answerError,
-  myUsername,
-  finalWagers,
-  selectedFinalist,
-  showDdModal,
-  showWager,
-  finalists,
-  answerProcessing,
+  buzzUi,
+  timerUi,
+  answerUi,
+  finalUi,
+  ddUi,
 }) => {
   const { sendJson } = useWebSocket();
 
@@ -92,7 +71,6 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
       reader.onerror = () => reject(reader.error);
       reader.onloadend = () => {
         const result = String(reader.result || "");
-        // "data:audio/webm;codecs=opus;base64,AAAA..."
         const base64 = result.split(",")[1] || "";
         resolve(base64);
       };
@@ -106,18 +84,19 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
       return preferred;
     if (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported("audio/webm"))
       return "audio/webm";
-    return ""; // let browser pick
+    return "";
   }
 
   const isAnsweringPlayer =
-    !!answerCapture && !!myUsername && answerCapture.username === myUsername;
+    !!answerUi.answerCapture &&
+    !!answerUi.myUsername &&
+    answerUi.answerCapture.username === answerUi.myUsername;
 
   useEffect(() => {
-    // Only the selected player records
-    if (!answerCapture || !isAnsweringPlayer) return;
+    const capture = answerUi.answerCapture;
+    if (!capture || !isAnsweringPlayer) return;
 
-    // Don’t resend for same session
-    if (sentSessionRef.current === answerCapture.answerSessionId) return;
+    if (sentSessionRef.current === capture.answerSessionId) return;
 
     let cancelled = false;
 
@@ -147,7 +126,7 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
           mime
             ? {
                 mimeType: mime,
-                audioBitsPerSecond: 24000, // try 16000–32000
+                audioBitsPerSecond: 24000,
                 bitsPerSecond: 24000,
               }
             : {
@@ -157,10 +136,9 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
         );
         recorderRef.current = rec;
 
-        // --- VAD setup (detect when they've spoken, then stop after silence) ---
-        const END_SILENCE_MS = 900; // stop after this much silence *after speech*
-        const VAD_INTERVAL_MS = 80; // how often to sample audio
-        const RMS_THRESHOLD = 0.018; // tweak: lower = more sensitive, higher = less sensitive
+        const END_SILENCE_MS = 900;
+        const VAD_INTERVAL_MS = 80;
+        const RMS_THRESHOLD = 0.018;
 
         audioCtx = createAudioContext();
         source = audioCtx.createMediaStreamSource(stream);
@@ -201,7 +179,6 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
             lastVoiceAt = now;
           }
 
-          // Only stop early after we've heard speech, then a silence gap
           if (hasSpoken && now - lastVoiceAt >= END_SILENCE_MS) {
             try {
               if (rec.state !== "inactive") rec.stop();
@@ -219,13 +196,11 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
         };
 
         rec.onstop = async () => {
-          // Stop VAD timer
           if (vadTimer) {
             window.clearTimeout(vadTimer);
             vadTimer = null;
           }
 
-          // Cleanup audio graph
           try {
             source?.disconnect();
           } catch {
@@ -242,7 +217,6 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
             /* ignore */
           }
 
-          // Stop tracks
           try {
             stream?.getTracks().forEach((t) => t.stop());
           } catch {
@@ -256,11 +230,10 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
           const voiceMs = voiceTicks * VAD_INTERVAL_MS;
 
           if (!hasSpoken) {
-            // Mark sent now so we never duplicate
-            sentSessionRef.current = answerCapture.answerSessionId;
+            sentSessionRef.current = capture.answerSessionId;
 
             console.log("[mic] no speech detected, sending noSpeech", {
-              session: answerCapture.answerSessionId,
+              session: capture.answerSessionId,
               durationMs,
               maxRms,
             });
@@ -268,11 +241,11 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
             sendJson({
               type: "answer-audio-blob",
               gameId,
-              answerSessionId: answerCapture.answerSessionId,
+              answerSessionId: capture.answerSessionId,
               mimeType: rec.mimeType || "audio/webm",
               noSpeech: true,
               vad: { hasSpoken: false, maxRms, voiceMs, durationMs },
-              dataBase64: "", // keep server happy if it expects a string
+              dataBase64: "",
             });
 
             return;
@@ -281,8 +254,7 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
           const blob = new Blob(chunksRef.current, { type: rec.mimeType || "audio/webm" });
           chunksRef.current = [];
 
-          // Mark sent now so we never duplicate
-          sentSessionRef.current = answerCapture.answerSessionId;
+          sentSessionRef.current = capture.answerSessionId;
 
           const t0 = performance.now();
           const dataBase64 = await blobToBase64(blob);
@@ -292,28 +264,24 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
           console.log("[mic] sending", {
             bytes: blob.size,
             mime: blob.type,
-            session: answerCapture.answerSessionId,
+            session: capture.answerSessionId,
           });
 
           sendJson({
             type: "answer-audio-blob",
             gameId,
-            answerSessionId: answerCapture.answerSessionId,
+            answerSessionId: capture.answerSessionId,
             mimeType: blob.type,
             dataBase64,
             vad: { hasSpoken: true, maxRms, voiceMs, durationMs },
           });
         };
 
-        // Start recording; collect chunks every 1000ms
         rec.start(1000);
-
-        // Start VAD loop
         vadTimer = window.setTimeout(scheduleVadTick, VAD_INTERVAL_MS);
 
-        // Hard stop: always stop a bit early to beat server window
         const BUFFER_MS = 800;
-        const hardStopInMs = Math.max(500, (answerCapture.durationMs || 6500) - BUFFER_MS);
+        const hardStopInMs = Math.max(500, (capture.durationMs || 6500) - BUFFER_MS);
 
         window.setTimeout(() => {
           try {
@@ -325,7 +293,6 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
       } catch (err) {
         console.error("Mic capture failed:", err);
 
-        // Cleanup if getUserMedia fails partway
         try {
           stream?.getTracks().forEach((t) => t.stop());
         } catch {
@@ -346,8 +313,6 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
         } catch {
           /* ignore */
         }
-
-        // If mic fails, do nothing — backend timeout will mark incorrect
       }
     };
 
@@ -366,7 +331,7 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
       recorderRef.current = null;
       chunksRef.current = [];
     };
-  }, [answerCapture, isAnsweringPlayer, gameId, sendJson]);
+  }, [answerUi.answerCapture, isAnsweringPlayer, gameId, sendJson]);
 
   useEffect(() => {
     if (localSelectedClue?.media?.type === "image") {
@@ -377,17 +342,13 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
 
   return (
     <div className="absolute inset-0 h-[calc(100vh-5.5rem)] text-white z-10 p-5">
-      {/* Timer stays pinned */}
       <div className="absolute left-8 top-0">
-        <Timer endTime={timerEndTime} duration={timerDuration} />
+        <Timer endTime={timerUi.timerEndTime} duration={timerUi.timerDuration} />
       </div>
 
-      {/* Keep buzz animation overlay-ish */}
-      <BuzzAnimation playerName={buzzResultDisplay} />
+      <BuzzAnimation playerName={buzzUi.buzzResultDisplay} />
 
-      {/* Main layout: top padding for timer + scrollable center area */}
       <div className="h-full pt-16 flex flex-col items-center">
-        {/* Scroll container so long clues never run off-screen */}
         <div className="w-full flex-1 overflow-y-auto overscroll-contain flex justify-center">
           <div className="text-center cursor-pointer w-full max-w-[85vw] md:max-w-[65vw] py-2">
             {imageAssetId ? (
@@ -439,48 +400,47 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
                 drawings={drawings}
                 drawingSubmitted={drawingSubmitted}
                 setDrawingSubmitted={setDrawingSubmitted}
-                finalWagers={finalWagers}
-                selectedFinalist={selectedFinalist}
-                timerEndTime={timerEndTime}
-                showWager={showWager}
-                finalists={finalists}
+                finalWagers={finalUi.finalWagers}
+                selectedFinalist={finalUi.selectedFinalist}
+                timerEndTime={timerUi.timerEndTime}
+                showWager={finalUi.showWager}
+                finalists={finalUi.finalists}
               />
             )}
-            {answerProcessing && !showAnswer && (
+            {answerUi.answerProcessing && !showAnswer && (
               <div className="mt-3 flex justify-center">
                 <div className="text-md text-red-500 font-extrabold mt-1">Host is thinking…</div>
               </div>
             )}
 
-            {answerCapture && !showAnswer && (
+            {answerUi.answerCapture && !showAnswer && (
               <div className="mt-4 text-center">
-                <div className="text-lg font-bold">{answerCapture.displayname} is answering…</div>
+                <div className="text-lg font-bold">{answerUi.answerCapture.displayname} is answering…</div>
                 {isAnsweringPlayer && (
-                  <div className="text-md text-red-500 font-extrabold mt-1">
-                    Recording your mic now…
-                  </div>
+                  <div className="text-md text-red-500 font-extrabold mt-1">Recording your mic now…</div>
                 )}
-                {answerError && <div className="mt-2 text-sm text-red-200">{answerError}</div>}
+                {answerUi.answerError && (
+                  <div className="mt-2 text-sm text-red-200">{answerUi.answerError}</div>
+                )}
               </div>
             )}
           </div>
         </div>
 
-        {/* Buzz button stays at the bottom */}
-        {!isFinalJeopardy && !showDdModal && !showAnswer && !hasBuzzedCurrentClue && (
+        {!isFinalJeopardy && !ddUi.showDdModal && !showAnswer && !buzzUi.hasBuzzedCurrentClue && (
           <button
             onClick={handleBuzz}
-            disabled={!!buzzResult || buzzLockedOut || !!answerCapture}
+            disabled={!!buzzUi.buzzResult || buzzUi.buzzLockedOut || !!answerUi.answerCapture}
             style={{ fontSize: "clamp(1.5rem, 3vw, 2.5rem)" }}
             className={`mt-4 px-12 py-5 rounded-xl font-bold shadow-2xl min-w-64 intext-white transition duration-300 ease-in-out ${
-              buzzLockedOut
+              buzzUi.buzzLockedOut
                 ? "bg-orange-500"
-                : buzzResult || buzzerLocked
+                : buzzUi.buzzResult || buzzUi.buzzerLocked
                   ? "bg-gray-500 cursor-not-allowed"
                   : "bg-green-500 hover:bg-green-600"
             }`}
           >
-            {buzzLockedOut ? "Locked Out" : buzzerLocked ? "Buzz Early" : "Buzz!"}
+            {buzzUi.buzzLockedOut ? "Locked Out" : buzzUi.buzzerLocked ? "Buzz Early" : "Buzz!"}
           </button>
         )}
       </div>
