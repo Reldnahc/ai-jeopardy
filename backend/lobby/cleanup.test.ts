@@ -24,6 +24,11 @@ describe("lobby cleanup", () => {
     expect(game.emptySince).toBeNull();
   });
 
+  it("cancelLobbyCleanup no-ops for nullish input", () => {
+    expect(() => cancelLobbyCleanup(null)).not.toThrow();
+    expect(() => cancelLobbyCleanup(undefined)).not.toThrow();
+  });
+
   it("schedules and deletes empty lobby after grace period", () => {
     games.g1 = {
       inLobby: true,
@@ -54,6 +59,21 @@ describe("lobby cleanup", () => {
     expect(games.g2?.emptySince).toBeNull();
   });
 
+  it("does not schedule when game is missing or already scheduled", () => {
+    expect(() => scheduleLobbyCleanupIfEmpty("missing")).not.toThrow();
+
+    const timer = setTimeout(() => {}, 1000);
+    games.g4 = {
+      inLobby: true,
+      players: [{ username: "alice", online: false }],
+      cleanupTimer: timer,
+      emptySince: Date.now(),
+    } as never;
+
+    scheduleLobbyCleanupIfEmpty("g4");
+    expect(games.g4.cleanupTimer).toBe(timer);
+  });
+
   it("keeps game when someone reconnects before timer fires", () => {
     games.g3 = {
       inLobby: true,
@@ -70,5 +90,20 @@ describe("lobby cleanup", () => {
     expect(games.g3.cleanupTimer).toBeNull();
     expect(games.g3.emptySince).toBeNull();
   });
-});
 
+  it("keeps non-lobby game when empty at expiry", () => {
+    games.g5 = {
+      inLobby: false,
+      players: [{ username: "alice", online: false }],
+      cleanupTimer: null,
+      emptySince: null,
+    } as never;
+
+    scheduleLobbyCleanupIfEmpty("g5");
+    vi.advanceTimersByTime(LOBBY_EMPTY_GRACE_MS + 1);
+
+    expect(games.g5).toBeTruthy();
+    expect(games.g5.cleanupTimer).toBeNull();
+    expect(games.g5.emptySince).toBeNull();
+  });
+});
