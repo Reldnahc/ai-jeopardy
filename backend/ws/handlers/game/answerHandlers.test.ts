@@ -66,6 +66,52 @@ describe("answerHandlers", () => {
     expect(ctx.autoResolveAfterJudgement).toHaveBeenCalledWith(ctx, "g1", game, "alice", "incorrect");
   });
 
+  it("rejects a non-answering player submission", async () => {
+    const ws = makeWs();
+    const game = makeGame({ answeringPlayerUsername: "bob" });
+    const ctx = makeCtx(game);
+
+    await answerHandlers["answer-audio-blob"]({
+      ws,
+      data: { gameId: "g1", answerSessionId: "sess-1", dataBase64: Buffer.from("a").toString("base64") },
+      ctx,
+    });
+
+    expect(ws.send).toHaveBeenCalledWith(expect.stringContaining("You are not the answering player"));
+    expect(ctx.autoResolveAfterJudgement).toHaveBeenCalledWith(ctx, "g1", game, "alice", "incorrect");
+  });
+
+  it("rejects missing audio data", async () => {
+    const ws = makeWs();
+    const game = makeGame();
+    const ctx = makeCtx(game);
+
+    await answerHandlers["answer-audio-blob"]({
+      ws,
+      data: { gameId: "g1", answerSessionId: "sess-1", dataBase64: "" },
+      ctx,
+    });
+
+    expect(ws.send).toHaveBeenCalledWith(expect.stringContaining("Missing audio data"));
+    expect(ctx.autoResolveAfterJudgement).toHaveBeenCalledWith(ctx, "g1", game, "alice", "incorrect");
+  });
+
+  it("rejects oversized audio payloads", async () => {
+    const ws = makeWs();
+    const game = makeGame();
+    const ctx = makeCtx(game);
+    const hugeBase64 = Buffer.alloc(2_000_001, 1).toString("base64");
+
+    await answerHandlers["answer-audio-blob"]({
+      ws,
+      data: { gameId: "g1", answerSessionId: "sess-1", dataBase64: hugeBase64 },
+      ctx,
+    });
+
+    expect(ws.send).toHaveBeenCalledWith(expect.stringContaining("Audio too large"));
+    expect(ctx.autoResolveAfterJudgement).toHaveBeenCalledWith(ctx, "g1", game, "alice", "incorrect");
+  });
+
   it("broadcasts transcript and result on successful judging", async () => {
     const ws = makeWs();
     const game = makeGame();
@@ -103,6 +149,59 @@ describe("answerHandlers", () => {
     const game = makeGame();
     const ctx = makeCtx(game, {
       transcribeAnswerAudio: vi.fn(async () => ""),
+    });
+
+    await answerHandlers["answer-audio-blob"]({
+      ws,
+      data: {
+        gameId: "g1",
+        answerSessionId: "sess-1",
+        mimeType: "audio/webm",
+        dataBase64: Buffer.from("audio").toString("base64"),
+      },
+      ctx,
+    });
+
+    expect(ctx.broadcast).toHaveBeenCalledWith(
+      "g1",
+      expect.objectContaining({ type: "answer-result", verdict: "incorrect", suggestedDelta: -400 }),
+    );
+    expect(ctx.autoResolveAfterJudgement).toHaveBeenCalledWith(ctx, "g1", game, "alice", "incorrect");
+  });
+
+  it("uses daily double wager as result delta when active on clue", async () => {
+    const ws = makeWs();
+    const game = makeGame({
+      dailyDouble: { clueKey: "firstBoard:400:Capital of France?", wager: 1200 },
+    });
+    const ctx = makeCtx(game, {
+      judgeClueAnswerFast: vi.fn(async () => ({ verdict: "incorrect" })),
+    });
+
+    await answerHandlers["answer-audio-blob"]({
+      ws,
+      data: {
+        gameId: "g1",
+        answerSessionId: "sess-1",
+        mimeType: "audio/webm",
+        dataBase64: Buffer.from("audio").toString("base64"),
+      },
+      ctx,
+    });
+
+    expect(ctx.broadcast).toHaveBeenCalledWith(
+      "g1",
+      expect.objectContaining({ type: "answer-result", verdict: "incorrect", suggestedDelta: -1200 }),
+    );
+  });
+
+  it("falls back to incorrect when judge throws", async () => {
+    const ws = makeWs();
+    const game = makeGame();
+    const ctx = makeCtx(game, {
+      judgeClueAnswerFast: vi.fn(async () => {
+        throw new Error("judge failed");
+      }),
     });
 
     await answerHandlers["answer-audio-blob"]({

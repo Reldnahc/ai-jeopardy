@@ -72,6 +72,51 @@ describe("miscHandlers", () => {
     expect(ctx.broadcast).toHaveBeenCalledWith("g1", { type: "update-scores", scores: game.scores });
   });
 
+  it("unlock-buzzer requires host and unlocks authoritatively", async () => {
+    const ws = makeWs();
+    const game = makeGame();
+    const ctx = makeCtx(game);
+
+    await miscHandlers["unlock-buzzer"]({ ws, data: { gameId: "g1" }, ctx });
+
+    expect(ctx.cancelAutoUnlock).toHaveBeenCalledWith(game);
+    expect(ctx.doUnlockBuzzerAuthoritative).toHaveBeenCalledWith("g1", game, ctx);
+  });
+
+  it("lock-buzzer toggles lock and broadcasts for host", async () => {
+    const ws = makeWs();
+    const game = makeGame({ buzzerLocked: false });
+    const ctx = makeCtx(game);
+
+    await miscHandlers["lock-buzzer"]({ ws, data: { gameId: "g1" }, ctx });
+
+    expect(game.buzzerLocked).toBe(true);
+    expect(ctx.broadcast).toHaveBeenCalledWith("g1", { type: "buzzer-locked" });
+  });
+
+  it("reset-buzzer clears buzz state and broadcasts reset events", async () => {
+    const ws = makeWs();
+    const game = makeGame({
+      buzzed: "alice",
+      buzzerLocked: false,
+      buzzLockouts: { alice: Date.now() + 1000 },
+      timerVersion: 1,
+      timerEndTime: Date.now() + 5000,
+    });
+    const ctx = makeCtx(game);
+
+    await miscHandlers["reset-buzzer"]({ ws, data: { gameId: "g1" }, ctx });
+
+    expect(game.buzzed).toBeNull();
+    expect(game.buzzerLocked).toBe(true);
+    expect(game.buzzLockouts).toEqual({});
+    expect(game.timerEndTime).toBeNull();
+    expect(game.timerVersion).toBe(2);
+    expect(ctx.broadcast).toHaveBeenCalledWith("g1", { type: "buzzer-ui-reset" });
+    expect(ctx.broadcast).toHaveBeenCalledWith("g1", { type: "buzzer-locked" });
+    expect(ctx.broadcast).toHaveBeenCalledWith("g1", { type: "timer-end", timerVersion: 2 });
+  });
+
   it("mark-all-complete marks active board clues and checks transition", async () => {
     const ws = makeWs();
     const game = makeGame();
@@ -88,6 +133,73 @@ describe("miscHandlers", () => {
     expect(ctx.checkBoardTransition).toHaveBeenCalledWith(game, "g1", ctx);
   });
 
+  it("reveal-answer marks clue revealed and resets answer capture state", async () => {
+    const ws = makeWs();
+    const game = makeGame({
+      phase: "ANSWER_CAPTURE",
+      answeringPlayerKey: "alice",
+      answerSessionId: "sess-1",
+      answerClueKey: "firstBoard:200:Q1",
+      selectedClue: { value: 200, question: "Q1", answer: "A1", isAnswerRevealed: false },
+    });
+    const ctx = makeCtx(game);
+
+    await miscHandlers["reveal-answer"]({ ws, data: { gameId: "g1" }, ctx });
+
+    expect(ctx.clearAnswerWindow).toHaveBeenCalledWith(game);
+    expect(game.phase).toBeNull();
+    expect(game.answeringPlayerKey).toBeNull();
+    expect(game.answerSessionId).toBeNull();
+    expect(game.answerClueKey).toBeNull();
+    expect(game.selectedClue?.isAnswerRevealed).toBe(true);
+    expect(ctx.broadcast).toHaveBeenCalledWith(
+      "g1",
+      expect.objectContaining({ type: "answer-revealed" }),
+    );
+  });
+
+  it("submit handlers delegate to game helpers", async () => {
+    const ws = makeWs();
+    const game = makeGame();
+    const ctx = makeCtx(game);
+
+    await miscHandlers["submit-wager"]({ ws, data: { gameId: "g1", player: "alice", wager: 500 }, ctx });
+    await miscHandlers["submit-drawing"]({ ws, data: { gameId: "g1", player: "alice", drawing: "img" }, ctx });
+    await miscHandlers["submit-final-wager-drawing"]({
+      ws,
+      data: { gameId: "g1", player: "alice", drawing: "wager-img" },
+      ctx,
+    });
+
+    expect(ctx.submitWager).toHaveBeenCalledWith(game, "g1", "alice", 500, ctx);
+    expect(ctx.submitDrawing).toHaveBeenCalledWith(game, "g1", "alice", "img", ctx);
+    expect(ctx.submitWagerDrawing).toHaveBeenCalledWith(game, "g1", "alice", "wager-img", ctx);
+  });
+
+  it("tts-ensure sends tts-ready with generated asset", async () => {
+    const ws = makeWs();
+    const game = makeGame({ lobbySettings: { narrationEnabled: true } });
+    const ctx = makeCtx(game, {
+      ensureTtsAsset: vi.fn(async () => ({ id: "asset-99" })),
+    });
+
+    await miscHandlers["tts-ensure"]({
+      ws,
+      data: { gameId: "g1", text: "hello", requestId: "r1" },
+      ctx,
+    });
+
+    expect(ctx.ensureTtsAsset).toHaveBeenCalled();
+    expect(ws.send).toHaveBeenCalledWith(
+      JSON.stringify({
+        type: "tts-ready",
+        requestId: "r1",
+        assetId: "asset-99",
+        url: "/api/tts/asset-99",
+      }),
+    );
+  });
+
   it("tts-ensure sends error when narration is disabled", async () => {
     const ws = makeWs();
     const game = makeGame({ lobbySettings: { narrationEnabled: false } });
@@ -101,6 +213,26 @@ describe("miscHandlers", () => {
 
     expect(ws.send).toHaveBeenCalledWith(
       JSON.stringify({ type: "tts-error", requestId: "r1", message: "Narration disabled" }),
+    );
+  });
+
+  it("tts-ensure sends generation error when asset creation fails", async () => {
+    const ws = makeWs();
+    const game = makeGame({ lobbySettings: { narrationEnabled: true } });
+    const ctx = makeCtx(game, {
+      ensureTtsAsset: vi.fn(async () => {
+        throw new Error("boom");
+      }),
+    });
+
+    await miscHandlers["tts-ensure"]({
+      ws,
+      data: { gameId: "g1", text: "hello", requestId: "r2" },
+      ctx,
+    });
+
+    expect(ws.send).toHaveBeenCalledWith(
+      JSON.stringify({ type: "tts-error", requestId: "r2", message: "Failed to generate narration" }),
     );
   });
 });

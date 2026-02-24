@@ -101,4 +101,76 @@ describe("buzzHandlers", () => {
     });
     expect(ctx.repos.profiles.incrementTotalBuzzes).toHaveBeenCalledWith("alice");
   });
+
+  it("denies buzz when stable user is currently lockout-blocked", async () => {
+    const ws = makeWs();
+    const game = makeGame({ buzzLockouts: { alice: Date.now() + 5_000 } });
+    const ctx = makeCtx(game);
+
+    await buzzHandlers.buzz({ ws, data: { gameId: "g1" }, ctx });
+
+    expect(ws.send).toHaveBeenCalledWith(expect.stringContaining("\"reason\":\"locked-out\""));
+  });
+
+  it("denies buzz with invalid early timestamp", async () => {
+    const ws = makeWs();
+    const now = Date.now();
+    const game = makeGame({
+      clueState: { clueKey: "firstBoard:400:Q", lockedOut: {}, buzzOpenAtMs: now + 1000 },
+    });
+    const ctx = makeCtx(game);
+
+    await buzzHandlers.buzz({
+      ws,
+      data: { gameId: "g1", estimatedServerBuzzAtMs: now },
+      ctx,
+    });
+
+    expect(ws.send).toHaveBeenCalledWith(expect.stringContaining("\"reason\":\"bad-timestamp\""));
+  });
+
+  it("collects winner and starts answer capture flow", async () => {
+    vi.useFakeTimers();
+    try {
+      const ws = makeWs();
+      const game = makeGame({
+        timeToAnswer: 5,
+        clueState: { clueKey: "firstBoard:400:Q", lockedOut: {}, buzzOpenAtMs: Date.now() - 10 },
+      });
+      const ctx = makeCtx(game);
+
+      await buzzHandlers.buzz({
+        ws,
+        data: { gameId: "g1", estimatedServerBuzzAtMs: Date.now(), clientSeq: 1 },
+        ctx,
+      });
+
+      await vi.advanceTimersByTimeAsync(70);
+
+      expect(game.buzzed).toBe("alice");
+      expect(ctx.broadcast).toHaveBeenCalledWith(
+        "g1",
+        expect.objectContaining({ type: "buzz-result", username: "alice" }),
+      );
+      expect(ctx.broadcast).toHaveBeenCalledWith(
+        "g1",
+        expect.objectContaining({ type: "answer-capture-start", username: "alice", durationMs: 5000 }),
+      );
+      expect(ctx.startGameTimer).toHaveBeenCalledWith("g1", game, ctx, 5, "answer");
+      expect(ctx.repos.profiles.incrementTimesBuzzed).toHaveBeenCalledWith("alice");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not add duplicate pending candidate for same user", async () => {
+    const ws = makeWs();
+    const game = makeGame();
+    const ctx = makeCtx(game);
+
+    await buzzHandlers.buzz({ ws, data: { gameId: "g1", clientSeq: 1 }, ctx });
+    await buzzHandlers.buzz({ ws, data: { gameId: "g1", clientSeq: 2 }, ctx });
+
+    expect(game.pendingBuzz?.candidates).toHaveLength(1);
+  });
 });
