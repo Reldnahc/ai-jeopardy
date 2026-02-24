@@ -4,7 +4,11 @@ import { createCtx, fireAndForget } from "../../../test/createCtx.js";
 import { clueHandlers } from "./clueHandlers.js";
 
 function makeWs() {
-  return { id: "ws-1", send: vi.fn(), gameId: null } as any;
+  return { id: "ws-1", send: vi.fn(), gameId: null } as {
+    id: string;
+    send: ReturnType<typeof vi.fn>;
+    gameId: string | null;
+  };
 }
 
 function makeGame(overrides: Partial<GameState> = {}): GameState {
