@@ -63,6 +63,41 @@ describe("lobbyCategoryHandlers", () => {
     );
   });
 
+  it("toggle-lock-category rejects non-host and snapshots", async () => {
+    const ws = makeWs();
+    const game = makeGame();
+    const ctx = makeCtx(game, { isHostSocket: vi.fn(() => false) });
+
+    await lobbyCategoryHandlers["toggle-lock-category"]({
+      ws,
+      data: { gameId: "g1", boardType: "firstBoard", index: 2 },
+      ctx,
+    });
+
+    expect(ws.send).toHaveBeenCalledWith(
+      JSON.stringify({ type: "error", message: "Only the host can toggle category locks." }),
+    );
+    expect(ctx.sendLobbySnapshot).toHaveBeenCalledWith(ws, "g1");
+  });
+
+  it("toggle-lock-category initializes lock state when missing", async () => {
+    const ws = makeWs();
+    const game = makeGame({ lockedCategories: undefined });
+    const ctx = makeCtx(game);
+
+    await lobbyCategoryHandlers["toggle-lock-category"]({
+      ws,
+      data: { gameId: "g1", boardType: "finalJeopardy", index: 0 },
+      ctx,
+    });
+
+    expect(game.lockedCategories?.finalJeopardy?.[0]).toBe(true);
+    expect(ctx.broadcast).toHaveBeenCalledWith(
+      "g1",
+      expect.objectContaining({ type: "category-lock-updated", boardType: "finalJeopardy", index: 0, locked: true }),
+    );
+  });
+
   it("randomize-category rejects when slot is locked", async () => {
     const ws = makeWs();
     const game = makeGame({
@@ -102,6 +137,130 @@ describe("lobbyCategoryHandlers", () => {
     );
   });
 
+  it("randomize-category rejects when there is no unique candidate", async () => {
+    const ws = makeWs();
+    const game = makeGame();
+    const ctx = makeCtx(game);
+
+    await lobbyCategoryHandlers["randomize-category"]({
+      ws,
+      data: { gameId: "g1", boardType: "firstBoard", index: 0, candidates: ["B", "C"] },
+      ctx,
+    });
+
+    expect(ws.send).toHaveBeenCalledWith(
+      JSON.stringify({ type: "error", message: "No unique random category available." }),
+    );
+    expect(ctx.sendLobbySnapshot).toHaveBeenCalledWith(ws, "g1");
+  });
+
+  it("update-category validates required gameId", async () => {
+    const ws = makeWs();
+    const game = makeGame();
+    const ctx = makeCtx(game);
+
+    await lobbyCategoryHandlers["update-category"]({
+      ws,
+      data: { boardType: "firstBoard", index: 0, value: "X" },
+      ctx,
+    });
+
+    expect(ws.send).toHaveBeenCalledWith(
+      JSON.stringify({ type: "error", message: "update-category missing gameId" }),
+    );
+  });
+
+  it("update-category rejects invalid boardType and snapshots", async () => {
+    const ws = makeWs();
+    const game = makeGame();
+    const ctx = makeCtx(game);
+
+    await lobbyCategoryHandlers["update-category"]({
+      ws,
+      data: { gameId: "g1", boardType: "bogus", index: 0, value: "X" },
+      ctx,
+    });
+
+    expect(ws.send).toHaveBeenCalledWith(expect.stringContaining("Invalid boardType"));
+    expect(ctx.sendLobbySnapshot).toHaveBeenCalledWith(ws, "g1");
+  });
+
+  it("update-category rejects invalid index and snapshots", async () => {
+    const ws = makeWs();
+    const game = makeGame();
+    const ctx = makeCtx(game);
+
+    await lobbyCategoryHandlers["update-category"]({
+      ws,
+      data: { gameId: "g1", boardType: "firstBoard", index: "NaN", value: "X" },
+      ctx,
+    });
+
+    expect(ws.send).toHaveBeenCalledWith(expect.stringContaining("Invalid index"));
+    expect(ctx.sendLobbySnapshot).toHaveBeenCalledWith(ws, "g1");
+  });
+
+  it("update-category rejects locked category", async () => {
+    const ws = makeWs();
+    const game = makeGame({
+      lockedCategories: {
+        firstBoard: [false, true, false, false, false],
+        secondBoard: [false, false, false, false, false],
+        finalJeopardy: [false],
+      },
+    });
+    const ctx = makeCtx(game);
+
+    await lobbyCategoryHandlers["update-category"]({
+      ws,
+      data: { gameId: "g1", boardType: "firstBoard", index: 1, value: "X" },
+      ctx,
+    });
+
+    expect(ws.send).toHaveBeenCalledWith(
+      JSON.stringify({ type: "error", message: "That category is locked." }),
+    );
+    expect(ctx.sendLobbySnapshot).toHaveBeenCalledWith(ws, "g1");
+  });
+
+  it("update-category updates value and broadcasts", async () => {
+    const ws = makeWs();
+    const game = makeGame();
+    const ctx = makeCtx(game);
+
+    await lobbyCategoryHandlers["update-category"]({
+      ws,
+      data: { gameId: "g1", boardType: "secondBoard", index: 1, value: "  New Cat" },
+      ctx,
+    });
+
+    expect(game.categories?.[6]).toBe("New Cat");
+    expect(ctx.broadcast).toHaveBeenCalledWith(
+      "g1",
+      expect.objectContaining({ type: "category-updated", boardType: "secondBoard", index: 1, value: "New Cat" }),
+    );
+  });
+
+  it("update-category catches internal errors and sends server error", async () => {
+    const ws = makeWs();
+    const game = makeGame();
+    const ctx = makeCtx(game, {
+      broadcast: vi.fn(() => {
+        throw new Error("boom");
+      }),
+    });
+
+    await lobbyCategoryHandlers["update-category"]({
+      ws,
+      data: { gameId: "g1", boardType: "firstBoard", index: 0, value: "X" },
+      ctx,
+    });
+
+    expect(ws.send).toHaveBeenCalledWith(
+      JSON.stringify({ type: "error", message: "Server error while updating category." }),
+    );
+  });
+
   it("update-categories normalizes and broadcasts category list", async () => {
     const ws = makeWs();
     const game = makeGame();
@@ -117,6 +276,24 @@ describe("lobbyCategoryHandlers", () => {
     expect(ctx.broadcast).toHaveBeenCalledWith(
       "g1",
       expect.objectContaining({ type: "categories-updated" }),
+    );
+  });
+
+  it("update-categories errors when game is missing", async () => {
+    const ws = makeWs();
+    const ctx = makeCtx(makeGame(), { games: {} });
+
+    await lobbyCategoryHandlers["update-categories"]({
+      ws,
+      data: { gameId: "missing", categories: ["foo"] },
+      ctx,
+    });
+
+    expect(ws.send).toHaveBeenCalledWith(
+      JSON.stringify({
+        type: "error",
+        message: "Game missing not found while updating categories.",
+      }),
     );
   });
 });

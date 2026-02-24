@@ -84,6 +84,51 @@ describe("sessionHandlers", () => {
     );
   });
 
+  it("join-game reconnects existing player by username and updates displayname", async () => {
+    const ws = makeWs("ws-new");
+    const game = makeGame({
+      players: [{ id: "old-id", username: "alice", displayname: "Old Alice", online: false }],
+    });
+    const ctx = makeCtx({ g1: game });
+
+    await sessionHandlers["join-game"]({
+      ws,
+      data: { gameId: "g1", username: "alice", displayname: "Alice" },
+      ctx,
+    });
+
+    expect(game.players[0]).toMatchObject({
+      id: "ws-new",
+      username: "alice",
+      displayname: "Alice",
+      online: true,
+    });
+    expect(ws.gameId).toBe("g1");
+    expect(ctx.repos.profiles.getPublicProfileByUsername).not.toHaveBeenCalled();
+  });
+
+  it("join-game sends active ai-host-say playback metadata when in progress", async () => {
+    const ws = makeWs();
+    const now = Date.now();
+    const game = makeGame({
+      aiHostPlayback: {
+        assetId: "asset-1",
+        startedAtMs: now - 1000,
+        durationMs: 5000,
+      },
+    });
+    const ctx = makeCtx({ g1: game });
+
+    await sessionHandlers["join-game"]({
+      ws,
+      data: { gameId: "g1", username: "alice", displayname: "Alice" },
+      ctx,
+    });
+
+    expect(ws.send).toHaveBeenCalledWith(expect.stringContaining("\"type\":\"game-state\""));
+    expect(ws.send).toHaveBeenCalledWith(expect.stringContaining("\"type\":\"ai-host-say\""));
+  });
+
   it("leave-game removes last player and deletes game", async () => {
     const ws = makeWs("ws-1");
     const game = makeGame({
@@ -126,5 +171,18 @@ describe("sessionHandlers", () => {
     );
     expect(ctx.checkAllWagersSubmitted).toHaveBeenCalledWith(game, "g1", ctx);
     expect(ctx.checkAllDrawingsSubmitted).toHaveBeenCalledWith(game, "g1", ctx);
+  });
+
+  it("leave-game no-ops when player is not found", async () => {
+    const ws = makeWs("ws-x");
+    const game = makeGame({
+      players: [{ id: "ws-1", username: "alice", displayname: "Alice" }],
+    });
+    const ctx = makeCtx({ g1: game });
+
+    await sessionHandlers["leave-game"]({ ws, data: { gameId: "g1", username: "bob" }, ctx });
+
+    expect(game.players).toHaveLength(1);
+    expect(ctx.broadcast).not.toHaveBeenCalled();
   });
 });

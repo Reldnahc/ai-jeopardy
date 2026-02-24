@@ -40,6 +40,38 @@ function makeCtx(game: GameState, overrides: Record<string, unknown> = {}) {
 }
 
 describe("lobbyConfigHandlers", () => {
+  it("update-lobby-settings validates missing gameId", async () => {
+    const ws = makeWs();
+    const game = makeGame();
+    const ctx = makeCtx(game);
+
+    await lobbyConfigHandlers["update-lobby-settings"]({
+      ws,
+      data: { patch: { timeToBuzz: 5 } },
+      ctx,
+    });
+
+    expect(ws.send).toHaveBeenCalledWith(
+      JSON.stringify({ type: "error", message: "update-lobby-settings missing gameId" }),
+    );
+  });
+
+  it("update-lobby-settings validates unknown game", async () => {
+    const ws = makeWs();
+    const game = makeGame();
+    const ctx = makeCtx(game, { games: {} });
+
+    await lobbyConfigHandlers["update-lobby-settings"]({
+      ws,
+      data: { gameId: "missing", patch: { timeToBuzz: 5 } },
+      ctx,
+    });
+
+    expect(ws.send).toHaveBeenCalledWith(
+      JSON.stringify({ type: "error", message: "Game missing not found." }),
+    );
+  });
+
   it("update-lobby-settings rejects non-host", async () => {
     const ws = makeWs();
     const game = makeGame();
@@ -88,6 +120,42 @@ describe("lobbyConfigHandlers", () => {
     );
   });
 
+  it("update-lobby-settings initializes defaults when lobbySettings missing", async () => {
+    const ws = makeWs();
+    const game = makeGame({ lobbySettings: undefined });
+    const ctx = makeCtx(game, { appConfig: { ai: { defaultModel: "gpt-default" } } });
+
+    await lobbyConfigHandlers["update-lobby-settings"]({
+      ws,
+      data: { gameId: "g1", patch: { boardJson: "{\"ok\":true}" } },
+      ctx,
+    });
+
+    expect(game.lobbySettings).toMatchObject({
+      selectedModel: "gpt-default",
+      boardJson: "{\"ok\":true}",
+    });
+    expect(ctx.broadcast).toHaveBeenCalled();
+  });
+
+  it("check-lobby responds true only for in-lobby game", async () => {
+    const ws = makeWs();
+    const game = makeGame({ inLobby: true });
+    const ctx = makeCtx(game);
+
+    await lobbyConfigHandlers["check-lobby"]({ ws, data: { gameId: "g1" }, ctx });
+    await lobbyConfigHandlers["check-lobby"]({ ws, data: { gameId: "missing" }, ctx });
+
+    expect(ws.send).toHaveBeenNthCalledWith(
+      1,
+      JSON.stringify({ type: "check-lobby-response", isValid: true, gameId: "g1" }),
+    );
+    expect(ws.send).toHaveBeenNthCalledWith(
+      2,
+      JSON.stringify({ type: "check-lobby-response", isValid: false, gameId: "missing" }),
+    );
+  });
+
   it("promote-host updates host and broadcasts player list", async () => {
     const ws = makeWs();
     const game = makeGame({
@@ -112,6 +180,58 @@ describe("lobbyConfigHandlers", () => {
     );
   });
 
+  it("promote-host no-ops when caller is not host", async () => {
+    const ws = makeWs();
+    const game = makeGame({
+      players: [
+        { username: "alice", displayname: "Alice", online: true },
+        { username: "bob", displayname: "Bob", online: true },
+      ],
+    });
+    const ctx = makeCtx(game, { requireHost: vi.fn(() => false) });
+
+    await lobbyConfigHandlers["promote-host"]({
+      ws,
+      data: { gameId: "g1", targetUsername: "bob" },
+      ctx,
+    });
+
+    expect(game.host).toBe("alice");
+    expect(ctx.broadcast).not.toHaveBeenCalled();
+  });
+
+  it("promote-host no-ops when target user is missing", async () => {
+    const ws = makeWs();
+    const game = makeGame();
+    const ctx = makeCtx(game);
+
+    await lobbyConfigHandlers["promote-host"]({
+      ws,
+      data: { gameId: "g1", targetUsername: "nobody" },
+      ctx,
+    });
+
+    expect(game.host).toBe("alice");
+    expect(ctx.broadcast).not.toHaveBeenCalled();
+  });
+
+  it("promote-host no-ops when target already host", async () => {
+    const ws = makeWs();
+    const game = makeGame({
+      host: "alice",
+      players: [{ username: "alice", displayname: "Alice", online: true }],
+    });
+    const ctx = makeCtx(game);
+
+    await lobbyConfigHandlers["promote-host"]({
+      ws,
+      data: { gameId: "g1", targetUsername: "alice" },
+      ctx,
+    });
+
+    expect(ctx.broadcast).not.toHaveBeenCalled();
+  });
+
   it("request-lobby-state sends snapshot to caller", async () => {
     const ws = makeWs();
     const game = makeGame();
@@ -120,5 +240,17 @@ describe("lobbyConfigHandlers", () => {
     await lobbyConfigHandlers["request-lobby-state"]({ ws, data: { gameId: "g1" }, ctx });
 
     expect(ws.send).toHaveBeenCalledWith(JSON.stringify({ type: "lobby-state", gameId: "g1" }));
+  });
+
+  it("request-lobby-state errors when snapshot is unavailable", async () => {
+    const ws = makeWs();
+    const game = makeGame();
+    const ctx = makeCtx(game, { buildLobbyState: vi.fn(() => null) });
+
+    await lobbyConfigHandlers["request-lobby-state"]({ ws, data: { gameId: "g1" }, ctx });
+
+    expect(ws.send).toHaveBeenCalledWith(
+      JSON.stringify({ type: "error", message: "Lobby does not exist!" }),
+    );
   });
 });
