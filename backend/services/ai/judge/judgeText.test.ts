@@ -48,5 +48,33 @@ describe("judgeClueAnswerFast", () => {
     expect(out.verdict).toBe("incorrect");
     expect(callOpenAiJson).toHaveBeenCalledTimes(1);
   });
-});
 
+  it("rejects overly generic transcript when expected is specific", async () => {
+    const out = await judgeClueAnswerFast("what is saturn", "it", "Gas giant with rings.");
+
+    expect(out.verdict).toBe("incorrect");
+    expect(callOpenAiJson).not.toHaveBeenCalled();
+  });
+
+  it("accepts valid model verdict when parser returns correct", async () => {
+    parseOpenAiJson.mockReturnValueOnce({ verdict: "correct" });
+
+    const out = await judgeClueAnswerFast("what is a cat", "a feline", "House pet.");
+
+    expect(out.verdict).toBe("correct");
+    expect(callOpenAiJson).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to incorrect on parse failure or unknown verdict", async () => {
+    parseOpenAiJson.mockImplementationOnce(() => {
+      throw new Error("bad json");
+    });
+
+    const parseFail = await judgeClueAnswerFast("what is a cat", "a car", "House pet.");
+    expect(parseFail.verdict).toBe("incorrect");
+
+    parseOpenAiJson.mockReturnValueOnce({ verdict: "maybe" });
+    const badVerdict = await judgeClueAnswerFast("what is a cat", "a car", "House pet.");
+    expect(badVerdict.verdict).toBe("incorrect");
+  });
+});
