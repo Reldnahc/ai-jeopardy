@@ -29,6 +29,15 @@ function makeCtx(overrides: Partial<Ctx> = {}) {
 }
 
 describe("stageTransition", () => {
+  it("isBoardFullyCleared returns false for missing board categories", () => {
+    const game = {
+      boardData: { firstBoard: {} },
+      clearedClues: new Set<string>(),
+    } as unknown as GameState;
+
+    expect(isBoardFullyCleared(game, "firstBoard")).toBe(false);
+  });
+
   it("isBoardFullyCleared returns false when any clue is uncleared", () => {
     const game = {
       boardData: {
@@ -42,6 +51,31 @@ describe("stageTransition", () => {
     } as unknown as GameState;
 
     expect(isBoardFullyCleared(game, "firstBoard")).toBe(false);
+  });
+
+  it("checkBoardTransition returns false when board is not fully cleared", () => {
+    const game = {
+      activeBoard: "firstBoard",
+      boardData: {
+        firstBoard: { categories: [{ values: [{ value: 200, question: "Q1" }] }] },
+      },
+      clearedClues: new Set<string>(),
+    } as unknown as GameState;
+
+    const { ctx } = makeCtx();
+    const transitioned = checkBoardTransition(game, "g1", ctx);
+    expect(transitioned).toBe(false);
+  });
+
+  it("checkBoardTransition returns false for unsupported board key", () => {
+    const game = {
+      activeBoard: "finalJeopardy",
+      clearedClues: new Set<string>(),
+    } as unknown as GameState;
+
+    const { ctx } = makeCtx();
+    const transitioned = checkBoardTransition(game, "g1", ctx);
+    expect(transitioned).toBe(false);
   });
 
   it("checkBoardTransition firstBoard->secondBoard when first board is fully cleared", async () => {
@@ -76,6 +110,28 @@ describe("stageTransition", () => {
     );
   });
 
+  it("firstBoard->secondBoard keeps selector null when no players exist", async () => {
+    const game = {
+      activeBoard: "firstBoard",
+      players: [],
+      scores: {},
+      selectorKey: "alice",
+      selectorName: "Alice",
+      boardData: {
+        firstBoard: { categories: [{ values: [{ value: 200, question: "Q1" }] }] },
+      },
+      clearedClues: new Set(["200-Q1"]),
+    } as unknown as GameState;
+
+    const { ctx } = makeCtx();
+    const transitioned = checkBoardTransition(game, "g1", ctx);
+    await Promise.resolve();
+
+    expect(transitioned).toBe(true);
+    expect(game.selectorKey).toBeNull();
+    expect(game.selectorName).toBeNull();
+  });
+
   it("checkBoardTransition secondBoard->finalJeopardy initializes final state and starts timer", async () => {
     const game = {
       activeBoard: "secondBoard",
@@ -107,5 +163,38 @@ describe("stageTransition", () => {
     await vi.waitFor(() => {
       expect(ctx.startGameTimer).toHaveBeenCalled();
     });
+  });
+
+  it("final wager timer callback fills missing wagers/drawings and checks completion", async () => {
+    let onExpire: (() => void) | null = null;
+    const game = {
+      activeBoard: "secondBoard",
+      isFinalJeopardy: false,
+      players: [
+        { username: "alice", displayname: "Alice", online: true },
+        { username: "bob", displayname: "Bob", online: true },
+      ],
+      scores: { alice: 1000, bob: 1200 },
+      boardData: {
+        secondBoard: { categories: [{ values: [{ value: 200, question: "Q1" }] }] },
+      },
+      clearedClues: new Set(["200-Q1"]),
+    } as unknown as GameState;
+
+    const { ctx } = makeCtx({
+      startGameTimer: vi.fn((_gid, _game, _ctx, _seconds, _kind, cb: () => void) => {
+        onExpire = cb;
+      }),
+    });
+
+    checkBoardTransition(game, "g1", ctx);
+    await vi.waitFor(() => {
+      expect(onExpire).toBeTypeOf("function");
+    });
+    onExpire?.();
+
+    expect(game.wagers).toMatchObject({ alice: 0, bob: 0 });
+    expect(game.finalWagerDrawings).toMatchObject({ alice: "", bob: "" });
+    expect(ctx.checkAllWagersSubmitted).toHaveBeenCalledWith(game, "g1", ctx);
   });
 });
