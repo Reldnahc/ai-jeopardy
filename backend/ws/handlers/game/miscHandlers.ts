@@ -1,4 +1,5 @@
 import type { GameState } from "../../../types/runtime.js";
+import type { CtxDeps } from "../../context.types.js";
 import type { WsHandler } from "../types.js";
 
 type GameIdData = { gameId: string };
@@ -15,14 +16,32 @@ type TtsEnsureData = {
   requestId?: string;
 };
 
+type MiscHandlersCtx = CtxDeps<
+  | "games"
+  | "broadcast"
+  | "requireHost"
+  | "cancelAutoUnlock"
+  | "doUnlockBuzzerAuthoritative"
+  | "checkBoardTransition"
+  | "clearAnswerWindow"
+  | "submitWager"
+  | "submitDrawing"
+  | "submitWagerDrawing"
+  | "ensureTtsAsset"
+  | "repos"
+  | "checkAllWagersSubmitted"
+  | "checkAllDrawingsSubmitted"
+>;
+
 export const miscHandlers: Record<string, WsHandler> = {
   "dd-snipe-next": async ({ data, ctx }) => {
+    const hctx = ctx as MiscHandlersCtx;
     const { gameId, enabled } = (data || {}) as DdSnipeNextData;
-    const game = ctx.games?.[gameId] as GameState | undefined;
+    const game = hctx.games?.[gameId] as GameState | undefined;
     if (!game) return;
 
     game.ddSnipeNext = Boolean(enabled);
-    ctx.broadcast(gameId, { type: "dd-snipe-next-set", enabled: Boolean(game.ddSnipeNext) });
+    hctx.broadcast(gameId, { type: "dd-snipe-next-set", enabled: Boolean(game.ddSnipeNext) });
   },
 
   "unlock-buzzer": async ({ ws, data, ctx }) => {

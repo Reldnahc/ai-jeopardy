@@ -1,4 +1,5 @@
 import type { PlayerState } from "../../../types/runtime.js";
+import type { CtxDeps } from "../../context.types.js";
 import type { WsHandler } from "../types.js";
 
 type DailyDoubleWagerAudioBlobData = {
@@ -8,11 +9,22 @@ type DailyDoubleWagerAudioBlobData = {
   dataBase64?: string;
 };
 
+type DailyDoubleHandlersCtx = CtxDeps<
+  | "games"
+  | "clearDdWagerTimer"
+  | "transcribeAnswerAudio"
+  | "parseDailyDoubleWager"
+  | "broadcast"
+  | "repromptDdWager"
+  | "finalizeDailyDoubleWagerAndStartClue"
+>;
+
 export const dailyDoubleHandlers: Record<string, WsHandler> = {
   "daily-double-wager-audio-blob": async ({ ws, data, ctx }) => {
+    const hctx = ctx as DailyDoubleHandlersCtx;
     const { gameId, ddWagerSessionId, mimeType, dataBase64 } =
       (data ?? {}) as DailyDoubleWagerAudioBlobData;
-    const game = ctx.games?.[gameId];
+    const game = hctx.games?.[gameId];
     if (!game) return;
 
     const norm = (v: unknown) =>
@@ -101,15 +113,15 @@ export const dailyDoubleHandlers: Record<string, WsHandler> = {
       return;
     }
 
-    ctx.clearDdWagerTimer(ctx, gameId, game);
+    hctx.clearDdWagerTimer(ctx, gameId, game);
 
     let transcript = "";
     try {
-      const stt = await ctx.transcribeAnswerAudio(
+      const stt = await hctx.transcribeAnswerAudio(
         buf,
         mimeType,
         null,
-        game.lobbySettings.sttProviderName as Parameters<typeof ctx.transcribeAnswerAudio>[3],
+        game.lobbySettings.sttProviderName as Parameters<typeof hctx.transcribeAnswerAudio>[3],
       );
       transcript = String(stt || "").trim();
     } catch (e) {
@@ -128,7 +140,7 @@ export const dailyDoubleHandlers: Record<string, WsHandler> = {
     const dd = game.dailyDouble;
     const maxWager = Number(dd?.maxWager || 0);
 
-    const parsed = await ctx.parseDailyDoubleWager({
+    const parsed = await hctx.parseDailyDoubleWager({
       transcriptRaw: transcript,
       maxWager,
     });
@@ -136,7 +148,7 @@ export const dailyDoubleHandlers: Record<string, WsHandler> = {
     const wager = parsed.wager;
     const reason = parsed.reason;
 
-    ctx.broadcast(gameId, {
+    hctx.broadcast(gameId, {
       type: "daily-double-wager-heard",
       gameId,
       username: playerUsername,
@@ -148,7 +160,7 @@ export const dailyDoubleHandlers: Record<string, WsHandler> = {
     });
 
     if (wager === null) {
-      await ctx.repromptDdWager(gameId, game, ctx, { reason: reason || "no-number" });
+      await hctx.repromptDdWager(gameId, game, ctx, { reason: reason || "no-number" });
       return;
     }
 
@@ -161,7 +173,7 @@ export const dailyDoubleHandlers: Record<string, WsHandler> = {
     game.ddWagerSessionId = null;
     game.ddWagerDeadlineAt = null;
 
-    ctx.broadcast(gameId, {
+    hctx.broadcast(gameId, {
       type: "daily-double-wager-locked",
       gameId,
       username: playerUsername,
@@ -169,7 +181,7 @@ export const dailyDoubleHandlers: Record<string, WsHandler> = {
       wager,
     });
 
-    await ctx.finalizeDailyDoubleWagerAndStartClue(gameId, game, ctx, {
+    await hctx.finalizeDailyDoubleWagerAndStartClue(gameId, game, ctx, {
       wager,
       fallback: false,
       reason: null,

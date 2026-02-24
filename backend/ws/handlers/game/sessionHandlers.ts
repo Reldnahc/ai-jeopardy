@@ -1,4 +1,5 @@
 import type { GameState, PlayerState } from "../../../types/runtime.js";
+import type { CtxDeps } from "../../context.types.js";
 import type { WsHandler } from "../types.js";
 
 type JoinGameData = { gameId: string; username?: string; displayname?: string };
@@ -15,8 +16,17 @@ function pickDisplayname(d: unknown, fallbackUsername: string): string {
   return s || fallbackUsername;
 }
 
+type SessionHandlersCtx = CtxDeps<
+  | "games"
+  | "repos"
+  | "broadcast"
+  | "checkAllWagersSubmitted"
+  | "checkAllDrawingsSubmitted"
+>;
+
 export const sessionHandlers: Record<string, WsHandler> = {
   "join-game": async ({ ws, data, ctx }) => {
+    const hctx = ctx as SessionHandlersCtx;
     const { gameId, username, displayname } = (data ?? {}) as JoinGameData;
     const u = normUsername(username);
 
@@ -25,12 +35,12 @@ export const sessionHandlers: Record<string, WsHandler> = {
       return;
     }
 
-    if (!ctx.games?.[gameId]) {
+    if (!hctx.games?.[gameId]) {
       ws.send(JSON.stringify({ type: "error", message: "Game does not exist!" }));
       return;
     }
 
-    const game = ctx.games[gameId] as GameState;
+    const game = hctx.games[gameId] as GameState;
 
     let player = (game.players ?? []).find((p: PlayerState) => normUsername(p.username) === u);
 
@@ -45,7 +55,7 @@ export const sessionHandlers: Record<string, WsHandler> = {
 
       ws.gameId = gameId;
     } else {
-      const profile = await ctx.repos.profiles.getPublicProfileByUsername(u);
+      const profile = await hctx.repos.profiles.getPublicProfileByUsername(u);
 
       player = (game.players ?? []).find((p: PlayerState) => normUsername(p.username) === u);
       if (player) {
@@ -173,7 +183,7 @@ export const sessionHandlers: Record<string, WsHandler> = {
       );
     }
 
-    ctx.broadcast(gameId, {
+    hctx.broadcast(gameId, {
       type: "player-list-update",
       players: game.players.map((p: PlayerState) => ({
         username: p.username,
@@ -185,10 +195,11 @@ export const sessionHandlers: Record<string, WsHandler> = {
   },
 
   "leave-game": async ({ ws, data, ctx }) => {
+    const hctx = ctx as SessionHandlersCtx;
     const { gameId, username } = (data ?? {}) as LeaveGameData;
-    if (!gameId || !ctx.games?.[gameId]) return;
+    if (!gameId || !hctx.games?.[gameId]) return;
 
-    const game = ctx.games[gameId] as GameState;
+    const game = hctx.games[gameId] as GameState;
     const u = normUsername(username);
 
     const leavingPlayer =
@@ -209,13 +220,13 @@ export const sessionHandlers: Record<string, WsHandler> = {
     if (game.buzzLockouts) delete game.buzzLockouts[leavingUsername];
 
     if (game.players.length === 0) {
-      delete ctx.games[gameId];
+      delete hctx.games[gameId];
       return;
     }
 
     ws.gameId = null;
 
-    ctx.broadcast(gameId, {
+    hctx.broadcast(gameId, {
       type: "player-list-update",
       players: game.players.map((p: PlayerState) => ({
         username: p.username,
@@ -225,7 +236,7 @@ export const sessionHandlers: Record<string, WsHandler> = {
       host: game.host,
     });
 
-    ctx.checkAllWagersSubmitted(game, gameId, ctx);
-    ctx.checkAllDrawingsSubmitted(game, gameId, ctx);
+    hctx.checkAllWagersSubmitted(game, gameId, ctx);
+    hctx.checkAllDrawingsSubmitted(game, gameId, ctx);
   },
 };

@@ -1,4 +1,5 @@
 import type { PlayerState } from "../../../types/runtime.js";
+import type { CtxDeps } from "../../context.types.js";
 import type { WsHandler } from "../types.js";
 
 type AnswerAudioBlobData = {
@@ -8,10 +9,21 @@ type AnswerAudioBlobData = {
   dataBase64?: string;
 };
 
+type AnswerHandlersCtx = CtxDeps<
+  | "games"
+  | "autoResolveAfterJudgement"
+  | "clearAnswerWindow"
+  | "broadcast"
+  | "transcribeAnswerAudio"
+  | "judgeClueAnswerFast"
+  | "parseClueValue"
+>;
+
 export const answerHandlers: Record<string, WsHandler> = {
   "answer-audio-blob": async ({ ws, data, ctx }) => {
+    const hctx = ctx as AnswerHandlersCtx;
     const { gameId, answerSessionId, mimeType, dataBase64 } = (data || {}) as AnswerAudioBlobData;
-    const game = ctx.games?.[gameId];
+    const game = hctx.games?.[gameId];
     if (!game) return;
 
     const norm = (v: unknown) =>
@@ -112,11 +124,11 @@ export const answerHandlers: Record<string, WsHandler> = {
         .catch((e: unknown) => console.error("[answer-audio-blob] autoResolve failed:", e));
     }
 
-    ctx.clearAnswerWindow(game);
-    ctx.broadcast(gameId, { type: "answer-capture-ended", gameId, answerSessionId });
+    hctx.clearAnswerWindow(game);
+    hctx.broadcast(gameId, { type: "answer-capture-ended", gameId, answerSessionId });
     game.phase = "JUDGING";
 
-    ctx.broadcast(gameId, {
+    hctx.broadcast(gameId, {
       type: "answer-processing",
       gameId,
       answerSessionId,
@@ -127,11 +139,11 @@ export const answerHandlers: Record<string, WsHandler> = {
 
     let transcript = "";
     try {
-      const stt = await ctx.transcribeAnswerAudio(
+      const stt = await hctx.transcribeAnswerAudio(
         buf,
         mimeType,
         game.selectedClue?.answer,
-        game.lobbySettings.sttProviderName as Parameters<typeof ctx.transcribeAnswerAudio>[3],
+        game.lobbySettings.sttProviderName as Parameters<typeof hctx.transcribeAnswerAudio>[3],
       );
       transcript = String(stt || "").trim();
 
@@ -154,7 +166,7 @@ export const answerHandlers: Record<string, WsHandler> = {
         game.answerVerdict = "incorrect";
         game.answerConfidence = 0.0;
 
-        ctx.broadcast(gameId, {
+        hctx.broadcast(gameId, {
           type: "answer-result",
           gameId,
           answerSessionId,
@@ -184,7 +196,7 @@ export const answerHandlers: Record<string, WsHandler> = {
       game.answerVerdict = "incorrect";
       game.answerConfidence = 0.0;
 
-      ctx.broadcast(gameId, {
+      hctx.broadcast(gameId, {
         type: "answer-result",
         gameId,
         answerSessionId,
@@ -201,7 +213,7 @@ export const answerHandlers: Record<string, WsHandler> = {
         .catch((err: unknown) => console.error("[answer-audio-blob-error] autoResolve failed:", err));
     }
 
-    ctx.broadcast(gameId, {
+    hctx.broadcast(gameId, {
       type: "answer-transcript",
       gameId,
       answerSessionId,
@@ -214,14 +226,14 @@ export const answerHandlers: Record<string, WsHandler> = {
     let verdict;
     try {
       const expectedAnswer = String(game.selectedClue?.answer || "");
-      verdict = (await ctx.judgeClueAnswerFast(expectedAnswer, transcript, game.selectedClue.question))
+      verdict = (await hctx.judgeClueAnswerFast(expectedAnswer, transcript, game.selectedClue.question))
         .verdict;
     } catch (e) {
       console.error("[answer-audio-blob] judge failed:", e?.message || e);
       verdict = "incorrect";
     }
 
-    const clueValue = ctx.parseClueValue(game.selectedClue?.value);
+    const clueValue = hctx.parseClueValue(game.selectedClue?.value);
     const ddWorth =
       game.dailyDouble?.clueKey === game.clueState?.clueKey &&
       Number.isFinite(Number(game.dailyDouble?.wager))
@@ -234,7 +246,7 @@ export const answerHandlers: Record<string, WsHandler> = {
     game.answerTranscript = transcript;
     game.answerVerdict = verdict;
 
-    ctx.broadcast(gameId, {
+    hctx.broadcast(gameId, {
       type: "answer-result",
       gameId,
       answerSessionId,

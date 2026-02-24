@@ -1,11 +1,29 @@
+import type { CtxDeps } from "../../context.types.js";
 import type { WsHandler } from "../types.js";
 
 type ClueSelectedData = { gameId: string; clue?: Record<string, unknown> };
+type ClueHandlersCtx = CtxDeps<
+  | "games"
+  | "getPlayerForSocket"
+  | "playerStableId"
+  | "cancelAutoUnlock"
+  | "fireAndForget"
+  | "repos"
+  | "findCategoryForClue"
+  | "broadcast"
+  | "computeDailyDoubleMaxWager"
+  | "aiHostVoiceSequence"
+  | "startDdWagerCapture"
+  | "doUnlockBuzzerAuthoritative"
+  | "getTtsDurationMs"
+  | "sleepAndCheckGame"
+>;
 
 export const clueHandlers: Record<string, WsHandler> = {
   "clue-selected": async ({ ws, data, ctx }) => {
+    const hctx = ctx as ClueHandlersCtx;
     const { gameId, clue } = (data ?? {}) as ClueSelectedData;
-    const game = ctx.games?.[gameId];
+    const game = hctx.games?.[gameId];
     if (!game) return;
     const clueObj =
       clue && typeof clue === "object"
@@ -17,8 +35,8 @@ export const clueHandlers: Record<string, WsHandler> = {
         .trim()
         .toLowerCase();
 
-    const caller = ctx.getPlayerForSocket(game, ws);
-    const callerStable = caller ? norm(ctx.playerStableId(caller)) : null;
+    const caller = hctx.getPlayerForSocket(game, ws);
+    const callerStable = caller ? norm(hctx.playerStableId(caller)) : null;
     const callerDisplay = String(caller?.displayname ?? "").trim() || (callerStable ?? null);
 
     console.log("[CLUE SELECT ATTEMPT]", {
@@ -52,11 +70,11 @@ export const clueHandlers: Record<string, WsHandler> = {
       return;
     }
 
-    ctx.cancelAutoUnlock(game);
-    ctx.fireAndForget(ctx.repos.profiles.incrementCluesSelected(callerStable), "Increment Clues");
+    hctx.cancelAutoUnlock(game);
+    hctx.fireAndForget(hctx.repos.profiles.incrementCluesSelected(callerStable), "Increment Clues");
 
     const category =
-      String(clueObj.category ?? "").trim() || ctx.findCategoryForClue(game, clueObj);
+      String(clueObj.category ?? "").trim() || hctx.findCategoryForClue(game, clueObj);
 
     game.selectedClue = {
       ...clueObj,
@@ -76,7 +94,7 @@ export const clueHandlers: Record<string, WsHandler> = {
 
     if (snipedDD) {
       game.ddSnipeNext = false;
-      ctx.broadcast(gameId, { type: "dd-snipe-consumed", clueKey });
+      hctx.broadcast(gameId, { type: "dd-snipe-consumed", clueKey });
     }
 
     game.phase = "clue";
@@ -89,9 +107,9 @@ export const clueHandlers: Record<string, WsHandler> = {
     const ttsAssetId = game.boardData?.ttsByClueKey?.[clueKey] || null;
 
     const broadcastClueSelected = () => {
-      ctx.broadcast(gameId, { type: "buzzer-ui-reset" });
-      ctx.broadcast(gameId, { type: "buzzer-locked" });
-      ctx.broadcast(gameId, {
+      hctx.broadcast(gameId, { type: "buzzer-ui-reset" });
+      hctx.broadcast(gameId, { type: "buzzer-locked" });
+      hctx.broadcast(gameId, {
         type: "clue-selected",
         clue: game.selectedClue,
         clearedClues: Array.from(game.clearedClues),
@@ -104,12 +122,12 @@ export const clueHandlers: Record<string, WsHandler> = {
       const playerUsername = norm(game.selectorKey);
       const playerDisplayname = String(game.selectorName ?? "").trim() || playerUsername;
 
-      ctx.fireAndForget(
-        ctx.repos.profiles.incrementDailyDoubleFound(playerUsername),
+      hctx.fireAndForget(
+        hctx.repos.profiles.incrementDailyDoubleFound(playerUsername),
         "Increment Daily Double found",
       );
 
-      const maxWager = ctx.computeDailyDoubleMaxWager(game, boardKey, playerUsername);
+      const maxWager = hctx.computeDailyDoubleMaxWager(game, boardKey, playerUsername);
 
       game.dailyDouble = {
         clueKey,
@@ -123,7 +141,7 @@ export const clueHandlers: Record<string, WsHandler> = {
       };
 
       const showModal = () => {
-        ctx.broadcast(gameId, {
+        hctx.broadcast(gameId, {
           type: "daily-double-show-modal",
           username: playerUsername,
           displayname: playerDisplayname,
@@ -131,23 +149,23 @@ export const clueHandlers: Record<string, WsHandler> = {
         });
       };
 
-      await ctx.aiHostVoiceSequence(ctx, gameId, game, [
+      await hctx.aiHostVoiceSequence(hctx, gameId, game, [
         { slot: "daily_double", after: showModal },
         { slot: playerDisplayname },
         { slot: "daily_double2" },
         { slot: "single_wager" },
       ]);
 
-      ctx.startDdWagerCapture(gameId, game, ctx);
+      hctx.startDdWagerCapture(gameId, game, ctx);
       return;
     }
 
-    await ctx.aiHostVoiceSequence(ctx, gameId, game, [
+    await hctx.aiHostVoiceSequence(hctx, gameId, game, [
       { slot: String(game.selectedClue.category ?? ""), pad },
       { slot: String(game.selectedClue.value ?? ""), after: broadcastClueSelected },
       { assetId: ttsAssetId },
     ]);
 
-    ctx.doUnlockBuzzerAuthoritative(gameId, game, ctx);
+    hctx.doUnlockBuzzerAuthoritative(gameId, game, ctx);
   },
 };

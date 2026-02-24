@@ -1,18 +1,34 @@
 import type { GameState, PlayerState } from "../../../types/runtime.js";
+import type { CtxDeps } from "../../context.types.js";
 import type { WsHandler } from "../types.js";
 
 type BuzzData = { gameId: string; estimatedServerBuzzAtMs?: number; clientSeq?: number };
 
+type BuzzHandlersCtx = CtxDeps<
+  | "games"
+  | "playerStableId"
+  | "fireAndForget"
+  | "repos"
+  | "broadcast"
+  | "aiHostSayByKey"
+  | "clearAnswerWindow"
+  | "startGameTimer"
+  | "startAnswerWindow"
+  | "parseClueValue"
+  | "autoResolveAfterJudgement"
+>;
+
 export const buzzHandlers: Record<string, WsHandler> = {
   buzz: async ({ ws, data, ctx }) => {
+    const hctx = ctx as BuzzHandlersCtx;
     const { gameId } = data as BuzzData;
-    const game = ctx.games?.[gameId] as GameState | undefined;
+    const game = hctx.games?.[gameId] as GameState | undefined;
     if (!game) return;
 
     const player = game.players.find((p: PlayerState) => p.id === ws.id);
     if (!player?.username) return;
 
-    const stable = ctx.playerStableId(player);
+    const stable = hctx.playerStableId(player);
     if (!stable) return;
 
     const lockedOut = game.clueState?.lockedOut || {};
@@ -21,7 +37,7 @@ export const buzzHandlers: Record<string, WsHandler> = {
       return;
     }
 
-    ctx.fireAndForget(ctx.repos.profiles.incrementTotalBuzzes(stable), "Increment total buzzes");
+    hctx.fireAndForget(hctx.repos.profiles.incrementTotalBuzzes(stable), "Increment total buzzes");
 
     if (!game.buzzLockouts) game.buzzLockouts = {};
 
@@ -73,7 +89,7 @@ export const buzzHandlers: Record<string, WsHandler> = {
       game.pendingBuzz = { deadline: now + COLLECT_MS, candidates: [], timer: null };
 
       game.pendingBuzz.timer = setTimeout(async () => {
-        const g = ctx.games?.[gameId];
+        const g = hctx.games?.[gameId];
         if (!g || !g.pendingBuzz) return;
 
         if (g.buzzed || g.buzzerLocked) {
@@ -106,21 +122,24 @@ export const buzzHandlers: Record<string, WsHandler> = {
         if (!winner?.playerUsername) return;
 
         g.buzzed = winner.playerUsername;
-        ctx.fireAndForget(ctx.repos.profiles.incrementTimesBuzzed(winner.playerUsername), "Increment buzzes won");
+        hctx.fireAndForget(
+          hctx.repos.profiles.incrementTimesBuzzed(winner.playerUsername),
+          "Increment buzzes won",
+        );
 
-        ctx.broadcast(gameId, {
+        hctx.broadcast(gameId, {
           type: "buzz-result",
           username: winner.playerUsername,
           displayname: winner.playerDisplayname,
         });
 
         g.buzzerLocked = true;
-        ctx.broadcast(gameId, { type: "buzzer-locked" });
+        hctx.broadcast(gameId, { type: "buzzer-locked" });
 
-        await ctx.aiHostSayByKey(ctx, gameId, g, winner.playerDisplayname);
+        await hctx.aiHostSayByKey(ctx, gameId, g, winner.playerDisplayname);
 
         setTimeout(() => {
-          const gg = ctx.games?.[gameId];
+          const gg = hctx.games?.[gameId];
           if (!gg) return;
 
           const ANSWER_SECONDS = typeof gg.timeToAnswer === "number" && gg.timeToAnswer > 0 ? gg.timeToAnswer : 9;
@@ -141,10 +160,10 @@ export const buzzHandlers: Record<string, WsHandler> = {
           gg.answerVerdict = null;
           gg.answerConfidence = null;
 
-          ctx.clearAnswerWindow(gg);
+          hctx.clearAnswerWindow(gg);
           const deadlineAt = Date.now() + RECORD_MS;
 
-          ctx.broadcast(gameId, {
+          hctx.broadcast(gameId, {
             type: "answer-capture-start",
             gameId,
             username: winner.playerUsername,
@@ -156,11 +175,11 @@ export const buzzHandlers: Record<string, WsHandler> = {
           });
 
           if (ANSWER_SECONDS > 0) {
-            ctx.startGameTimer(gameId, gg, ctx, ANSWER_SECONDS, "answer");
+            hctx.startGameTimer(gameId, gg, hctx, ANSWER_SECONDS, "answer");
           }
 
-          ctx.startAnswerWindow(gameId, gg, ctx.broadcast, RECORD_MS, () => {
-            const ggg = ctx.games?.[gameId];
+          hctx.startAnswerWindow(gameId, gg, hctx.broadcast, RECORD_MS, () => {
+            const ggg = hctx.games?.[gameId];
             if (!ggg) return;
             if (!ggg.answerSessionId) return;
             if (ggg.answerSessionId !== gg.answerSessionId) return;
@@ -172,8 +191,8 @@ export const buzzHandlers: Record<string, WsHandler> = {
             ggg.answerVerdict = "incorrect";
             ggg.answerConfidence = 0.0;
 
-            const clueValue = ctx.parseClueValue(ggg.selectedClue?.value);
-            ctx.broadcast(gameId, {
+            const clueValue = hctx.parseClueValue(ggg.selectedClue?.value);
+            hctx.broadcast(gameId, {
               type: "answer-result",
               gameId,
               answerSessionId: ggg.answerSessionId,
