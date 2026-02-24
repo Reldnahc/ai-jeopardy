@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 type SvgOutlinedTextProps = {
   text: string;
@@ -31,6 +31,7 @@ type SvgOutlinedTextProps = {
 
   /** Shadow: 0 = off, 1 = on */
   shadow?: boolean;
+  shadowStyle?: "default" | "board";
 
   smallPrefix?: string; // e.g. "$"
   smallPrefixScale?: number; // e.g. 0.7
@@ -80,7 +81,9 @@ export default function SvgOutlinedText({
   heightFill = 0.86,
   lineHeight = 0.92,
   shadow = true,
+  shadowStyle = "default",
 }: SvgOutlinedTextProps) {
+  const filterId = useId().replace(/:/g, "");
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const textRefs = useRef<Array<SVGTextElement | null>>([]);
 
@@ -190,15 +193,34 @@ export default function SvgOutlinedText({
       <svg width="100%" height="100%" role="img" aria-label={displayText}>
         {shadow && (
           <defs>
-            <filter id="jeopardyShadow" x="-20%" y="-20%" width="140%" height="140%">
-              <feDropShadow dx="4" dy="4" stdDeviation="0" floodColor="rgba(0,0,0,0.85)" />
-              <feDropShadow dx="10" dy="10" stdDeviation="2.5" floodColor="rgba(0,0,0,0.15)" />
+            <filter id={filterId} x="-30%" y="-30%" width="170%" height="170%">
+              {shadowStyle === "board" ? (
+                <>
+                  <feDropShadow
+                    dx={Math.max(1, layout.fontSize * 0.05)}
+                    dy={Math.max(1, layout.fontSize * 0.04)}
+                    stdDeviation="0"
+                    floodColor="rgba(0,0,0,0.8)"
+                  />
+                  <feDropShadow
+                    dx={Math.max(2, layout.fontSize * 0.18)}
+                    dy={Math.max(2, layout.fontSize * 0.18)}
+                    stdDeviation={Math.max(1, layout.fontSize * 0.04)}
+                    floodColor="rgba(0,0,0,0.4)"
+                  />
+                </>
+              ) : (
+                <>
+                  <feDropShadow dx="4" dy="4" stdDeviation="0" floodColor="rgba(0,0,0,0.85)" />
+                  <feDropShadow dx="10" dy="10" stdDeviation="2.5" floodColor="rgba(0,0,0,0.15)" />
+                </>
+              )}
             </filter>
           </defs>
         )}
 
         <g
-          filter={shadow ? "url(#jeopardyShadow)" : undefined}
+          filter={shadow ? `url(#${filterId})` : undefined}
           style={{
             fontFamily,
             fontWeight,

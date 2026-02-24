@@ -103,7 +103,11 @@ const Header: React.FC = () => {
         <div className="flex items-center space-x-6">
           <Link
             to="/"
-            className="text-3xl lg:text-5xl text-shadow-jeopardy font-swiss911 tracking-wider font-bold hover:underline text-white hover:text-blue-600"
+            className="text-3xl lg:text-5xl font-swiss911 tracking-wider font-bold text-white hover:text-blue-600 transition-colors"
+            style={{
+              WebkitTextStroke: "2px #000000",
+              textShadow: "0.05em 0.04em 0 rgba(0,0,0,0.8), 0.18em 0.18em 0.25em rgba(0,0,0,0.35)",
+            }}
           >
             AI-Jeopardy.com
           </Link>

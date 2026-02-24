@@ -5,6 +5,7 @@ import { useAuth } from "../contexts/AuthContext.tsx";
 import { useAlert } from "../contexts/AlertContext.tsx";
 import PlayerSearch from "../components/main/PlayerSearch.tsx";
 import PageCardContainer from "../components/common/PageCardContainer.tsx";
+import SvgOutlinedText from "../components/common/SvgOutlinedText.tsx";
 import { Player } from "../types/Lobby.ts";
 import { getUniqueCategories } from "../categories/getUniqueCategories.ts";
 import { useGameSession } from "../hooks/useGameSession.ts";
@@ -241,46 +242,86 @@ export default function MainPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 ">
+    <div className="min-h-screen flex items-center justify-center p-4 md:p-6">
       {/* Animated container for the main card */}
-      <PageCardContainer className="p-12 pt-4 md:p-16 md:pt-5 lg:p-20 lg:pt-8">
+      <PageCardContainer className="relative overflow-hidden border border-white/30 bg-white/95 p-6 md:p-10 lg:p-12">
+        <div className="pointer-events-none absolute -top-28 -right-20 h-64 w-64 rounded-full bg-blue-300/35 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-24 -left-16 h-56 w-56 rounded-full bg-cyan-200/35 blur-3xl" />
+        <div className="pointer-events-none absolute top-40 left-1/2 h-40 w-40 -translate-x-1/2 rounded-full bg-indigo-200/25 blur-3xl" />
         {/* Main Content (spans two columns on medium+ screens) */}
-        <div className="col-span-2 p-10">
-          <h1 className="text-5xl font-extrabold text-gray-900 text-center">
-            Artificially {randomAdjective} Jeopardy
-          </h1>
-          <p className="text-xl text-gray-700 text-center mt-4">
+        <div className="relative col-span-2">
+          <div className="h-24 md:h-28 lg:h-32 w-full">
+            <SvgOutlinedText
+              text={`Artificially ${randomAdjective} Jeopardy`}
+              className="w-full h-full md:hidden"
+              fill="#facc15"
+              shadowStyle="board"
+              singleLine={false}
+              maxLines={2}
+              wrapAtChars={22}
+              uppercase
+            />
+            <SvgOutlinedText
+              text={`Artificially ${randomAdjective} Jeopardy`}
+              className="hidden w-full h-full md:block"
+              fill="#facc15"
+              shadowStyle="board"
+              singleLine
+              uppercase
+            />
+          </div>
+          <p className="text-lg md:text-xl text-slate-700 text-center -mt-1">
             Race to buzz in and answer clues by voice.
           </p>
 
           {/* Featured Category Card */}
-          <div className="mt-10">
-            <div className="p-8 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border border-gray-200 shadow-sm">
-              <div className="text-center mb-6">
-                <span className="inline-block text-xl uppercase tracking-wider text-gray-500 font-semibold">
+          <div className="mt-8 md:mt-10">
+            <div className="p-6 md:p-8 bg-gradient-to-br from-[#11336d] via-[#1f4f9b] to-[#143a7c] rounded-2xl border border-blue-300/40 shadow-[0_20px_40px_rgba(16,42,92,0.35)]">
+              <div className="text-center mb-4 md:mb-5">
+                <span className="inline-block text-sm md:text-base uppercase tracking-[0.2em] text-blue-100/85 font-semibold">
                   Featured Category
                 </span>
               </div>
 
-              <h3 className="text-6xl text-shadow-jeopardy font-swiss911 text-yellow-400 tracking-widest text-center mb-3">
-                {cotd.category.toUpperCase()}
-              </h3>
+              <div className="h-24 md:h-28 lg:h-32 w-full mb-3">
+                <SvgOutlinedText
+                  text={cotd.category}
+                  className="w-full h-full md:hidden"
+                  fill="#FFFFFF"
+                  shadowStyle="board"
+                  singleLine={false}
+                  maxLines={3}
+                  wrapAtChars={20}
+                  uppercase
+                />
+                <SvgOutlinedText
+                  text={cotd.category}
+                  className="hidden w-full h-full md:block"
+                  fill="#FFFFFF"
+                  shadowStyle="board"
+                  singleLine
+                  uppercase
+                />
+              </div>
 
-              <p className="text-lg text-gray-700 text-center max-w-2xl mx-auto leading-relaxed">
+              <p className="text-base md:text-lg text-blue-50 text-center max-w-2xl mx-auto leading-relaxed">
                 {cotd.description}
               </p>
             </div>
           </div>
 
           {/* Create & Join Game Section */}
-          <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
             {/* Create Game Box */}
-            <div className="flex flex-col justify-center items-center bg-gray-50 p-6 rounded-lg border-gray-200 shadow">
+            <div className="flex flex-col justify-center items-center bg-gradient-to-br from-emerald-50 to-green-50 p-5 md:p-6 rounded-2xl border border-emerald-200/80 shadow-sm">
+              <div className="mb-3 w-full text-left text-sm font-semibold uppercase tracking-wide text-emerald-700">
+                Start a New Match
+              </div>
               <button
                 onClick={handleCreateGame}
                 disabled={isCreatingLobby}
                 aria-busy={isCreatingLobby}
-                className="w-full h-full py-3 px-6 text-white bg-green-500 hover:bg-green-600 disabled:opacity-60 disabled:cursor-not-allowed text-xl rounded-lg font-semibold transition-colors duration-200"
+                className="w-full h-full py-3 px-6 text-white bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 disabled:opacity-60 disabled:cursor-not-allowed text-lg md:text-xl rounded-lg font-semibold transition-colors duration-200 shadow-md"
               >
                 {isCreatingLobby ? (
                   <span className="flex items-center justify-center gap-2">
@@ -314,10 +355,13 @@ export default function MainPage() {
             </div>
 
             {/* Join Game Box */}
-            <div className="bg-gray-50 p-6 rounded-lg border border-gray-200 shadow">
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-5 md:p-6 rounded-2xl border border-blue-200/80 shadow-sm">
+              <div className="mb-3 w-full text-left text-sm font-semibold uppercase tracking-wide text-blue-700">
+                Join Existing Lobby
+              </div>
               <div className="flex flex-col gap-4">
                 <div className="flex flex-col">
-                  <label htmlFor="gameId" className="text-lg font-medium text-gray-800">
+                  <label htmlFor="gameId" className="text-lg font-medium text-slate-800">
                     Game ID:
                   </label>
                   <input
@@ -326,14 +370,14 @@ export default function MainPage() {
                     value={gameId}
                     onChange={(e) => setGameId(e.target.value)}
                     placeholder="Enter Game ID to join"
-                    className="mt-2 p-3 border border-gray-300 text-black rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="mt-2 p-3 border border-slate-300 text-slate-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 <button
                   onClick={handleJoinGame}
                   disabled={isCreatingLobby}
                   aria-busy={isCreatingLobby}
-                  className="py-3 px-6 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded transition-colors duration-200"
+                  className="py-3 px-6 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-semibold rounded-lg transition-colors duration-200 shadow-md"
                 >
                   Join Game
                 </button>
@@ -341,26 +385,29 @@ export default function MainPage() {
             </div>
           </div>
 
-          <div className="mt-8">
-            <div className="p-6 bg-gray-50 rounded-lg border border-gray-200 shadow-sm">
+          <div className="mt-6">
+            <div className="p-5 md:p-6 bg-white/80 rounded-2xl border border-slate-200 shadow-sm">
               <PlayerSearch />
             </div>
           </div>
 
           {/* How to Play Section */}
-          <div className="mt-8">
-            <details className="bg-gray-50 p-6 rounded-lg border border-gray-200 shadow" open>
-              <summary className="text-2xl font-semibold text-gray-800 cursor-pointer">
+          <div className="mt-6">
+            <details
+              className="bg-white/85 p-5 md:p-6 rounded-2xl border border-slate-200 shadow-sm"
+              open
+            >
+              <summary className="text-2xl font-semibold text-slate-800 cursor-pointer">
                 How to Play
               </summary>
 
-              <p className="mt-4 text-lg text-gray-700">
+              <p className="mt-4 text-lg text-slate-700">
                 <strong>AI Jeopardy</strong> is a live multiplayer trivia game with voice narration,
                 buzzer races, and automatic judging.
               </p>
 
-              <h3 className="mt-6 text-xl font-semibold text-gray-800">Getting Started</h3>
-              <ul className="list-disc ml-6 mt-3 text-lg text-gray-700 space-y-2">
+              <h3 className="mt-6 text-xl font-semibold text-slate-800">Getting Started</h3>
+              <ul className="list-disc ml-6 mt-3 text-lg text-slate-700 space-y-2">
                 <li>
                   Sign in, create a lobby, and share the Game ID with players who want to join.
                 </li>
@@ -372,8 +419,8 @@ export default function MainPage() {
                 </li>
               </ul>
 
-              <h3 className="mt-6 text-xl font-semibold text-gray-800">How Jeopardy Works</h3>
-              <ul className="list-disc ml-6 mt-3 text-lg text-gray-700 space-y-2">
+              <h3 className="mt-6 text-xl font-semibold text-slate-800">How Jeopardy Works</h3>
+              <ul className="list-disc ml-6 mt-3 text-lg text-slate-700 space-y-2">
                 <li>The active selector chooses clues from the board.</li>
                 <li>The AI host reads each clue, then the buzzer opens.</li>
                 <li>Players race to buzz in. First valid buzz gets the answer attempt.</li>
@@ -392,8 +439,8 @@ export default function MainPage() {
                 <li>Early buzzing can trigger a temporary lockout, so timing matters.</li>
               </ul>
 
-              <h3 className="mt-6 text-xl font-semibold text-gray-800">Daily Double</h3>
-              <ul className="list-disc ml-6 mt-3 text-lg text-gray-700 space-y-2">
+              <h3 className="mt-6 text-xl font-semibold text-slate-800">Daily Double</h3>
+              <ul className="list-disc ml-6 mt-3 text-lg text-slate-700 space-y-2">
                 <li>When a Daily Double appears, only that player can answer.</li>
                 <li>They place a wager by voice, then hear the clue and answer by voice.</li>
                 <li>
@@ -401,8 +448,8 @@ export default function MainPage() {
                 </li>
               </ul>
 
-              <h3 className="mt-6 text-xl font-semibold text-gray-800">Final Jeopardy</h3>
-              <ul className="list-disc ml-6 mt-3 text-lg text-gray-700 space-y-2">
+              <h3 className="mt-6 text-xl font-semibold text-slate-800">Final Jeopardy</h3>
+              <ul className="list-disc ml-6 mt-3 text-lg text-slate-700 space-y-2">
                 <li>After the main boards clear, finalists enter Final Jeopardy.</li>
                 <li>Finalists submit wagers, then the final clue is played.</li>
                 <li>Answers are captured and judged, then wagers are applied to scores.</li>
@@ -410,7 +457,7 @@ export default function MainPage() {
                 <li>Highest final score wins.</li>
               </ul>
 
-              <p className="mt-6 text-lg text-gray-700">
+              <p className="mt-6 text-lg text-slate-700">
                 Most importantly: have fun, compete hard, and play fast on the buzzer.
               </p>
             </details>
