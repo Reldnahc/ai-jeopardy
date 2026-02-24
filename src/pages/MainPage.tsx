@@ -1,14 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useWebSocket } from "../contexts/WebSocketContext.tsx";
 import { useAuth } from "../contexts/AuthContext.tsx";
 import { useAlert } from "../contexts/AlertContext.tsx";
 import PlayerSearch from "../components/main/PlayerSearch.tsx";
 import PageCardContainer from "../components/common/PageCardContainer.tsx";
-import SvgOutlinedText from "../components/common/SvgOutlinedText.tsx";
+import MainHeader from "../components/main/mainPage/MainHeader.tsx";
+import FeaturedCategoryCard from "../components/main/mainPage/FeaturedCategoryCard.tsx";
+import GameActionsSection from "../components/main/mainPage/GameActionsSection.tsx";
+import DiscoveryLinks from "../components/main/mainPage/DiscoveryLinks.tsx";
+import HowToPlaySection from "../components/main/mainPage/HowToPlaySection.tsx";
 import { Player } from "../types/Lobby.ts";
 import { getUniqueCategories } from "../categories/getUniqueCategories.ts";
 import { useGameSession } from "../hooks/useGameSession.ts";
+
 const ADJECTIVES = ["Hallucinated", "Intelligent", "Dreamt", "Generated", "Conjured", "Created"];
 
 function getOrCreatePlayerKey(): string {
@@ -41,7 +46,6 @@ export default function MainPage() {
     [],
   );
 
-  // canonical identity
   const username = (user?.username || "").trim().toLowerCase();
   const displayname = (user?.displayname || user?.username || "").trim();
   const myName = displayname;
@@ -95,7 +99,6 @@ export default function MainPage() {
           const m = message as unknown as { isValid: boolean; gameId: string };
 
           if (m.isValid) {
-            // Pre-save the session so the lobby page can join/reconnect cleanly
             if (username && displayname) {
               saveSession({
                 gameId: m.gameId,
@@ -166,8 +169,6 @@ export default function MainPage() {
 
   const handleCreateGame = async () => {
     if (isCreatingLobby) return;
-
-    // wait for auth to finish initializing
     if (authLoading) return;
 
     if (!user) {
@@ -220,7 +221,6 @@ export default function MainPage() {
       return;
     }
 
-    // wait for auth init so we don't flash "not logged in"
     if (authLoading) return;
 
     if (!user) {
@@ -242,168 +242,31 @@ export default function MainPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 md:p-6">
-      {/* Animated container for the main card */}
-      <PageCardContainer className="relative overflow-hidden border border-white/50 bg-white/94 p-5 md:p-8 lg:p-10 shadow-[0_20px_48px_-28px_rgba(15,23,42,0.45)]">
+    <div className="min-h-screen flex flex-col items-center px-4 py-6 md:px-6">
+      <PageCardContainer className="relative overflow-hidden border border-white/50 bg-white/94 shadow-[0_20px_48px_-28px_rgba(15,23,42,0.45)]">
         <div className="pointer-events-none absolute -top-24 -right-16 h-60 w-60 rounded-full bg-blue-200/25 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-20 -left-14 h-52 w-52 rounded-full bg-cyan-100/25 blur-3xl" />
         <div className="pointer-events-none absolute top-40 left-1/2 h-36 w-36 -translate-x-1/2 rounded-full bg-indigo-100/20 blur-3xl" />
-        {/* Main Content (spans two columns on medium+ screens) */}
-        <div className="relative col-span-2 mx-auto w-full max-w-5xl">
-          <div className="h-20 md:h-24 lg:h-28 w-full">
-            <SvgOutlinedText
-              text={`Artificially ${randomAdjective} Jeopardy`}
-              className="w-full h-full md:hidden"
-              fill="#facc15"
-              shadowStyle="board"
-              singleLine={false}
-              maxLines={2}
-              wrapAtChars={22}
-              uppercase
-            />
-            <SvgOutlinedText
-              text={`Artificially ${randomAdjective} Jeopardy`}
-              className="hidden w-full h-full md:block"
-              fill="#facc15"
-              shadowStyle="board"
-              singleLine
-              uppercase
-            />
-          </div>
-          <p className="text-base md:text-lg text-slate-700 text-center mt-1">
-            Race to buzz in and answer clues by voice.
-          </p>
 
-          {/* Featured Category Card */}
+        <div className="relative mx-auto w-full max-w-5xl p-6 md:p-10">
+          <MainHeader randomAdjective={randomAdjective} />
+
           <div className="mt-6 md:mt-8">
-            <div className="p-4 md:p-5 bg-gradient-to-br from-[#214a8d] via-[#2d66ba] to-[#1e4f95] rounded-2xl border border-blue-200/45 shadow-[0_14px_28px_rgba(16,42,92,0.26)]">
-              <div className="text-center mb-4 md:mb-5">
-                <span className="inline-block text-sm md:text-base uppercase tracking-[0.2em] text-blue-100/85 font-semibold">
-                  Featured Category
-                </span>
-              </div>
-
-              <div className="h-16 md:h-20 lg:h-24 w-full mb-2">
-                <SvgOutlinedText
-                  text={cotd.category}
-                  className="w-full h-full md:hidden"
-                  fill="#FFFFFF"
-                  shadowStyle="board"
-                  singleLine={false}
-                  maxLines={3}
-                  wrapAtChars={20}
-                  uppercase
-                />
-                <SvgOutlinedText
-                  text={cotd.category}
-                  className="hidden w-full h-full md:block"
-                  fill="#FFFFFF"
-                  shadowStyle="board"
-                  singleLine
-                  uppercase
-                />
-              </div>
-
-              <p className="text-xs md:text-sm text-blue-50 text-center max-w-2xl mx-auto leading-relaxed">
-                {cotd.description}
-              </p>
-            </div>
+            <FeaturedCategoryCard cotd={cotd} />
           </div>
 
-          <div className="mt-6 md:mt-8 grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-            <Link
-              to="/recent-boards"
-              className="rounded-2xl border border-slate-200 bg-white/85 p-5 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
-            >
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-500 font-semibold">
-                Explore
-              </p>
-              <p className="mt-2 text-2xl font-semibold text-slate-900">Recent Boards</p>
-              <p className="mt-1 text-slate-600">Browse newly generated games and categories.</p>
-            </Link>
-            <Link
-              to="/leaderboards"
-              className="rounded-2xl border border-slate-200 bg-white/85 p-5 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
-            >
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-500 font-semibold">Rank</p>
-              <p className="mt-2 text-2xl font-semibold text-slate-900">Leaderboards</p>
-              <p className="mt-1 text-slate-600">See top players across wins, money, and more.</p>
-            </Link>
+          <div className="mt-6">
+            <GameActionsSection
+              gameId={gameId}
+              isCreatingLobby={isCreatingLobby}
+              onGameIdChange={setGameId}
+              onCreateGame={handleCreateGame}
+              onJoinGame={handleJoinGame}
+            />
           </div>
 
-          {/* Create & Join Game Section */}
-          <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
-            {/* Create Game Box */}
-            <div className="flex flex-col justify-center items-center bg-gradient-to-br from-emerald-50 to-green-50 p-5 md:p-6 rounded-2xl border border-emerald-200/80 shadow-sm">
-              <div className="mb-3 w-full text-left text-sm font-semibold uppercase tracking-wide text-emerald-700">
-                Start a New Match
-              </div>
-              <button
-                onClick={handleCreateGame}
-                disabled={isCreatingLobby}
-                aria-busy={isCreatingLobby}
-                className="w-full h-full py-3 px-6 text-white bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 disabled:opacity-60 disabled:cursor-not-allowed text-lg md:text-xl rounded-lg font-semibold transition-colors duration-200 shadow-md"
-              >
-                {isCreatingLobby ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                      />
-                    </svg>
-                    <span>Creating…</span>
-                  </span>
-                ) : (
-                  "Create Game"
-                )}
-              </button>
-
-              {isCreatingLobby && (
-                <p className="mt-3 text-sm text-gray-600 text-center">
-                  Creating lobby… this can take a few seconds.
-                </p>
-              )}
-            </div>
-
-            {/* Join Game Box */}
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-5 md:p-6 rounded-2xl border border-blue-200/80 shadow-sm">
-              <div className="mb-3 w-full text-left text-sm font-semibold uppercase tracking-wide text-blue-700">
-                Join Existing Lobby
-              </div>
-              <div className="flex flex-col gap-4">
-                <div className="flex flex-col">
-                  <label htmlFor="gameId" className="text-lg font-medium text-slate-800">
-                    Game ID:
-                  </label>
-                  <input
-                    id="gameId"
-                    type="text"
-                    value={gameId}
-                    onChange={(e) => setGameId(e.target.value)}
-                    placeholder="Enter Game ID to join"
-                    className="mt-2 p-3 border border-slate-300 text-slate-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <button
-                  onClick={handleJoinGame}
-                  disabled={isCreatingLobby}
-                  aria-busy={isCreatingLobby}
-                  className="py-3 px-6 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-semibold rounded-lg transition-colors duration-200 shadow-md"
-                >
-                  Join Game
-                </button>
-              </div>
-            </div>
+          <div className="mt-6 md:mt-8">
+            <DiscoveryLinks />
           </div>
 
           <div className="mt-6">
@@ -412,76 +275,8 @@ export default function MainPage() {
             </div>
           </div>
 
-          {/* How to Play Section */}
           <div className="mt-6">
-            <details
-              className="bg-white/85 p-5 md:p-6 rounded-2xl border border-slate-200 shadow-sm"
-              open
-            >
-              <summary className="text-2xl font-semibold text-slate-800 cursor-pointer">
-                How to Play
-              </summary>
-
-              <p className="mt-4 text-lg text-slate-700">
-                <strong>AI Jeopardy</strong> is a live multiplayer trivia game with voice narration,
-                buzzer races, and automatic judging.
-              </p>
-
-              <h3 className="mt-6 text-xl font-semibold text-slate-800">Getting Started</h3>
-              <ul className="list-disc ml-6 mt-3 text-lg text-slate-700 space-y-2">
-                <li>
-                  Sign in, create a lobby, and share the Game ID with players who want to join.
-                </li>
-                <li>
-                  In the lobby, set or randomize categories, adjust settings, then start the game.
-                </li>
-                <li>
-                  The host controls game start. Once started, players are moved into the board view.
-                </li>
-              </ul>
-
-              <h3 className="mt-6 text-xl font-semibold text-slate-800">How Jeopardy Works</h3>
-              <ul className="list-disc ml-6 mt-3 text-lg text-slate-700 space-y-2">
-                <li>The active selector chooses clues from the board.</li>
-                <li>The AI host reads each clue, then the buzzer opens.</li>
-                <li>Players race to buzz in. First valid buzz gets the answer attempt.</li>
-                <li>
-                  The buzzed player answers by microphone capture. The answer is transcribed and
-                  judged automatically.
-                </li>
-                <li>Correct answers add clue value and make that player the next selector.</li>
-                <li>
-                  Incorrect answers subtract clue value and lock that player out from rebuzzing on
-                  that clue.
-                </li>
-                <li>
-                  If nobody answers correctly, the clue is revealed and play returns to the board.
-                </li>
-                <li>Early buzzing can trigger a temporary lockout, so timing matters.</li>
-              </ul>
-
-              <h3 className="mt-6 text-xl font-semibold text-slate-800">Daily Double</h3>
-              <ul className="list-disc ml-6 mt-3 text-lg text-slate-700 space-y-2">
-                <li>When a Daily Double appears, only that player can answer.</li>
-                <li>They place a wager by voice, then hear the clue and answer by voice.</li>
-                <li>
-                  Daily Double does not use normal rebuzz flow for other players on that clue.
-                </li>
-              </ul>
-
-              <h3 className="mt-6 text-xl font-semibold text-slate-800">Final Jeopardy</h3>
-              <ul className="list-disc ml-6 mt-3 text-lg text-slate-700 space-y-2">
-                <li>After the main boards clear, finalists enter Final Jeopardy.</li>
-                <li>Finalists submit wagers, then the final clue is played.</li>
-                <li>Answers are captured and judged, then wagers are applied to scores.</li>
-                <li>Correct adds wagered points; incorrect subtracts wagered points.</li>
-                <li>Highest final score wins.</li>
-              </ul>
-
-              <p className="mt-6 text-lg text-slate-700">
-                Most importantly: have fun, compete hard, and play fast on the buzzer.
-              </p>
-            </details>
+            <HowToPlaySection />
           </div>
         </div>
       </PageCardContainer>
