@@ -9,10 +9,13 @@ import { copyTextToClipboard } from "../../utils/clipboardUtils.ts";
 
 type GameCardProps = {
   game: Board;
+  collapsible?: boolean;
+  defaultCollapsed?: boolean;
 };
 
-const GameCard = ({ game }: GameCardProps) => {
+const GameCard = ({ game, collapsible = false, defaultCollapsed = false }: GameCardProps) => {
   const [copied, setCopied] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
   const { getProfileByUsername, fetchPublicProfile } = useProfile();
   const modelLabel = modelsByValue[String(game.model)]?.label ?? String(game.model ?? "");
   const hostUsername = String(game.host ?? "")
@@ -76,9 +79,11 @@ const GameCard = ({ game }: GameCardProps) => {
     },
   ];
 
+  const showBoard = !collapsible || !isCollapsed;
+
   return (
-    <article className="mb-8 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-      <div className="border-b border-slate-200 bg-gradient-to-br from-[#11336d] via-[#1f4f9b] to-[#143a7c] p-3 md:p-4">
+    <article className="space-y-4">
+      <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-[#11336d] via-[#1f4f9b] to-[#143a7c] p-3 md:p-4">
         <div className="mb-2 flex items-start justify-between gap-4">
           <div className="space-y-1.5">
             <div className="flex flex-wrap items-center gap-2 text-sm text-blue-100">
@@ -104,35 +109,47 @@ const GameCard = ({ game }: GameCardProps) => {
             )}
           </div>
 
-          <button
-            onClick={onCopyJson}
-            className={`rounded-lg px-3.5 py-2 text-sm font-semibold shadow-sm transition ${
-              copied
-                ? "bg-emerald-600 text-white"
-                : "border border-slate-300 bg-white text-slate-800 hover:bg-slate-100"
-            }`}
-            aria-label="Copy board JSON to clipboard"
-            type="button"
-          >
-            {copied ? "Copied!" : "Copy JSON"}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onCopyJson}
+              className={`rounded-lg px-3.5 py-2 text-sm font-semibold shadow-sm transition ${
+                copied
+                  ? "bg-emerald-600 text-white"
+                  : "border border-slate-300 bg-white text-slate-800 hover:bg-slate-100"
+              }`}
+              aria-label="Copy board JSON to clipboard"
+              type="button"
+            >
+              {copied ? "Copied!" : "Copy JSON"}
+            </button>
+
+            {collapsible && (
+              <button
+                onClick={() => setIsCollapsed((prev) => !prev)}
+                className="w-24 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-center text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-100"
+                type="button"
+              >
+                {isCollapsed ? "Expand" : "Collapse"}
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="space-y-4 p-5 md:p-6">
-        {sections.map((section) => (
-          <section key={section.key} className="rounded-lg border border-slate-200 bg-white p-4 md:p-5">
-            <h2 className="mb-3 border-b border-slate-200 pb-2 text-xl font-semibold text-slate-800">
-              {section.title}
-            </h2>
-            <div className="space-y-2">
-              {section.categories.map((cat, idx) => (
-                <CollapsibleCategory key={`${section.key}-${idx}`} category={cat.category} values={cat.values} />
-              ))}
-            </div>
-          </section>
-        ))}
-      </div>
+      {showBoard && (
+        <div className="space-y-6 px-4 pb-4 md:px-5 md:pb-5">
+          {sections.map((section) => (
+            <section key={section.key}>
+              <h2 className="mb-3 text-xl font-semibold text-slate-800">{section.title}</h2>
+              <div className="space-y-2">
+                {section.categories.map((cat, idx) => (
+                  <CollapsibleCategory key={`${section.key}-${idx}`} category={cat.category} values={cat.values} />
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+      )}
     </article>
   );
 };

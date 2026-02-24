@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { Board } from "../types/Board";
 import Avatar from "../components/common/Avatar";
 import LoadingScreen from "../components/common/LoadingScreen";
-import ProfileGameCard from "../components/profile/ProfileGameCard";
+import GameCard from "../components/recentboards/GameCard";
 import { useProfile } from "../contexts/ProfileContext";
 import { getProfilePresentation } from "../utils/profilePresentation";
 import type { Profile as P } from "../contexts/ProfileContext";
@@ -228,7 +228,7 @@ export default function UserHistory() {
           {/* Boards */}
           <div className="space-y-4">
             {boards.length > 0 ? (
-              boards.map((board, idx) => <ProfileGameCard key={`${idx}`} game={board} />)
+              boards.map((board, idx) => <GameCard key={`${idx}`} game={board} collapsible defaultCollapsed />)
             ) : (
               <p className="text-gray-600 italic">No boards generated yet.</p>
             )}

@@ -1,5 +1,5 @@
 import type { Board } from "../../types/Board";
-import ProfileGameCard from "./ProfileGameCard";
+import GameCard from "../recentboards/GameCard";
 
 type Props = {
   boardsLoading: boolean;
@@ -12,7 +12,7 @@ export default function RecentBoards({ boardsLoading, boards }: Props) {
       {boardsLoading ? (
         <p className="text-gray-600 italic">Loading boards…</p>
       ) : boards.length > 0 ? (
-        boards.map((board, idx) => <ProfileGameCard key={idx} game={board} />)
+        boards.map((board, idx) => <GameCard key={idx} game={board} collapsible defaultCollapsed />)
       ) : (
         <p className="text-gray-600 italic">No boards generated yet.</p>
       )}
