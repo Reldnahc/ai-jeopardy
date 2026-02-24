@@ -17,16 +17,18 @@ export default function UserHeaderButton({ pres, dropdownOpen, setDropdownOpen, 
   return (
     <div className="relative inline-block">
       <button
+        onMouseDown={(e) => e.preventDefault()}
         onClick={() => setDropdownOpen((v) => !v)}
         className={[
           "relative flex items-center rounded-xl",
           "text-white transition-all duration-200",
-          "focus:outline-none hover:brightness-110",
+          "appearance-none outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 hover:brightness-110",
           compact ? "px-3 py-2" : "text-xl px-4 py-2",
         ].join(" ")}
         style={{
           backgroundColor: pres.backgroundColor ?? "#1e293b",
           ...(pres.borderStyle ?? {}),
+          WebkitTapHighlightColor: "transparent",
         }}
       >
         <Avatar
