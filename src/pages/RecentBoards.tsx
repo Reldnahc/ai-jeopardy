@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import GameCard from "../components/recentboards/GameCard";
 import PageCardContainer from "../components/common/PageCardContainer.tsx";
 import FilterToolbar from "../components/common/FilterToolbar.tsx";
+import SvgOutlinedText from "../components/common/SvgOutlinedText.tsx";
 import { Board } from "../types/Board.ts";
 import { models } from "../../shared/models.js";
 import { getApiBase, fetchJson } from "../utils/utils.ts";
@@ -140,12 +141,24 @@ const RecentBoards = () => {
   );
 
   return (
-    <div className="min-h-screen flex flex-col items-center p-6">
-      <PageCardContainer>
-        <div className="p-10">
-          <h1 className="text-6xl font-swiss911 tracking-wider text-shadow-jeopardy text-yellow-400 mb-8 text-center">
-            <div> Recent Boards</div>
-          </h1>
+    <div className="min-h-screen flex flex-col items-center px-4 py-6 md:px-6">
+      <PageCardContainer className="border border-white/60 bg-white/95 shadow-[0_28px_70px_-32px_rgba(15,23,42,0.55)]">
+        <div className="p-6 md:p-10">
+          <div className="mb-8 rounded-2xl border border-blue-300/40 bg-gradient-to-br from-[#11336d] via-[#1f4f9b] to-[#143a7c] p-5 text-white shadow-[0_20px_40px_rgba(16,42,92,0.35)]">
+            <div className="h-16 w-full md:h-20">
+              <SvgOutlinedText
+                text="Recent Boards"
+                className="h-full w-full"
+                fill="#facc15"
+                shadowStyle="board"
+                singleLine
+                uppercase
+              />
+            </div>
+            <p className="mt-2 text-center text-sm text-blue-100 md:text-base">
+              Explore generated boards and filter by model, host, or categories
+            </p>
+          </div>
 
           <FilterToolbar
             selectLabel="Model"
@@ -172,16 +185,16 @@ const RecentBoards = () => {
           </div>
 
           {filteredBoards.length === 0 && !loading && (
-            <div className="text-center text-gray-700 my-4 italic">
+            <div className="my-5 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-center italic text-slate-700">
               No boards match the current filters.
             </div>
           )}
 
           {loading && (
-            <div className="text-center text-gray-700 my-4 italic">Loading more boards...</div>
+            <div className="my-4 text-center italic text-slate-700">Loading more boards...</div>
           )}
           {!hasMoreBoards && !loading && (
-            <div className="text-center text-gray-700 my-4 italic">No more boards to load.</div>
+            <div className="my-4 text-center italic text-slate-700">No more boards to load.</div>
           )}
           <div className="h-12"></div>
         </div>

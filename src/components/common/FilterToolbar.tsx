@@ -82,7 +82,7 @@ const FilterToolbar: React.FC<FilterToolbarProps> = ({
         </div>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+      <div className="mt-3">
         <div className="flex flex-wrap gap-2">
           {chips.map((chip) => (
             <button
@@ -100,7 +100,7 @@ const FilterToolbar: React.FC<FilterToolbarProps> = ({
           ))}
         </div>
 
-        <div className="text-sm text-gray-600">{summaryText}</div>
+        <div className="mt-2 text-right text-sm text-gray-600">{summaryText}</div>
       </div>
     </div>
   );

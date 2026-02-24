@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import Avatar from "../components/common/Avatar";
 import PageCardContainer from "../components/common/PageCardContainer.tsx";
 import FilterToolbar from "../components/common/FilterToolbar.tsx";
+import SvgOutlinedText from "../components/common/SvgOutlinedText.tsx";
 import { getProfilePresentation } from "../utils/profilePresentation";
 import type { Profile } from "../contexts/ProfileContext";
 import { LeaderboardRow } from "../../backend/repositories/profile/profile.types.ts";
@@ -276,13 +277,24 @@ const Leaderboard: React.FC = () => {
   if (error) console.error(error);
 
   return (
-    <div className="min-h-screen flex flex-col items-center p-6">
-      <PageCardContainer>
-        <div className="p-10">
-          <h1 className="text-6xl font-swiss911 tracking-wider text-shadow-jeopardy text-yellow-400 mb-8 text-center">
-            <div>Leaderboard</div>
-            <div className="text-4xl mt-2">{selectedStat.label}</div>
-          </h1>
+    <div className="min-h-screen flex flex-col items-center px-4 py-6 md:px-6">
+      <PageCardContainer className="border border-white/60 bg-white/95 shadow-[0_28px_70px_-32px_rgba(15,23,42,0.55)]">
+        <div className="p-6 md:p-10">
+          <div className="mb-8 rounded-2xl border border-blue-300/40 bg-gradient-to-br from-[#11336d] via-[#1f4f9b] to-[#143a7c] p-5 text-white shadow-[0_20px_40px_rgba(16,42,92,0.35)]">
+            <div className="h-16 w-full md:h-20">
+              <SvgOutlinedText
+                text="Leaderboard"
+                className="h-full w-full"
+                fill="#facc15"
+                shadowStyle="board"
+                singleLine
+                uppercase
+              />
+            </div>
+            <p className="mt-1 text-center text-sm text-blue-100 md:text-base">
+              Ranked by <span className="font-semibold text-white">{selectedStat.label}</span>
+            </p>
+          </div>
 
           <FilterToolbar
             selectLabel="Stat"
@@ -303,13 +315,13 @@ const Leaderboard: React.FC = () => {
           />
 
           <div className="hidden md:block">
-            <div className="overflow-x-auto rounded-lg border border-gray-200">
+            <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
               <table className="w-full text-left">
-                <thead className="bg-gray-50 border-b border-gray-200">
+                <thead className="border-b border-slate-200 bg-slate-50/80">
                   <tr>
-                    <th className="px-4 py-3 text-sm font-semibold text-gray-700 w-20">Rank</th>
-                    <th className="px-4 py-3 text-sm font-semibold text-gray-700">Player</th>
-                    <th className="px-4 py-3 text-sm font-semibold text-gray-700 w-56 text-right">
+                    <th className="w-20 px-4 py-3 text-sm font-semibold text-slate-700">Rank</th>
+                    <th className="px-4 py-3 text-sm font-semibold text-slate-700">Player</th>
+                    <th className="w-56 px-4 py-3 text-right text-sm font-semibold text-slate-700">
                       {selectedStat.label}
                     </th>
                   </tr>
@@ -336,7 +348,7 @@ const Leaderboard: React.FC = () => {
                     return (
                       <tr
                         key={`${r.username}-${i}`}
-                        className="border-b border-gray-100 hover:bg-gray-50"
+                        className="border-b border-slate-100 transition-colors hover:bg-blue-50/40"
                       >
                         <td className="px-4 py-3">
                           <span
@@ -361,7 +373,7 @@ const Leaderboard: React.FC = () => {
                             <div className="min-w-0">
                               <Link
                                 to={`/profile/${encodeURIComponent(r.username)}`}
-                                className="font-semibold text-gray-900 hover:underline"
+                                className="font-semibold text-slate-900 hover:underline"
                               >
                                 <span
                                   className={pres.nameClassName}
@@ -370,12 +382,12 @@ const Leaderboard: React.FC = () => {
                                   {r.displayname || r.username}
                                 </span>
                               </Link>
-                              <div className="text-xs text-gray-500 truncate">@{r.username}</div>
+                              <div className="truncate text-xs text-slate-500">@{r.username}</div>
                             </div>
                           </div>
                         </td>
 
-                        <td className="px-4 py-3 text-right font-semibold text-gray-900">
+                        <td className="px-4 py-3 text-right font-semibold text-slate-900">
                           {selectedStat.format(r.value)}
                         </td>
                       </tr>
@@ -407,7 +419,7 @@ const Leaderboard: React.FC = () => {
               return (
                 <div
                   key={`${r.username}-${i}`}
-                  className="bg-gray-50 border border-gray-200 rounded-lg p-4 shadow-sm"
+                  className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
@@ -424,19 +436,19 @@ const Leaderboard: React.FC = () => {
                       <div className="min-w-0">
                         <Link
                           to={`/profile/${encodeURIComponent(r.username)}`}
-                          className="font-semibold text-gray-900 hover:underline"
+                          className="font-semibold text-slate-900 hover:underline"
                         >
                           <span className={pres.nameClassName} style={pres.nameStyle ?? undefined}>
                             {r.displayname || r.username}
                           </span>
                         </Link>
-                        <div className="text-xs text-gray-500 truncate">@{r.username}</div>
+                        <div className="truncate text-xs text-slate-500">@{r.username}</div>
                       </div>
                     </div>
 
                     <div className="text-right flex-shrink-0">
-                      <div className="text-xs text-gray-500">#{rank}</div>
-                      <div className="font-semibold text-gray-900">
+                      <div className="text-xs text-slate-500">#{rank}</div>
+                      <div className="font-semibold text-slate-900">
                         {selectedStat.format(r.value)}
                       </div>
                     </div>
@@ -453,11 +465,11 @@ const Leaderboard: React.FC = () => {
           </div>
 
           {loading && (
-            <div className="text-center text-gray-700 my-6 italic">Loading leaderboard…</div>
+            <div className="my-6 text-center italic text-slate-700">Loading leaderboard...</div>
           )}
 
           {!hasMore && !loading && rows.length > 0 && (
-            <div className="text-center text-gray-700 my-6 italic">
+            <div className="my-6 text-center italic text-slate-700">
               Showing top {Math.min(rows.length, MAX_ROWS).toLocaleString()} players.
             </div>
           )}

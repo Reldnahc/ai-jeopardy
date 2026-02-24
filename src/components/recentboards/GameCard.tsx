@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { useState } from "react";
 import { Board } from "../../types/Board.ts";
 import CollapsibleCategory from "./CollapsibleCategory.tsx";
+import { modelsByValue } from "../../../shared/models.js";
 
 type GameCardProps = {
   game: Board;
@@ -33,6 +34,7 @@ async function copyTextToClipboard(text: string): Promise<boolean> {
 
 const GameCard = ({ game }: GameCardProps) => {
   const [copied, setCopied] = useState(false);
+  const modelLabel = modelsByValue[String(game.model)]?.label ?? String(game.model ?? "");
 
   const onCopyJson = async () => {
     const ok = await copyTextToClipboard(JSON.stringify(game, null, 2));
@@ -43,28 +45,28 @@ const GameCard = ({ game }: GameCardProps) => {
   };
 
   return (
-    <div className="bg-gray-50 border border-gray-200 shadow-md rounded-lg p-6 mb-8">
-      <div className="mb-4 border-b pb-2 flex items-start justify-between gap-4">
+    <div className="mb-8 rounded-xl border border-slate-200 bg-white p-6 shadow-[0_18px_35px_-24px_rgba(15,23,42,0.55)]">
+      <div className="mb-4 flex items-start justify-between gap-4 border-b border-slate-200 pb-3">
         <div>
           {/* Host with Link */}
-          <p className="text-xl font-semibold text-gray-800">
+          <p className="text-xl font-semibold text-slate-800">
             Host:{" "}
             <Link
               to={`/profile/${game.host.toLowerCase()}`}
-              className="text-blue-600 hover:underline font-normal transition"
+              className="font-normal text-blue-600 transition hover:text-blue-700 hover:underline"
             >
               {game.host}
             </Link>
           </p>
           {/* Model */}
-          <p className="text-xl font-semibold text-gray-800">
-            Model: <span className="font-normal">{game.model}</span>
+          <p className="text-xl font-semibold text-slate-800">
+            Model: <span className="font-normal text-slate-700">{modelLabel}</span>
           </p>
         </div>
 
         <button
           onClick={onCopyJson}
-          className={`px-3 py-2 rounded-md text-sm font-semibold shadow-sm transition ${
+          className={`rounded-md px-3 py-2 text-sm font-semibold shadow-sm transition ${
             copied ? "bg-green-600 text-white" : "bg-gray-900 text-white hover:bg-gray-800"
           }`}
           aria-label="Copy board JSON to clipboard"
@@ -76,7 +78,7 @@ const GameCard = ({ game }: GameCardProps) => {
 
       {/* First Board */}
       <div className="mb-6">
-        <h2 className="text-2xl font-bold mb-3 text-gray-800">First Board</h2>
+        <h2 className="mb-3 text-2xl font-bold text-slate-800">Jeopardy!</h2>
         {game.firstBoard?.categories.map((cat, idx) => (
           <CollapsibleCategory key={idx} category={cat.category} values={cat.values} />
         ))}
@@ -84,7 +86,7 @@ const GameCard = ({ game }: GameCardProps) => {
 
       {/* Second Board */}
       <div className="mb-6">
-        <h2 className="text-2xl font-bold mb-3 text-gray-800">Second Board</h2>
+        <h2 className="mb-3 text-2xl font-bold text-slate-800">Double Jeopardy!</h2>
         {game.secondBoard?.categories.map((cat, idx) => (
           <CollapsibleCategory key={idx} category={cat.category} values={cat.values} />
         ))}
@@ -92,7 +94,7 @@ const GameCard = ({ game }: GameCardProps) => {
 
       {/* Final Jeopardy */}
       <div>
-        <h2 className="text-2xl font-bold mb-3 text-gray-800">Final Jeopardy</h2>
+        <h2 className="mb-3 text-2xl font-bold text-slate-800">Final Jeopardy!</h2>
         {game.finalJeopardy?.categories.map((cat, idx) => (
           <CollapsibleCategory
             key={idx}
