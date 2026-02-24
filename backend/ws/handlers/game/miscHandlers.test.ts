@@ -1,14 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import type { GameState } from "../../../types/runtime.js";
+import type { GameState, SocketState } from "../../../types/runtime.js";
 import { createCtx } from "../../../test/createCtx.js";
 import { miscHandlers } from "./miscHandlers.js";
 
 function makeWs() {
-  return { id: "ws-1", send: vi.fn(), gameId: null } as {
-    id: string;
-    send: ReturnType<typeof vi.fn>;
-    gameId: string | null;
-  };
+  return { id: "ws-1", send: vi.fn(), gameId: null } as unknown as SocketState;
 }
 
 function makeGame(overrides: Partial<GameState> = {}): GameState {
