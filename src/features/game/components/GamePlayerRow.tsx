@@ -133,7 +133,7 @@ export default function GamePlayerRow({
             aria-label={`Increase ${displayName} score`}
             title={`+${lastQuestionValue}`}
           >
-            ï¼‹
+            +
           </button>
 
           <button
@@ -151,7 +151,7 @@ export default function GamePlayerRow({
             aria-label={`Decrease ${displayName} score`}
             title={`-${lastQuestionValue}`}
           >
-            âˆ’
+            -
           </button>
         </div>
       )}
