@@ -60,6 +60,17 @@ function makeCtx(game: GameState, overrides: Record<string, unknown> = {}) {
 }
 
 describe("clueHandlers", () => {
+  it("returns immediately when game does not exist", async () => {
+    const ws = makeWs();
+    const game = makeGame();
+    const ctx = makeCtx(game, { games: {} });
+
+    await clueHandlers["clue-selected"]({ ws, data: { gameId: "missing", clue: { value: 400, question: "Q" } }, ctx });
+
+    expect(ctx.broadcast).not.toHaveBeenCalled();
+    expect(ctx.doUnlockBuzzerAuthoritative).not.toHaveBeenCalled();
+  });
+
   it("blocks clue selection when phase is not board", async () => {
     const ws = makeWs();
     const game = makeGame({ phase: "clue" });
@@ -100,6 +111,17 @@ describe("clueHandlers", () => {
       getPlayerForSocket: vi.fn(() => game.players?.[0] ?? null),
       playerStableId: vi.fn(() => ""),
     });
+
+    await clueHandlers["clue-selected"]({ ws, data: { gameId: "g1", clue: { value: 400, question: "Q" } }, ctx });
+
+    expect(game.selectedClue).toBeUndefined();
+    expect(ctx.broadcast).not.toHaveBeenCalled();
+  });
+
+  it("blocks clue selection when socket has no matching caller", async () => {
+    const ws = makeWs();
+    const game = makeGame();
+    const ctx = makeCtx(game, { getPlayerForSocket: vi.fn(() => null) });
 
     await clueHandlers["clue-selected"]({ ws, data: { gameId: "g1", clue: { value: 400, question: "Q" } }, ctx });
 
@@ -172,6 +194,23 @@ describe("clueHandlers", () => {
     expect(ctx.startDdWagerCapture).toHaveBeenCalledWith("g1", game, ctx);
   });
 
+  it("treats already-used natural DD clue as normal clue flow", async () => {
+    const ws = makeWs();
+    const game = makeGame({
+      usedDailyDoubles: new Set(["firstBoard:400:Q"]),
+    });
+    const ctx = makeCtx(game);
+
+    await clueHandlers["clue-selected"]({
+      ws,
+      data: { gameId: "g1", clue: { value: 400, question: "Q", category: "Science" } },
+      ctx,
+    });
+
+    expect(ctx.startDdWagerCapture).not.toHaveBeenCalled();
+    expect(ctx.doUnlockBuzzerAuthoritative).toHaveBeenCalledWith("g1", game, ctx);
+  });
+
   it("fills clue category from fallback finder when category is missing", async () => {
     const ws = makeWs();
     const game = makeGame({
@@ -189,6 +228,26 @@ describe("clueHandlers", () => {
     });
 
     expect(game.selectedClue?.category).toBe("Fallback Category");
+    expect(ctx.doUnlockBuzzerAuthoritative).toHaveBeenCalled();
+  });
+
+  it("leaves clue category undefined when both clue and fallback are empty", async () => {
+    const ws = makeWs();
+    const game = makeGame({
+      boardData: {
+        ttsByClueKey: { "firstBoard:200:QX": "asset-2" },
+        dailyDoubleClueKeys: { firstBoard: [] },
+      },
+    });
+    const ctx = makeCtx(game, { findCategoryForClue: vi.fn(() => "") });
+
+    await clueHandlers["clue-selected"]({
+      ws,
+      data: { gameId: "g1", clue: { value: 200, question: "QX" } },
+      ctx,
+    });
+
+    expect(game.selectedClue?.category).toBeUndefined();
     expect(ctx.doUnlockBuzzerAuthoritative).toHaveBeenCalled();
   });
 });
