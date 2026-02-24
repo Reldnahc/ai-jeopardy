@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import GameCard from "../components/recentboards/GameCard";
 import PageCardContainer from "../components/common/PageCardContainer.tsx";
+import FilterToolbar from "../components/common/FilterToolbar.tsx";
 import { Board } from "../types/Board.ts";
 import { models } from "../../shared/models.js";
 import { getApiBase, fetchJson } from "../utils/utils.ts";
@@ -10,6 +11,7 @@ const RecentBoards = () => {
   const [loading, setLoading] = useState(false);
   const [hasMoreBoards, setHasMoreBoards] = useState(true);
   const [filterModel, setFilterModel] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
   const loadingRef = useRef(false);
   const hasMoreRef = useRef(true);
   const lastRequestedOffsetRef = useRef<number | null>(null);
@@ -91,6 +93,52 @@ const RecentBoards = () => {
     return () => window.removeEventListener("scroll", handleScroll);
   }, [boards.length, loading, hasMoreBoards, fetchBoards]);
 
+  const filteredBoards = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return boards;
+    return boards.filter((b) => {
+      const host = String(b.host ?? "").toLowerCase();
+      const model = String(b.model ?? "").toLowerCase();
+      const firstCats = (b.firstBoard?.categories ?? []).map((c) => String(c.category ?? "").toLowerCase());
+      const secondCats = (b.secondBoard?.categories ?? []).map((c) =>
+        String(c.category ?? "").toLowerCase(),
+      );
+      const finalCats = (b.finalJeopardy?.categories ?? []).map((c) =>
+        String(c.category ?? "").toLowerCase(),
+      );
+
+      return (
+        host.includes(q) ||
+        model.includes(q) ||
+        firstCats.some((c) => c.includes(q)) ||
+        secondCats.some((c) => c.includes(q)) ||
+        finalCats.some((c) => c.includes(q))
+      );
+    });
+  }, [boards, search]);
+
+  const modelSelectOptions = useMemo(
+    () => [{ value: "", label: "All Models" }, ...models.map((m) => ({ value: m.value, label: m.label }))],
+    [],
+  );
+  const modelChips = useMemo(
+    () => [
+      {
+        key: "all",
+        label: "All",
+        active: filterModel === null,
+        onClick: () => setFilterModel(null),
+      },
+      ...models.map((model) => ({
+        key: model.value,
+        label: model.label,
+        active: filterModel === model.value,
+        onClick: () => setFilterModel(model.value === filterModel ? null : model.value),
+      })),
+    ],
+    [filterModel],
+  );
+
   return (
     <div className="min-h-screen flex flex-col items-center p-6">
       <PageCardContainer>
@@ -99,33 +147,35 @@ const RecentBoards = () => {
             <div> Recent Boards</div>
           </h1>
 
-          <div className="flex flex-wrap gap-4 justify-center mb-6">
-            {models.map((model) => (
-              <button
-                key={model.value}
-                onClick={() => setFilterModel(model.value === filterModel ? null : model.value)}
-                className={`px-3 py-1.5 rounded-md text-xs sm:text-sm font-semibold shadow-md ${
-                  filterModel === model.value
-                    ? "bg-blue-500 text-white border border-blue-600 scale-105 ring-2 ring-blue-300"
-                    : "bg-gray-200 text-gray-700 hover:bg-gray-300 hover:scale-105"
-                }`}
-              >
-                {model.label}
-              </button>
-            ))}
-            <button
-              onClick={() => setFilterModel(null)}
-              className="px-4 py-2 rounded-md bg-red-500 hover:bg-red-600 text-white shadow-md hover:scale-105 transition-all duration-300 text-sm sm:text-base font-semibold"
-            >
-              Clear Filter
-            </button>
-          </div>
+          <FilterToolbar
+            selectLabel="Model"
+            selectValue={filterModel ?? ""}
+            onSelectChange={(value) => setFilterModel(value ? value : null)}
+            selectOptions={modelSelectOptions}
+            searchLabel="Search Boards"
+            searchValue={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Host, model, or category"
+            onReset={() => {
+              setFilterModel(null);
+              setSearch("");
+            }}
+            resetDisabled={filterModel === null && !search}
+            chips={modelChips}
+            summaryText={`Showing ${filteredBoards.length.toLocaleString()} of ${boards.length.toLocaleString()} loaded`}
+          />
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {boards.map((game, idx) => (
+            {filteredBoards.map((game, idx) => (
               <GameCard key={idx} game={game} />
             ))}
           </div>
+
+          {filteredBoards.length === 0 && !loading && (
+            <div className="text-center text-gray-700 my-4 italic">
+              No boards match the current filters.
+            </div>
+          )}
 
           {loading && (
             <div className="text-center text-gray-700 my-4 italic">Loading more boards...</div>

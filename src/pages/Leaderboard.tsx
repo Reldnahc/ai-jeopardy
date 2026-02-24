@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import Avatar from "../components/common/Avatar";
 import PageCardContainer from "../components/common/PageCardContainer.tsx";
+import FilterToolbar from "../components/common/FilterToolbar.tsx";
 import { getProfilePresentation } from "../utils/profilePresentation";
 import type { Profile } from "../contexts/ProfileContext";
 import { LeaderboardRow } from "../../backend/repositories/profile/profile.types.ts";
@@ -93,6 +94,7 @@ const PAGE_SIZE = 25;
 
 const Leaderboard: React.FC = () => {
   const [stat, setStat] = useState<StatKey>("money_won");
+  const [search, setSearch] = useState("");
 
   const [rows, setRows] = useState<LeaderboardRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -124,6 +126,30 @@ const Leaderboard: React.FC = () => {
   const selectedStat = useMemo(() => {
     return STAT_OPTIONS.find((s) => s.key === stat) ?? STAT_OPTIONS[0];
   }, [stat]);
+  const statSelectOptions = useMemo(
+    () => STAT_OPTIONS.map((s) => ({ value: s.key, label: s.label })),
+    [],
+  );
+  const statChips = useMemo(
+    () =>
+      STAT_OPTIONS.map((s) => ({
+        key: s.key,
+        label: s.label,
+        active: stat === s.key,
+        onClick: () => setStat(s.key),
+      })),
+    [stat],
+  );
+
+  const normalizedSearch = search.trim().toLowerCase();
+  const visible = useMemo(() => {
+    if (!normalizedSearch) return rows;
+    return rows.filter((r) => {
+      const u = String(r.username ?? "").toLowerCase();
+      const d = String(r.displayname ?? "").toLowerCase();
+      return u.includes(normalizedSearch) || d.includes(normalizedSearch);
+    });
+  }, [normalizedSearch, rows]);
 
   const fetchRows = async (offset: number, limit: number, signal?: AbortSignal) => {
     const genAtCall = requestGenRef.current;
@@ -247,8 +273,6 @@ const Leaderboard: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows.length]);
 
-  const visible = rows;
-
   if (error) console.error(error);
 
   return (
@@ -260,22 +284,23 @@ const Leaderboard: React.FC = () => {
             <div className="text-4xl mt-2">{selectedStat.label}</div>
           </h1>
 
-          <div className="flex flex-wrap gap-3 justify-center mb-6">
-            {STAT_OPTIONS.map((s) => (
-              <button
-                key={s.key}
-                onClick={() => setStat(s.key)}
-                className={[
-                  "px-3 py-1.5 rounded-md text-xs sm:text-sm font-semibold shadow-md transition-all duration-200",
-                  stat === s.key
-                    ? "bg-blue-500 text-white border border-blue-600 scale-105 ring-2 ring-blue-300"
-                    : "bg-gray-200 text-gray-700 hover:bg-gray-300 hover:scale-105",
-                ].join(" ")}
-              >
-                {s.label}
-              </button>
-            ))}
-          </div>
+          <FilterToolbar
+            selectLabel="Stat"
+            selectValue={stat}
+            onSelectChange={(value) => setStat(value as StatKey)}
+            selectOptions={statSelectOptions}
+            searchLabel="Player Search"
+            searchValue={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search by username or display name"
+            onReset={() => {
+              setStat("money_won");
+              setSearch("");
+            }}
+            resetDisabled={stat === "money_won" && !search}
+            chips={statChips}
+            summaryText={`Showing ${visible.length.toLocaleString()} of ${rows.length.toLocaleString()} loaded`}
+          />
 
           <div className="hidden md:block">
             <div className="overflow-x-auto rounded-lg border border-gray-200">
@@ -360,7 +385,7 @@ const Leaderboard: React.FC = () => {
                   {visible.length === 0 && !loading && (
                     <tr>
                       <td colSpan={3} className="px-4 py-10 text-center text-gray-600 italic">
-                        No players.
+                        {search ? "No players match this search." : "No players."}
                       </td>
                     </tr>
                   )}
@@ -421,7 +446,9 @@ const Leaderboard: React.FC = () => {
             })}
 
             {visible.length === 0 && !loading && (
-              <div className="text-center text-gray-600 italic py-6">No players.</div>
+              <div className="text-center text-gray-600 italic py-6">
+                {search ? "No players match this search." : "No players."}
+              </div>
             )}
           </div>
 
