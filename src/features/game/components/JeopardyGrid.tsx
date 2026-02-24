@@ -1,6 +1,6 @@
-import React from "react";
-import { Category, Clue } from "../../../shared/types/board.ts";
-import SvgOutlinedText from "../common/SvgOutlinedText.tsx";
+﻿import React from "react";
+import { Category, Clue } from "../../../../shared/types/board.ts";
+import SvgOutlinedText from "../../../components/common/SvgOutlinedText.tsx";
 
 interface JeopardyGridProps {
   boardData: Category[];
@@ -11,7 +11,7 @@ interface JeopardyGridProps {
 }
 
 const JEOPARDY_VALUE_STYLE: React.CSSProperties = {
-  // BIG and responsive — will “fill” the tile without overflowing too badly.
+  // BIG and responsive â€” will â€œfillâ€ the tile without overflowing too badly.
   fontSize: "clamp(1.4rem, 5vw, 6rem)",
   fontWeight: 900,
   letterSpacing: "0.01em",
@@ -78,7 +78,7 @@ const JeopardyGrid: React.FC<JeopardyGridProps> = ({
                   "select-none",
                   isCleared ? "bg-gray-300" : "bg-indigo-600",
                   clickable ? "cursor-pointer" : "cursor-not-allowed",
-                  // subtle “tile” depth like Jeopardy board
+                  // subtle â€œtileâ€ depth like Jeopardy board
                   "shadow-[inset_0_0_0_2px_rgba(255,255,255,0.06),inset_0_-10px_18px_rgba(0,0,0,0.25)]",
                   "active:brightness-95",
                 ].join(" ")}
@@ -127,3 +127,4 @@ const JeopardyGrid: React.FC<JeopardyGridProps> = ({
 };
 
 export default JeopardyGrid;
+

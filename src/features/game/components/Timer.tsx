@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useWebSocket } from "../../contexts/WebSocketContext.tsx";
+import { useWebSocket } from "../../../contexts/WebSocketContext.tsx";
 
 interface TimerProps {
   endTime: number | null;
@@ -83,3 +83,4 @@ const Timer: React.FC<TimerProps> = ({ endTime, duration }) => {
 };
 
 export default Timer;
+

@@ -1,8 +1,8 @@
-import { useEffect, useMemo } from "react";
+﻿import { useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { useProfile } from "../../contexts/ProfileContext.tsx";
-import Avatar from "../common/Avatar.tsx";
-import { getProfilePresentation } from "../../utils/profilePresentation";
+import { useProfile } from "../../../contexts/ProfileContext.tsx";
+import Avatar from "../../../components/common/Avatar.tsx";
+import { getProfilePresentation } from "../../../utils/profilePresentation";
 
 interface FinalScoreScreenProps {
   scores: Record<string, number>;
@@ -141,3 +141,4 @@ const FinalScoreScreen = ({ scores }: FinalScoreScreenProps) => {
 };
 
 export default FinalScoreScreen;
+

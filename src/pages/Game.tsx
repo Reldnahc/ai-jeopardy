@@ -1,15 +1,15 @@
 ﻿import { useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import FinalScoreScreen from "../components/game/FinalScoreScreen.tsx";
-import JeopardyBoard from "../components/game/JeopardyBoard.tsx";
-import Sidebar from "../components/game/Sidebar.tsx";
+import FinalScoreScreen from "../features/game/components/FinalScoreScreen.tsx";
+import JeopardyBoard from "../features/game/components/JeopardyBoard.tsx";
+import Sidebar from "../features/game/components/Sidebar.tsx";
 import type {
   AnswerUiState,
   BuzzUiState,
   DailyDoubleUiState,
   FinalUiState,
   TimerUiState,
-} from "../components/game/gameViewModels.ts";
+} from "../features/game/components/gameViewModels.ts";
 import { useWebSocket } from "../contexts/WebSocketContext.tsx";
 import { useEarlyMicPermission } from "../hooks/earlyMicPermission.ts";
 import { usePreload } from "../hooks/game/usePreload.ts";

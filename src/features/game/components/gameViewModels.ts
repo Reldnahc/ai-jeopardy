@@ -1,9 +1,9 @@
-import type {
+﻿import type {
   AnswerCaptureStartMsg,
   AnswerProcessingMsg,
   DailyDoubleShowModalMsg,
   DailyDoubleWagerCaptureStartMsg,
-} from "../../features/game/socket/useGameSocketSync.types.ts";
+} from "../socket/useGameSocketSync.types.ts";
 
 export type BuzzUiState = {
   buzzerLocked: boolean;
@@ -37,3 +37,4 @@ export type DailyDoubleUiState = {
   ddWagerError: string | null;
   showDdModal: DailyDoubleShowModalMsg | null;
 };
+

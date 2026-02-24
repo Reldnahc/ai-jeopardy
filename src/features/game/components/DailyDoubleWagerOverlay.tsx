@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from "react";
-import { useWebSocket } from "../../contexts/WebSocketContext.tsx";
+﻿import { useEffect, useRef, useState } from "react";
+import { useWebSocket } from "../../../contexts/WebSocketContext.tsx";
 import Timer from "./Timer.tsx";
 import {
   DailyDoubleShowModalMsg,
   DailyDoubleWagerCaptureStartMsg,
-} from "../../features/game/socket/useGameSocketSync.ts";
+} from "../socket/useGameSocketSync.ts";
 
 type Props = {
   gameId: string;
@@ -67,7 +67,7 @@ export default function DailyDoubleWagerOverlay({
   useEffect(() => {
     if (!isDdWagerPlayer) return;
 
-    // Don’t resend for same session
+    // Donâ€™t resend for same session
     if (sentDdSessionRef.current === ddWagerCapture?.ddWagerSessionId) return;
 
     let cancelled = false;
@@ -159,7 +159,7 @@ export default function DailyDoubleWagerOverlay({
 
           if (cancelled) return;
 
-          // If they said nothing, just let them try again (don’t send empty base64)
+          // If they said nothing, just let them try again (donâ€™t send empty base64)
           if (!hasSpoken) {
             sentDdSessionRef.current = ddWagerCapture?.ddWagerSessionId ?? null;
             return;
@@ -238,7 +238,7 @@ export default function DailyDoubleWagerOverlay({
 
         {isDdWagerPlayer && isRecording ? (
           <div className="mt-6 text-lg text-red-500 font-semibold">
-            Recording your wager now… say a number (or “true daily double”).
+            Recording your wager nowâ€¦ say a number (or â€œtrue daily doubleâ€).
           </div>
         ) : isDdWagerPlayer ? (
           <div className="mt-6 text-lg opacity-80">Waiting for host...</div>
@@ -261,3 +261,4 @@ export default function DailyDoubleWagerOverlay({
     </div>
   );
 }
+

@@ -1,4 +1,4 @@
-// BuzzAnimation.tsx
+﻿// BuzzAnimation.tsx
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -56,3 +56,4 @@ const BuzzAnimation: React.FC<BuzzAnimationProps> = ({ playerName }) => {
 };
 
 export default BuzzAnimation;
+

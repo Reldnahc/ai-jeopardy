@@ -1,7 +1,7 @@
-import React, { useEffect, useRef } from "react";
-import Avatar from "../common/Avatar";
-import type { Player } from "../../types/Lobby";
-import type { ProfilePresentation } from "../../utils/profilePresentation";
+﻿import React, { useEffect, useRef } from "react";
+import Avatar from "../../../components/common/Avatar";
+import type { Player } from "../../../types/Lobby";
+import type { ProfilePresentation } from "../../../utils/profilePresentation";
 
 type RollerMoneyComponent = React.ComponentType<{ value: number; className?: string }>;
 
@@ -133,7 +133,7 @@ export default function GamePlayerRow({
             aria-label={`Increase ${displayName} score`}
             title={`+${lastQuestionValue}`}
           >
-            ＋
+            ï¼‹
           </button>
 
           <button
@@ -151,10 +151,11 @@ export default function GamePlayerRow({
             aria-label={`Decrease ${displayName} score`}
             title={`-${lastQuestionValue}`}
           >
-            −
+            âˆ’
           </button>
         </div>
       )}
     </li>
   );
 }
+

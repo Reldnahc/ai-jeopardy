@@ -1,6 +1,6 @@
 ﻿import React, { useEffect } from "react";
-import { Clue } from "../../../shared/types/board.ts";
-import { useWebSocket } from "../../contexts/WebSocketContext.tsx";
+import { Clue } from "../../../../shared/types/board.ts";
+import { useWebSocket } from "../../../contexts/WebSocketContext.tsx";
 import BuzzAnimation from "./BuzzAnimation.tsx";
 import Timer from "./Timer.tsx";
 import FinalJeopardyPanel from "./FinalJeopardyPanel.tsx";
@@ -449,3 +449,4 @@ const SelectedClueDisplay: React.FC<SelectedClueDisplayProps> = ({
 };
 
 export default SelectedClueDisplay;
+

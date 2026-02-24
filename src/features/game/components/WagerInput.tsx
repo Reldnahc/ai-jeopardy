@@ -1,5 +1,5 @@
-import React from "react";
-import { Player } from "../../types/Lobby.ts";
+﻿import React from "react";
+import { Player } from "../../../types/Lobby.ts";
 
 interface WagerInputProps {
   players: Player[];
@@ -65,3 +65,4 @@ const WagerInput: React.FC<WagerInputProps> = ({
 };
 
 export default WagerInput;
+

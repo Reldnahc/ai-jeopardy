@@ -1,16 +1,16 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+﻿import React, { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { useProfile } from "../../contexts/ProfileContext.tsx";
-import { Player } from "../../types/Lobby.ts";
-import MutedIcon from "../../icons/MutedIcon.tsx";
-import LoudIcon from "../../icons/LoudIcon.tsx";
-import MicIcon from "../../icons/MicIcon.tsx";
-import SpeakerIcon from "../../icons/SpeakerIcon.tsx";
-import { getProfilePresentation } from "../../utils/profilePresentation";
+import { useProfile } from "../../../contexts/ProfileContext.tsx";
+import { Player } from "../../../types/Lobby.ts";
+import MutedIcon from "../../../icons/MutedIcon.tsx";
+import LoudIcon from "../../../icons/LoudIcon.tsx";
+import MicIcon from "../../../icons/MicIcon.tsx";
+import SpeakerIcon from "../../../icons/SpeakerIcon.tsx";
+import { getProfilePresentation } from "../../../utils/profilePresentation";
 import GamePlayerRow from "./GamePlayerRow.tsx";
-import { atLeast } from "../../../shared/roles.ts";
-import { useAlert } from "../../contexts/AlertContext.tsx";
-import Avatar from "../common/Avatar.tsx";
+import { atLeast } from "../../../../shared/roles.ts";
+import { useAlert } from "../../../contexts/AlertContext.tsx";
+import Avatar from "../../../components/common/Avatar.tsx";
 
 interface SidebarProps {
   players: Player[];
@@ -498,3 +498,4 @@ const Sidebar: React.FC<SidebarProps> = ({
 };
 
 export default Sidebar;
+

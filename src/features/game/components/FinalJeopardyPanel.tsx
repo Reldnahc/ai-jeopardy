@@ -1,8 +1,8 @@
-// src/components/game/FinalJeopardyPanel.tsx
+﻿// src/components/game/FinalJeopardyPanel.tsx
 import React, { useEffect } from "react";
 import { ReactSketchCanvas } from "react-sketch-canvas";
-import { useWebSocket } from "../../contexts/WebSocketContext.tsx";
-import { useDeviceContext } from "../../contexts/DeviceContext.tsx";
+import { useWebSocket } from "../../../contexts/WebSocketContext.tsx";
+import { useDeviceContext } from "../../../contexts/DeviceContext.tsx";
 
 type FinalJeopardyPanelProps = {
   gameId: string;
@@ -180,3 +180,4 @@ const FinalJeopardyPanel: React.FC<FinalJeopardyPanelProps> = ({
 };
 
 export default FinalJeopardyPanel;
+
