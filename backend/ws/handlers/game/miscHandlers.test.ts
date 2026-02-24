@@ -149,6 +149,19 @@ describe("miscHandlers", () => {
     expect(ctx.broadcast).toHaveBeenCalledWith("g1", { type: "timer-end", timerVersion: 2 });
   });
 
+  it("reset-buzzer no-ops for non-host and missing game", async () => {
+    const ws = makeWs();
+    const game = makeGame({ buzzed: "alice", buzzerLocked: false });
+    const nonHostCtx = makeCtx(game, { requireHost: vi.fn(() => false) });
+    await miscHandlers["reset-buzzer"]({ ws, data: { gameId: "g1" }, ctx: nonHostCtx });
+    expect(game.buzzed).toBe("alice");
+    expect(game.buzzerLocked).toBe(false);
+
+    const missingCtx = makeCtx(game, { games: {} });
+    await miscHandlers["reset-buzzer"]({ ws, data: { gameId: "g1" }, ctx: missingCtx });
+    expect(missingCtx.broadcast).not.toHaveBeenCalled();
+  });
+
   it("mark-all-complete marks active board clues and checks transition", async () => {
     const ws = makeWs();
     const game = makeGame();
@@ -163,6 +176,15 @@ describe("miscHandlers", () => {
       expect.objectContaining({ type: "cleared-clues-sync" }),
     );
     expect(ctx.checkBoardTransition).toHaveBeenCalledWith(game, "g1", ctx);
+  });
+
+  it("mark-all-complete no-ops when game is missing", async () => {
+    const ws = makeWs();
+    const game = makeGame();
+    const ctx = makeCtx(game, { games: {} });
+
+    await miscHandlers["mark-all-complete"]({ ws, data: { gameId: "g1" }, ctx });
+    expect(ctx.broadcast).not.toHaveBeenCalled();
   });
 
   it("mark-all-complete no-ops when active board has no categories", async () => {
@@ -198,6 +220,27 @@ describe("miscHandlers", () => {
     expect(game.answerClueKey).toBeNull();
     expect(game.selectedClue?.isAnswerRevealed).toBe(true);
     expect(ctx.broadcast).toHaveBeenCalledWith(
+      "g1",
+      expect.objectContaining({ type: "answer-revealed" }),
+    );
+  });
+
+  it("reveal-answer clears capture state even when clue is missing", async () => {
+    const ws = makeWs();
+    const game = makeGame({
+      phase: "ANSWER_CAPTURE",
+      answerSessionId: "sess-1",
+      answerClueKey: "firstBoard:200:Q1",
+      selectedClue: null,
+    });
+    const ctx = makeCtx(game);
+
+    await miscHandlers["reveal-answer"]({ ws, data: { gameId: "g1" }, ctx });
+
+    expect(ctx.clearAnswerWindow).toHaveBeenCalledWith(game);
+    expect(game.phase).toBeNull();
+    expect(game.answerSessionId).toBeNull();
+    expect(ctx.broadcast).not.toHaveBeenCalledWith(
       "g1",
       expect.objectContaining({ type: "answer-revealed" }),
     );
@@ -307,6 +350,16 @@ describe("miscHandlers", () => {
     await miscHandlers["tts-ensure"]({ ws, data: { gameId: "g1", text: "   " }, ctx });
     await miscHandlers["tts-ensure"]({ ws, data: { gameId: "missing", text: "hello" }, ctx });
 
+    expect(ctx.ensureTtsAsset).not.toHaveBeenCalled();
+    expect(ws.send).not.toHaveBeenCalled();
+  });
+
+  it("tts-ensure no-ops when gameId is missing", async () => {
+    const ws = makeWs();
+    const game = makeGame();
+    const ctx = makeCtx(game);
+
+    await miscHandlers["tts-ensure"]({ ws, data: { text: "hello" }, ctx });
     expect(ctx.ensureTtsAsset).not.toHaveBeenCalled();
     expect(ws.send).not.toHaveBeenCalled();
   });

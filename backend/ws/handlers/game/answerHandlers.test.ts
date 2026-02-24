@@ -95,6 +95,21 @@ describe("answerHandlers", () => {
     expect(ctx.autoResolveAfterJudgement).toHaveBeenCalledWith(ctx, "g1", game, "alice", "incorrect");
   });
 
+  it("rejects submission when socket is not mapped to a known player", async () => {
+    const ws = makeWs();
+    const game = makeGame({ players: [{ id: "other", username: "alice", displayname: "Alice" }] });
+    const ctx = makeCtx(game);
+
+    await answerHandlers["answer-audio-blob"]({
+      ws,
+      data: { gameId: "g1", answerSessionId: "sess-1", dataBase64: Buffer.from("a").toString("base64") },
+      ctx,
+    });
+
+    expect(ws.send).toHaveBeenCalledWith(expect.stringContaining("You are not the answering player"));
+    expect(ctx.autoResolveAfterJudgement).toHaveBeenCalledWith(ctx, "g1", game, "", "incorrect");
+  });
+
   it("rejects missing audio data", async () => {
     const ws = makeWs();
     const game = makeGame();
@@ -200,6 +215,37 @@ describe("answerHandlers", () => {
       expect.objectContaining({ type: "answer-result", verdict: "incorrect", suggestedDelta: -400 }),
     );
     expect(ctx.autoResolveAfterJudgement).toHaveBeenCalledWith(ctx, "g1", game, "alice", "incorrect");
+  });
+
+  it("uses active daily double wager for empty-transcript penalty", async () => {
+    const ws = makeWs();
+    const game = makeGame({
+      dailyDouble: {
+        clueKey: "firstBoard:400:Capital of France?",
+        playerUsername: "alice",
+        playerDisplayname: "Alice",
+        wager: 1600,
+      },
+    });
+    const ctx = makeCtx(game, {
+      transcribeAnswerAudio: vi.fn(async () => ""),
+    });
+
+    await answerHandlers["answer-audio-blob"]({
+      ws,
+      data: {
+        gameId: "g1",
+        answerSessionId: "sess-1",
+        mimeType: "audio/webm",
+        dataBase64: Buffer.from("audio").toString("base64"),
+      },
+      ctx,
+    });
+
+    expect(ctx.broadcast).toHaveBeenCalledWith(
+      "g1",
+      expect.objectContaining({ type: "answer-result", verdict: "incorrect", suggestedDelta: -1600 }),
+    );
   });
 
   it("uses daily double wager as result delta when active on clue", async () => {

@@ -159,6 +159,23 @@ describe("buzzHandlers", () => {
     expect(ws.send).toHaveBeenCalledWith(expect.stringContaining("\"reason\":\"bad-timestamp\""));
   });
 
+  it("denies buzz with invalid far-future timestamp", async () => {
+    const ws = makeWs();
+    const now = Date.now();
+    const game = makeGame({
+      clueState: { clueKey: "firstBoard:400:Q", lockedOut: {}, buzzOpenAtMs: now - 1000 },
+    });
+    const ctx = makeCtx(game);
+
+    await buzzHandlers.buzz({
+      ws,
+      data: { gameId: "g1", estimatedServerBuzzAtMs: now + 1000 },
+      ctx,
+    });
+
+    expect(ws.send).toHaveBeenCalledWith(expect.stringContaining("\"reason\":\"bad-timestamp\""));
+  });
+
   it("collects winner and starts answer capture flow", async () => {
     vi.useFakeTimers();
     try {
@@ -251,6 +268,38 @@ describe("buzzHandlers", () => {
         expect.objectContaining({ type: "answer-result", verdict: "incorrect", suggestedDelta: -400 }),
       );
       expect(ctx.autoResolveAfterJudgement).toHaveBeenCalledWith(ctx, "g1", game, "alice", "incorrect");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("answer timeout callback exits when session is no longer active", async () => {
+    vi.useFakeTimers();
+    try {
+      const ws = makeWs();
+      const game = makeGame({
+        clueState: { clueKey: "firstBoard:400:Q", lockedOut: {}, buzzOpenAtMs: Date.now() - 10 },
+      });
+      let capturedOnTimeout: (() => void) | null = null;
+      const ctx = makeCtx(game, {
+        startAnswerWindow: vi.fn((_gid, _g, _broadcast, _ms, onTimeout: () => void) => {
+          capturedOnTimeout = onTimeout;
+        }),
+      });
+
+      await buzzHandlers.buzz({
+        ws,
+        data: { gameId: "g1", estimatedServerBuzzAtMs: Date.now(), clientSeq: 1 },
+        ctx,
+      });
+      await vi.advanceTimersByTimeAsync(70);
+
+      const callsBefore = (ctx.broadcast as ReturnType<typeof vi.fn>).mock.calls.length;
+      game.answerSessionId = null;
+      capturedOnTimeout?.();
+
+      expect((ctx.broadcast as ReturnType<typeof vi.fn>).mock.calls.length).toBe(callsBefore);
+      expect(ctx.autoResolveAfterJudgement).not.toHaveBeenCalled();
     } finally {
       vi.useRealTimers();
     }
