@@ -25,14 +25,11 @@ type UpdateCategoriesData = { gameId: string; categories?: unknown };
 type RefreshCategoryPoolData = { gameId: string };
 
 type LobbyCategoryCtx = CtxDeps<
-  | "games"
-  | "sendLobbySnapshot"
-  | "broadcast"
-  | "normalizeCategories11"
+  "games" | "sendLobbySnapshot" | "broadcast" | "normalizeCategories11"
 >;
 
 export const lobbyCategoryHandlers: Record<string, WsHandler> = {
-  "toggle-lock-category": async ({ ws, data, ctx }) => {
+  "toggle-lock-category": async ({ data, ctx }) => {
     const hctx = ctx as LobbyCategoryCtx;
     const { gameId, boardType, index } = data as ToggleLockCategoryData;
     const game = hctx.games[gameId];
@@ -241,7 +238,9 @@ export const lobbyCategoryHandlers: Record<string, WsHandler> = {
 
     const locked = Boolean(game.lobbySettings?.categoryRefreshLocked);
     if (locked) {
-      ws.send(JSON.stringify({ type: "error", message: "Category refresh is locked by the host." }));
+      ws.send(
+        JSON.stringify({ type: "error", message: "Category refresh is locked by the host." }),
+      );
       hctx.sendLobbySnapshot(ws, gameId);
       return;
     }
@@ -263,7 +262,9 @@ export const lobbyCategoryHandlers: Record<string, WsHandler> = {
     }
 
     if (game.categoryPoolGenerating) {
-      ws.send(JSON.stringify({ type: "error", message: "Category pool refresh already in progress." }));
+      ws.send(
+        JSON.stringify({ type: "error", message: "Category pool refresh already in progress." }),
+      );
       hctx.sendLobbySnapshot(ws, gameId);
       return;
     }
@@ -308,7 +309,9 @@ export const lobbyCategoryHandlers: Record<string, WsHandler> = {
         return key && !lockedKeys.has(key);
       });
 
-      const unlockedIndexes = Array.from({ length: 11 }, (_, idx) => idx).filter((idx) => !isLockedAt(idx));
+      const unlockedIndexes = Array.from({ length: 11 }, (_, idx) => idx).filter(
+        (idx) => !isLockedAt(idx),
+      );
       const needed = unlockedIndexes.length;
       const replacement = poolWithoutLocked.slice(0, needed);
       if (replacement.length < needed) {
