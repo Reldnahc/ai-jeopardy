@@ -1,5 +1,6 @@
 import type { CtxDeps } from "../../context.types.js";
 import type { WsHandler } from "../types.js";
+import { getUniqueCategories } from "../../../services/categories/getUniqueCategories.js";
 
 type ToggleLockCategoryData = {
   gameId: string;
@@ -10,7 +11,6 @@ type RandomizeCategoryData = {
   gameId: string;
   boardType: "firstBoard" | "secondBoard" | "finalJeopardy";
   index?: number;
-  candidates?: unknown[];
 };
 type UpdateCategoryData = {
   gameId: string;
@@ -72,7 +72,7 @@ export const lobbyCategoryHandlers: Record<string, WsHandler> = {
 
   "randomize-category": async ({ ws, data, ctx }) => {
     const hctx = ctx as LobbyCategoryCtx;
-    const { gameId, boardType, index, candidates } = data as RandomizeCategoryData;
+    const { gameId, boardType, index } = data as RandomizeCategoryData;
     const game = hctx.games[gameId];
     if (!game) return;
 
@@ -101,25 +101,15 @@ export const lobbyCategoryHandlers: Record<string, WsHandler> = {
     else if (bt === "secondBoard") globalIndex = 5 + idx;
     else globalIndex = 10;
 
-    const norm = (s: unknown) =>
-      String(s ?? "")
-        .trim()
-        .toLowerCase();
-    const used = new Set(
-      game.categories
-        .map((c: unknown, i: number) => (i === globalIndex ? "" : norm(c)))
-        .filter((v: string) => v.length > 0),
-    );
+    const exclude = game.categories
+      .map((c: unknown, i: number) => (i === globalIndex ? "" : String(c ?? "").trim()))
+      .filter((v: string) => v.length > 0);
 
-    const list = Array.isArray(candidates) ? candidates : [];
     let chosen = "";
-
-    for (const c of list) {
-      const v = norm(c);
-      if (!v) continue;
-      if (used.has(v)) continue;
-      chosen = String(c ?? "").trim();
-      break;
+    try {
+      chosen = getUniqueCategories(1, { exclude })[0] ?? "";
+    } catch (e) {
+      console.error("[randomize-category] failed to generate category:", e);
     }
 
     if (!chosen) {

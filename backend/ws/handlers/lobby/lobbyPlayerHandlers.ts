@@ -2,12 +2,12 @@ import type { JsonMap, PlayerState } from "../../../types/runtime.js";
 import type { CtxDeps } from "../../context.types.js";
 import type { WsHandler } from "../types.js";
 import { MAX_LOBBY_PLAYERS } from "../../../lobby/constants.js";
+import { getUniqueCategories } from "../../../services/categories/getUniqueCategories.js";
 
 type CreateLobbyData = {
   username?: string;
   displayname?: string;
   playerKey?: string;
-  categories?: unknown;
 };
 type JoinLobbyData = {
   gameId: string;
@@ -46,7 +46,7 @@ export const lobbyPlayerHandlers: Record<string, WsHandler> = {
       if (dt > 50) console.warn(`[create-lobby][${reqId}] ws.send slow (${type})`, { ms: dt });
     };
 
-    const { username, displayname, playerKey, categories } = (data ?? {}) as CreateLobbyData;
+    const { username, displayname, playerKey } = (data ?? {}) as CreateLobbyData;
 
     const u = String(username ?? "")
       .trim()
@@ -67,6 +67,14 @@ export const lobbyPlayerHandlers: Record<string, WsHandler> = {
 
     ws.gameId = newGameId;
 
+    let generatedCategories: string[] = [];
+    try {
+      generatedCategories = getUniqueCategories(11);
+    } catch (e) {
+      console.error("[create-lobby] failed to generate categories, falling back:", e);
+      generatedCategories = hctx.normalizeCategories11([]);
+    }
+
     hctx.games[newGameId] = {
       host: u,
       players: [
@@ -80,7 +88,7 @@ export const lobbyPlayerHandlers: Record<string, WsHandler> = {
       ],
       inLobby: true,
       createdAt: Date.now(),
-      categories: hctx.normalizeCategories11(categories),
+      categories: generatedCategories,
       lobbySettings: {
         timeToBuzz: 10,
         timeToAnswer: 10,

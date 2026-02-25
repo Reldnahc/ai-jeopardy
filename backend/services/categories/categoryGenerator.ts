@@ -1,5 +1,5 @@
-import { SUBJECTS } from "./categorySubjects";
-import { MODIFIERS, BLOCKED } from "./categoryTemplates";
+import { SUBJECTS } from "./categorySubjects.js";
+import { MODIFIERS, BLOCKED } from "./categoryTemplates.js";
 
 function randomFrom<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];

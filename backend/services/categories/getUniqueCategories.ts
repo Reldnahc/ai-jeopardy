@@ -1,5 +1,5 @@
-import { buildCategoryPool } from "./categoryPool";
-import { shuffle, normalizeCategory } from "./categoryUtils";
+import { buildCategoryPool } from "./categoryPool.js";
+import { shuffle, normalizeCategory } from "./categoryUtils.js";
 
 type Options = {
   exclude?: string[];

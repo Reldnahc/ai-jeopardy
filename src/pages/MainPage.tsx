@@ -11,7 +11,6 @@ import GameActionsSection from "../components/main/mainPage/GameActionsSection.t
 import DiscoveryLinks from "../components/main/mainPage/DiscoveryLinks.tsx";
 import HowToPlaySection from "../components/main/mainPage/HowToPlaySection.tsx";
 import { Player } from "../types/Lobby.ts";
-import { getUniqueCategories } from "../categories/getUniqueCategories.ts";
 import { useGameSession } from "../hooks/useGameSession.ts";
 
 const ADJECTIVES = ["Hallucinated", "Intelligent", "Dreamt", "Generated", "Conjured", "Created"];
@@ -175,10 +174,6 @@ export default function MainPage() {
     sendJson({ type: "check-cotd" });
   }, [isSocketReady, sendJson]);
 
-  const handleGenerateRandomCategories = () => {
-    return getUniqueCategories(11);
-  };
-
   function sendErrorAlert() {
     void showAlert("Connection Error", <span>Please refresh the page and try again.</span>, [
       {
@@ -222,7 +217,6 @@ export default function MainPage() {
         username,
         displayname,
         playerKey,
-        categories: handleGenerateRandomCategories(),
       });
     } else {
       sendErrorAlert();

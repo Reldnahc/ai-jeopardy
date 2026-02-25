@@ -1,7 +1,16 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { getUniqueCategories } from "../../../services/categories/getUniqueCategories.js";
+import { lobbyCategoryHandlers } from "./lobbyCategoryHandlers.js";
 import type { GameState, SocketState } from "../../../types/runtime.js";
 import { createCtx } from "../../../test/createCtx.js";
-import { lobbyCategoryHandlers } from "./lobbyCategoryHandlers.js";
+
+vi.mock("../../../services/categories/getUniqueCategories.js", () => ({
+  getUniqueCategories: vi.fn(),
+}));
+
+beforeEach(() => {
+  vi.mocked(getUniqueCategories).mockReset();
+});
 
 function makeWs(): SocketState {
   return { id: "ws-1", send: vi.fn(), gameId: "g1" } as unknown as SocketState;
@@ -125,7 +134,7 @@ describe("lobbyCategoryHandlers", () => {
 
     await lobbyCategoryHandlers["randomize-category"]({
       ws,
-      data: { gameId: "g1", boardType: "firstBoard", index: 0, candidates: ["X"] },
+      data: { gameId: "g1", boardType: "firstBoard", index: 0 },
       ctx,
     });
 
@@ -137,10 +146,11 @@ describe("lobbyCategoryHandlers", () => {
     const ws = makeWs();
     const game = makeGame();
     const ctx = makeCtx(game);
+    vi.mocked(getUniqueCategories).mockReturnValue(["X"]);
 
     await lobbyCategoryHandlers["randomize-category"]({
       ws,
-      data: { gameId: "g1", boardType: "firstBoard", index: 0, candidates: ["B", "X"] },
+      data: { gameId: "g1", boardType: "firstBoard", index: 0 },
       ctx,
     });
 
@@ -155,10 +165,11 @@ describe("lobbyCategoryHandlers", () => {
     const ws = makeWs();
     const game = makeGame();
     const ctx = makeCtx(game);
+    vi.mocked(getUniqueCategories).mockReturnValue([]);
 
     await lobbyCategoryHandlers["randomize-category"]({
       ws,
-      data: { gameId: "g1", boardType: "firstBoard", index: 0, candidates: ["B", "C"] },
+      data: { gameId: "g1", boardType: "firstBoard", index: 0 },
       ctx,
     });
 

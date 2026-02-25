@@ -39,7 +39,7 @@ describe("lobbyPlayerHandlers", () => {
 
     await lobbyPlayerHandlers["create-lobby"]({
       ws,
-      data: { username: "alice", displayname: "Alice", categories: ["A"] },
+      data: { username: "alice", displayname: "Alice" },
       ctx,
     });
 

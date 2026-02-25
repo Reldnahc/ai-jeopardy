@@ -9,7 +9,6 @@ import CategoryBoard, { LobbyBoardType } from "../features/lobby/components/Cate
 import { useProfile } from "../contexts/ProfileContext.tsx";
 import { useAlert } from "../contexts/AlertContext.tsx";
 import { motion } from "framer-motion";
-import { getUniqueCategories } from "../categories/getUniqueCategories.ts";
 import { useLobbySocketSync } from "../features/lobby/socket/useLobbySocketSync";
 import { usePlayerIdentity } from "../hooks/usePlayerIdentity.ts";
 import { useLobbyPreloadAck } from "../hooks/lobby/useLobbyPreloadAck.ts";
@@ -115,14 +114,11 @@ const Lobby: React.FC = () => {
     if (!isSocketReady) return;
     if (!gameId) return;
 
-    const candidates = getUniqueCategories(25);
-
     sendJson({
       type: "randomize-category",
       gameId,
       boardType,
       index,
-      candidates,
     });
   };
 

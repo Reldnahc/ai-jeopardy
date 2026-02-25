@@ -31,7 +31,7 @@ export const SUBJECTS = [
   "The Vietnam War",
   "The Korean War",
   "The Civil Rights Movement",
-  "Women’s Suffrage",
+  "Women's Suffrage",
   "The Great Depression",
   "The New Deal",
   "Fall of the Berlin Wall",

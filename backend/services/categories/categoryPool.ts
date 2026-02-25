@@ -1,4 +1,4 @@
-import { generateTemplateCategory } from "./categoryGenerator";
+import { generateTemplateCategory } from "./categoryGenerator.js";
 
 export function buildCategoryPool(size = 2000): string[] {
   const generated = Array.from({ length: size }, generateTemplateCategory);
