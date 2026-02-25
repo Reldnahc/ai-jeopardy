@@ -231,19 +231,22 @@ export const lobbyPlayerHandlers: Record<string, WsHandler> = {
     const game = hctx.games[effectiveGameId];
     if (!game.inLobby) return;
 
-    const stable =
-      String(playerKey ?? "").trim() ||
-      String(username ?? "")
-        .trim()
-        .toLowerCase();
-    if (!stable) return;
+    const stableUsername = String(username ?? "")
+      .trim()
+      .toLowerCase();
+    const stableKey = String(playerKey ?? "").trim();
+    if (!stableUsername && !stableKey) return;
 
     const before = game.players.length;
 
-    game.players = game.players.filter((p: PlayerState) => {
-      const pid = hctx.playerStableId(p);
-      return pid !== stable;
-    });
+    if (stableUsername) {
+      game.players = game.players.filter((p: PlayerState) => {
+        const pid = hctx.playerStableId(p);
+        return pid !== stableUsername;
+      });
+    } else if (stableKey) {
+      game.players = game.players.filter((p: PlayerState) => p.playerKey !== stableKey);
+    }
 
     if (game.players.length === before) return;
 

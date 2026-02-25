@@ -7,6 +7,8 @@ import { useAuth } from "../../contexts/AuthContext.tsx";
 import { useProfile } from "../../contexts/ProfileContext.tsx";
 import { getProfilePresentation } from "../../utils/profilePresentation.ts";
 import UserHeaderButton from "../header/UserHeaderButton.tsx";
+import { useWebSocket } from "../../contexts/WebSocketContext.tsx";
+import { useGameSession } from "../../hooks/useGameSession.ts";
 
 type NavItem =
   | { key: string; label: string; to: string; kind: "link" }
@@ -27,6 +29,32 @@ const Header: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { showAlert } = useAlert();
+  const { sendJson } = useWebSocket();
+  const { session } = useGameSession();
+
+  const leaveLobbyIfNeeded = useCallback(() => {
+    const path = location.pathname;
+    if (!path.startsWith("/lobby/")) return;
+    const match = path.match(/^\/lobby\/([^/]+)/);
+    const lobbyId = match?.[1];
+    if (!lobbyId) return;
+
+    sendJson({
+      type: "leave-lobby",
+      gameId: lobbyId,
+      playerKey: session?.playerKey,
+      username: session?.username,
+    });
+  }, [location.pathname, sendJson, session?.playerKey, session?.username]);
+
+  const handleNav = useCallback(
+    (to: string) => {
+      leaveLobbyIfNeeded();
+      navigate(to);
+      closeAllMenus();
+    },
+    [leaveLobbyIfNeeded, navigate],
+  );
 
   const closeAllMenus = () => {
     setDropdownOpen(false);
@@ -103,6 +131,10 @@ const Header: React.FC = () => {
         <div className="flex items-center space-x-6">
           <Link
             to="/"
+            onClick={(e) => {
+              e.preventDefault();
+              handleNav("/");
+            }}
             className="text-3xl lg:text-5xl font-swiss911 tracking-wider font-bold text-white hover:text-blue-600 transition-colors"
             style={{
               WebkitTextStroke: "2px #000000",
@@ -117,6 +149,10 @@ const Header: React.FC = () => {
               <Link
                 key={item.key}
                 to={item.to}
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleNav(item.to);
+                }}
                 className="px-4 lg:text-2xl py-2 font-bold hover:underline hover:text-blue-600 rounded"
               >
                 {item.label}
@@ -152,7 +188,10 @@ const Header: React.FC = () => {
                             <Link
                               key={item.key}
                               to={item.to}
-                              onClick={() => setDropdownOpen(false)}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                handleNav(item.to);
+                              }}
                               className="block px-4 py-2 text-blue-600 hover:bg-gray-200"
                             >
                               {item.label}
@@ -215,9 +254,8 @@ const Header: React.FC = () => {
                     item.kind === "action" && item.danger ? "text-red-600" : ""
                   }`}
                   onClick={() => {
-                    if (item.kind === "link") navigate(item.to);
+                    if (item.kind === "link") handleNav(item.to);
                     else item.onClick();
-                    setMenuOpen(false);
                   }}
                   variants={{ hidden: { opacity: 0, y: -10 }, visible: { opacity: 1, y: 0 } }}
                 >

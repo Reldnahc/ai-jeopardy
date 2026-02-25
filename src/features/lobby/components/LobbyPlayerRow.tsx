@@ -96,7 +96,7 @@ export default function LobbyPlayerRow({
           </button>
         )}
 
-        {isHostRow && <span className="text-yellow-400 text-xs -mt-1">Host</span>}
+        {isHostRow && <span className="text-yellow-400 text-sm font-bold -mt-1">Host</span>}
       </div>
     </li>
   );

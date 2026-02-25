@@ -1,9 +1,37 @@
-import { Link } from "react-router-dom";
+import { useCallback } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useWebSocket } from "../../contexts/WebSocketContext.tsx";
+import { useGameSession } from "../../hooks/useGameSession.ts";
 
 export default function Footer() {
-  const handleFooterNav = () => {
-    window.scrollTo(0, 0);
-  };
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { sendJson } = useWebSocket();
+  const { session } = useGameSession();
+
+  const leaveLobbyIfNeeded = useCallback(() => {
+    const path = location.pathname;
+    if (!path.startsWith("/lobby/")) return;
+    const match = path.match(/^\/lobby\/([^/]+)/);
+    const lobbyId = match?.[1];
+    if (!lobbyId) return;
+
+    sendJson({
+      type: "leave-lobby",
+      gameId: lobbyId,
+      playerKey: session?.playerKey,
+      username: session?.username,
+    });
+  }, [location.pathname, sendJson, session?.playerKey, session?.username]);
+
+  const handleFooterNav = useCallback(
+    (to: string) => {
+      leaveLobbyIfNeeded();
+      window.scrollTo(0, 0);
+      navigate(to);
+    },
+    [leaveLobbyIfNeeded, navigate],
+  );
 
   return (
     <footer className="bg-transparent text-white py-6 mt-8 ">
@@ -20,17 +48,38 @@ export default function Footer() {
             <h3 className="text-xl font-extrabold">Quick Links</h3>
             <ul className="mt-2 space-y-2 text-sm text-center">
               <li>
-                <Link to="/" className="hover:underline" onClick={handleFooterNav}>
+                <Link
+                  to="/"
+                  className="hover:underline"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleFooterNav("/");
+                  }}
+                >
                   Home
                 </Link>
               </li>
               <li>
-                <Link to="/recent-boards" className="hover:underline" onClick={handleFooterNav}>
+                <Link
+                  to="/recent-boards"
+                  className="hover:underline"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleFooterNav("/recent-boards");
+                  }}
+                >
                   Recent Boards
                 </Link>
               </li>
               <li>
-                <Link to="/leaderboards" className="hover:underline" onClick={handleFooterNav}>
+                <Link
+                  to="/leaderboards"
+                  className="hover:underline"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleFooterNav("/leaderboards");
+                  }}
+                >
                   Leaderboards
                 </Link>
               </li>

@@ -27,6 +27,45 @@ export function handleSocketClose(
     const player = game.players?.find((p: PlayerState) => p.id === ws.id);
     if (!player) return;
 
+    if (game.inLobby) {
+      console.log(`[Server] Player ${player.name} disconnected in lobby (hard).`);
+
+      const before = game.players.length;
+      game.players = game.players.filter((p: PlayerState) => p.id !== ws.id);
+      if (game.players.length === before) return;
+
+      const wasHost =
+        String(game.host ?? "")
+          .trim()
+          .toLowerCase() ===
+        String(player.username ?? "")
+          .trim()
+          .toLowerCase();
+
+      if (wasHost) {
+        if (game.players.length === 0) {
+          ctx.scheduleLobbyCleanupIfEmpty(gameId);
+          return;
+        }
+        game.host = String(game.players[0].username ?? "")
+          .trim()
+          .toLowerCase();
+      }
+
+      ctx.broadcast(gameId, {
+        type: "player-list-update",
+        players: game.players.map((p: PlayerState) => ({
+          username: p.username,
+          displayname: p.displayname,
+          online: p?.online,
+        })),
+        host: game.host,
+      });
+
+      ctx.scheduleLobbyCleanupIfEmpty(gameId);
+      return;
+    }
+
     player.online = false;
     player.id = null; // keeps reconnect logic consistent
 
@@ -40,12 +79,6 @@ export function handleSocketClose(
       })),
       host: game.host,
     });
-
-    if (game.inLobby) {
-      console.log(`[Server] Player ${player.name} disconnected in lobby (soft).`);
-      ctx.scheduleLobbyCleanupIfEmpty(gameId);
-      return;
-    }
 
     console.log(`[Server] Player ${player.name} disconnected (soft).`);
 

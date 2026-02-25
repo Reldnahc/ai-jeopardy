@@ -204,6 +204,32 @@ describe("lobbyPlayerHandlers", () => {
     expect(ctx.scheduleLobbyCleanupIfEmpty).toHaveBeenCalledWith("G1");
   });
 
+  it("leave-lobby removes player by playerKey when username missing", async () => {
+    const ws = makeWs("ws-1");
+    const game: GameState = {
+      inLobby: true,
+      host: "alice",
+      players: [
+        { id: "ws-1", username: "alice", displayname: "Alice", playerKey: "pk1", online: true },
+        { id: "ws-2", username: "bob", displayname: "Bob", playerKey: "pk2", online: true },
+      ],
+      categories: Array(11).fill("Category"),
+    };
+    const ctx = makeCtx({ games: { G1: game } });
+
+    await lobbyPlayerHandlers["leave-lobby"]({
+      ws,
+      data: { gameId: "G1", playerKey: "pk2" },
+      ctx,
+    });
+
+    expect(game.players.map((p) => p.username)).toEqual(["alice"]);
+    expect(ctx.broadcast).toHaveBeenCalledWith(
+      "G1",
+      expect.objectContaining({ type: "player-list-update" }),
+    );
+  });
+
   it("leave-lobby uses ws.gameId fallback and no-ops if player id is missing", async () => {
     const ws = makeWs("unknown");
     ws.gameId = "G1";
