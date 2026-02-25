@@ -14,7 +14,7 @@ export default function MainHeader({ randomAdjective }: MainHeaderProps) {
           fill="#facc15"
           shadowStyle="board"
           singleLine={false}
-          maxLines={2}
+          maxLines={3}
           wrapAtChars={22}
           uppercase
         />
@@ -33,4 +33,3 @@ export default function MainHeader({ randomAdjective }: MainHeaderProps) {
     </>
   );
 }
-
