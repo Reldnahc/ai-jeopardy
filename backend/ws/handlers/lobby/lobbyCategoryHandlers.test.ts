@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getUniqueCategories } from "../../../services/categories/getUniqueCategories.js";
+import { generateCategoryPoolFromOpenAi } from "../../../services/ai/categoryPool.js";
 import { lobbyCategoryHandlers } from "./lobbyCategoryHandlers.js";
 import type { GameState, SocketState } from "../../../types/runtime.js";
 import { createCtx } from "../../../test/createCtx.js";
@@ -7,9 +8,13 @@ import { createCtx } from "../../../test/createCtx.js";
 vi.mock("../../../services/categories/getUniqueCategories.js", () => ({
   getUniqueCategories: vi.fn(),
 }));
+vi.mock("../../../services/ai/categoryPool.js", () => ({
+  generateCategoryPoolFromOpenAi: vi.fn(),
+}));
 
 beforeEach(() => {
   vi.mocked(getUniqueCategories).mockReset();
+  vi.mocked(generateCategoryPoolFromOpenAi).mockReset();
 });
 
 function makeWs(): SocketState {
@@ -44,7 +49,6 @@ function makeCtx(game: GameState, overrides: Record<string, unknown> = {}) {
   return createCtx(
     {
       games: { g1: game },
-      isHostSocket: vi.fn(() => true),
       sendLobbySnapshot: vi.fn(),
       broadcast: vi.fn(),
       normalizeCategories11: vi.fn((c) => (Array.isArray(c) ? c : Array(11).fill(""))),
@@ -72,10 +76,10 @@ describe("lobbyCategoryHandlers", () => {
     );
   });
 
-  it("toggle-lock-category rejects non-host and snapshots", async () => {
+  it("toggle-lock-category allows non-host callers", async () => {
     const ws = makeWs();
     const game = makeGame();
-    const ctx = makeCtx(game, { isHostSocket: vi.fn(() => false) });
+    const ctx = makeCtx(game);
 
     await lobbyCategoryHandlers["toggle-lock-category"]({
       ws,
@@ -83,10 +87,11 @@ describe("lobbyCategoryHandlers", () => {
       ctx,
     });
 
-    expect(ws.send).toHaveBeenCalledWith(
-      JSON.stringify({ type: "error", message: "Only the host can toggle category locks." }),
+    expect(game.lockedCategories?.firstBoard?.[2]).toBe(true);
+    expect(ctx.broadcast).toHaveBeenCalledWith(
+      "g1",
+      expect.objectContaining({ type: "category-lock-updated", boardType: "firstBoard", index: 2, locked: true }),
     );
-    expect(ctx.sendLobbySnapshot).toHaveBeenCalledWith(ws, "g1");
   });
 
   it("toggle-lock-category initializes lock state when missing", async () => {
@@ -359,6 +364,58 @@ describe("lobbyCategoryHandlers", () => {
         type: "error",
         message: "Game missing not found while updating categories.",
       }),
+    );
+  });
+
+  it("refresh-category-pool preserves locked categories and replaces only unlocked slots", async () => {
+    const ws = makeWs();
+    const game = makeGame({
+      inLobby: true,
+      categories: ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K"],
+      lockedCategories: {
+        firstBoard: [false, true, false, false, false],
+        secondBoard: [false, false, false, true, false],
+        finalJeopardy: [true],
+      },
+      lobbySettings: { categoryRefreshLocked: false, categoryPoolPrompt: "" } as never,
+    });
+    const ctx = makeCtx(game);
+
+    vi.mocked(generateCategoryPoolFromOpenAi).mockResolvedValue([
+      "P1",
+      "P2",
+      "P3",
+      "P4",
+      "P5",
+      "P6",
+      "P7",
+      "P8",
+      "P9",
+      "P10",
+      "P11",
+      "P12",
+    ]);
+
+    await lobbyCategoryHandlers["refresh-category-pool"]({
+      ws,
+      data: { gameId: "g1" },
+      ctx,
+    });
+
+    expect(game.categories?.[1]).toBe("B");
+    expect(game.categories?.[8]).toBe("I");
+    expect(game.categories?.[10]).toBe("K");
+
+    expect(game.categories?.[0]).not.toBe("A");
+    expect(game.categories?.[2]).not.toBe("C");
+    expect(game.categories?.[9]).not.toBe("J");
+    expect(game.categories?.[0]).toMatch(/^P/);
+    expect(game.categories?.[2]).toMatch(/^P/);
+    expect(game.categories?.[9]).toMatch(/^P/);
+
+    expect(ctx.broadcast).toHaveBeenCalledWith(
+      "g1",
+      expect.objectContaining({ type: "categories-updated" }),
     );
   });
 });

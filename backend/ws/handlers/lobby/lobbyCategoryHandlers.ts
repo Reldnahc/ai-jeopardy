@@ -25,7 +25,6 @@ type RefreshCategoryPoolData = { gameId: string };
 
 type LobbyCategoryCtx = CtxDeps<
   | "games"
-  | "isHostSocket"
   | "sendLobbySnapshot"
   | "broadcast"
   | "normalizeCategories11"
@@ -37,14 +36,6 @@ export const lobbyCategoryHandlers: Record<string, WsHandler> = {
     const { gameId, boardType, index } = data as ToggleLockCategoryData;
     const game = hctx.games[gameId];
     if (!game) return;
-
-    if (!hctx.isHostSocket(game, ws)) {
-      ws.send(
-        JSON.stringify({ type: "error", message: "Only the host can toggle category locks." }),
-      );
-      hctx.sendLobbySnapshot(ws, gameId);
-      return;
-    }
 
     const bt = boardType;
     if (bt !== "firstBoard" && bt !== "secondBoard" && bt !== "finalJeopardy") return;
@@ -293,10 +284,42 @@ export const lobbyCategoryHandlers: Record<string, WsHandler> = {
 
       const poolSet = pool.map((c) => String(c ?? "").trim()).filter(Boolean);
       const shuffledPool = shuffle(poolSet);
-      const replacement =
-        shuffledPool.length >= 11 ? shuffledPool.slice(0, 11) : getUniqueCategories(11, { exclude: [] });
+      const normalizedCurrent = hctx.normalizeCategories11(game.categories);
+      const lockedFirst = game.lockedCategories?.firstBoard ?? Array(5).fill(false);
+      const lockedSecond = game.lockedCategories?.secondBoard ?? Array(5).fill(false);
+      const lockedFinal = game.lockedCategories?.finalJeopardy ?? Array(1).fill(false);
+      const isLockedAt = (idx: number): boolean => {
+        if (idx >= 0 && idx <= 4) return Boolean(lockedFirst[idx]);
+        if (idx >= 5 && idx <= 9) return Boolean(lockedSecond[idx - 5]);
+        if (idx === 10) return Boolean(lockedFinal[0]);
+        return false;
+      };
 
-      game.categories = hctx.normalizeCategories11(replacement);
+      const lockedCategories = normalizedCurrent
+        .map((c, idx) => (isLockedAt(idx) ? String(c ?? "").trim() : ""))
+        .filter(Boolean);
+      const lockedKeys = new Set(lockedCategories.map(normalizeCategory));
+
+      const poolWithoutLocked = shuffledPool.filter((c) => {
+        const key = normalizeCategory(String(c ?? ""));
+        return key && !lockedKeys.has(key);
+      });
+
+      const unlockedIndexes = Array.from({ length: 11 }, (_, idx) => idx).filter((idx) => !isLockedAt(idx));
+      const needed = unlockedIndexes.length;
+      const replacement = poolWithoutLocked.slice(0, needed);
+      if (replacement.length < needed) {
+        const exclude = [...lockedCategories, ...replacement];
+        replacement.push(...getUniqueCategories(needed - replacement.length, { exclude }));
+      }
+
+      const nextCategories = [...normalizedCurrent];
+      let replacementIdx = 0;
+      for (const idx of unlockedIndexes) {
+        nextCategories[idx] = replacement[replacementIdx] ?? nextCategories[idx] ?? "";
+        replacementIdx += 1;
+      }
+      game.categories = hctx.normalizeCategories11(nextCategories);
 
       hctx.broadcast(gameId, {
         type: "categories-updated",

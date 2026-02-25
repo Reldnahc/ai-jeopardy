@@ -189,7 +189,6 @@ const Lobby: React.FC = () => {
                   <CategoryBoard
                     title="Jeopardy!"
                     categories={categories.firstBoard}
-                    isHost={isHost}
                     lockedCategories={lockedCategories.firstBoard}
                     boardType="firstBoard"
                     onChangeCategory={onChangeCategory}
@@ -201,7 +200,6 @@ const Lobby: React.FC = () => {
                   <CategoryBoard
                     title="Double Jeopardy!"
                     categories={categories.secondBoard}
-                    isHost={isHost}
                     lockedCategories={lockedCategories.secondBoard}
                     boardType="secondBoard"
                     onChangeCategory={onChangeCategory}
@@ -214,7 +212,6 @@ const Lobby: React.FC = () => {
               <CategoryBoard
                 title="Final Jeopardy!"
                 categories={categories.finalJeopardy}
-                isHost={isHost}
                 lockedCategories={lockedCategories.finalJeopardy}
                 boardType="finalJeopardy"
                 onChangeCategory={onChangeCategory}

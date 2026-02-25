@@ -7,7 +7,6 @@ export type LobbyBoardType = "firstBoard" | "secondBoard" | "finalJeopardy";
 interface CategoryBoardProps {
   title: string;
   categories: string[];
-  isHost: boolean;
   lockedCategories: boolean[];
   boardType: LobbyBoardType;
 
@@ -41,7 +40,6 @@ function fitInputText(el: HTMLInputElement) {
 const CategoryBoard: React.FC<CategoryBoardProps> = ({
   title,
   categories,
-  isHost,
   lockedCategories,
   boardType,
   placeholder,
@@ -109,28 +107,25 @@ const CategoryBoard: React.FC<CategoryBoardProps> = ({
                         `}
           />
 
-          {isHost && (
-            <div className="flex gap-2">
-              <button
-                onClick={() => onToggleLock(boardType, index)}
-                disabled={!isHost}
-                className={`text-[1rem] py-[10px] px-[15px] ${
-                  lockedCategories[index] ? "bg-red-600" : "bg-indigo-500"
-                } text-white rounded cursor-pointer`}
-                title={lockedCategories[index] ? "Unlock" : "Lock"}
-              >
-                <LockIcon />
-              </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => onToggleLock(boardType, index)}
+              className={`text-[1rem] py-[10px] px-[15px] ${
+                lockedCategories[index] ? "bg-red-600" : "bg-indigo-500"
+              } text-white rounded cursor-pointer`}
+              title={lockedCategories[index] ? "Unlock" : "Lock"}
+            >
+              <LockIcon />
+            </button>
 
-              <button
-                onClick={() => onRandomizeCategory(boardType, index)}
-                className="text-[1rem] py-[10px] px-[15px] bg-blue-700 text-white rounded cursor-pointer"
-                title="Randomize"
-              >
-                <RedoIcon />
-              </button>
-            </div>
-          )}
+            <button
+              onClick={() => onRandomizeCategory(boardType, index)}
+              className="text-[1rem] py-[10px] px-[15px] bg-blue-700 text-white rounded cursor-pointer"
+              title="Randomize"
+            >
+              <RedoIcon />
+            </button>
+          </div>
         </div>
       ))}
     </div>
