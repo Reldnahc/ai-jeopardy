@@ -88,7 +88,7 @@ export const lobbyCategoryHandlers: Record<string, WsHandler> = {
 
     game.categories = hctx.normalizeCategories11(game.categories);
 
-    let globalIndex = -1;
+    let globalIndex: number;
     if (bt === "firstBoard") globalIndex = idx;
     else if (bt === "secondBoard") globalIndex = 5 + idx;
     else globalIndex = 10;
