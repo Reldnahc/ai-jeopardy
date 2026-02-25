@@ -27,6 +27,8 @@ type LobbyPlayerCtx = CtxDeps<
   | "playerStableId"
 >;
 
+const MAX_LOBBY_PLAYERS = 5;
+
 export const lobbyPlayerHandlers: Record<string, WsHandler> = {
   "create-lobby": async ({ ws, data, ctx }) => {
     const hctx = ctx as LobbyPlayerCtx;
@@ -186,6 +188,11 @@ export const lobbyPlayerHandlers: Record<string, WsHandler> = {
       if (race) {
         attachSocket(race);
       } else {
+        if (game.players.length >= MAX_LOBBY_PLAYERS) {
+          ws.send(JSON.stringify({ type: "error", message: "Lobby is full (max 5 players)." }));
+          return;
+        }
+
         game.players.push({
           id: ws.id,
           username: u,

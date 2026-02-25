@@ -146,6 +146,36 @@ describe("lobbyPlayerHandlers", () => {
     expect(ctx.scheduleLobbyCleanupIfEmpty).toHaveBeenCalledWith("G1");
   });
 
+  it("join-lobby rejects new player when lobby is full", async () => {
+    const ws = makeWs("ws-full");
+    const game: GameState = {
+      inLobby: true,
+      host: "alice",
+      players: [
+        { id: "p1", username: "alice", displayname: "Alice", online: true },
+        { id: "p2", username: "bob", displayname: "Bob", online: true },
+        { id: "p3", username: "carol", displayname: "Carol", online: true },
+        { id: "p4", username: "dan", displayname: "Dan", online: true },
+        { id: "p5", username: "erin", displayname: "Erin", online: true },
+      ],
+      categories: Array(11).fill("Category"),
+    };
+    const ctx = makeCtx({ games: { G1: game } });
+
+    await lobbyPlayerHandlers["join-lobby"]({
+      ws,
+      data: { gameId: "G1", username: "frank", displayname: "Frank" },
+      ctx,
+    });
+
+    expect(ws.send).toHaveBeenCalledWith(
+      JSON.stringify({ type: "error", message: "Lobby is full (max 5 players)." }),
+    );
+    expect(game.players).toHaveLength(5);
+    expect(ctx.buildLobbyState).not.toHaveBeenCalled();
+    expect(ctx.broadcast).not.toHaveBeenCalled();
+  });
+
   it("leave-lobby removes player and reassigns host when current host leaves", async () => {
     const ws = makeWs("ws-1");
     const game: GameState = {
