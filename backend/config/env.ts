@@ -40,7 +40,6 @@ export const env = Object.freeze({
   NODE_ENV: requireEnv("NODE_ENV"),
 
   // local service endpoints
-  PIPER_URL: optionalEnv("PIPER_URL", ""),
   KOKORO_URL: optionalEnv("KOKORO_URL", ""),
   WHISPER_URL: optionalEnv("WHISPER_URL", ""),
 

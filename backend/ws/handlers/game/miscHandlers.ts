@@ -174,10 +174,9 @@ export const miscHandlers: Record<string, WsHandler> = {
         {
           text: safeText,
           textType: (textType || "text") as "text" | "ssml",
-          voiceId: voiceId || "amy",
+          voiceId: voiceId || "kokoro:af_heart",
           engine: "standard",
           outputFormat: "mp3",
-          provider: "piper",
         },
         ctx.repos,
       );

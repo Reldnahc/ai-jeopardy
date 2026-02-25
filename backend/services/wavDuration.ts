@@ -41,7 +41,7 @@ export function estimateWavDurationMsFromHeaderBytes(
       if (chunkSize < 16) return null;
 
       const audioFormat = bytes.readUInt16LE(offset);
-      if (audioFormat !== 1) return null; // PCM only (fine for Piper)
+      if (audioFormat !== 1) return null; // PCM only
 
       channels = bytes.readUInt16LE(offset + 2);
       sampleRate = bytes.readUInt32LE(offset + 4);

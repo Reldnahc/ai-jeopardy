@@ -4,7 +4,7 @@ import { getProviders } from "./providers/registry.js";
 function splitVoicePrefix(voiceId: string): { provider: TtsProviderName | null; voiceId: string } {
   const raw = String(voiceId ?? "").trim();
 
-  // allow "piper:amy", "kokoro:af_heart", "openai:alloy"
+  // allow "kokoro:af_heart", "openai:alloy"
   const m = raw.match(/^([a-z0-9_-]+):(.+)$/i);
   if (!m) return { provider: null, voiceId: raw };
 
@@ -42,7 +42,7 @@ export function selectProvider(req: TtsRequest): {
   }
 
   // Default routing (keep your preference order)
-  const order: TtsProviderName[] = ["kokoro", "piper", "openai"];
+  const order: TtsProviderName[] = ["kokoro", "openai"];
   for (const name of order) {
     const p = providers.get(name);
     if (p && p.supports(effectiveReq)) return { provider: p, effectiveReq };

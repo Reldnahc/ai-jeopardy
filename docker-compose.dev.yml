@@ -21,7 +21,6 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       JWT_SECRET: ${JWT_SECRET}
       KOKORO_URL: http://kokoro:8000
-      PIPER_URL: http://piper:8000
       WHISPER_URL: http://whisper:8000
     command: ["bash", "-lc", "npm install && npm run build:backend && npm run dev:backend"]
     ports:
@@ -44,22 +43,6 @@ services:
       - "5173:5173"
     depends_on:
       - backend
-
-  piper:
-    image: ghcr.io/reldnahc/ai-jeopardy-piper-api:latest
-    environment:
-      PIPER_MODEL: /models/en_US-amy-low.onnx
-      PIPER_USE_CUDA: "0"
-      MAX_INFLIGHT_PER_WORKER: "16"
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
-    ports:
-      - "8000:8000"
 
   kokoro:
     image: ghcr.io/reldnahc/ai-jeopardy-kokoro-api:latest

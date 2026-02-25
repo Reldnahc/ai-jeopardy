@@ -65,14 +65,6 @@ const _limiters: Partial<Record<TtsProviderName, Limiter>> = {};
 export function getLimiter(provider: TtsProviderName): Limiter {
   if (_limiters[provider]) return _limiters[provider]!;
 
-  if (provider === "piper") {
-    _limiters[provider] = makeLimiter(
-      envNum("TTS_PIPER_CONCURRENCY", 5),
-      envNum("TTS_PIPER_MIN_DELAY_MS", 0),
-    );
-    return _limiters[provider]!;
-  }
-
   if (provider === "kokoro") {
     _limiters[provider] = makeLimiter(
       envNum("TTS_KOKORO_CONCURRENCY", 5),
