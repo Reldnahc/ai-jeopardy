@@ -18,7 +18,7 @@ describe("judge prompt builders", () => {
     expect(prompt).toContain("EXPECTED ANSWER TYPE: thing");
   });
 
-  it("builds strict text-judge prompt with strict guidance", () => {
+  it("builds standard text-judge prompt with strict guidance", () => {
     const prompt = buildJudgePrompt({
       transcriptRaw: "mars",
       expectedRaw: "jupiter",
@@ -26,7 +26,7 @@ describe("judge prompt builders", () => {
       normT: "mars",
       normA: "jupiter",
       answerType: "place",
-      strictness: "strict",
+      strictness: "standard",
     });
 
     expect(prompt).toContain("SCORING INTENT (STRICT)");

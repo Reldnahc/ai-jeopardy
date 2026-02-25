@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { games } from "../state/gamesStore.js";
+import type { GameState } from "../types/runtime.js";
 import {
   LOBBY_EMPTY_GRACE_MS,
   cancelLobbyCleanup,
@@ -18,7 +19,7 @@ describe("lobby cleanup", () => {
 
   it("cancelLobbyCleanup clears timer and emptySince", () => {
     const timer = setTimeout(() => {}, 1000);
-    const game = { cleanupTimer: timer, emptySince: Date.now() } as never;
+    const game: GameState = { cleanupTimer: timer, emptySince: Date.now() };
     cancelLobbyCleanup(game);
     expect(game.cleanupTimer).toBeNull();
     expect(game.emptySince).toBeNull();
@@ -35,7 +36,7 @@ describe("lobby cleanup", () => {
       players: [{ username: "alice", online: false }],
       cleanupTimer: null,
       emptySince: null,
-    } as never;
+    } as GameState;
 
     scheduleLobbyCleanupIfEmpty("g1");
     expect(games.g1?.cleanupTimer).toBeTruthy();
@@ -52,7 +53,7 @@ describe("lobby cleanup", () => {
       players: [{ username: "alice", online: true }],
       cleanupTimer: timer,
       emptySince: Date.now(),
-    } as never;
+    } as GameState;
 
     scheduleLobbyCleanupIfEmpty("g2");
     expect(games.g2?.cleanupTimer).toBeNull();
@@ -68,7 +69,7 @@ describe("lobby cleanup", () => {
       players: [{ username: "alice", online: false }],
       cleanupTimer: timer,
       emptySince: Date.now(),
-    } as never;
+    } as GameState;
 
     scheduleLobbyCleanupIfEmpty("g4");
     expect(games.g4.cleanupTimer).toBe(timer);
@@ -80,7 +81,7 @@ describe("lobby cleanup", () => {
       players: [{ username: "alice", online: false }],
       cleanupTimer: null,
       emptySince: null,
-    } as never;
+    } as GameState;
 
     scheduleLobbyCleanupIfEmpty("g3");
     games.g3.players[0].online = true;
@@ -97,7 +98,7 @@ describe("lobby cleanup", () => {
       players: [{ username: "alice", online: false }],
       cleanupTimer: null,
       emptySince: null,
-    } as never;
+    } as GameState;
 
     scheduleLobbyCleanupIfEmpty("g5");
     vi.advanceTimersByTime(LOBBY_EMPTY_GRACE_MS + 1);

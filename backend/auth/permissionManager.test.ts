@@ -1,10 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { PermissionManager } from "./permissionManager.js";
 import { PERM_RULES } from "./permissions.js";
+import type { WsLike } from "./wsTypes.js";
 
-function makeWs(role: unknown = "default") {
+function makeWs(role: unknown = "default"): WsLike {
   return {
-    auth: { role },
+    auth: { isAuthed: true, userId: "u-1", role: role as never },
     send: vi.fn(),
   };
 }
@@ -55,4 +56,3 @@ describe("PermissionManager", () => {
     (PERM_RULES as unknown as Record<string, unknown>)["game:create"] = original;
   });
 });
-
