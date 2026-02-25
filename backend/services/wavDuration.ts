@@ -1,10 +1,19 @@
 // backend/services/wavDuration.js
 
-export function estimateWavDurationMsFromHeaderBytes(
-  headerBytes: Buffer | Uint8Array | null | undefined,
-): number | null {
-  if (!headerBytes || headerBytes.length < 44) return null;
-  const bytes = Buffer.isBuffer(headerBytes) ? headerBytes : Buffer.from(headerBytes);
+const MAX_TRAILING_SILENCE_TRIM_MS = 700;
+const PCM16_SILENCE_THRESHOLD = 8;
+
+type ParsedWav = {
+  audioFormat: number;
+  sampleRate: number;
+  channels: number;
+  bitsPerSample: number;
+  dataSize: number;
+  dataOffset: number;
+};
+
+function parseWav(bytes: Buffer): ParsedWav | null {
+  if (bytes.length < 44) return null;
 
   // "RIFF"
   if (
@@ -25,46 +34,97 @@ export function estimateWavDurationMsFromHeaderBytes(
     return null;
 
   let offset = 12;
+  let audioFormat: number | null = null;
+  let sampleRate: number | null = null;
+  let channels: number | null = null;
+  let bitsPerSample: number | null = null;
+  let dataSize: number | null = null;
+  let dataOffset: number | null = null;
 
-  let sampleRate = null;
-  let channels = null;
-  let bitsPerSample = null;
-  let dataSize = null;
-
-  // Walk chunks until we find "fmt " and "data"
   while (offset + 8 <= bytes.length) {
     const chunkId = bytes.toString("ascii", offset, offset + 4);
     const chunkSize = bytes.readUInt32LE(offset + 4);
-    offset += 8;
+    const chunkDataStart = offset + 8;
 
     if (chunkId === "fmt ") {
-      if (chunkSize < 16) return null;
+      if (chunkDataStart + 16 > bytes.length || chunkSize < 16) return null;
 
-      const audioFormat = bytes.readUInt16LE(offset);
-      if (audioFormat !== 1) return null; // PCM only
-
-      channels = bytes.readUInt16LE(offset + 2);
-      sampleRate = bytes.readUInt32LE(offset + 4);
-      bitsPerSample = bytes.readUInt16LE(offset + 14);
+      audioFormat = bytes.readUInt16LE(chunkDataStart);
+      channels = bytes.readUInt16LE(chunkDataStart + 2);
+      sampleRate = bytes.readUInt32LE(chunkDataStart + 4);
+      bitsPerSample = bytes.readUInt16LE(chunkDataStart + 14);
     } else if (chunkId === "data") {
       dataSize = chunkSize;
+      dataOffset = chunkDataStart;
       break;
     }
 
-    offset += chunkSize;
+    // RIFF chunks are word-aligned.
+    offset = chunkDataStart + chunkSize + (chunkSize % 2);
   }
 
-  if (!sampleRate || !channels || !bitsPerSample || !dataSize) {
+  if (
+    !audioFormat ||
+    !sampleRate ||
+    !channels ||
+    !bitsPerSample ||
+    dataSize == null ||
+    !dataOffset
+  ) {
     return null;
   }
 
-  const bytesPerSecond = sampleRate * channels * (bitsPerSample / 8);
+  return { audioFormat, sampleRate, channels, bitsPerSample, dataSize, dataOffset };
+}
+
+function trimTrailingSilencePcm16(bytes: Buffer, wav: ParsedWav): number {
+  if (wav.audioFormat !== 1 || wav.bitsPerSample !== 16) return wav.dataSize;
+  if (wav.dataOffset + wav.dataSize > bytes.length) return wav.dataSize;
+
+  const bytesPerSample = wav.bitsPerSample / 8;
+  const frameBytes = wav.channels * bytesPerSample;
+  if (!frameBytes) return wav.dataSize;
+
+  const totalFrames = Math.floor(wav.dataSize / frameBytes);
+  if (!totalFrames) return wav.dataSize;
+
+  const maxTrimFrames = Math.floor((wav.sampleRate * MAX_TRAILING_SILENCE_TRIM_MS) / 1000);
+  const minFrame = Math.max(0, totalFrames - maxTrimFrames);
+
+  let trailingSilentFrames = 0;
+  for (let frame = totalFrames - 1; frame >= minFrame; frame -= 1) {
+    const frameStart = wav.dataOffset + frame * frameBytes;
+
+    let silent = true;
+    for (let ch = 0; ch < wav.channels; ch += 1) {
+      const sample = bytes.readInt16LE(frameStart + ch * bytesPerSample);
+      if (Math.abs(sample) > PCM16_SILENCE_THRESHOLD) {
+        silent = false;
+        break;
+      }
+    }
+
+    if (!silent) break;
+    trailingSilentFrames += 1;
+  }
+
+  return Math.max(0, wav.dataSize - trailingSilentFrames * frameBytes);
+}
+
+export function estimateWavDurationMsFromHeaderBytes(
+  headerBytes: Buffer | Uint8Array | null | undefined,
+): number | null {
+  if (!headerBytes || headerBytes.length < 44) return null;
+  const bytes = Buffer.isBuffer(headerBytes) ? headerBytes : Buffer.from(headerBytes);
+  const wav = parseWav(bytes);
+  if (!wav) return null;
+
+  const bytesPerSecond = wav.sampleRate * wav.channels * (wav.bitsPerSample / 8);
   if (!bytesPerSecond) return null;
 
-  const durationMs = Math.round((dataSize / bytesPerSecond) * 1000);
+  const trimmedDataSize = trimTrailingSilencePcm16(bytes, wav);
+  const durationMs = Math.round((trimmedDataSize / bytesPerSecond) * 1000);
 
   if (!Number.isFinite(durationMs) || durationMs < 0) return null;
-
-  // Clamp defensively (same idea as MP3)
   return Math.min(durationMs, 60_000);
 }

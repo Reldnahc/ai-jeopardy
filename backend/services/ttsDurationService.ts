@@ -31,7 +31,8 @@ export function createTtsDurationService(repos: TtsDurationRepos) {
     let ms = null;
 
     if (contentType === "audio/wav") {
-      ms = estimateWavDurationMsFromHeaderBytes(headerBytes);
+      // WAV estimation can trim trailing PCM silence when full bytes are available.
+      ms = estimateWavDurationMsFromHeaderBytes(row.data);
     } else if (contentType === "audio/mpeg") {
       ms = estimateMp3DurationMsFromHeaderBytes(headerBytes, Number(row.bytes || row.data.length));
     }
