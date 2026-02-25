@@ -2,7 +2,11 @@
 import { useWebSocket } from "../../../contexts/WebSocketContext";
 import type { Player } from "../../../types/Lobby";
 import type { LobbyBoardType } from "../components/CategoryBoard";
-import { type BoardType, CATEGORY_SECTIONS, unflattenBySections } from "../../../utils/lobbySections";
+import {
+  type BoardType,
+  CATEGORY_SECTIONS,
+  unflattenBySections,
+} from "../../../utils/lobbySections";
 import { routeLobbySocketMessage } from "./useLobbySocketSync.router.ts";
 import type {
   LobbySettings,
@@ -170,7 +174,16 @@ export function useLobbySocketSync({
 
     sendJson({ type: "check-lobby", gameId, username, playerKey });
     return unsubscribe;
-  }, [isSocketReady, gameId, subscribe, sendJson, username, showAlert, requestLobbyState]);
+  }, [
+    isSocketReady,
+    gameId,
+    subscribe,
+    sendJson,
+    username,
+    showAlert,
+    requestLobbyState,
+    playerKey,
+  ]);
 
   return {
     isSocketReady,

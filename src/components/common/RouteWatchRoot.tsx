@@ -8,7 +8,7 @@ export default function RouteWatchRoot() {
   const prevPathRef = useRef(location.pathname);
   const lastLeaveKeyRef = useRef<string>("");
 
-  const { isSocketReady, sendJson } = useWebSocket();
+  const { sendJson } = useWebSocket();
   const { session } = useGameSession();
 
   const getPlayerKeyForLobby = useCallback((gameId: string) => {
