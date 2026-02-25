@@ -181,10 +181,10 @@ const Lobby: React.FC = () => {
           </div>
 
           {/* Main Content Column */}
-          <div className="p-8">
+          <div className="p-6">
             {/* Category Boards */}
-            <div className="space-y-8">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 ">
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="min-w-0">
                   <CategoryBoard
                     title="Jeopardy!"
@@ -221,32 +221,32 @@ const Lobby: React.FC = () => {
                 onRandomizeCategory={handleRandomizeCategory}
                 onToggleLock={onToggleLock}
               />
+
+              {/* Category Settings */}
+              <CategorySettings
+                isHost={isHost}
+                lobbySettings={lobbySettings}
+                categoryPoolState={categoryPoolState}
+                onToggleLock={handleToggleCategoryRefreshLock}
+                onRefreshPool={handleRefreshCategoryPool}
+                onUpdatePrompt={handleUpdateCategoryPrompt}
+              />
+
+              {/* Host Controls */}
+              {isHost && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                  <HostControls
+                    onCreateGame={handleCreateGame}
+                    isSoloLobby={players.length <= 1}
+                    boardJsonError={boardJsonError}
+                    setBoardJsonError={setBoardJsonError}
+                    tryValidateBoardJson={tryValidateBoardJson}
+                    lobbySettings={lobbySettings}
+                    updateLobbySettings={updateLobbySettings}
+                  />
+                </motion.div>
+              )}
             </div>
-
-            {/* Category Settings */}
-            <CategorySettings
-              isHost={isHost}
-              lobbySettings={lobbySettings}
-              categoryPoolState={categoryPoolState}
-              onToggleLock={handleToggleCategoryRefreshLock}
-              onRefreshPool={handleRefreshCategoryPool}
-              onUpdatePrompt={handleUpdateCategoryPrompt}
-            />
-
-            {/* Host Controls */}
-            {isHost && (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-8">
-                <HostControls
-                  onCreateGame={handleCreateGame}
-                  isSoloLobby={players.length <= 1}
-                  boardJsonError={boardJsonError}
-                  setBoardJsonError={setBoardJsonError}
-                  tryValidateBoardJson={tryValidateBoardJson}
-                  lobbySettings={lobbySettings}
-                  updateLobbySettings={updateLobbySettings}
-                />
-              </motion.div>
-            )}
           </div>
         </div>
       </PageCardContainer>
@@ -255,4 +255,3 @@ const Lobby: React.FC = () => {
 };
 
 export default Lobby;
-
