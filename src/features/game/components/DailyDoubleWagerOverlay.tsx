@@ -238,7 +238,7 @@ export default function DailyDoubleWagerOverlay({
 
         {isDdWagerPlayer && isRecording ? (
           <div className="mt-6 text-lg text-red-500 font-semibold">
-            Recording your wager nowâ€¦ say a number (or â€œtrue daily doubleâ€).
+            Recording your wager now! say a number (or true daily double).
           </div>
         ) : isDdWagerPlayer ? (
           <div className="mt-6 text-lg opacity-80">Waiting for host...</div>
@@ -261,4 +261,3 @@ export default function DailyDoubleWagerOverlay({
     </div>
   );
 }
-
