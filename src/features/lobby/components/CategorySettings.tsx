@@ -73,7 +73,7 @@ const CategorySettings: React.FC<Props> = ({
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h3 className="text-2xl font-extrabold tracking-wide text-slate-800">
-            Category Settings
+            Category Generation
           </h3>
           <p className="text-sm text-slate-600 mt-1">
             Generate a fresh pool of categories for the lobby.
@@ -126,9 +126,7 @@ const CategorySettings: React.FC<Props> = ({
       </div>
 
       <div className="mt-4">
-        <label className="block text-sm font-semibold text-slate-700 mb-2">
-          Category Prompt
-        </label>
+        <label className="block text-sm font-semibold text-slate-700 mb-2">Category Prompt</label>
         <textarea
           value={localPrompt}
           onChange={(e) => setLocalPrompt(e.target.value)}
