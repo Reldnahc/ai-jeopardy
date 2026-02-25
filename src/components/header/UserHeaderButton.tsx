@@ -39,7 +39,10 @@ export default function UserHeaderButton({ pres, dropdownOpen, setDropdownOpen, 
           icon={pres.avatar.icon}
         />
 
-        <span className={`ml-3 ${pres.nameClassName} hidden sm:inline`} style={pres.nameStyle}>
+        <span
+          className={`ml-3 ${pres.nameClassName} hidden sm:inline whitespace-nowrap`}
+          style={pres.nameStyle}
+        >
           {pres.displayName}
         </span>
 

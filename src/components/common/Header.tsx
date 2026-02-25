@@ -126,16 +126,16 @@ const Header: React.FC = () => {
 
   return (
     <header className="bg-transparent text-white w-full h-[5.5rem]">
-      <div className="container mx-auto flex items-center py-4 px-6 justify-between h-full">
+      <div className="mx-auto flex items-center py-4 px-6 justify-between h-full w-full max-w-screen-2xl">
         {/* Left: Logo + Desktop nav */}
-        <div className="flex items-center space-x-6">
+        <div className="flex items-center space-x-6 min-w-0">
           <Link
             to="/"
             onClick={(e) => {
               e.preventDefault();
               handleNav("/");
             }}
-            className="text-3xl lg:text-5xl font-swiss911 tracking-wider font-bold text-white hover:text-blue-600 transition-colors"
+            className="text-3xl lg:text-5xl font-swiss911 tracking-wider font-bold text-white hover:text-blue-600 transition-colors whitespace-nowrap"
             style={{
               WebkitTextStroke: "2px #000000",
               textShadow: "0.05em 0.04em 0 rgba(0,0,0,0.8), 0.18em 0.18em 0.25em rgba(0,0,0,0.35)",
@@ -153,7 +153,7 @@ const Header: React.FC = () => {
                   e.preventDefault();
                   handleNav(item.to);
                 }}
-                className="px-4 lg:text-2xl py-2 font-bold hover:underline hover:text-blue-600 rounded"
+                className="px-4 lg:text-2xl py-2 font-bold hover:underline hover:text-blue-600 rounded whitespace-nowrap"
               >
                 {item.label}
               </Link>
@@ -250,7 +250,7 @@ const Header: React.FC = () => {
               {[...topLinks, ...(user ? accountItems : [])].map((item) => (
                 <motion.button
                   key={item.key}
-                  className={`block px-4 py-2 hover:bg-blue-500 cursor-pointer ${
+                  className={`block px-4 py-2 hover:bg-blue-500 cursor-pointer whitespace-nowrap ${
                     item.kind === "action" && item.danger ? "text-red-600" : ""
                   }`}
                   onClick={() => {
