@@ -3,6 +3,7 @@ import type { WsHandler } from "../types.js";
 import { getUniqueCategories } from "../../../services/categories/getUniqueCategories.js";
 import { shuffle, normalizeCategory } from "../../../services/categories/categoryUtils.js";
 import { generateCategoryPoolFromOpenAi } from "../../../services/ai/categoryPool.js";
+import { atLeast, normalizeRole } from "../../../../shared/roles.js";
 
 type ToggleLockCategoryData = {
   gameId: string;
@@ -247,7 +248,9 @@ export const lobbyCategoryHandlers: Record<string, WsHandler> = {
 
     const now = Date.now();
     const nextAllowed = Number(game.categoryPoolNextAllowedAtMs ?? 0);
-    if (nextAllowed && now < nextAllowed) {
+    const role = normalizeRole(ws.auth?.role);
+    const bypassCooldown = atLeast(role, "privileged");
+    if (!bypassCooldown && nextAllowed && now < nextAllowed) {
       ws.send(
         JSON.stringify({
           type: "error",

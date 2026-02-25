@@ -17,8 +17,13 @@ beforeEach(() => {
   vi.mocked(generateCategoryPoolFromOpenAi).mockReset();
 });
 
-function makeWs(): SocketState {
-  return { id: "ws-1", send: vi.fn(), gameId: "g1" } as unknown as SocketState;
+function makeWs(role: string = "default"): SocketState {
+  return {
+    id: "ws-1",
+    send: vi.fn(),
+    gameId: "g1",
+    auth: { isAuthed: true, userId: "u1", role: role as never },
+  } as unknown as SocketState;
 }
 
 function makeGame(overrides: Partial<GameState> = {}): GameState {
@@ -413,6 +418,63 @@ describe("lobbyCategoryHandlers", () => {
     expect(game.categories?.[2]).toMatch(/^P/);
     expect(game.categories?.[9]).toMatch(/^P/);
 
+    expect(ctx.broadcast).toHaveBeenCalledWith(
+      "g1",
+      expect.objectContaining({ type: "categories-updated" }),
+    );
+  });
+
+  it("refresh-category-pool enforces cooldown for default role", async () => {
+    const ws = makeWs("default");
+    const game = makeGame({
+      inLobby: true,
+      categoryPoolNextAllowedAtMs: Date.now() + 30_000,
+      lobbySettings: { categoryRefreshLocked: false, categoryPoolPrompt: "" } as never,
+    });
+    const ctx = makeCtx(game);
+
+    await lobbyCategoryHandlers["refresh-category-pool"]({
+      ws,
+      data: { gameId: "g1" },
+      ctx,
+    });
+
+    expect(ws.send).toHaveBeenCalledWith(expect.stringContaining("Category pool refresh is on cooldown."));
+    expect(generateCategoryPoolFromOpenAi).not.toHaveBeenCalled();
+  });
+
+  it("refresh-category-pool bypasses cooldown for privileged role and higher", async () => {
+    const ws = makeWs("privileged");
+    const game = makeGame({
+      inLobby: true,
+      categoryPoolNextAllowedAtMs: Date.now() + 30_000,
+      lobbySettings: { categoryRefreshLocked: false, categoryPoolPrompt: "" } as never,
+    });
+    const ctx = makeCtx(game);
+
+    vi.mocked(generateCategoryPoolFromOpenAi).mockResolvedValue([
+      "P1",
+      "P2",
+      "P3",
+      "P4",
+      "P5",
+      "P6",
+      "P7",
+      "P8",
+      "P9",
+      "P10",
+      "P11",
+      "P12",
+    ]);
+
+    await lobbyCategoryHandlers["refresh-category-pool"]({
+      ws,
+      data: { gameId: "g1" },
+      ctx,
+    });
+
+    expect(generateCategoryPoolFromOpenAi).toHaveBeenCalled();
+    expect(ws.send).not.toHaveBeenCalledWith(expect.stringContaining("on cooldown"));
     expect(ctx.broadcast).toHaveBeenCalledWith(
       "g1",
       expect.objectContaining({ type: "categories-updated" }),

@@ -16,6 +16,7 @@ import { useLobbyPreloadAck } from "../hooks/lobby/useLobbyPreloadAck.ts";
 import { useLobbyBoardJson } from "../hooks/lobby/useLobbyBoardJson.ts";
 import { useLobbySessionAndNavigation } from "../hooks/lobby/useLobbySessionAndNavigation.ts";
 import { useLobbyCreateGame } from "../hooks/lobby/useLobbyCreateGame.tsx";
+import { atLeast, normalizeRole } from "../../shared/roles.ts";
 
 const Lobby: React.FC = () => {
   const { gameId } = useParams<{ gameId: string }>();
@@ -63,6 +64,7 @@ const Lobby: React.FC = () => {
   });
 
   const isHost = isHostServer;
+  const canBypassCategoryPoolCooldown = atLeast(normalizeRole(profile?.role), "privileged");
 
   useEffect(() => {
     const set = new Set<string>();
@@ -222,6 +224,7 @@ const Lobby: React.FC = () => {
               {/* Category Settings */}
               <CategorySettings
                 isHost={isHost}
+                canBypassCooldown={canBypassCategoryPoolCooldown}
                 lobbySettings={lobbySettings}
                 categoryPoolState={categoryPoolState}
                 onToggleLock={handleToggleCategoryRefreshLock}

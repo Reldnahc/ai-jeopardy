@@ -4,6 +4,7 @@ import LockIcon from "../../../icons/LockIcon.tsx";
 
 type Props = {
   isHost: boolean;
+  canBypassCooldown?: boolean;
   lobbySettings: LobbySettings | null;
   categoryPoolState: CategoryPoolState | null;
   onToggleLock: (nextLocked: boolean) => void;
@@ -20,6 +21,7 @@ function formatCountdown(ms: number) {
 
 const CategorySettings: React.FC<Props> = ({
   isHost,
+  canBypassCooldown = false,
   lobbySettings,
   categoryPoolState,
   onToggleLock,
@@ -66,7 +68,8 @@ const CategorySettings: React.FC<Props> = ({
   }, [nextAllowedAt, nowMs]);
 
   const cooldownActive = remainingMs > 0;
-  const canRefresh = !isGenerating && !cooldownActive && !locked;
+  const cooldownBlocked = cooldownActive && !canBypassCooldown;
+  const canRefresh = !isGenerating && !cooldownBlocked && !locked;
 
   return (
     <div className="mb-8 rounded-xl border border-slate-200 bg-white/90 p-6 shadow-md">
@@ -118,8 +121,10 @@ const CategorySettings: React.FC<Props> = ({
       </div>
 
       <div className="mt-4 text-sm text-slate-600">
-        {cooldownActive ? (
+        {cooldownBlocked ? (
           <span>Cooldown: {formatCountdown(remainingMs)}</span>
+        ) : cooldownActive && canBypassCooldown ? (
+          <span>Cooldown: Bypassed</span>
         ) : (
           <span>Cooldown: Ready</span>
         )}
