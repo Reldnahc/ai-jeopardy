@@ -7,6 +7,7 @@ type GameIdData = { gameId: string };
 type UpdateLobbySettingsData = { gameId: string; patch?: Record<string, unknown> };
 type CheckLobbyData = { gameId: string; username?: string; playerKey?: string };
 type PromoteHostData = { gameId: string; targetUsername?: string };
+type UpdateCategoryPromptData = { gameId: string; prompt?: string };
 
 type LobbyConfigCtx = CtxDeps<
   | "games"
@@ -15,6 +16,7 @@ type LobbyConfigCtx = CtxDeps<
   | "broadcast"
   | "requireHost"
   | "buildLobbyState"
+  | "sendLobbySnapshot"
 >;
 
 export const lobbyConfigHandlers: Record<string, WsHandler> = {
@@ -49,6 +51,8 @@ export const lobbyConfigHandlers: Record<string, WsHandler> = {
           visualMode: "off",
           narrationEnabled: true,
           boardJson: "",
+          categoryRefreshLocked: false,
+          categoryPoolPrompt: "",
         };
       }
 
@@ -81,6 +85,12 @@ export const lobbyConfigHandlers: Record<string, WsHandler> = {
       if (typeof p.narrationEnabled === "boolean") {
         game.lobbySettings.narrationEnabled = p.narrationEnabled;
       }
+      if (typeof p.categoryRefreshLocked === "boolean") {
+        game.lobbySettings.categoryRefreshLocked = p.categoryRefreshLocked;
+      }
+      if (typeof p.categoryPoolPrompt === "string") {
+        game.lobbySettings.categoryPoolPrompt = p.categoryPoolPrompt;
+      }
 
       hctx.broadcast(gameId, {
         type: "lobby-settings-updated",
@@ -91,6 +101,51 @@ export const lobbyConfigHandlers: Record<string, WsHandler> = {
       console.error("update-lobby-settings failed:", e);
       ws.send(JSON.stringify({ type: "error", message: "update-lobby-settings failed" }));
     }
+  },
+
+  "update-category-prompt": async ({ ws, data, ctx }) => {
+    const hctx = ctx as LobbyConfigCtx;
+    const { gameId, prompt } = (data ?? {}) as UpdateCategoryPromptData;
+    if (!gameId) {
+      ws.send(JSON.stringify({ type: "error", message: "update-category-prompt missing gameId" }));
+      return;
+    }
+
+    const game = hctx.games?.[gameId];
+    if (!game || !game.inLobby) {
+      ws.send(JSON.stringify({ type: "error", message: `Game ${gameId} not found.` }));
+      return;
+    }
+
+    if (!game.lobbySettings) {
+      game.lobbySettings = {
+        timeToBuzz: 10,
+        timeToAnswer: 10,
+        selectedModel: hctx.appConfig.ai.defaultModel,
+        reasoningEffort: "off",
+        visualMode: "off",
+        narrationEnabled: true,
+        boardJson: "",
+        categoryRefreshLocked: false,
+        categoryPoolPrompt: "",
+      };
+    }
+
+    if (game.lobbySettings.categoryRefreshLocked) {
+      ws.send(
+        JSON.stringify({ type: "error", message: "Category refresh is locked by the host." }),
+      );
+      hctx.sendLobbySnapshot(ws, gameId);
+      return;
+    }
+
+    game.lobbySettings.categoryPoolPrompt = String(prompt ?? "").slice(0, 500);
+
+    hctx.broadcast(gameId, {
+      type: "lobby-settings-updated",
+      gameId,
+      lobbySettings: game.lobbySettings,
+    });
   },
 
   "check-lobby": async ({ ws, data, ctx }) => {

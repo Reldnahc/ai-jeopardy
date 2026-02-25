@@ -6,6 +6,7 @@ import LoadingScreen from "../components/common/LoadingScreen.tsx";
 import PageCardContainer from "../components/common/PageCardContainer.tsx";
 import HostControls from "../features/lobby/components/HostControls.tsx";
 import CategoryBoard, { LobbyBoardType } from "../features/lobby/components/CategoryBoard.tsx";
+import CategorySettings from "../features/lobby/components/CategorySettings.tsx";
 import { useProfile } from "../contexts/ProfileContext.tsx";
 import { useAlert } from "../contexts/AlertContext.tsx";
 import { motion } from "framer-motion";
@@ -46,6 +47,7 @@ const Lobby: React.FC = () => {
     onChangeCategory,
     lobbySettings,
     updateLobbySettings,
+    categoryPoolState,
     lobbyInvalid,
     preloadAssetIds,
     isPreloadingImages,
@@ -136,6 +138,29 @@ const Lobby: React.FC = () => {
     sendJson,
   });
 
+  const handleToggleCategoryRefreshLock = (nextLocked: boolean) => {
+    updateLobbySettings({ categoryRefreshLocked: nextLocked });
+  };
+
+  const handleRefreshCategoryPool = () => {
+    if (!gameId) return;
+    sendJson({
+      type: "refresh-category-pool",
+      gameId,
+      username,
+      playerKey,
+    });
+  };
+
+  const handleUpdateCategoryPrompt = (prompt: string) => {
+    if (!gameId) return;
+    sendJson({
+      type: "update-category-prompt",
+      gameId,
+      prompt,
+    });
+  };
+
   return isLoading ? (
     <LoadingScreen message={loadingMessage} progress={loadingProgress ?? 0} />
   ) : (
@@ -197,6 +222,16 @@ const Lobby: React.FC = () => {
                 onToggleLock={onToggleLock}
               />
             </div>
+
+            {/* Category Settings */}
+            <CategorySettings
+              isHost={isHost}
+              lobbySettings={lobbySettings}
+              categoryPoolState={categoryPoolState}
+              onToggleLock={handleToggleCategoryRefreshLock}
+              onRefreshPool={handleRefreshCategoryPool}
+              onUpdatePrompt={handleUpdateCategoryPrompt}
+            />
 
             {/* Host Controls */}
             {isHost && (

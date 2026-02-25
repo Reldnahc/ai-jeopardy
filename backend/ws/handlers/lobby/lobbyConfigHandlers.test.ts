@@ -21,6 +21,7 @@ function makeGame(overrides: Partial<GameState> = {}): GameState {
       visualMode: "off",
       narrationEnabled: true,
       boardJson: "",
+      categoryPoolPrompt: "",
     },
     ...overrides,
   };
@@ -135,8 +136,43 @@ describe("lobbyConfigHandlers", () => {
     expect(game.lobbySettings).toMatchObject({
       selectedModel: "gpt-default",
       boardJson: "{\"ok\":true}",
+      categoryPoolPrompt: "",
     });
     expect(ctx.broadcast).toHaveBeenCalled();
+  });
+
+  it("update-category-prompt updates prompt when unlocked", async () => {
+    const ws = makeWs();
+    const game = makeGame({ lobbySettings: { sttProviderName: "openai", categoryRefreshLocked: false } as never });
+    const ctx = makeCtx(game);
+
+    await lobbyConfigHandlers["update-category-prompt"]({
+      ws,
+      data: { gameId: "g1", prompt: "Space & Science" },
+      ctx,
+    });
+
+    expect(game.lobbySettings?.categoryPoolPrompt).toBe("Space & Science");
+    expect(ctx.broadcast).toHaveBeenCalledWith(
+      "g1",
+      expect.objectContaining({ type: "lobby-settings-updated" }),
+    );
+  });
+
+  it("update-category-prompt rejects when locked", async () => {
+    const ws = makeWs();
+    const game = makeGame({ lobbySettings: { sttProviderName: "openai", categoryRefreshLocked: true } as never });
+    const ctx = makeCtx(game);
+
+    await lobbyConfigHandlers["update-category-prompt"]({
+      ws,
+      data: { gameId: "g1", prompt: "Space & Science" },
+      ctx,
+    });
+
+    expect(ws.send).toHaveBeenCalledWith(
+      JSON.stringify({ type: "error", message: "Category refresh is locked by the host." }),
+    );
   });
 
   it("check-lobby responds true only for in-lobby game", async () => {

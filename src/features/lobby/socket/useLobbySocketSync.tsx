@@ -4,7 +4,12 @@ import type { Player } from "../../../types/Lobby";
 import type { LobbyBoardType } from "../components/CategoryBoard";
 import { type BoardType, CATEGORY_SECTIONS, unflattenBySections } from "../../../utils/lobbySections";
 import { routeLobbySocketMessage } from "./useLobbySocketSync.router.ts";
-import type { LobbySettings, LockedCategories, UseLobbySocketSyncArgs } from "./useLobbySocketSync.types.ts";
+import type {
+  LobbySettings,
+  LockedCategories,
+  UseLobbySocketSyncArgs,
+  CategoryPoolState,
+} from "./useLobbySocketSync.types.ts";
 
 export type { LobbySettings } from "./useLobbySocketSync.types.ts";
 
@@ -52,6 +57,7 @@ export function useLobbySocketSync({
   });
 
   const [lobbySettings, setLobbySettings] = useState<LobbySettings | null>(null);
+  const [categoryPoolState, setCategoryPoolState] = useState<CategoryPoolState | null>(null);
 
   const setManualLoading = useCallback((message: string) => {
     setIsLoading(true);
@@ -158,6 +164,7 @@ export function useLobbySocketSync({
         unflattenBySections,
         setLockedCategories,
         setLobbySettings,
+        setCategoryPoolState,
       });
     });
 
@@ -188,6 +195,7 @@ export function useLobbySocketSync({
     requestLobbyState,
     lobbySettings,
     updateLobbySettings,
+    categoryPoolState,
     preloadAssetIds,
     isPreloadingImages,
     preloadTtsAssetIds,

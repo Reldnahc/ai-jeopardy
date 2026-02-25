@@ -34,6 +34,10 @@ export type GameState = {
     secondBoard?: boolean[];
     finalJeopardy?: boolean[];
   } | null;
+  categoryPool?: string[] | null;
+  categoryPoolGeneratedAtMs?: number | null;
+  categoryPoolNextAllowedAtMs?: number | null;
+  categoryPoolGenerating?: boolean;
   lobbySettings?: {
     timeToBuzz?: number;
     timeToAnswer?: number;
@@ -43,6 +47,8 @@ export type GameState = {
     narrationEnabled?: boolean;
     boardJson?: string;
     sttProviderName?: string;
+    categoryRefreshLocked?: boolean;
+    categoryPoolPrompt?: string;
     [key: string]: unknown;
   } | null;
   boardData?: {

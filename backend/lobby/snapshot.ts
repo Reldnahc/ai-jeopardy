@@ -21,6 +21,11 @@ export const buildLobbyState = (gameId: string, ws: SocketState) => {
     lockedCategories: game.lockedCategories,
     inLobby: game.inLobby,
     lobbySettings: game.lobbySettings ?? null,
+    categoryPoolState: {
+      nextAllowedAtMs: game.categoryPoolNextAllowedAtMs ?? null,
+      generating: Boolean(game.categoryPoolGenerating),
+      lastGeneratedAtMs: game.categoryPoolGeneratedAtMs ?? null,
+    },
     isGenerating: Boolean(game.isGenerating),
     isLoading: Boolean(game.isLoading),
     generationProgress:

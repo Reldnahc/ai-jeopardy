@@ -47,6 +47,11 @@ export function routeLobbySnapshotMessage(
       lockedCategories?: LockedCategories;
       you?: { isHost?: boolean; playerName?: string; playerKey?: string };
       lobbySettings?: LobbySettings | null;
+      categoryPoolState?: {
+        nextAllowedAtMs?: number | null;
+        lastGeneratedAtMs?: number | null;
+        generating?: boolean;
+      };
     };
 
     d.setPlayers(Array.isArray(m.players) ? m.players : []);
@@ -77,6 +82,14 @@ export function routeLobbySnapshotMessage(
 
     if (m.lobbySettings) {
       d.setLobbySettings(m.lobbySettings);
+    }
+
+    if (m.categoryPoolState) {
+      d.setCategoryPoolState({
+        nextAllowedAtMs: m.categoryPoolState.nextAllowedAtMs ?? null,
+        lastGeneratedAtMs: m.categoryPoolState.lastGeneratedAtMs ?? null,
+        generating: Boolean(m.categoryPoolState.generating),
+      });
     }
 
     if (m.isGenerating) {
@@ -137,6 +150,20 @@ export function routeLobbySnapshotMessage(
   if (message.type === "lobby-settings-updated") {
     const m = message as { lobbySettings?: LobbySettings | null };
     if (m.lobbySettings) d.setLobbySettings(m.lobbySettings);
+    return true;
+  }
+
+  if (message.type === "category-pool-status") {
+    const m = message as {
+      nextAllowedAtMs?: number | null;
+      lastGeneratedAtMs?: number | null;
+      generating?: boolean;
+    };
+    d.setCategoryPoolState({
+      nextAllowedAtMs: m.nextAllowedAtMs ?? null,
+      lastGeneratedAtMs: m.lastGeneratedAtMs ?? null,
+      generating: Boolean(m.generating),
+    });
     return true;
   }
 

@@ -52,6 +52,7 @@ export const env = Object.freeze({
   OPENAI_STT_MODEL: optionalEnv("OPENAI_STT_MODEL", "gpt-4o-mini-transcribe"),
   OPENAI_IMAGE_JUDGE_MODEL: optionalEnv("OPENAI_IMAGE_JUDGE_MODEL", "gpt-4.1-mini"),
   OPENAI_COTD_MODEL: optionalEnv("OPENAI_COTD_MODEL", "gpt-4o-mini"),
+  OPENAI_CATEGORY_POOL_MODEL: optionalEnv("OPENAI_CATEGORY_POOL_MODEL", "gpt-4o-mini"),
 
   // server
   PORT: optionalNumber("PORT", 3002),

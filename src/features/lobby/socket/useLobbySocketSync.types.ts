@@ -15,6 +15,14 @@ export type LobbySettings = {
   visualMode: "off" | "commons" | "brave";
   narrationEnabled: boolean;
   boardJson: string;
+  categoryRefreshLocked?: boolean;
+  categoryPoolPrompt?: string;
+};
+
+export type CategoryPoolState = {
+  nextAllowedAtMs: number | null;
+  lastGeneratedAtMs: number | null;
+  generating: boolean;
 };
 
 export type UseLobbySocketSyncArgs = {

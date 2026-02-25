@@ -45,6 +45,28 @@ export function routeLobbyControlMessage(
   if (message.type === "error") {
     const m = message as { message?: string };
     const msg = String(m.message ?? "");
+    if (msg.toLowerCase().includes("category refresh")) {
+      void d.showAlert("Category Refresh", msg, [
+        {
+          label: "Okay",
+          actionValue: "okay",
+          styleClass: "bg-green-500 text-white hover:bg-green-600",
+        },
+      ]);
+      if (d.gameId) d.requestLobbyState();
+      return true;
+    }
+    if (msg.toLowerCase().includes("category pool refresh")) {
+      void d.showAlert("Category Pool", msg, [
+        {
+          label: "Okay",
+          actionValue: "okay",
+          styleClass: "bg-green-500 text-white hover:bg-green-600",
+        },
+      ]);
+      if (d.gameId) d.requestLobbyState();
+      return true;
+    }
     if (msg.toLowerCase().includes("lobby is full")) {
       void d.showAlert("Lobby Full", msg, [
         {

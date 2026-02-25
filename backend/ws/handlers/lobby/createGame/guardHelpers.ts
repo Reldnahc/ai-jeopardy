@@ -48,6 +48,8 @@ export function ensureLobbySettings(
     narrationEnabled: false,
     boardJson: "",
     sttProviderName: ctx.appConfig.ai.defaultSttProvider,
+    categoryRefreshLocked: false,
+    categoryPoolPrompt: "",
   };
 
   return game.lobbySettings;

@@ -2,7 +2,7 @@ import type React from "react";
 import type { Player } from "../../../types/Lobby.ts";
 import type { BoardType } from "../../../utils/lobbySections.ts";
 import type { AlertButton } from "../../../contexts/AlertContext.tsx";
-import type { LobbySettings, LockedCategories } from "./useLobbySocketSync.types.ts";
+import type { LobbySettings, LockedCategories, CategoryPoolState } from "./useLobbySocketSync.types.ts";
 
 export type LobbySocketMessage = { type?: string; [key: string]: unknown };
 
@@ -42,4 +42,5 @@ export type LobbySocketRouterDeps = {
     value: LockedCategories | ((prev: LockedCategories) => LockedCategories),
   ) => void;
   setLobbySettings: (value: LobbySettings | null) => void;
+  setCategoryPoolState: (value: CategoryPoolState | null) => void;
 };

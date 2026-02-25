@@ -1,6 +1,8 @@
 import type { CtxDeps } from "../../context.types.js";
 import type { WsHandler } from "../types.js";
 import { getUniqueCategories } from "../../../services/categories/getUniqueCategories.js";
+import { shuffle, normalizeCategory } from "../../../services/categories/categoryUtils.js";
+import { generateCategoryPoolFromOpenAi } from "../../../services/ai/categoryPool.js";
 
 type ToggleLockCategoryData = {
   gameId: string;
@@ -19,6 +21,7 @@ type UpdateCategoryData = {
   value?: string;
 };
 type UpdateCategoriesData = { gameId: string; categories?: unknown };
+type RefreshCategoryPoolData = { gameId: string };
 
 type LobbyCategoryCtx = CtxDeps<
   | "games"
@@ -102,14 +105,25 @@ export const lobbyCategoryHandlers: Record<string, WsHandler> = {
     else globalIndex = 10;
 
     const exclude = game.categories
-      .map((c: unknown, i: number) => (i === globalIndex ? "" : String(c ?? "").trim()))
+      .map((c: unknown) => String(c ?? "").trim())
       .filter((v: string) => v.length > 0);
 
     let chosen = "";
-    try {
-      chosen = getUniqueCategories(1, { exclude })[0] ?? "";
-    } catch (e) {
-      console.error("[randomize-category] failed to generate category:", e);
+    const pool = Array.isArray(game.categoryPool) ? game.categoryPool : [];
+    const normalizedExclude = new Set(exclude.map(normalizeCategory));
+    const poolChoices = shuffle(pool).filter((c) => {
+      const key = normalizeCategory(String(c ?? ""));
+      return key && !normalizedExclude.has(key);
+    });
+
+    if (poolChoices.length > 0) {
+      chosen = String(poolChoices[0] ?? "").trim();
+    } else {
+      try {
+        chosen = getUniqueCategories(1, { exclude })[0] ?? "";
+      } catch (e) {
+        console.error("[randomize-category] failed to generate category:", e);
+      }
     }
 
     if (!chosen) {
@@ -224,6 +238,82 @@ export const lobbyCategoryHandlers: Record<string, WsHandler> = {
           message: `Game ${gameId} not found while updating categories.`,
         }),
       );
+    }
+  },
+
+  "refresh-category-pool": async ({ ws, data, ctx }) => {
+    const hctx = ctx as LobbyCategoryCtx;
+    const { gameId } = data as RefreshCategoryPoolData;
+    const game = hctx.games[gameId];
+    if (!game || !game.inLobby) return;
+
+    const locked = Boolean(game.lobbySettings?.categoryRefreshLocked);
+    if (locked) {
+      ws.send(JSON.stringify({ type: "error", message: "Category refresh is locked by the host." }));
+      hctx.sendLobbySnapshot(ws, gameId);
+      return;
+    }
+
+    const now = Date.now();
+    const nextAllowed = Number(game.categoryPoolNextAllowedAtMs ?? 0);
+    if (nextAllowed && now < nextAllowed) {
+      ws.send(
+        JSON.stringify({
+          type: "error",
+          message: "Category pool refresh is on cooldown.",
+          nextAllowedAtMs: nextAllowed,
+        }),
+      );
+      hctx.sendLobbySnapshot(ws, gameId);
+      return;
+    }
+
+    if (game.categoryPoolGenerating) {
+      ws.send(JSON.stringify({ type: "error", message: "Category pool refresh already in progress." }));
+      hctx.sendLobbySnapshot(ws, gameId);
+      return;
+    }
+
+    game.categoryPoolGenerating = true;
+    hctx.broadcast(gameId, {
+      type: "category-pool-status",
+      generating: true,
+      nextAllowedAtMs: game.categoryPoolNextAllowedAtMs ?? null,
+    });
+
+    try {
+      const pool = await generateCategoryPoolFromOpenAi({
+        count: 60,
+        prompt: game.lobbySettings?.categoryPoolPrompt ?? "",
+      });
+      game.categoryPool = pool;
+      game.categoryPoolGeneratedAtMs = Date.now();
+      game.categoryPoolNextAllowedAtMs = game.categoryPoolGeneratedAtMs + 60_000;
+      game.categoryPoolGenerating = false;
+
+      const poolSet = pool.map((c) => String(c ?? "").trim()).filter(Boolean);
+      const shuffledPool = shuffle(poolSet);
+      const replacement =
+        shuffledPool.length >= 11 ? shuffledPool.slice(0, 11) : getUniqueCategories(11, { exclude: [] });
+
+      game.categories = hctx.normalizeCategories11(replacement);
+
+      hctx.broadcast(gameId, {
+        type: "categories-updated",
+        categories: game.categories,
+      });
+
+      hctx.broadcast(gameId, {
+        type: "category-pool-status",
+        generating: false,
+        nextAllowedAtMs: game.categoryPoolNextAllowedAtMs,
+        lastGeneratedAtMs: game.categoryPoolGeneratedAtMs,
+      });
+    } catch (e) {
+      console.error("[refresh-category-pool] failed:", e);
+      game.categoryPoolGenerating = false;
+      ws.send(JSON.stringify({ type: "error", message: "Failed to refresh category pool." }));
+      hctx.sendLobbySnapshot(ws, gameId);
     }
   },
 };
