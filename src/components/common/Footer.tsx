@@ -1,6 +1,10 @@
 import { Link } from "react-router-dom";
 
 export default function Footer() {
+  const handleFooterNav = () => {
+    window.scrollTo(0, 0);
+  };
+
   return (
     <footer className="bg-transparent text-white py-6 mt-8 ">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -16,13 +20,18 @@ export default function Footer() {
             <h3 className="text-xl font-extrabold">Quick Links</h3>
             <ul className="mt-2 space-y-2 text-sm text-center">
               <li>
-                <Link to="/" className="hover:underline">
+                <Link to="/" className="hover:underline" onClick={handleFooterNav}>
                   Home
                 </Link>
               </li>
               <li>
-                <Link to="/recent-boards" className="hover:underline">
+                <Link to="/recent-boards" className="hover:underline" onClick={handleFooterNav}>
                   Recent Boards
+                </Link>
+              </li>
+              <li>
+                <Link to="/leaderboards" className="hover:underline" onClick={handleFooterNav}>
+                  Leaderboards
                 </Link>
               </li>
             </ul>
