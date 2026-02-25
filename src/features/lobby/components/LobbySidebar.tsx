@@ -73,11 +73,14 @@ const LobbySidebar: React.FC<LobbySidebarProps> = ({
 
       {/* Player List */}
       <div className="flex flex-col gap-1 -mt-10">
-        <h2 className="text-4xl mt-3 font-extrabold font-swiss911 text-shadow-jeopardy tracking-wider bg-blue-700 text-white px-5 py-5 rounded-lg text-center w-full gap-2.5 shadow-md mb-3">
-          CONTESTANTS
+        <h2 className="text-4xl mt-3 font-extrabold font-swiss911 text-shadow-jeopardy tracking-wider bg-blue-700 text-white px-5 py-5 rounded-lg shadow-md mb-3 flex items-center justify-center gap-3">
+          <span>CONTESTANTS</span>
+          <span className="text-xl font-semibold tracking-[0.12em] opacity-90">
+            ({players.length}/5)
+          </span>
         </h2>
 
-        <ul className="list-none p-0 m-0 flex flex-wrap lg:flex-col lg:w-full gap-4">
+        <ul className="list-none p-0 m-0 flex flex-wrap lg:flex-col lg:w-full gap-4 lg:min-h-[34rem]">
           {players.map((player, index) => {
             const username = String(player.username ?? "").trim();
             const profile = username ? getProfileByUsername(username) : null;
