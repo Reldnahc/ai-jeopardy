@@ -47,7 +47,7 @@ export function useLobbySessionAndNavigation({
       gameId,
       playerKey: playerKey ?? "",
       username,
-      displayname,
+      displayname: displayname || username,
       isHost: Boolean(isHost),
     });
   }, [gameId, username, isHost, session?.gameId, session?.username, session?.isHost, saveSession, playerKey, displayname]);

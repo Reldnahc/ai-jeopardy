@@ -20,9 +20,9 @@ export function useLobbyPreloadAck({
   playerKey,
   preloadFinalToken,
   preloadAssetIds,
-  isPreloadingImages,
+  isPreloadingImages = false,
   preloadTtsAssetIds,
-  isPreloadingAudio,
+  isPreloadingAudio = false,
 }: Params) {
   const preloadAckSentRef = useRef(false);
 
@@ -72,11 +72,11 @@ export function useLobbyPreloadAck({
     setAudioDone(false);
   }, [preloadTtsAssetIds]);
 
-  usePreloadImageAssetIds(preloadAssetIds, isPreloadingImages, () => {
+  usePreloadImageAssetIds(preloadAssetIds, Boolean(isPreloadingImages), () => {
     setImagesDone(true);
   });
 
-  usePreloadAudioAssetIds(preloadTtsAssetIds, isPreloadingAudio, () => {
+  usePreloadAudioAssetIds(preloadTtsAssetIds, Boolean(isPreloadingAudio), () => {
     setAudioDone(true);
   });
 }
