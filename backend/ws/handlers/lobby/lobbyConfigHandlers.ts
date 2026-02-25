@@ -1,10 +1,11 @@
 import type { PlayerState } from "../../../types/runtime.js";
 import type { CtxDeps } from "../../context.types.js";
 import type { WsHandler } from "../types.js";
+import { MAX_LOBBY_PLAYERS } from "../../../lobby/constants.js";
 
 type GameIdData = { gameId: string };
 type UpdateLobbySettingsData = { gameId: string; patch?: Record<string, unknown> };
-type CheckLobbyData = { gameId: string };
+type CheckLobbyData = { gameId: string; username?: string; playerKey?: string };
 type PromoteHostData = { gameId: string; targetUsername?: string };
 
 type LobbyConfigCtx = CtxDeps<
@@ -94,14 +95,43 @@ export const lobbyConfigHandlers: Record<string, WsHandler> = {
 
   "check-lobby": async ({ ws, data, ctx }) => {
     const hctx = ctx as LobbyConfigCtx;
-    const { gameId } = data as CheckLobbyData;
+    const { gameId, username, playerKey } = data as CheckLobbyData;
 
-    let isValid = false;
-    if (hctx.games[gameId] && hctx.games[gameId].inLobby === true) {
-      isValid = true;
-    }
+    const game = hctx.games?.[gameId];
+    const inLobby = Boolean(game && game.inLobby === true);
 
-    ws.send(JSON.stringify({ type: "check-lobby-response", isValid, gameId }));
+    const u = String(username ?? "")
+      .trim()
+      .toLowerCase();
+    const pk = typeof playerKey === "string" ? playerKey.trim() : "";
+
+    const isAlreadyInLobby = Boolean(
+      game?.players?.some((p: PlayerState) => {
+        if (pk && p.playerKey && p.playerKey === pk) return true;
+        return (
+          u &&
+          String(p.username ?? "")
+            .trim()
+            .toLowerCase() === u
+        );
+      }),
+    );
+
+    const isFull = Boolean(
+      inLobby && game?.players?.length != null && game.players.length >= MAX_LOBBY_PLAYERS && !isAlreadyInLobby,
+    );
+
+    const isValid = Boolean(inLobby && !isFull);
+
+    ws.send(
+      JSON.stringify({
+        type: "check-lobby-response",
+        isValid,
+        isFull,
+        maxPlayers: MAX_LOBBY_PLAYERS,
+        gameId,
+      }),
+    );
   },
 
   "promote-host": async ({ ws, data, ctx }) => {

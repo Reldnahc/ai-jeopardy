@@ -16,7 +16,7 @@ export type LobbySocketRouterDeps = {
     actions: AlertButton[],
   ) => Promise<string>;
   setLobbyInvalid: (value: boolean) => void;
-  setInvalidReason: (value: "missing_identity" | "not_found_or_started" | null) => void;
+  setInvalidReason: (value: "missing_identity" | "not_found_or_started" | "full" | null) => void;
   setIsLoading: (value: boolean) => void;
   setLoadingMessage: (value: string) => void;
   setLoadingProgress: (value: number | null) => void;

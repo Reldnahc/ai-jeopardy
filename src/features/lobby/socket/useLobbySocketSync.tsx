@@ -18,7 +18,7 @@ export function useLobbySocketSync({
   const { isSocketReady, sendJson, subscribe } = useWebSocket();
   const [lobbyInvalid, setLobbyInvalid] = useState(false);
   const [invalidReason, setInvalidReason] = useState<
-    "missing_identity" | "not_found_or_started" | null
+    "missing_identity" | "not_found_or_started" | "full" | null
   >(null);
 
   const [isLoading, setIsLoading] = useState(false);
@@ -161,7 +161,7 @@ export function useLobbySocketSync({
       });
     });
 
-    sendJson({ type: "check-lobby", gameId });
+    sendJson({ type: "check-lobby", gameId, username, playerKey });
     return unsubscribe;
   }, [isSocketReady, gameId, subscribe, sendJson, username, showAlert, requestLobbyState]);
 

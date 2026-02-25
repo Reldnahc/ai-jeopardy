@@ -96,7 +96,29 @@ export default function MainPage() {
         }
 
         case "check-lobby-response": {
-          const m = message as unknown as { isValid: boolean; gameId: string };
+          const m = message as unknown as {
+            isValid: boolean;
+            isFull?: boolean;
+            maxPlayers?: number;
+            gameId: string;
+          };
+
+          if (m.isFull) {
+            void showAlert(
+              "Lobby Full",
+              typeof m.maxPlayers === "number"
+                ? `Lobby is full (max ${m.maxPlayers} players).`
+                : "Lobby is full.",
+              [
+                {
+                  label: "Okay",
+                  actionValue: "okay",
+                  styleClass: "bg-green-500 text-white hover:bg-green-600",
+                },
+              ],
+            );
+            return;
+          }
 
           if (m.isValid) {
             if (username && displayname) {
@@ -235,7 +257,7 @@ export default function MainPage() {
     }
 
     if (isSocketReady) {
-      sendJson({ type: "check-lobby", gameId: gameId.trim() });
+      sendJson({ type: "check-lobby", gameId: gameId.trim(), username, playerKey });
     } else {
       sendErrorAlert();
     }

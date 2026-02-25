@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { GameState, SocketState } from "../../../types/runtime.js";
 import { createCtx } from "../../../test/createCtx.js";
 import { lobbyConfigHandlers } from "./lobbyConfigHandlers.js";
+import { MAX_LOBBY_PLAYERS } from "../../../lobby/constants.js";
 
 function makeWs(): SocketState {
   return { id: "ws-1", send: vi.fn(), gameId: "g1" } as unknown as SocketState;
@@ -148,11 +149,79 @@ describe("lobbyConfigHandlers", () => {
 
     expect(ws.send).toHaveBeenNthCalledWith(
       1,
-      JSON.stringify({ type: "check-lobby-response", isValid: true, gameId: "g1" }),
+      JSON.stringify({
+        type: "check-lobby-response",
+        isValid: true,
+        isFull: false,
+        maxPlayers: MAX_LOBBY_PLAYERS,
+        gameId: "g1",
+      }),
     );
     expect(ws.send).toHaveBeenNthCalledWith(
       2,
-      JSON.stringify({ type: "check-lobby-response", isValid: false, gameId: "missing" }),
+      JSON.stringify({
+        type: "check-lobby-response",
+        isValid: false,
+        isFull: false,
+        maxPlayers: MAX_LOBBY_PLAYERS,
+        gameId: "missing",
+      }),
+    );
+  });
+
+  it("check-lobby marks full when max players reached for new user", async () => {
+    const ws = makeWs();
+    const game = makeGame({
+      players: Array.from({ length: MAX_LOBBY_PLAYERS }, (_, i) => ({
+        username: `p${i + 1}`,
+        displayname: `P${i + 1}`,
+        online: true,
+      })),
+    });
+    const ctx = makeCtx(game);
+
+    await lobbyConfigHandlers["check-lobby"]({
+      ws,
+      data: { gameId: "g1", username: "newbie" },
+      ctx,
+    });
+
+    expect(ws.send).toHaveBeenCalledWith(
+      JSON.stringify({
+        type: "check-lobby-response",
+        isValid: false,
+        isFull: true,
+        maxPlayers: MAX_LOBBY_PLAYERS,
+        gameId: "g1",
+      }),
+    );
+  });
+
+  it("check-lobby allows existing player even when lobby is full", async () => {
+    const ws = makeWs();
+    const game = makeGame({
+      players: Array.from({ length: MAX_LOBBY_PLAYERS }, (_, i) => ({
+        username: `p${i + 1}`,
+        displayname: `P${i + 1}`,
+        online: true,
+      })),
+    });
+    const ctx = makeCtx(game);
+
+    await lobbyConfigHandlers["check-lobby"]({
+      ws,
+      data: { gameId: "g1", username: "p1" },
+      ctx,
+    });
+
+    expect(ws.send).toHaveBeenCalledWith(
+      JSON.stringify({
+        type: "check-lobby-response",
+        isValid: true,
+        isFull: false,
+        maxPlayers: MAX_LOBBY_PLAYERS,
+        gameId: "g1",
+      }),
     );
   });
 

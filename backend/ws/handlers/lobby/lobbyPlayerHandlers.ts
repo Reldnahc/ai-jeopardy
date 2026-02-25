@@ -1,6 +1,7 @@
 import type { JsonMap, PlayerState } from "../../../types/runtime.js";
 import type { CtxDeps } from "../../context.types.js";
 import type { WsHandler } from "../types.js";
+import { MAX_LOBBY_PLAYERS } from "../../../lobby/constants.js";
 
 type CreateLobbyData = {
   username?: string;
@@ -26,8 +27,6 @@ type LobbyPlayerCtx = CtxDeps<
   | "broadcast"
   | "playerStableId"
 >;
-
-const MAX_LOBBY_PLAYERS = 5;
 
 export const lobbyPlayerHandlers: Record<string, WsHandler> = {
   "create-lobby": async ({ ws, data, ctx }) => {
