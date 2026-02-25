@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
 import { useWebSocket } from "../contexts/WebSocketContext.tsx";
 import LobbySidebar from "../features/lobby/components/LobbySidebar.tsx";
 import LoadingScreen from "../components/common/LoadingScreen.tsx";
@@ -10,10 +10,12 @@ import { useProfile } from "../contexts/ProfileContext.tsx";
 import { useAlert } from "../contexts/AlertContext.tsx";
 import { motion } from "framer-motion";
 import { getUniqueCategories } from "../categories/getUniqueCategories.ts";
-import { useGameSession } from "../hooks/useGameSession.ts";
 import { useLobbySocketSync } from "../features/lobby/socket/useLobbySocketSync";
 import { usePlayerIdentity } from "../hooks/usePlayerIdentity.ts";
-import { usePreloadAudioAssetIds, usePreloadImageAssetIds } from "../hooks/game/usePreload.ts";
+import { useLobbyPreloadAck } from "../hooks/lobby/useLobbyPreloadAck.ts";
+import { useLobbyBoardJson } from "../hooks/lobby/useLobbyBoardJson.ts";
+import { useLobbySessionAndNavigation } from "../hooks/lobby/useLobbySessionAndNavigation.ts";
+import { useLobbyCreateGame } from "../hooks/lobby/useLobbyCreateGame.tsx";
 
 const Lobby: React.FC = () => {
   const { gameId } = useParams<{ gameId: string }>();
@@ -21,10 +23,8 @@ const Lobby: React.FC = () => {
   const [boardJsonError, setBoardJsonError] = useState<string | null>(null);
 
   const { sendJson } = useWebSocket();
-  const navigate = useNavigate();
   const { profile, fetchPublicProfiles } = useProfile();
   const { showAlert } = useAlert();
-  const { session, saveSession } = useGameSession();
 
   const { playerKey, username, displayname } = usePlayerIdentity({
     gameId,
@@ -64,11 +64,6 @@ const Lobby: React.FC = () => {
   const isHost = isHostServer;
 
   useEffect(() => {
-    if (!lobbyInvalid) return;
-    navigate("/");
-  }, [lobbyInvalid, navigate]);
-
-  useEffect(() => {
     const set = new Set<string>();
 
     const h = String(host ?? "")
@@ -90,134 +85,30 @@ const Lobby: React.FC = () => {
     void fetchPublicProfiles(usernames).catch(() => {});
   }, [players, host, fetchPublicProfiles]);
 
-  useEffect(() => {
-    if (!gameId || !username) return;
-
-    const shouldUpdate =
-      session?.gameId !== gameId ||
-      session?.username !== username ||
-      session?.isHost !== Boolean(isHost);
-
-    if (!shouldUpdate) return;
-
-    saveSession({
-      gameId,
-      playerKey: playerKey ?? "",
-      username,
-      displayname,
-      isHost: Boolean(isHost),
-    });
-  }, [
+  useLobbySessionAndNavigation({
+    lobbyInvalid,
+    allowLeave,
+    isSocketReady,
     gameId,
     username,
-    isHost,
-    session?.gameId,
-    session?.username,
-    session?.isHost,
-    saveSession,
-    playerKey,
     displayname,
-  ]);
+    isHost,
+    host,
+    playerKey,
+  });
 
-  useEffect(() => {
-    if (!allowLeave) return;
-    if (!isSocketReady) return;
-    if (!gameId) return;
+  const { boardJson, usingImportedBoard, tryValidateBoardJson } = useLobbyBoardJson(lobbySettings);
 
-    navigate(`/game/${gameId}`, {
-      state: {
-        username,
-        displayname,
-        isHost,
-        host,
-      },
-    });
-  }, [allowLeave, isSocketReady, gameId, isHost, host, navigate, username, displayname]);
-
-  const tryValidateBoardJson = (raw: string): string | null => {
-    if (!raw.trim()) return null; // empty means "use AI"
-
-    try {
-      const parsed = JSON.parse(raw) as unknown;
-
-      // We only do minimal checks here because server is authoritative.
-      if (typeof parsed !== "object" || parsed === null) return "Board JSON must be an object.";
-
-      const p = parsed as Record<string, unknown>;
-      const boardDataCandidate = p.boardData;
-      const bd =
-        boardDataCandidate && typeof boardDataCandidate === "object"
-          ? (boardDataCandidate as Record<string, unknown>)
-          : p;
-
-      if (!bd.firstBoard || !bd.secondBoard || !bd.finalJeopardy) {
-        return "Missing firstBoard / secondBoard / finalJeopardy.";
-      }
-
-      return null;
-    } catch {
-      return "Invalid JSON (can’t parse).";
-    }
-  };
-
-  const boardJson = lobbySettings?.boardJson ?? "";
-  const usingImportedBoard = Boolean(boardJson.trim());
-
-  const preloadAckSentRef = useRef(false);
-
-  const [imagesDone, setImagesDone] = useState(false);
-  const [audioDone, setAudioDone] = useState(false);
-
-  const canAck = preloadFinalToken != null;
-
-  useEffect(() => {
-    if (preloadAckSentRef.current) return;
-    if (!canAck) return;
-
-    const imagesOk = !isPreloadingImages || !preloadAssetIds?.length || imagesDone;
-
-    const audioOk = !isPreloadingAudio || !preloadTtsAssetIds?.length || audioDone;
-
-    if (!imagesOk || !audioOk) return;
-
-    preloadAckSentRef.current = true;
-
-    sendJson({
-      type: "preload-done",
-      gameId,
-      username,
-      playerKey,
-      token: preloadFinalToken, // IMPORTANT: send token
-    });
-  }, [
-    canAck,
-    preloadFinalToken,
-    isPreloadingImages,
-    isPreloadingAudio,
-    preloadAssetIds,
-    preloadTtsAssetIds,
-    imagesDone,
-    audioDone,
+  useLobbyPreloadAck({
     sendJson,
     gameId,
     username,
     playerKey,
-  ]);
-
-  useEffect(() => {
-    setImagesDone(false);
-  }, [preloadAssetIds]);
-
-  useEffect(() => {
-    setAudioDone(false);
-  }, [preloadTtsAssetIds]);
-
-  usePreloadImageAssetIds(preloadAssetIds, isPreloadingImages, () => {
-    setImagesDone(true);
-  });
-
-  usePreloadAudioAssetIds(preloadTtsAssetIds, isPreloadingAudio, () => {
-    setAudioDone(true);
+    preloadFinalToken,
+    preloadAssetIds,
+    isPreloadingImages,
+    preloadTtsAssetIds,
+    isPreloadingAudio,
   });
 
   const handleRandomizeCategory = (boardType: LobbyBoardType, index: number) => {
@@ -235,81 +126,19 @@ const Lobby: React.FC = () => {
     });
   };
 
-  const handleCreateGame = async () => {
-    if (!profile) {
-      await showAlert("Login Required", <span>You need to be logged in to do this.</span>, [
-        {
-          label: "Okay",
-          actionValue: "okay",
-          styleClass: "bg-green-500 text-white hover:bg-green-600",
-        },
-      ]);
-      return;
-    }
-
-    const localJsonError = tryValidateBoardJson(boardJson);
-    setBoardJsonError(localJsonError);
-
-    if (usingImportedBoard && localJsonError) {
-      await showAlert(
-        "Invalid Board JSON",
-        <span>
-          <span>{localJsonError}</span>
-        </span>,
-        [
-          {
-            label: "Okay",
-            actionValue: "okay",
-            styleClass: "bg-green-500 text-white hover:bg-green-600",
-          },
-        ],
-      );
-      return;
-    }
-
-    // Only require categories when NOT importing
-    if (!usingImportedBoard) {
-      if (
-        categories.firstBoard.some((c) => !c.trim()) ||
-        categories.secondBoard.some((c) => !c.trim())
-      ) {
-        await showAlert("Missing Categories", <span>Please fill in all the categories.</span>, [
-          {
-            label: "Okay",
-            actionValue: "okay",
-            styleClass: "bg-green-500 text-white hover:bg-green-600",
-          },
-        ]);
-        return;
-      }
-    }
-
-    try {
-      setManualLoading("Generating your questions...");
-
-      if (!isSocketReady) return;
-      if (!gameId) return;
-
-      // Server authoritative: create-game only needs gameId.
-      sendJson({
-        type: "create-game",
-        gameId,
-      });
-    } catch (error) {
-      console.error("Failed to generate board data:", error);
-      await showAlert(
-        "Generation Failed",
-        <span>Failed to generate board data. Please try again.</span>,
-        [
-          {
-            label: "Okay",
-            actionValue: "okay",
-            styleClass: "bg-green-500 text-white hover:bg-green-600",
-          },
-        ],
-      );
-    }
-  };
+  const handleCreateGame = useLobbyCreateGame({
+    profile,
+    showAlert,
+    boardJson,
+    tryValidateBoardJson,
+    usingImportedBoard,
+    setBoardJsonError,
+    categories,
+    setManualLoading,
+    isSocketReady,
+    gameId,
+    sendJson,
+  });
 
   return isLoading ? (
     <LoadingScreen message={loadingMessage} progress={loadingProgress ?? 0} />
@@ -395,3 +224,4 @@ const Lobby: React.FC = () => {
 };
 
 export default Lobby;
+
