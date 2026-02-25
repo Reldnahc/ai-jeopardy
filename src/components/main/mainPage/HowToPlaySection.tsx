@@ -18,48 +18,52 @@ export default function HowToPlaySection() {
       </summary>
 
       <p className="mt-4 text-lg text-slate-700">
-        <strong>AI Jeopardy</strong> is a live multiplayer trivia game with voice narration, buzzer
-        races, and automatic judging.
+        <strong>AI Jeopardy</strong> is live multiplayer trivia with voice reading, buzzer races,
+        and auto-judged answers.
       </p>
 
       <h3 className="mt-6 text-xl font-semibold text-slate-800">Getting Started</h3>
       <ul className="list-disc ml-6 mt-3 text-lg text-slate-700 space-y-2">
-        <li>Sign in, create a lobby, and share the Game ID with players who want to join.</li>
-        <li>In the lobby, set or randomize categories, adjust settings, then start the game.</li>
-        <li>The host controls game start. Once started, players are moved into the board view.</li>
+        <li>Log in, then click Create Game.</li>
+        <li>Invite players with the Game ID (lobbies support 1-5 players; 3 is recommended).</li>
+        <li>Set up categories and timers in the lobby.</li>
+        <li>When everyone is ready, the host clicks Start Game.</li>
       </ul>
 
-      <h3 className="mt-6 text-xl font-semibold text-slate-800">How Jeopardy Works</h3>
+      <h3 className="mt-6 text-xl font-semibold text-slate-800">Lobby Guide</h3>
       <ul className="list-disc ml-6 mt-3 text-lg text-slate-700 space-y-2">
-        <li>The active selector chooses clues from the board.</li>
-        <li>The AI host reads each clue, then the buzzer opens.</li>
-        <li>Players race to buzz in. First valid buzz gets the answer attempt.</li>
-        <li>The buzzed player answers by microphone capture. The answer is transcribed and judged automatically.</li>
-        <li>Correct answers add clue value and make that player the next selector.</li>
-        <li>Incorrect answers subtract clue value and lock that player out from rebuzzing on that clue.</li>
-        <li>If nobody answers correctly, the clue is revealed and play returns to the board.</li>
-        <li>Early buzzing can trigger a temporary lockout, so timing matters.</li>
+        <li>Each category slot has three controls: edit text, lock/unlock, and randomize.</li>
+        <li>Lock categories you want to keep before generating a new category pool.</li>
+        <li>
+          Category Generation lets you set a prompt and generate a fresh pool. If refresh is on
+          cooldown, wait for the timer.
+        </li>
+        <li>Time to Buzz and Time to Answer control the pace of each clue.</li>
+        <li>Only the host can start the game, but everyone can help prep the board.</li>
       </ul>
 
-      <h3 className="mt-6 text-xl font-semibold text-slate-800">Daily Double</h3>
+      <h3 className="mt-6 text-xl font-semibold text-slate-800">During a Clue</h3>
       <ul className="list-disc ml-6 mt-3 text-lg text-slate-700 space-y-2">
-        <li>When a Daily Double appears, only that player can answer.</li>
-        <li>They place a wager by voice, then hear the clue and answer by voice.</li>
-        <li>Daily Double does not use normal rebuzz flow for other players on that clue.</li>
+        <li>The selector picks a clue and the AI host reads it.</li>
+        <li>When buzzing opens, the first valid buzz gets the attempt.</li>
+        <li>If you buzz too early you might get locked out.</li>
+        <li>
+          That player answers <strong>by voice</strong> and the game scores it automatically.
+        </li>
+        <li>A correct answer adds points and makes that player the next selector.</li>
+        <li>An incorrect answer subtracts points and blocks rebuzzing for that clue.</li>
       </ul>
 
-      <h3 className="mt-6 text-xl font-semibold text-slate-800">Final Jeopardy</h3>
+      <h3 className="mt-6 text-xl font-semibold text-slate-800">Special Rounds</h3>
       <ul className="list-disc ml-6 mt-3 text-lg text-slate-700 space-y-2">
-        <li>After the main boards clear, finalists enter Final Jeopardy.</li>
-        <li>Finalists submit wagers, then the final clue is played.</li>
-        <li>Answers are captured and judged, then wagers are applied to scores.</li>
-        <li>Correct adds wagered points; incorrect subtracts wagered points.</li>
-        <li>Highest final score wins.</li>
+        <li>Daily Double: the active player places a voice wager, then answers solo.</li>
+        <li>
+          Final Jeopardy: the top 3 players submit wagers, answer the final clue, and wagers are
+          applied to scores.
+        </li>
       </ul>
 
-      <p className="mt-6 text-lg text-slate-700">
-        Most importantly: have fun, compete hard, and play fast on the buzzer.
-      </p>
+      <p className="mt-6 text-lg text-slate-700">Fast buzzes win clues. Smart wagers win games.</p>
     </details>
   );
 }

@@ -105,7 +105,7 @@ const PlayerSearch: React.FC = () => {
   return (
     <div className="relative w-full">
       <label className="block text-2xl font-semibold text-gray-700 mb-2" htmlFor="player-search">
-        Search for a Player
+        Search for a Contestant
       </label>
 
       <input

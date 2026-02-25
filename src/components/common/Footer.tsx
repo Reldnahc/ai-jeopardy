@@ -34,9 +34,9 @@ export default function Footer() {
   );
 
   return (
-    <footer className="bg-transparent text-white py-6 mt-8 ">
+    <footer className="bg-transparent text-white py-4 mt-6">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* About Section */}
           <div className="flex flex-col items-center md:items-start">
             <h3 className="text-xl font-extrabold"></h3>
@@ -46,7 +46,7 @@ export default function Footer() {
           {/* Links Section */}
           <div className="flex flex-col items-center">
             <h3 className="text-xl font-extrabold">Quick Links</h3>
-            <ul className="mt-2 space-y-2 text-sm text-center">
+            <ul className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1 text-sm text-center">
               <li>
                 <Link
                   to="/"
@@ -83,6 +83,30 @@ export default function Footer() {
                   Leaderboards
                 </Link>
               </li>
+              <li>
+                <Link
+                  to="/model-info"
+                  className="hover:underline"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleFooterNav("/model-info");
+                  }}
+                >
+                  Model Info
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/board-creator"
+                  className="hover:underline"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleFooterNav("/board-creator");
+                  }}
+                >
+                  Board Creator
+                </Link>
+              </li>
             </ul>
           </div>
 
@@ -94,7 +118,7 @@ export default function Footer() {
         </div>
 
         {/* Footer Bottom Section */}
-        <div className="mt-8 text-center border-t border-gray-200 pt-4">
+        <div className="mt-5 text-center border-t border-gray-200 pt-3">
           <p className="text-xs text-gray-100 font-light">
             (c) {new Date().getFullYear()} AI Jeopardy. All rights reserved.
           </p>

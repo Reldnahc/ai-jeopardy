@@ -17,9 +17,24 @@ export default function DiscoveryLinks() {
       >
         <p className="text-xs uppercase tracking-[0.2em] text-slate-500 font-semibold">Rank</p>
         <p className="mt-2 text-2xl font-semibold text-slate-900">Leaderboards</p>
-        <p className="mt-1 text-slate-600">See top players across wins, money, and more.</p>
+        <p className="mt-1 text-slate-600">See top contestants across wins, money, and more.</p>
+      </Link>
+      <Link
+        to="/model-info"
+        className="rounded-2xl border border-slate-200 bg-white/85 p-5 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+      >
+        <p className="text-xs uppercase tracking-[0.2em] text-slate-500 font-semibold">Learn</p>
+        <p className="mt-2 text-2xl font-semibold text-slate-900">Model Info</p>
+        <p className="mt-1 text-slate-600">View model details and capability notes.</p>
+      </Link>
+      <Link
+        to="/board-creator"
+        className="rounded-2xl border border-slate-200 bg-white/85 p-5 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+      >
+        <p className="text-xs uppercase tracking-[0.2em] text-slate-500 font-semibold">Build</p>
+        <p className="mt-2 text-2xl font-semibold text-slate-900">Board Creator</p>
+        <p className="mt-1 text-slate-600">Create and tune a custom board.</p>
       </Link>
     </div>
   );
 }
-

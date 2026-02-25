@@ -19,6 +19,7 @@ import "./fonts";
 import "./index.css";
 import Leaderboard from "./pages/Leaderboard.tsx";
 import UserStats from "./pages/UserStats.tsx";
+import ModelInfo from "./pages/ModelInfo.tsx";
 
 // Define the router configuration
 const router = createBrowserRouter([
@@ -82,6 +83,14 @@ const router = createBrowserRouter([
         element: (
           <Layout>
             <Leaderboard />
+          </Layout>
+        ),
+      },
+      {
+        path: "/model-info",
+        element: (
+          <Layout>
+            <ModelInfo />
           </Layout>
         ),
       },

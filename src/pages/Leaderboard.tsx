@@ -58,7 +58,7 @@ const Leaderboard: React.FC = () => {
             selectValue={stat}
             onSelectChange={(value) => setStat(value as StatKey)}
             selectOptions={statSelectOptions}
-            searchLabel="Player Search"
+            searchLabel="Contestant Search"
             searchValue={search}
             onSearchChange={setSearch}
             searchPlaceholder="Search by username or display name"
