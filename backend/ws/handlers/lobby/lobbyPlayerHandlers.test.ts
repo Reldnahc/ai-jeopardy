@@ -17,7 +17,7 @@ function makeCtx(overrides: Record<string, unknown> = {}) {
       cancelLobbyCleanup: vi.fn(),
       scheduleLobbyCleanupIfEmpty: vi.fn(),
       broadcast: vi.fn(),
-      playerStableId: vi.fn((p: { playerKey?: string; username?: string }) => p.playerKey || p.username),
+      playerStableId: vi.fn((p: { username?: string }) => p.username),
     },
     overrides,
   );
@@ -30,7 +30,9 @@ describe("lobbyPlayerHandlers", () => {
 
     await lobbyPlayerHandlers["create-lobby"]({ ws, data: { username: " " }, ctx });
 
-    expect(ws.send).toHaveBeenCalledWith(JSON.stringify({ type: "error", message: "Invalid username." }));
+    expect(ws.send).toHaveBeenCalledWith(
+      JSON.stringify({ type: "error", message: "Invalid username." }),
+    );
   });
 
   it("create-lobby creates game, assigns host and sends initial snapshots", async () => {
@@ -49,17 +51,23 @@ describe("lobbyPlayerHandlers", () => {
     expect(game.host).toBe("alice");
     expect(game.inLobby).toBe(true);
     expect(game.players[0]).toMatchObject({ username: "alice", displayname: "Alice" });
-    expect(ws.send).toHaveBeenCalledWith(expect.stringContaining("\"type\":\"lobby-created\""));
-    expect(ws.send).toHaveBeenCalledWith(expect.stringContaining("\"type\":\"lobby-state\""));
+    expect(ws.send).toHaveBeenCalledWith(expect.stringContaining('"type":"lobby-created"'));
+    expect(ws.send).toHaveBeenCalledWith(expect.stringContaining('"type":"lobby-state"'));
   });
 
   it("join-lobby rejects unknown lobby", async () => {
     const ws = makeWs();
     const ctx = makeCtx();
 
-    await lobbyPlayerHandlers["join-lobby"]({ ws, data: { gameId: "NOPE", username: "alice" }, ctx });
+    await lobbyPlayerHandlers["join-lobby"]({
+      ws,
+      data: { gameId: "NOPE", username: "alice" },
+      ctx,
+    });
 
-    expect(ws.send).toHaveBeenCalledWith(JSON.stringify({ type: "error", message: "Lobby does not exist!" }));
+    expect(ws.send).toHaveBeenCalledWith(
+      JSON.stringify({ type: "error", message: "Lobby does not exist!" }),
+    );
   });
 
   it("join-lobby reconnects existing username and broadcasts update", async () => {
@@ -79,7 +87,7 @@ describe("lobbyPlayerHandlers", () => {
     });
 
     expect(game.players[0]).toMatchObject({ id: "ws-new", online: true });
-    expect(ws.send).toHaveBeenCalledWith(expect.stringContaining("\"type\":\"lobby-state\""));
+    expect(ws.send).toHaveBeenCalledWith(expect.stringContaining('"type":"lobby-state"'));
     expect(ctx.broadcast).toHaveBeenCalledWith(
       "G1",
       expect.objectContaining({ type: "player-list-update" }),
@@ -98,7 +106,9 @@ describe("lobbyPlayerHandlers", () => {
 
     await lobbyPlayerHandlers["join-lobby"]({ ws, data: { gameId: "G1", username: " " }, ctx });
 
-    expect(ws.send).toHaveBeenCalledWith(JSON.stringify({ type: "error", message: "Invalid username." }));
+    expect(ws.send).toHaveBeenCalledWith(
+      JSON.stringify({ type: "error", message: "Invalid username." }),
+    );
   });
 
   it("join-lobby reconnects existing player by stable playerKey", async () => {
@@ -106,7 +116,9 @@ describe("lobbyPlayerHandlers", () => {
     const game: GameState = {
       inLobby: true,
       host: "alice",
-      players: [{ id: "old", username: "old-name", displayname: "Old", playerKey: "pk1", online: false }],
+      players: [
+        { id: "old", username: "old-name", displayname: "Old", playerKey: "pk1", online: false },
+      ],
       categories: Array(11).fill("Category"),
     };
     const ctx = makeCtx({ games: { G1: game } });
@@ -191,7 +203,7 @@ describe("lobbyPlayerHandlers", () => {
 
     await lobbyPlayerHandlers["leave-lobby"]({
       ws,
-      data: { gameId: "G1", username: "alice", playerKey: "pk1" },
+      data: { gameId: "G1", username: "alice" },
       ctx,
     });
 
@@ -236,7 +248,9 @@ describe("lobbyPlayerHandlers", () => {
     const game: GameState = {
       inLobby: true,
       host: "alice",
-      players: [{ id: "ws-1", username: "alice", displayname: "Alice", playerKey: "pk1", online: true }],
+      players: [
+        { id: "ws-1", username: "alice", displayname: "Alice", playerKey: "pk1", online: true },
+      ],
       categories: Array(11).fill("Category"),
     };
     const ctx = makeCtx({ games: { G1: game } });
@@ -252,14 +266,16 @@ describe("lobbyPlayerHandlers", () => {
     const game: GameState = {
       inLobby: true,
       host: "alice",
-      players: [{ id: "ws-1", username: "alice", displayname: "Alice", playerKey: "pk1", online: true }],
+      players: [
+        { id: "ws-1", username: "alice", displayname: "Alice", playerKey: "pk1", online: true },
+      ],
       categories: Array(11).fill("Category"),
     };
     const ctx = makeCtx({ games: { G1: game } });
 
     await lobbyPlayerHandlers["leave-lobby"]({
       ws,
-      data: { gameId: "G1", username: "alice", playerKey: "pk1" },
+      data: { gameId: "G1", username: "alice" },
       ctx,
     });
 

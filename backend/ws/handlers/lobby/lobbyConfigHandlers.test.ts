@@ -36,6 +36,7 @@ function makeCtx(game: GameState, overrides: Record<string, unknown> = {}) {
       broadcast: vi.fn(),
       requireHost: vi.fn(() => true),
       buildLobbyState: vi.fn(() => ({ type: "lobby-state", gameId: "g1" })),
+      sendLobbySnapshot: vi.fn(),
     },
     overrides,
   );
@@ -85,7 +86,9 @@ describe("lobbyConfigHandlers", () => {
       ctx,
     });
 
-    expect(ws.send).toHaveBeenCalledWith(expect.stringContaining("Only the host can update lobby settings"));
+    expect(ws.send).toHaveBeenCalledWith(
+      expect.stringContaining("Only the host can update lobby settings"),
+    );
     expect(ctx.broadcast).not.toHaveBeenCalled();
   });
 
@@ -129,13 +132,13 @@ describe("lobbyConfigHandlers", () => {
 
     await lobbyConfigHandlers["update-lobby-settings"]({
       ws,
-      data: { gameId: "g1", patch: { boardJson: "{\"ok\":true}" } },
+      data: { gameId: "g1", patch: { boardJson: '{"ok":true}' } },
       ctx,
     });
 
     expect(game.lobbySettings).toMatchObject({
       selectedModel: "gpt-default",
-      boardJson: "{\"ok\":true}",
+      boardJson: '{"ok":true}',
       categoryPoolPrompt: "",
     });
     expect(ctx.broadcast).toHaveBeenCalled();
@@ -143,7 +146,9 @@ describe("lobbyConfigHandlers", () => {
 
   it("update-category-prompt updates prompt when unlocked", async () => {
     const ws = makeWs();
-    const game = makeGame({ lobbySettings: { sttProviderName: "openai", categoryRefreshLocked: false } as never });
+    const game = makeGame({
+      lobbySettings: { sttProviderName: "openai", categoryRefreshLocked: false } as never,
+    });
     const ctx = makeCtx(game);
 
     await lobbyConfigHandlers["update-category-prompt"]({
@@ -161,7 +166,9 @@ describe("lobbyConfigHandlers", () => {
 
   it("update-category-prompt rejects when locked", async () => {
     const ws = makeWs();
-    const game = makeGame({ lobbySettings: { sttProviderName: "openai", categoryRefreshLocked: true } as never });
+    const game = makeGame({
+      lobbySettings: { sttProviderName: "openai", categoryRefreshLocked: true } as never,
+    });
     const ctx = makeCtx(game);
 
     await lobbyConfigHandlers["update-category-prompt"]({
