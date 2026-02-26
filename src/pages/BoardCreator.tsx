@@ -68,7 +68,9 @@ function boardToPrettyJson(board: BoardData): string {
   return JSON.stringify(board, null, 2);
 }
 
-function parseBoardFromJson(raw: string): { ok: true; board: BoardData } | { ok: false; error: string } {
+function parseBoardFromJson(
+  raw: string,
+): { ok: true; board: BoardData } | { ok: false; error: string } {
   try {
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== "object") {
@@ -92,7 +94,10 @@ function validateBoard(board: BoardData): { ok: true } | { ok: false; error: str
     expectedClueCount: number,
   ): { ok: true } | { ok: false; error: string } => {
     if (!Array.isArray(categories) || categories.length !== expectedCategoryCount) {
-      return { ok: false, error: `${roundName}.categories must be length ${expectedCategoryCount}.` };
+      return {
+        ok: false,
+        error: `${roundName}.categories must be length ${expectedCategoryCount}.`,
+      };
     }
 
     for (let i = 0; i < categories.length; i += 1) {
@@ -101,18 +106,30 @@ function validateBoard(board: BoardData): { ok: true } | { ok: false; error: str
         return { ok: false, error: `${roundName}.categories[${i}].category is required.` };
       }
       if (!Array.isArray(cat.values) || cat.values.length !== expectedClueCount) {
-        return { ok: false, error: `${roundName}.categories[${i}].values must be length ${expectedClueCount}.` };
+        return {
+          ok: false,
+          error: `${roundName}.categories[${i}].values must be length ${expectedClueCount}.`,
+        };
       }
       for (let j = 0; j < cat.values.length; j += 1) {
         const clue = cat.values[j] as Clue;
         if (!Number.isFinite(Number(clue.value))) {
-          return { ok: false, error: `${roundName}.categories[${i}].values[${j}].value must be a number.` };
+          return {
+            ok: false,
+            error: `${roundName}.categories[${i}].values[${j}].value must be a number.`,
+          };
         }
         if (!String(clue.question ?? "").trim()) {
-          return { ok: false, error: `${roundName}.categories[${i}].values[${j}].question is required.` };
+          return {
+            ok: false,
+            error: `${roundName}.categories[${i}].values[${j}].question is required.`,
+          };
         }
         if (!String(clue.answer ?? "").trim()) {
-          return { ok: false, error: `${roundName}.categories[${i}].values[${j}].answer is required.` };
+          return {
+            ok: false,
+            error: `${roundName}.categories[${i}].values[${j}].answer is required.`,
+          };
         }
       }
     }
@@ -133,7 +150,10 @@ function validateBoard(board: BoardData): { ok: true } | { ok: false; error: str
     return { ok: false, error: "finalJeopardy.categories[0].category is required." };
   }
   if (!Array.isArray(fjCategory.values) || fjCategory.values.length < 1) {
-    return { ok: false, error: "finalJeopardy.categories[0].values must include at least one clue." };
+    return {
+      ok: false,
+      error: "finalJeopardy.categories[0].values must include at least one clue.",
+    };
   }
   const fjClue = fjCategory.values[0];
   if (!String(fjClue.question ?? "").trim()) {
@@ -244,33 +264,62 @@ export default function BoardCreator() {
             Build your own board JSON and paste it into lobby advanced settings.
           </p>
 
-          <div className="mt-6 grid gap-6 lg:grid-cols-2">
-            <div className="space-y-4">
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <p className="text-sm font-semibold text-slate-800">Template Rules</p>
-                <ul className="mt-2 list-disc pl-5 text-sm text-slate-700 space-y-1">
-                  <li>Jeopardy!: 5 categories, each with 5 clues.</li>
-                  <li>Double Jeopardy: 5 categories, each with 5 clues.</li>
-                  <li>Final Jeopardy: 1 category with at least 1 clue.</li>
-                </ul>
-              </div>
+          <div className="mt-6 space-y-4">
+            <div className="rounded-xl border border-slate-200 bg-white p-4">
+              <p className="text-sm font-semibold text-slate-800">Load Existing JSON</p>
+              <textarea
+                className="mt-2 h-40 w-full rounded-lg border border-slate-300 bg-white p-3 font-mono text-xs text-slate-900 placeholder:text-slate-400"
+                placeholder="Paste board JSON here..."
+                value={jsonInput}
+                onChange={(e) => setJsonInput(e.target.value)}
+              />
+              <button
+                onClick={loadFromJson}
+                className="mt-3 rounded-lg bg-slate-800 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-900"
+              >
+                Load Into Editor
+              </button>
+            </div>
 
-              <div className="rounded-xl border border-slate-200 bg-white p-4">
-                <p className="text-sm font-semibold text-slate-800">Load Existing JSON</p>
-                <textarea
-                  className="mt-2 h-40 w-full rounded-lg border border-slate-300 bg-white p-3 font-mono text-xs text-slate-900 placeholder:text-slate-400"
-                  placeholder="Paste board JSON here..."
-                  value={jsonInput}
-                  onChange={(e) => setJsonInput(e.target.value)}
-                />
+            <div className="rounded-xl border border-slate-200 bg-white p-4">
+              <div className="flex flex-wrap gap-2">
                 <button
-                  onClick={loadFromJson}
-                  className="mt-3 rounded-lg bg-slate-800 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-900"
+                  onClick={runValidation}
+                  className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
                 >
-                  Load Into Editor
+                  Validate
+                </button>
+                <button
+                  onClick={copyJson}
+                  className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700"
+                >
+                  Copy JSON
+                </button>
+                <button
+                  onClick={downloadJson}
+                  className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+                >
+                  Download JSON
+                </button>
+                <button
+                  onClick={() => {
+                    setBoard(makeTemplateBoard());
+                    setStatus("Reset to starter template.");
+                    setStatusError(false);
+                  }}
+                  className="rounded-lg bg-slate-700 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+                >
+                  Reset Template
                 </button>
               </div>
+              {status ? (
+                <p className={`mt-3 text-sm ${statusError ? "text-rose-700" : "text-emerald-700"}`}>
+                  {status}
+                </p>
+              ) : null}
+            </div>
 
+            <div className="grid gap-4 xl:grid-cols-2">
               {(["firstBoard", "secondBoard"] as const).map((roundKey) => (
                 <div key={roundKey} className="rounded-xl border border-slate-200 bg-white p-4">
                   <h2 className="text-lg font-semibold text-slate-900">
@@ -278,7 +327,10 @@ export default function BoardCreator() {
                   </h2>
                   <div className="mt-3 space-y-4">
                     {board[roundKey].categories.map((cat, catIndex) => (
-                      <div key={`${roundKey}-${catIndex}`} className="rounded-lg border border-slate-200 p-3">
+                      <div
+                        key={`${roundKey}-${catIndex}`}
+                        className="rounded-lg border border-slate-200 p-3"
+                      >
                         <input
                           className="w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm font-semibold text-slate-900 placeholder:text-slate-400"
                           value={cat.category}
@@ -286,27 +338,48 @@ export default function BoardCreator() {
                         />
                         <div className="mt-2 grid gap-2">
                           {cat.values.map((clue, clueIndex) => (
-                            <div key={`${roundKey}-${catIndex}-${clueIndex}`} className="grid gap-2 md:grid-cols-12">
+                            <div
+                              key={`${roundKey}-${catIndex}-${clueIndex}`}
+                              className="grid gap-2 md:grid-cols-12"
+                            >
                               <input
                                 type="number"
                                 className="rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 placeholder:text-slate-400 md:col-span-2"
                                 value={clue.value}
                                 onChange={(e) =>
-                                  setClueField(roundKey, catIndex, clueIndex, "value", e.target.value)
+                                  setClueField(
+                                    roundKey,
+                                    catIndex,
+                                    clueIndex,
+                                    "value",
+                                    e.target.value,
+                                  )
                                 }
                               />
                               <input
                                 className="rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 placeholder:text-slate-400 md:col-span-5"
                                 value={clue.question}
                                 onChange={(e) =>
-                                  setClueField(roundKey, catIndex, clueIndex, "question", e.target.value)
+                                  setClueField(
+                                    roundKey,
+                                    catIndex,
+                                    clueIndex,
+                                    "question",
+                                    e.target.value,
+                                  )
                                 }
                               />
                               <input
                                 className="rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 placeholder:text-slate-400 md:col-span-5"
                                 value={clue.answer}
                                 onChange={(e) =>
-                                  setClueField(roundKey, catIndex, clueIndex, "answer", e.target.value)
+                                  setClueField(
+                                    roundKey,
+                                    catIndex,
+                                    clueIndex,
+                                    "answer",
+                                    e.target.value,
+                                  )
                                 }
                               />
                             </div>
@@ -317,74 +390,25 @@ export default function BoardCreator() {
                   </div>
                 </div>
               ))}
-
-              <div className="rounded-xl border border-slate-200 bg-white p-4">
-                <h2 className="text-lg font-semibold text-slate-900">Final Jeopardy</h2>
-                <div className="mt-3 space-y-2">
-                  <input
-                    className="w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm font-semibold text-slate-900 placeholder:text-slate-400"
-                    value={board.finalJeopardy.categories[0].category}
-                    onChange={(e) => setRoundCategory("finalJeopardy", 0, e.target.value)}
-                  />
-                  <input
-                    className="w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 placeholder:text-slate-400"
-                    value={board.finalJeopardy.categories[0].values[0].question}
-                    onChange={(e) => setClueField("finalJeopardy", 0, 0, "question", e.target.value)}
-                  />
-                  <input
-                    className="w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 placeholder:text-slate-400"
-                    value={board.finalJeopardy.categories[0].values[0].answer}
-                    onChange={(e) => setClueField("finalJeopardy", 0, 0, "answer", e.target.value)}
-                  />
-                </div>
-              </div>
             </div>
 
-            <div className="space-y-4">
-              <div className="rounded-xl border border-slate-200 bg-white p-4">
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={runValidation}
-                    className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
-                  >
-                    Validate
-                  </button>
-                  <button
-                    onClick={copyJson}
-                    className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700"
-                  >
-                    Copy JSON
-                  </button>
-                  <button
-                    onClick={downloadJson}
-                    className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
-                  >
-                    Download JSON
-                  </button>
-                  <button
-                    onClick={() => {
-                      setBoard(makeTemplateBoard());
-                      setStatus("Reset to starter template.");
-                      setStatusError(false);
-                    }}
-                    className="rounded-lg bg-slate-700 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
-                  >
-                    Reset Template
-                  </button>
-                </div>
-                {status ? (
-                  <p className={`mt-3 text-sm ${statusError ? "text-rose-700" : "text-emerald-700"}`}>
-                    {status}
-                  </p>
-                ) : null}
-              </div>
-
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <p className="text-sm font-semibold text-slate-800">Generated JSON</p>
-                <textarea
-                  readOnly
-                  className="mt-2 h-[70vh] w-full rounded-lg border border-slate-300 bg-white p-3 font-mono text-xs text-slate-900"
-                  value={outputJson}
+            <div className="rounded-xl border border-slate-200 bg-white p-4">
+              <h2 className="text-lg font-semibold text-slate-900">Final Jeopardy</h2>
+              <div className="mt-3 space-y-2">
+                <input
+                  className="w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm font-semibold text-slate-900 placeholder:text-slate-400"
+                  value={board.finalJeopardy.categories[0].category}
+                  onChange={(e) => setRoundCategory("finalJeopardy", 0, e.target.value)}
+                />
+                <input
+                  className="w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 placeholder:text-slate-400"
+                  value={board.finalJeopardy.categories[0].values[0].question}
+                  onChange={(e) => setClueField("finalJeopardy", 0, 0, "question", e.target.value)}
+                />
+                <input
+                  className="w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 placeholder:text-slate-400"
+                  value={board.finalJeopardy.categories[0].values[0].answer}
+                  onChange={(e) => setClueField("finalJeopardy", 0, 0, "answer", e.target.value)}
                 />
               </div>
             </div>
