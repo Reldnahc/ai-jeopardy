@@ -177,6 +177,9 @@ export default function Game() {
         activeBoard={safeActiveBoard}
         handleScoreUpdate={handleScoreUpdate}
         markAllCluesComplete={markAllCluesComplete}
+        onSkipNextClue={() => {
+          sendJson({ type: "skip-next-clue", gameId });
+        }}
         onLeaveGame={leaveGame}
         selectorName={selectorName}
         micPermission={micPermission}

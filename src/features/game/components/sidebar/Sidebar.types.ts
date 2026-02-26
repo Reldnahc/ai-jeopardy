@@ -7,6 +7,7 @@ export interface SidebarProps {
   activeBoard: string;
   handleScoreUpdate: (player: string, delta: number) => void;
   markAllCluesComplete: () => void;
+  onSkipNextClue: () => void;
   buzzResult: string | null;
   narrationEnabled: boolean;
   onLeaveGame: () => void;

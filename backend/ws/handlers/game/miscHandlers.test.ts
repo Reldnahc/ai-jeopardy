@@ -46,6 +46,27 @@ function makeCtx(game: GameState, overrides: Record<string, unknown> = {}) {
 }
 
 describe("miscHandlers", () => {
+  it("skip-next-clue sets one-shot flag and broadcasts state", async () => {
+    const ws = makeWs();
+    const game = makeGame();
+    const ctx = makeCtx(game);
+
+    await miscHandlers["skip-next-clue"]({ ws, data: { gameId: "g1" }, ctx });
+
+    expect(game.skipNextClue).toBe(true);
+    expect(ctx.broadcast).toHaveBeenCalledWith("g1", { type: "skip-next-clue-set", enabled: true });
+  });
+
+  it("skip-next-clue no-ops for missing game", async () => {
+    const ws = makeWs();
+    const game = makeGame();
+    const ctx = makeCtx(game, { games: {} });
+
+    await miscHandlers["skip-next-clue"]({ ws, data: { gameId: "missing" }, ctx });
+
+    expect(ctx.broadcast).not.toHaveBeenCalled();
+  });
+
   it("dd-snipe-next no-ops for missing game", async () => {
     const ws = makeWs();
     const game = makeGame();

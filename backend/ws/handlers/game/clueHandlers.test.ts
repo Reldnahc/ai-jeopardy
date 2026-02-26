@@ -54,6 +54,7 @@ function makeCtx(game: GameState, overrides: Record<string, unknown> = {}) {
       doUnlockBuzzerAuthoritative: vi.fn(),
       getTtsDurationMs: vi.fn(async () => 0),
       sleepAndCheckGame: vi.fn(async () => true),
+      checkBoardTransition: vi.fn(() => true),
     },
     overrides,
   );
@@ -249,5 +250,33 @@ describe("clueHandlers", () => {
 
     expect(game.selectedClue?.category).toBeUndefined();
     expect(ctx.doUnlockBuzzerAuthoritative).toHaveBeenCalled();
+  });
+
+  it("consumes skip-next-clue by clearing the selected clue without narration or buzzer flow", async () => {
+    const ws = makeWs();
+    const game = makeGame({
+      skipNextClue: true,
+      boardData: {
+        ttsByClueKey: { "firstBoard:400:Q": "asset-1" },
+        dailyDoubleClueKeys: { firstBoard: [] },
+      },
+    });
+    const ctx = makeCtx(game);
+
+    await clueHandlers["clue-selected"]({
+      ws,
+      data: { gameId: "g1", clue: { value: 400, question: "Q", category: "Science" } },
+      ctx,
+    });
+
+    expect(game.skipNextClue).toBe(false);
+    expect(game.phase).toBe("board");
+    expect(game.selectedClue).toBeNull();
+    expect(game.clearedClues?.has("400-Q")).toBe(true);
+    expect(ctx.broadcast).toHaveBeenCalledWith("g1", { type: "clue-cleared", clueId: "400-Q" });
+    expect(ctx.aiHostVoiceSequence).not.toHaveBeenCalled();
+    expect(ctx.startDdWagerCapture).not.toHaveBeenCalled();
+    expect(ctx.doUnlockBuzzerAuthoritative).not.toHaveBeenCalled();
+    expect(ctx.checkBoardTransition).toHaveBeenCalledWith(game, "g1", ctx);
   });
 });

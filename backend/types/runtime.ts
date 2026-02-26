@@ -130,6 +130,7 @@ export type GameState = {
   finalVerdicts?: Record<string, string>;
   finalTranscripts?: Record<string, string>;
   ddSnipeNext?: boolean;
+  skipNextClue?: boolean;
   ddWagerSessionId?: string | null;
   ddWagerDeadlineAt?: number | null;
   dailyDouble?: {

@@ -11,6 +11,7 @@ interface SidebarBottomControlsProps {
   isAdmin: boolean;
   activeBoard: string;
   markAllCluesComplete: () => void;
+  onSkipNextClue: () => void;
   onToggleDailyDoubleSnipe: (enabled: boolean) => void;
   narrationEnabled: boolean;
   audioVolume: number;
@@ -25,6 +26,7 @@ const SidebarBottomControls: React.FC<SidebarBottomControlsProps> = ({
   isAdmin,
   activeBoard,
   markAllCluesComplete,
+  onSkipNextClue,
   onToggleDailyDoubleSnipe,
   narrationEnabled,
   audioVolume,
@@ -93,6 +95,13 @@ const SidebarBottomControls: React.FC<SidebarBottomControlsProps> = ({
             className="px-10 py-5 bg-red-700 text-white text-xl font-bold border-none rounded-lg cursor-pointer min-w-72 hover:bg-red-800"
           >
             Mark All Questions Complete
+          </button>
+
+          <button
+            onClick={onSkipNextClue}
+            className="px-10 py-4 bg-amber-600 text-white text-lg font-bold border-none rounded-lg cursor-pointer min-w-72 hover:bg-amber-700"
+          >
+            Skip Next Clue
           </button>
         </>
       )}

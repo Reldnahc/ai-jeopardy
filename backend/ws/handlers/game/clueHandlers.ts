@@ -17,6 +17,7 @@ type ClueHandlersCtx = CtxDeps<
   | "doUnlockBuzzerAuthoritative"
   | "getTtsDurationMs"
   | "sleepAndCheckGame"
+  | "checkBoardTransition"
 >;
 
 export const clueHandlers: Record<string, WsHandler> = {
@@ -91,10 +92,31 @@ export const clueHandlers: Record<string, WsHandler> = {
     const naturalDD = ddKeys.includes(clueKey) && !game.usedDailyDoubles?.has?.(clueKey);
     const snipedDD = Boolean(game.ddSnipeNext);
     const isDailyDouble = naturalDD || snipedDD;
+    const shouldSkip = Boolean(game.skipNextClue);
 
     if (snipedDD) {
       game.ddSnipeNext = false;
       hctx.broadcast(gameId, { type: "dd-snipe-consumed", clueKey });
+    }
+
+    if (shouldSkip) {
+      game.skipNextClue = false;
+      if (!game.clearedClues) game.clearedClues = new Set();
+
+      const clueId = `${clueObj.value}-${clueObj.question}`;
+      game.clearedClues.add(clueId);
+
+      game.selectedClue = null;
+      game.phase = "board";
+      game.clueState = null;
+      game.buzzed = null;
+      game.buzzerLocked = true;
+      game.buzzLockouts = {};
+
+      hctx.broadcast(gameId, { type: "clue-cleared", clueId });
+      hctx.broadcast(gameId, { type: "skip-next-clue-consumed", clueKey });
+      hctx.checkBoardTransition(game, gameId, ctx);
+      return;
     }
 
     game.phase = "clue";

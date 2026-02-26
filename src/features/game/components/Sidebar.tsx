@@ -15,6 +15,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   activeBoard,
   handleScoreUpdate,
   markAllCluesComplete,
+  onSkipNextClue,
   buzzResult,
   narrationEnabled,
   onLeaveGame,
@@ -130,6 +131,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         isAdmin={isAdmin}
         activeBoard={activeBoard}
         markAllCluesComplete={markAllCluesComplete}
+        onSkipNextClue={onSkipNextClue}
         onToggleDailyDoubleSnipe={onToggleDailyDoubleSnipe}
         narrationEnabled={narrationEnabled}
         audioVolume={audioVolume}

@@ -34,6 +34,16 @@ type MiscHandlersCtx = CtxDeps<
 >;
 
 export const miscHandlers: Record<string, WsHandler> = {
+  "skip-next-clue": async ({ data, ctx }) => {
+    const hctx = ctx as MiscHandlersCtx;
+    const { gameId } = (data || {}) as GameIdData;
+    const game = hctx.games?.[gameId] as GameState | undefined;
+    if (!game) return;
+
+    game.skipNextClue = true;
+    hctx.broadcast(gameId, { type: "skip-next-clue-set", enabled: true });
+  },
+
   "dd-snipe-next": async ({ data, ctx }) => {
     const hctx = ctx as MiscHandlersCtx;
     const { gameId, enabled } = (data || {}) as DdSnipeNextData;
