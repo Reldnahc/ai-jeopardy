@@ -20,6 +20,7 @@ import "./index.css";
 import Leaderboard from "./pages/Leaderboard.tsx";
 import UserStats from "./pages/UserStats.tsx";
 import ModelInfo from "./pages/ModelInfo.tsx";
+import BoardCreator from "./pages/BoardCreator.tsx";
 
 // Define the router configuration
 const router = createBrowserRouter([
@@ -91,6 +92,14 @@ const router = createBrowserRouter([
         element: (
           <Layout>
             <ModelInfo />
+          </Layout>
+        ),
+      },
+      {
+        path: "/board-creator",
+        element: (
+          <Layout>
+            <BoardCreator />
           </Layout>
         ),
       },
