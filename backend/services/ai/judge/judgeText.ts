@@ -9,6 +9,7 @@ export async function judgeClueAnswerFast(
   expectedAnswer: string,
   transcript: string,
   question: string,
+  category: string,
 ): Promise<JudgeTextResult> {
   const transcriptRaw = String(transcript || "");
   const expectedRaw = String(expectedAnswer || "");
@@ -33,6 +34,7 @@ export async function judgeClueAnswerFast(
     transcriptRaw,
     expectedRaw,
     question,
+    category,
     normT,
     normA,
     answerType,

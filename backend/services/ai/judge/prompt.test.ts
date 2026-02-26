@@ -7,6 +7,7 @@ describe("judge prompt builders", () => {
       transcriptRaw: "there's an exoplanet",
       expectedRaw: "what is an exoplanet",
       question: "This world orbits outside our solar system.",
+      category: "Space",
       normT: "an exoplanet",
       normA: "an exoplanet",
       answerType: "thing",
@@ -16,6 +17,7 @@ describe("judge prompt builders", () => {
     expect(prompt).toContain("SCORING INTENT (LENIENT)");
     expect(prompt).not.toContain("SCORING INTENT (STRICT)");
     expect(prompt).toContain("EXPECTED ANSWER TYPE: thing");
+    expect(prompt).toContain('CATEGORY: "Space"');
   });
 
   it("builds standard text-judge prompt with strict guidance", () => {
@@ -23,6 +25,7 @@ describe("judge prompt builders", () => {
       transcriptRaw: "mars",
       expectedRaw: "jupiter",
       question: "Largest planet in our solar system",
+      category: "Space",
       normT: "mars",
       normA: "jupiter",
       answerType: "place",
@@ -42,6 +45,7 @@ describe("judge prompt builders", () => {
       transcriptRaw: longTranscript,
       expectedRaw: longExpected,
       question: longClue,
+      category: "c".repeat(500),
       normT: "t",
       normA: "e",
       answerType: "title",
@@ -49,6 +53,7 @@ describe("judge prompt builders", () => {
     });
 
     expect(prompt).not.toContain("q".repeat(1300));
+    expect(prompt).not.toContain("c".repeat(220));
     expect(prompt).not.toContain("t".repeat(850));
     expect(prompt).not.toContain("e".repeat(850));
   });

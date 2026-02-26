@@ -5,12 +5,14 @@ export function buildJudgePrompt(args: {
   transcriptRaw: string;
   expectedRaw: string;
   question: string;
+  category: string;
   normT: string;
   normA: string;
   answerType: AnswerType;
   strictness: JudgeStrictness;
 }) {
-  const { transcriptRaw, expectedRaw, question, normT, normA, answerType, strictness } = args;
+  const { transcriptRaw, expectedRaw, question, category, normT, normA, answerType, strictness } =
+    args;
 
   const strictnessBlock =
     strictness === "lenient"
@@ -32,7 +34,7 @@ SCORING INTENT (STRICT):
   return `
 You are judging a Jeopardy-style player response.
 
-You MUST use the CLUE/QUESTION as context to interpret the player's intent and determine whether a shortened
+You MUST use CATEGORY and CLUE/QUESTION context to interpret the player's intent and determine whether a shortened
 or alternate form clearly refers to the same specific answer.
 
 Return STRICT JSON ONLY:
@@ -40,10 +42,10 @@ Return STRICT JSON ONLY:
 
 EXPECTED ANSWER TYPE: ${answerType}
 
-CLUE-AWARE EQUIVALENCE (IMPORTANT):
-- The clue/question provides context. If the player's response uniquely matches the intended answer given the clue,
+CONTEXT-AWARE EQUIVALENCE (IMPORTANT):
+- Category + clue/question provide context. If the player's response uniquely matches the intended answer given that context,
   accept even if it is abbreviated, shortened, or a common alias.
-- If the response could reasonably refer to multiple different things *given the clue*, treat it as ambiguous.
+- If the response could reasonably refer to multiple different things *given the category + clue context*, treat it as ambiguous.
 
 ACCEPTANCE RULES:
 - Ignore articles ("a", "an", "the"), punctuation, casing, and minor spelling differences.
@@ -74,13 +76,14 @@ VAGUE / GENERIC DISALLOWED:
 - Do not accept responses that do not identify an entity/value, or that could fit many different answers.
 
 AMBIGUITY HANDLING:
-- Use the clue context first to resolve ambiguity.
+- Use category and clue context first to resolve ambiguity.
 - If still ambiguous (plausibly could be something else), verdict depends on strictness:
   - LENIENT: accept only if the player's intent is still clearly pointing to the expected answer; otherwise incorrect.
   - STRICT: incorrect.
 
 ${strictnessBlock}
 
+CATEGORY: ${JSON.stringify(clampLen(category ?? "", 200))}
 CLUE/QUESTION: ${JSON.stringify(clampLen(question ?? "", 1200))}
 Player Input (raw): ${JSON.stringify(clampLen(transcriptRaw, 800))}
 Expected Answer (raw): ${JSON.stringify(clampLen(expectedRaw, 800))}

@@ -11,7 +11,7 @@ function makeGame(overrides: Partial<GameState> = {}): GameState {
   return {
     phase: "ANSWER_CAPTURE",
     players: [{ id: "ws-1", username: "alice", displayname: "Alice" }],
-    selectedClue: { value: "$400", question: "Capital of France?", answer: "Paris" },
+    selectedClue: { value: "$400", question: "Capital of France?", answer: "Paris", category: "Geography" },
     clueState: { clueKey: "firstBoard:400:Capital of France?" },
     answerSessionId: "sess-1",
     answeringPlayerUsername: "alice",
@@ -188,6 +188,12 @@ describe("answerHandlers", () => {
     expect(ctx.broadcast).toHaveBeenCalledWith(
       "g1",
       expect.objectContaining({ type: "answer-result", verdict: "correct", suggestedDelta: 400 }),
+    );
+    expect(ctx.judgeClueAnswerFast).toHaveBeenCalledWith(
+      "Paris",
+      "Paris",
+      "Capital of France?",
+      "Geography",
     );
     expect(ctx.autoResolveAfterJudgement).toHaveBeenCalledWith(ctx, "g1", game, "alice", "correct");
   });

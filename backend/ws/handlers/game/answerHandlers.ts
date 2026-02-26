@@ -228,8 +228,9 @@ export const answerHandlers: Record<string, WsHandler> = {
     let verdict: string;
     try {
       const expectedAnswer = String(game.selectedClue?.answer || "");
+      const category = String(game.selectedClue?.category || "");
       verdict = (
-        await hctx.judgeClueAnswerFast(expectedAnswer, transcript, game.selectedClue.question)
+        await hctx.judgeClueAnswerFast(expectedAnswer, transcript, game.selectedClue.question, category)
       ).verdict;
     } catch (e) {
       console.error("[answer-audio-blob] judge failed:", e?.message || e);
