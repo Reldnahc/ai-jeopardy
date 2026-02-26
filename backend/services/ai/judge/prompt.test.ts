@@ -68,4 +68,20 @@ describe("judge prompt builders", () => {
     expect(prompt).toContain("EXPECTED ANSWER TYPE: person");
     expect(prompt).toContain('Expected Answer (raw): "Alex Trebek"');
   });
+
+  it("handles missing category and question by falling back to empty strings", () => {
+    const prompt = buildJudgePrompt({
+      transcriptRaw: "mars",
+      expectedRaw: "jupiter",
+      question: undefined as unknown as string,
+      category: undefined as unknown as string,
+      normT: "mars",
+      normA: "jupiter",
+      answerType: "place",
+      strictness: "standard",
+    });
+
+    expect(prompt).toContain('CATEGORY: ""');
+    expect(prompt).toContain('CLUE/QUESTION: ""');
+  });
 });

@@ -10,6 +10,7 @@ describe("profile.search", () => {
     const pool = makePool();
     const repo = createProfileSearchRepo(pool as never);
 
+    expect(await repo.searchProfiles(undefined, 10)).toEqual([]);
     expect(await repo.searchProfiles("", 10)).toEqual([]);
     expect(await repo.searchProfiles("a", 10)).toEqual([]);
     expect(pool.query).not.toHaveBeenCalled();
@@ -29,5 +30,15 @@ describe("profile.search", () => {
     ]);
     expect(out).toEqual([{ username: "alice" }]);
   });
-});
 
+  it("uses fallback limit for non-finite values and normalizes null rows to []", async () => {
+    const pool = makePool();
+    pool.query.mockResolvedValueOnce({ rows: null });
+    const repo = createProfileSearchRepo(pool as never);
+
+    const out = await repo.searchProfiles("Ali", Number.NaN);
+
+    expect(pool.query).toHaveBeenCalledWith(expect.stringContaining("limit $3"), ["%Ali%", "Ali%", 5]);
+    expect(out).toEqual([]);
+  });
+});

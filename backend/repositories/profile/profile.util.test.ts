@@ -10,6 +10,6 @@ describe("profile.util", () => {
   it("normalizeEmail returns null for empty", () => {
     expect(normalizeEmail(" USER@EXAMPLE.COM ")).toBe("user@example.com");
     expect(normalizeEmail("   ")).toBeNull();
+    expect(normalizeEmail(null)).toBeNull();
   });
 });
-

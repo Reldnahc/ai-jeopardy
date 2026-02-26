@@ -43,6 +43,19 @@ describe("env config", () => {
     expect(mod.env.CORS_ORIGINS).toEqual(["https://a.com", "https://b.com"]);
   });
 
+  it("uses provided optional string env values", async () => {
+    process.env = {};
+    setRequiredBaseEnv();
+    process.env.KOKORO_URL = "http://kokoro.local";
+    process.env.WHISPER_URL = "http://whisper.local";
+    process.env.DEFAULT_MODEL = "gpt-custom";
+
+    const mod = await loadEnvModule();
+    expect(mod.env.KOKORO_URL).toBe("http://kokoro.local");
+    expect(mod.env.WHISPER_URL).toBe("http://whisper.local");
+    expect(mod.env.OPENAI_DEFAULT_MODEL).toBe("gpt-custom");
+  });
+
   it("throws when a required env variable is missing", async () => {
     process.env = {};
     process.env.OPENAI_API_KEY = "key";

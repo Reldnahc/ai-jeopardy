@@ -33,5 +33,15 @@ describe("profile.auth", () => {
     expect(pool.query).toHaveBeenCalledWith(expect.stringContaining("where p.username = $1"), ["alice"]);
     expect(out).toEqual({ username: "alice", password_hash: "h" });
   });
-});
 
+  it("returns null when query returns no rows", async () => {
+    const pool = makePool();
+    const repo = createProfileAuthRepo(pool as never);
+
+    pool.query.mockResolvedValueOnce({ rows: [] });
+    await expect(repo.insertProfile("x@y.com", "user", "User", "hash")).resolves.toBeNull();
+
+    pool.query.mockResolvedValueOnce({ rows: [] });
+    await expect(repo.getLoginRowByUsername("user")).resolves.toBeNull();
+  });
+});
