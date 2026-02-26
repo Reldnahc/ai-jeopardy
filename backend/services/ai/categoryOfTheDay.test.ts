@@ -29,7 +29,10 @@ describe("ai/categoryOfTheDay", () => {
       description: "A playful journey through unusual moments in space exploration.",
     });
 
-    const { createCategoryOfTheDay } = await import("./categoryOfTheDay.js");
+    const { __resetCategoryOfTheDayStateForTests, createCategoryOfTheDay } = await import(
+      "./categoryOfTheDay.js"
+    );
+    __resetCategoryOfTheDayStateForTests();
     const out = await createCategoryOfTheDay();
 
     expect(out.category).toBe("Space Oddities");
@@ -56,7 +59,10 @@ describe("ai/categoryOfTheDay", () => {
         description: "Untold stories and little-known events from around the world.",
       });
 
-    const { createCategoryOfTheDay } = await import("./categoryOfTheDay.js");
+    const { __resetCategoryOfTheDayStateForTests, createCategoryOfTheDay } = await import(
+      "./categoryOfTheDay.js"
+    );
+    __resetCategoryOfTheDayStateForTests();
 
     await createCategoryOfTheDay();
     const out = await createCategoryOfTheDay();
@@ -64,5 +70,36 @@ describe("ai/categoryOfTheDay", () => {
     expect(out.category).toBe("Hidden Histories");
     expect(callOpenAiJsonMock).toHaveBeenCalledTimes(3);
     expect(callOpenAiJsonMock.mock.calls[2]?.[1] as string).toContain("too similar to recent ones");
+  });
+
+  it("helper utilities cover shape, similarity, and prompt rendering", async () => {
+    const {
+      __resetCategoryOfTheDayStateForTests,
+      buildCategoryOfTheDayPrompt,
+      categoryShape,
+      isTooSimilarToRecent,
+      normalizeCategoryName,
+      pushRecentCategory,
+      pushRecentShape,
+    } = await import("./categoryOfTheDay.js");
+    __resetCategoryOfTheDayStateForTests();
+
+    expect(normalizeCategoryName("  Space  ")).toBe("space");
+    expect(categoryShape("One")).toBe("1w");
+    expect(categoryShape("Two Words")).toBe("2w");
+    expect(categoryShape("Three Word Name")).toBe("3w");
+    expect(categoryShape("A Four Word Name")).toBe("4w+");
+
+    pushRecentCategory("Whimsical Wonders");
+    pushRecentShape("2w");
+    expect(isTooSimilarToRecent("whimsical wonders")).toBe(true);
+    expect(isTooSimilarToRecent("Whimsical Wonder")).toBe(true);
+    expect(isTooSimilarToRecent("Hidden Histories")).toBe(false);
+
+    const prompt = buildCategoryOfTheDayPrompt();
+    expect(prompt).toContain("Recent categories to avoid:");
+    expect(prompt).toContain("- whimsical wonders");
+    expect(prompt).toContain("Recently-used category lengths");
+    expect(prompt).toContain("2w");
   });
 });

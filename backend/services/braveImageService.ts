@@ -77,7 +77,7 @@ type BraveImageApiItem = {
  * Ensures Brave API calls are rate-limited to 1 request / second across the whole Node process.
  * This queues concurrent callers behind a single shared chain.
  */
-async function braveRateLimit(trace?: TraceLike): Promise<void> {
+export async function braveRateLimit(trace?: TraceLike): Promise<void> {
   limiterChain = limiterChain.then(async () => {
     const now = Date.now();
     const waitMs = Math.max(0, nextAllowedAtMs - now);
@@ -90,14 +90,14 @@ async function braveRateLimit(trace?: TraceLike): Promise<void> {
   await limiterChain;
 }
 
-function requireBraveToken(): string {
+export function requireBraveToken(): string {
   // Centralized dotenv load happens in env.ts; no direct process.env access here
   const token = env.BRAVE_API_KEY;
   if (!token) throw new Error("Missing BRAVE_API_KEY env var.");
   return token;
 }
 
-async function braveImageSearch(
+export async function braveImageSearch(
   query: string,
   opts: { count?: number; trace?: TraceLike } = {},
 ): Promise<BraveRawResponse> {
@@ -139,7 +139,7 @@ async function braveImageSearch(
   return json;
 }
 
-function normalizeBraveResult(item: unknown): BraveCandidate | null {
+export function normalizeBraveResult(item: unknown): BraveCandidate | null {
   if (!item || typeof item !== "object") return null;
 
   if (typeof item !== "object") return null;
@@ -162,7 +162,7 @@ function normalizeBraveResult(item: unknown): BraveCandidate | null {
   return { imageUrl, sourceUrl, title, type, width, height };
 }
 
-function safeHost(u: unknown): string {
+export function safeHost(u: unknown): string {
   try {
     return new URL(String(u)).hostname.toLowerCase();
   } catch {
@@ -170,7 +170,7 @@ function safeHost(u: unknown): string {
   }
 }
 
-function urlExt(u: unknown): string {
+export function urlExt(u: unknown): string {
   try {
     const p = new URL(String(u)).pathname.toLowerCase();
     const m = p.match(/\.([a-z0-9]+)$/);
@@ -180,7 +180,7 @@ function urlExt(u: unknown): string {
   }
 }
 
-function domainScore(host: string): number {
+export function domainScore(host: string): number {
   if (!host) return 0;
   if (host.endsWith("wikimedia.org") || host.endsWith("wikipedia.org")) return 80;
 
@@ -224,7 +224,7 @@ function domainScore(host: string): number {
   return 0;
 }
 
-function scoreBraveCandidate(c: BraveCandidate, opts: { preferPhotos: boolean }): number {
+export function scoreBraveCandidate(c: BraveCandidate, opts: { preferPhotos: boolean }): number {
   const { preferPhotos } = opts;
   let score = 0;
 
@@ -368,4 +368,9 @@ export async function pickBraveImageForQueries(
 
   trace?.mark?.("brave_pick_none");
   return null;
+}
+
+export function __resetBraveRateLimiterForTests(): void {
+  nextAllowedAtMs = 0;
+  limiterChain = Promise.resolve();
 }

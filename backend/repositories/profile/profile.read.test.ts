@@ -34,6 +34,16 @@ describe("profile.read", () => {
     expect(pool.query).toHaveBeenNthCalledWith(2, expect.stringContaining("where p.username = $1"), ["alice"]);
   });
 
+  it("returns null when lookups find no rows", async () => {
+    const pool = makePool();
+    pool.query.mockResolvedValue({ rows: [] });
+    const repo = createProfileReadRepo(pool as never);
+
+    expect(await repo.getPublicUserById("u1")).toBeNull();
+    expect(await repo.getMeProfile("u1")).toBeNull();
+    expect(await repo.getIdByUsername("alice")).toBeNull();
+  });
+
   it("getPublicProfilesByUsernames dedupes, limits, and preserves order", async () => {
     const pool = makePool();
     pool.query.mockResolvedValueOnce({
@@ -52,5 +62,28 @@ describe("profile.read", () => {
       { username: "bob", x: 2 },
     ]);
   });
-});
 
+  it("getPublicProfilesByUsernames returns [] when normalized list is empty and clamps limits", async () => {
+    const pool = makePool();
+    const repo = createProfileReadRepo(pool as never);
+
+    const empty = await repo.getPublicProfilesByUsernames(["", "   ", null], { limit: -10 });
+    expect(empty).toEqual([]);
+    expect(pool.query).not.toHaveBeenCalled();
+
+    pool.query.mockResolvedValueOnce({ rows: [{ username: "a" }] });
+    await repo.getPublicProfilesByUsernames(["a", "b"], { limit: 9999 });
+    expect(pool.query).toHaveBeenCalledWith(expect.any(String), [["a", "b"]]);
+  });
+
+  it("getPublicProfilesByUsernames omits usernames missing from query result", async () => {
+    const pool = makePool();
+    pool.query.mockResolvedValueOnce({
+      rows: [{ username: "bob", y: 2 }],
+    });
+    const repo = createProfileReadRepo(pool as never);
+
+    const out = await repo.getPublicProfilesByUsernames(["alice", "bob", "carol"], { limit: 10 });
+    expect(out).toEqual([{ username: "bob", y: 2 }]);
+  });
+});

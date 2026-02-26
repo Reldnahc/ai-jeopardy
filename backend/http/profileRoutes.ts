@@ -8,25 +8,59 @@ import { normalizeRole, isBanned, rank, type LadderRole } from "../../shared/rol
 
 type ProfileRepos = Pick<Repos, "profiles" | "boards">;
 
-function normalizeUsername(u: unknown): string {
+export function normalizeUsername(u: unknown): string {
   return String(u ?? "")
     .trim()
     .toLowerCase();
 }
 
-function asRecord(v: unknown): Record<string, unknown> {
+export function asRecord(v: unknown): Record<string, unknown> {
   return typeof v === "object" && v !== null ? (v as Record<string, unknown>) : {};
 }
 
-function asTrimmedString(v: unknown): string {
+export function asTrimmedString(v: unknown): string {
   return String(v ?? "").trim();
+}
+
+export function clampFiniteNumber(
+  raw: unknown,
+  fallback: number,
+  min: number,
+  max: number,
+): number {
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(Math.max(parsed, min), max);
+}
+
+export function parseSearchLimit(raw: unknown): number {
+  return clampFiniteNumber(raw, 5, 1, 20);
+}
+
+export function parseBoardsLimit(raw: unknown): number {
+  return clampFiniteNumber(raw, 10, 1, 50);
+}
+
+export function parseBoardsOffset(raw: unknown): number {
+  return clampFiniteNumber(raw, 0, 0, Number.MAX_SAFE_INTEGER);
+}
+
+export function parseBatchUsernames(raw: unknown): string[] {
+  const list = Array.isArray(raw) ? raw : typeof raw === "string" ? raw.split(",") : [];
+  return list.map(normalizeUsername).filter(Boolean).slice(0, 50);
+}
+
+export function getAuthedUserId(req: Request): string | null {
+  const userIdRaw = req.user?.sub ?? req.user?.id ?? req.user?.userId;
+  if (!userIdRaw) return null;
+  return String(userIdRaw);
 }
 
 export function registerProfileRoutes(app: Application, repos: ProfileRepos) {
   // --- Me ------------------------------------------------------------
 
   app.get("/api/profile/me", requireAuth, async (req: Request, res: Response) => {
-    const userId = req.user?.sub ?? req.user?.id ?? req.user?.userId;
+    const userId = getAuthedUserId(req);
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
     try {
@@ -47,8 +81,7 @@ export function registerProfileRoutes(app: Application, repos: ProfileRepos) {
       const q = String(query.q ?? "").trim();
       if (!q) return res.json({ users: [] });
 
-      const limitRaw = Number(query.limit ?? 5);
-      const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 20) : 5;
+      const limit = parseSearchLimit(query.limit);
 
       const users = await repos.profiles.searchProfiles(q, limit);
       return res.json({ users });
@@ -67,11 +100,8 @@ export function registerProfileRoutes(app: Application, repos: ProfileRepos) {
 
       const query = req.query as Record<string, unknown>;
 
-      const limitRaw = Number(query.limit ?? 10);
-      const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 50) : 10;
-
-      const offsetRaw = Number(query.offset ?? 0);
-      const offset = Number.isFinite(offsetRaw) ? Math.max(offsetRaw, 0) : 0;
+      const limit = parseBoardsLimit(query.limit);
+      const offset = parseBoardsOffset(query.offset);
 
       const boards = await repos.boards.listBoardsByUsername(username, limit, offset);
       return res.json({ boards });
@@ -85,10 +115,8 @@ export function registerProfileRoutes(app: Application, repos: ProfileRepos) {
 
   app.patch("/api/profile/me", requireAuth, async (req: Request, res: Response) => {
     try {
-      const userIdRaw = req.user?.sub ?? req.user?.id ?? req.user?.userId;
-      if (!userIdRaw) return res.status(401).json({ error: "Unauthorized" });
-
-      const userId = String(userIdRaw);
+      const userId = getAuthedUserId(req);
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
       const body = asRecord(req.body);
 
       const patch: CustomizationPatch = {};
@@ -139,11 +167,7 @@ export function registerProfileRoutes(app: Application, repos: ProfileRepos) {
       // Accept either:
       // /api/profile/batch?u=alice&u=bob
       // /api/profile/batch?u=alice,bob
-      const raw = query.u;
-
-      const list = Array.isArray(raw) ? raw : typeof raw === "string" ? raw.split(",") : [];
-
-      const usernames = list.map(normalizeUsername).filter(Boolean).slice(0, 50); // safety cap
+      const usernames = parseBatchUsernames(query.u);
 
       if (usernames.length === 0) return res.json({ profiles: [] });
 
@@ -181,9 +205,8 @@ export function registerProfileRoutes(app: Application, repos: ProfileRepos) {
   //   - role: privileged+ (ladder roles), moderators+ (banned)
   app.patch("/api/profile/:username", requireAuth, async (req: Request, res: Response) => {
     try {
-      const actorIdRaw = req.user?.sub ?? req.user?.id ?? req.user?.userId;
-      if (!actorIdRaw) return res.status(401).json({ error: "Unauthorized" });
-      const actorId = String(actorIdRaw);
+      const actorId = getAuthedUserId(req);
+      if (!actorId) return res.status(401).json({ error: "Unauthorized" });
 
       const username = normalizeUsername(req.params.username);
       if (!username) return res.status(400).json({ error: "Missing username" });

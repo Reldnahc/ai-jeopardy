@@ -10,20 +10,20 @@ export type CategoryOfTheDay = {
 const RECENT_MAX = 40;
 const recent: string[] = [];
 
-function norm(s: string) {
+export function normalizeCategoryName(s: string) {
   return s.trim().toLowerCase();
 }
 
-function pushRecent(category: string) {
-  const n = norm(category);
+export function pushRecentCategory(category: string) {
+  const n = normalizeCategoryName(category);
   const idx = recent.indexOf(n);
   if (idx >= 0) recent.splice(idx, 1);
   recent.unshift(n);
   if (recent.length > RECENT_MAX) recent.pop();
 }
 
-// super simple “shape” heuristic (helps reduce same-y naming patterns)
-function categoryShape(category: string): string {
+// super simple "shape" heuristic (helps reduce same-y naming patterns)
+export function categoryShape(category: string): string {
   const words = category.trim().split(/\s+/);
   if (words.length === 1) return "1w";
   if (words.length === 2) return "2w";
@@ -35,44 +35,50 @@ function categoryShape(category: string): string {
 const recentShapes: string[] = [];
 const SHAPES_MAX = 12;
 
-function pushShape(shape: string) {
+export function pushRecentShape(shape: string) {
   recentShapes.unshift(shape);
   if (recentShapes.length > SHAPES_MAX) recentShapes.pop();
 }
 
-function isTooSimilar(candidate: string): boolean {
-  const c = norm(candidate);
-  if (recent.includes(c)) return true;
+export function isTooSimilarToRecent(
+  candidate: string,
+  recentCategories: string[] = recent,
+): boolean {
+  const c = normalizeCategoryName(candidate);
+  if (recentCategories.includes(c)) return true;
 
-  // basic “near repeat” check (substring overlap)
+  // basic "near repeat" check (substring overlap)
   // catches stuff like "Whimsical Wonder" vs "Whimsical Wonders"
-  for (const r of recent) {
+  for (const r of recentCategories) {
     if (r.includes(c) || c.includes(r)) return true;
   }
 
   return false;
 }
 
-async function generateOnce(): Promise<CategoryOfTheDay> {
-  const prompt = `
+export function buildCategoryOfTheDayPrompt(
+  recentCategories: string[] = recent,
+  recentCategoryShapes: string[] = recentShapes,
+): string {
+  return `
 Create a "Category of the Day" for a Jeopardy-style game.
 
 Hard rules:
 - Must be NEW: do not repeat or closely remix any recent categories listed below.
 - Keep it broadly playable (no super niche jargon).
-- Category: 2–5 words, Title Case.
-- Description: exactly 1 sentence, 8–16 words, fun and vivid.
+- Category: 2-5 words, Title Case.
+- Description: exactly 1 sentence, 8-16 words, fun and vivid.
 - No emojis. No quotes. Avoid colons in the category.
 
 Soft goals (do your best):
 - Increase variety in naming style: don't overuse the same vibe or word pattern day after day.
-- If a popular phrase happens to fit (e.g., "Whimsical Wonders"), it is allowed, but prefer something different unless it’s truly the best idea.
+- If a popular phrase happens to fit (e.g., "Whimsical Wonders"), it is allowed, but prefer something different unless it's truly the best idea.
 
 Recent categories to avoid:
-${recent.length ? recent.map((c) => `- ${c}`).join("\n") : "- (none yet)"}
+${recentCategories.length ? recentCategories.map((c) => `- ${c}`).join("\n") : "- (none yet)"}
 
 Recently-used category lengths (avoid repeating the same length again if possible):
-${recentShapes.length ? recentShapes.join(", ") : "(none yet)"}
+${recentCategoryShapes.length ? recentCategoryShapes.join(", ") : "(none yet)"}
 
 Return JSON only:
 {
@@ -80,6 +86,10 @@ Return JSON only:
   "description": "One sentence description."
 }
 `.trim();
+}
+
+async function generateOnce(): Promise<CategoryOfTheDay> {
+  const prompt = buildCategoryOfTheDayPrompt();
 
   const response = await callOpenAiJson(appConfig.ai.cotdModel, prompt, {});
 
@@ -91,7 +101,7 @@ export async function createCategoryOfTheDay(): Promise<CategoryOfTheDay> {
   let out = await generateOnce();
 
   // validate & retry once if too similar
-  if (isTooSimilar(out.category)) {
+  if (isTooSimilarToRecent(out.category)) {
     const prompt2 = `
 The previous category was too similar to recent ones.
 Generate a DIFFERENT category with a different wording and theme.
@@ -107,8 +117,13 @@ Return JSON only with the same schema.
   }
 
   // record
-  pushRecent(out.category);
-  pushShape(categoryShape(out.category));
+  pushRecentCategory(out.category);
+  pushRecentShape(categoryShape(out.category));
 
   return out;
+}
+
+export function __resetCategoryOfTheDayStateForTests() {
+  recent.length = 0;
+  recentShapes.length = 0;
 }

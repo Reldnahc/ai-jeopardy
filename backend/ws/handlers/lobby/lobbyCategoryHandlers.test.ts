@@ -171,6 +171,23 @@ describe("lobbyCategoryHandlers", () => {
     );
   });
 
+  it("randomize-category prefers pool candidates before generator fallback", async () => {
+    const ws = makeWs();
+    const game = makeGame({
+      categoryPool: ["A", "Pool Choice", "B"],
+    });
+    const ctx = makeCtx(game);
+
+    await lobbyCategoryHandlers["randomize-category"]({
+      ws,
+      data: { gameId: "g1", boardType: "firstBoard", index: 0 },
+      ctx,
+    });
+
+    expect(game.categories?.[0]).toBe("Pool Choice");
+    expect(getUniqueCategories).not.toHaveBeenCalled();
+  });
+
   it("randomize-category rejects when there is no unique candidate", async () => {
     const ws = makeWs();
     const game = makeGame();
@@ -187,6 +204,25 @@ describe("lobbyCategoryHandlers", () => {
       JSON.stringify({ type: "error", message: "No unique random category available." }),
     );
     expect(ctx.sendLobbySnapshot).toHaveBeenCalledWith(ws, "g1");
+  });
+
+  it("randomize-category handles generator errors and returns user-facing error", async () => {
+    const ws = makeWs();
+    const game = makeGame({ categoryPool: [] });
+    const ctx = makeCtx(game);
+    vi.mocked(getUniqueCategories).mockImplementation(() => {
+      throw new Error("boom");
+    });
+
+    await lobbyCategoryHandlers["randomize-category"]({
+      ws,
+      data: { gameId: "g1", boardType: "firstBoard", index: 0 },
+      ctx,
+    });
+
+    expect(ws.send).toHaveBeenCalledWith(
+      JSON.stringify({ type: "error", message: "No unique random category available." }),
+    );
   });
 
   it("update-category validates required gameId", async () => {
@@ -232,6 +268,21 @@ describe("lobbyCategoryHandlers", () => {
     });
 
     expect(ws.send).toHaveBeenCalledWith(expect.stringContaining("Invalid index"));
+    expect(ctx.sendLobbySnapshot).toHaveBeenCalledWith(ws, "g1");
+  });
+
+  it("update-category rejects out-of-range index and snapshots", async () => {
+    const ws = makeWs();
+    const game = makeGame();
+    const ctx = makeCtx(game);
+
+    await lobbyCategoryHandlers["update-category"]({
+      ws,
+      data: { gameId: "g1", boardType: "firstBoard", index: 8, value: "X" },
+      ctx,
+    });
+
+    expect(ws.send).toHaveBeenCalledWith(expect.stringContaining("Index out of range"));
     expect(ctx.sendLobbySnapshot).toHaveBeenCalledWith(ws, "g1");
   });
 
@@ -333,6 +384,22 @@ describe("lobbyCategoryHandlers", () => {
 
     expect(ws.send).toHaveBeenCalledWith(
       JSON.stringify({ type: "error", message: "Server error while updating category." }),
+    );
+  });
+
+  it("update-category errors when game does not exist", async () => {
+    const ws = makeWs();
+    const game = makeGame();
+    const ctx = makeCtx(game, { games: {} });
+
+    await lobbyCategoryHandlers["update-category"]({
+      ws,
+      data: { gameId: "missing", boardType: "firstBoard", index: 0, value: "X" },
+      ctx,
+    });
+
+    expect(ws.send).toHaveBeenCalledWith(
+      JSON.stringify({ type: "error", message: "Game missing not found." }),
     );
   });
 
@@ -441,6 +508,45 @@ describe("lobbyCategoryHandlers", () => {
 
     expect(ws.send).toHaveBeenCalledWith(expect.stringContaining("Category pool refresh is on cooldown."));
     expect(generateCategoryPoolFromOpenAi).not.toHaveBeenCalled();
+  });
+
+  it("refresh-category-pool blocks when host lock is enabled", async () => {
+    const ws = makeWs("default");
+    const game = makeGame({
+      inLobby: true,
+      lobbySettings: { categoryRefreshLocked: true, categoryPoolPrompt: "" } as never,
+    });
+    const ctx = makeCtx(game);
+
+    await lobbyCategoryHandlers["refresh-category-pool"]({
+      ws,
+      data: { gameId: "g1" },
+      ctx,
+    });
+
+    expect(ws.send).toHaveBeenCalledWith(
+      JSON.stringify({ type: "error", message: "Category refresh is locked by the host." }),
+    );
+  });
+
+  it("refresh-category-pool blocks when a refresh is already in progress", async () => {
+    const ws = makeWs("admin");
+    const game = makeGame({
+      inLobby: true,
+      categoryPoolGenerating: true,
+      lobbySettings: { categoryRefreshLocked: false, categoryPoolPrompt: "" } as never,
+    });
+    const ctx = makeCtx(game);
+
+    await lobbyCategoryHandlers["refresh-category-pool"]({
+      ws,
+      data: { gameId: "g1" },
+      ctx,
+    });
+
+    expect(ws.send).toHaveBeenCalledWith(
+      JSON.stringify({ type: "error", message: "Category pool refresh already in progress." }),
+    );
   });
 
   it("refresh-category-pool bypasses cooldown for privileged role and higher", async () => {

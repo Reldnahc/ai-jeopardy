@@ -28,7 +28,7 @@ type CommonsImageInfoResponse = {
   };
 };
 
-type CommonsImageInfo = {
+export type CommonsImageInfo = {
   title: string | null;
   downloadUrl: string | null;
   sourceUrl: string | null;
@@ -88,7 +88,12 @@ export async function commonsGetImageInfos(
   url.searchParams.set("titles", fileTitles.join("|"));
 
   const data = (await fetchJson(url.toString())) as CommonsImageInfoResponse;
+  return extractCommonsImageInfosFromResponse(data);
+}
 
+export function extractCommonsImageInfosFromResponse(
+  data: CommonsImageInfoResponse | null | undefined,
+): CommonsImageInfo[] {
   return Object.values(data?.query?.pages ?? {})
     .map((p: CommonsImageInfoResponse["query"]["pages"][string]) => {
       const ii = p?.imageinfo?.[0];
@@ -133,7 +138,7 @@ export function buildCommonsAttribution(meta: {
 
 // --- scoring helpers (prefer photo-like assets) ---
 
-function mimeScore(mime: string | null | undefined, preferPhotos: boolean) {
+export function mimeScore(mime: string | null | undefined, preferPhotos: boolean) {
   const m = String(mime ?? "").toLowerCase();
   if (m === "image/jpeg") return preferPhotos ? 80 : 60;
   if (m === "image/webp") return preferPhotos ? 75 : 55;
@@ -144,7 +149,7 @@ function mimeScore(mime: string | null | undefined, preferPhotos: boolean) {
   return -999;
 }
 
-function textPenalty(title: string | null | undefined, description: string | null | undefined) {
+export function textPenalty(title: string | null | undefined, description: string | null | undefined) {
   const t = `${title ?? ""} ${description ?? ""}`.toLowerCase();
 
   const bad = [
@@ -179,7 +184,7 @@ function textPenalty(title: string | null | undefined, description: string | nul
   return score;
 }
 
-function sizeScore(width: number | null | undefined, height: number | null | undefined) {
+export function sizeScore(width: number | null | undefined, height: number | null | undefined) {
   const w = typeof width === "number" ? width : 0;
   const h = typeof height === "number" ? height : 0;
   if (!w || !h) return 0;
@@ -198,13 +203,39 @@ function sizeScore(width: number | null | undefined, height: number | null | und
   return mpBoost + arBoost;
 }
 
-function scoreCommonsCandidate(info: CommonsImageInfo, { preferPhotos }: { preferPhotos: boolean }) {
+export function scoreCommonsCandidate(info: CommonsImageInfo, { preferPhotos }: { preferPhotos: boolean }) {
   let score = 0;
   score += mimeScore(info?.mime, preferPhotos);
   score += sizeScore(info?.width, info?.height);
   score += textPenalty(info?.title, info?.description);
   if (!info?.downloadUrl) score -= 999;
   return score;
+}
+
+export function isUsableCommonsImage(info: CommonsImageInfo, requireImageMime: boolean): boolean {
+  if (!info?.downloadUrl) return false;
+  if (!requireImageMime) return true;
+  return String(info.mime ?? "").startsWith("image/");
+}
+
+export function pickBestCommonsImage(
+  infos: CommonsImageInfo[],
+  opts: { requireImageMime: boolean; preferPhotos: boolean },
+): { best: CommonsImageInfo | null; bestScore: number } {
+  const imageInfos = infos.filter((x) => isUsableCommonsImage(x, opts.requireImageMime));
+  if (!imageInfos.length) return { best: null, bestScore: -Infinity };
+
+  let best: CommonsImageInfo | null = null;
+  let bestScore = -Infinity;
+  for (const info of imageInfos) {
+    const s = scoreCommonsCandidate(info, { preferPhotos: opts.preferPhotos });
+    if (s > bestScore) {
+      bestScore = s;
+      best = info;
+    }
+  }
+
+  return { best, bestScore };
 }
 
 export async function pickCommonsImageForQueries(
@@ -231,23 +262,9 @@ export async function pickCommonsImageForQueries(
     trace?.mark("commons_imageinfo_start", { q });
     const infos = await commonsGetImageInfos(titles, thumbWidth);
     trace?.mark("commons_imageinfo_end", { q, infos: infos.length });
-    const imageInfos = infos.filter((x: CommonsImageInfo) => {
-      if (!x?.downloadUrl) return false;
-      if (!requireImageMime) return true;
-      return String(x.mime ?? "").startsWith("image/");
-    });
+    const { best, bestScore } = pickBestCommonsImage(infos, { requireImageMime, preferPhotos });
 
-    if (!imageInfos.length) continue;
-
-    let best = null;
-    let bestScore = -Infinity;
-    for (const info of imageInfos) {
-      const s = scoreCommonsCandidate(info, { preferPhotos });
-      if (s > bestScore) {
-        bestScore = s;
-        best = info;
-      }
-    }
+    if (!best) continue;
 
     trace?.mark?.("commons_pick_scored", {
       q,
@@ -257,15 +274,13 @@ export async function pickCommonsImageForQueries(
       bestSize: best?.width && best?.height ? `${best.width}x${best.height}` : null,
     });
 
-    if (best) {
-      return {
-        downloadUrl: best.downloadUrl,
-        sourceUrl: best.sourceUrl,
-        license: best.license,
-        licenseUrl: best.licenseUrl,
-        attribution: buildCommonsAttribution(best),
-      };
-    }
+    return {
+      downloadUrl: best.downloadUrl,
+      sourceUrl: best.sourceUrl,
+      license: best.license,
+      licenseUrl: best.licenseUrl,
+      attribution: buildCommonsAttribution(best),
+    };
   }
   trace?.mark("commons_pick_none");
   return null;

@@ -28,6 +28,39 @@ type LobbyCategoryCtx = CtxDeps<
   "games" | "sendLobbySnapshot" | "broadcast" | "normalizeCategories11"
 >;
 
+type BoardType = "firstBoard" | "secondBoard" | "finalJeopardy";
+
+export function isBoardType(v: unknown): v is BoardType {
+  return v === "firstBoard" || v === "secondBoard" || v === "finalJeopardy";
+}
+
+export function parseBoardIndex(index: unknown): number | null {
+  const idx = Number(index);
+  if (!Number.isFinite(idx)) return null;
+  return idx;
+}
+
+export function isBoardIndexInRange(boardType: BoardType, index: number): boolean {
+  if (boardType === "finalJeopardy") return index === 0;
+  return index >= 0 && index <= 4;
+}
+
+export function toGlobalCategoryIndex(boardType: BoardType, index: number): number {
+  if (boardType === "firstBoard") return index;
+  if (boardType === "secondBoard") return 5 + index;
+  return 10;
+}
+
+export function isLockedCategory(
+  locked: GameState["lockedCategories"] | undefined,
+  boardType: BoardType,
+  index: number,
+): boolean {
+  if (!locked) return false;
+  if (boardType === "finalJeopardy") return Boolean(locked.finalJeopardy?.[0]);
+  return Boolean(locked[boardType]?.[index]);
+}
+
 export const lobbyCategoryHandlers: Record<string, WsHandler> = {
   "toggle-lock-category": async ({ data, ctx }) => {
     const hctx = ctx as LobbyCategoryCtx;
@@ -35,13 +68,10 @@ export const lobbyCategoryHandlers: Record<string, WsHandler> = {
     const game = hctx.games[gameId];
     if (!game) return;
 
-    const bt = boardType;
-    if (bt !== "firstBoard" && bt !== "secondBoard" && bt !== "finalJeopardy") return;
-
-    const idx = Number(index);
-    if (!Number.isFinite(idx)) return;
-    if ((bt === "firstBoard" || bt === "secondBoard") && (idx < 0 || idx > 4)) return;
-    if (bt === "finalJeopardy" && idx !== 0) return;
+    const bt = isBoardType(boardType) ? boardType : null;
+    if (!bt) return;
+    const idx = parseBoardIndex(index);
+    if (idx === null || !isBoardIndexInRange(bt, idx)) return;
 
     if (!game.lockedCategories) {
       game.lockedCategories = {
@@ -68,19 +98,13 @@ export const lobbyCategoryHandlers: Record<string, WsHandler> = {
     const game = hctx.games[gameId];
     if (!game) return;
 
-    const bt = boardType;
-    if (bt !== "firstBoard" && bt !== "secondBoard" && bt !== "finalJeopardy") return;
+    const bt = isBoardType(boardType) ? boardType : null;
+    if (!bt) return;
 
-    const idx = bt === "finalJeopardy" ? 0 : Number(index);
-    if (!Number.isFinite(idx)) return;
-    if ((bt === "firstBoard" || bt === "secondBoard") && (idx < 0 || idx > 4)) return;
+    const idx = bt === "finalJeopardy" ? 0 : parseBoardIndex(index);
+    if (idx === null || !isBoardIndexInRange(bt, idx)) return;
 
-    if ((bt === "firstBoard" || bt === "secondBoard") && game.lockedCategories?.[bt]?.[idx]) {
-      ws.send(JSON.stringify({ type: "error", message: "That category is locked." }));
-      hctx.sendLobbySnapshot(ws, gameId);
-      return;
-    }
-    if (bt === "finalJeopardy" && game.lockedCategories?.finalJeopardy?.[0]) {
+    if (isLockedCategory(game.lockedCategories, bt, idx)) {
       ws.send(JSON.stringify({ type: "error", message: "That category is locked." }));
       hctx.sendLobbySnapshot(ws, gameId);
       return;
@@ -88,10 +112,7 @@ export const lobbyCategoryHandlers: Record<string, WsHandler> = {
 
     game.categories = hctx.normalizeCategories11(game.categories);
 
-    let globalIndex: number;
-    if (bt === "firstBoard") globalIndex = idx;
-    else if (bt === "secondBoard") globalIndex = 5 + idx;
-    else globalIndex = 10;
+    const globalIndex = toGlobalCategoryIndex(bt, idx);
 
     const exclude = game.categories
       .map((c: unknown) => String(c ?? "").trim())
@@ -147,38 +168,33 @@ export const lobbyCategoryHandlers: Record<string, WsHandler> = {
         return;
       }
 
-      const bt = boardType;
-      if (bt !== "firstBoard" && bt !== "secondBoard" && bt !== "finalJeopardy") {
+      const bt = isBoardType(boardType) ? boardType : null;
+      if (!bt) {
         ws.send(JSON.stringify({ type: "error", message: `Invalid boardType: ${String(bt)}` }));
         hctx.sendLobbySnapshot(ws, gameId);
         return;
       }
 
-      const idx = bt === "finalJeopardy" ? 0 : Number(index);
-      if (!Number.isFinite(idx)) {
+      const idx = bt === "finalJeopardy" ? 0 : parseBoardIndex(index);
+      if (idx === null) {
         ws.send(JSON.stringify({ type: "error", message: `Invalid index: ${String(index)}` }));
         hctx.sendLobbySnapshot(ws, gameId);
         return;
       }
 
-      if ((bt === "firstBoard" || bt === "secondBoard") && (idx < 0 || idx > 4)) {
+      if (!isBoardIndexInRange(bt, idx)) {
         ws.send(JSON.stringify({ type: "error", message: `Index out of range for ${bt}.` }));
         hctx.sendLobbySnapshot(ws, gameId);
         return;
       }
 
-      if ((bt === "firstBoard" || bt === "secondBoard") && game.lockedCategories?.[bt]?.[idx]) {
-        ws.send(JSON.stringify({ type: "error", message: "That category is locked." }));
-        hctx.sendLobbySnapshot(ws, gameId);
-        return;
-      }
-      if (bt === "finalJeopardy" && game.lockedCategories?.finalJeopardy?.[0]) {
+      if (isLockedCategory(game.lockedCategories, bt, idx)) {
         ws.send(JSON.stringify({ type: "error", message: "That category is locked." }));
         hctx.sendLobbySnapshot(ws, gameId);
         return;
       }
 
-      const globalIndex = bt === "firstBoard" ? idx : bt === "secondBoard" ? 5 + idx : 10;
+      const globalIndex = toGlobalCategoryIndex(bt, idx);
 
       if (!Array.isArray(game.categories) || globalIndex < 0 || globalIndex > 10) {
         ws.send(
