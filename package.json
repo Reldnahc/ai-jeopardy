@@ -18,6 +18,8 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
     "preview": "vite preview",
     "predeploy": "npm run build:web",
     "deploy": "gh-pages -d dist --cname ai-jeopardy.com",
@@ -93,6 +95,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
+    "@playwright/test": "^1.58.2",
     "@types/bad-words": "^3.0.3",
     "@types/body-parser": "^1.19.6",
     "@types/cors": "^2.8.19",

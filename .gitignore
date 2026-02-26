@@ -12,6 +12,9 @@ dist
 dist-backend
 dist-ssr
 coverage
+playwright-report
+test-results
+blob-report
 *.local
 repomix-output.xml
 
