@@ -90,6 +90,8 @@ describe("stageTransition", () => {
       scores: { alice: 1000, bob: 800 },
       selectorKey: null,
       selectorName: null,
+      boardSelectionLocked: true,
+      boardSelectionLockVersion: 2,
       boardData: {
         firstBoard: { categories: [{ values: [{ value: 200, question: "Q1" }] }] },
       },
@@ -108,6 +110,13 @@ describe("stageTransition", () => {
       "g1",
       expect.objectContaining({ type: "transition-to-second-board" }),
     );
+    await vi.waitFor(() => {
+      expect(game.boardSelectionLocked).toBe(false);
+      expect(ctx.broadcast).toHaveBeenCalledWith(
+        "g1",
+        expect.objectContaining({ type: "board-selection-unlocked" }),
+      );
+    });
   });
 
   it("firstBoard->secondBoard keeps selector null when no players exist", async () => {

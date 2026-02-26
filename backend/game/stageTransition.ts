@@ -98,6 +98,15 @@ async function startDoubleJeopardy(game: GameState, gameId: string, ctx: StageTr
     selectorKey: game.selectorKey ?? null,
     selectorName: game.selectorName ?? null,
   });
+
+  if (game.boardSelectionLocked) {
+    game.boardSelectionLocked = false;
+    game.boardSelectionLockReason = null;
+    ctx.broadcast(gameId, {
+      type: "board-selection-unlocked",
+      lockVersion: game.boardSelectionLockVersion || 0,
+    });
+  }
 }
 
 function getExpectedFinalists(game: GameState): PlayerState[] {
