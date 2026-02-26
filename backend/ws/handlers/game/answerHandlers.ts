@@ -210,7 +210,9 @@ export const answerHandlers: Record<string, WsHandler> = {
 
       return ctx
         .autoResolveAfterJudgement(ctx, gameId, game, playerUsername, "incorrect")
-        .catch((err: unknown) => console.error("[answer-audio-blob-error] autoResolve failed:", err));
+        .catch((err: unknown) =>
+          console.error("[answer-audio-blob-error] autoResolve failed:", err),
+        );
     }
 
     hctx.broadcast(gameId, {
@@ -223,11 +225,12 @@ export const answerHandlers: Record<string, WsHandler> = {
       isFinal: true,
     });
 
-    let verdict;
+    let verdict: string;
     try {
       const expectedAnswer = String(game.selectedClue?.answer || "");
-      verdict = (await hctx.judgeClueAnswerFast(expectedAnswer, transcript, game.selectedClue.question))
-        .verdict;
+      verdict = (
+        await hctx.judgeClueAnswerFast(expectedAnswer, transcript, game.selectedClue.question)
+      ).verdict;
     } catch (e) {
       console.error("[answer-audio-blob] judge failed:", e?.message || e);
       verdict = "incorrect";
