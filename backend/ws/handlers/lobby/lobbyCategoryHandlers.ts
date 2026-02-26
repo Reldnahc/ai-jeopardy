@@ -1,5 +1,6 @@
 import type { CtxDeps } from "../../context.types.js";
 import type { WsHandler } from "../types.js";
+import type { GameState } from "../../../types/runtime.js";
 import { getUniqueCategories } from "../../../services/categories/getUniqueCategories.js";
 import { shuffle, normalizeCategory } from "../../../services/categories/categoryUtils.js";
 import { generateCategoryPoolFromOpenAi } from "../../../services/ai/categoryPool.js";

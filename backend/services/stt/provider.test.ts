@@ -41,14 +41,14 @@ describe("stt/provider", () => {
     const out = getSttProvider("whisper");
 
     expect(WhisperCtor).toHaveBeenCalledWith("http://whisper.local");
-    expect((out as Record<string, unknown>).kind).toBe("whisper");
+    expect((out as unknown as { kind: string }).kind).toBe("whisper");
   });
 
   it("falls back to openai when whisper is requested but WHISPER_URL is missing", () => {
     const out = getSttProvider("whisper");
 
     expect(OpenAiCtor).toHaveBeenCalledTimes(1);
-    expect((out as Record<string, unknown>).kind).toBe("openai");
+    expect((out as unknown as { kind: string }).kind).toBe("openai");
   });
 
   it("returns openai provider for explicit openai", () => {
@@ -58,6 +58,6 @@ describe("stt/provider", () => {
 
     expect(OpenAiCtor).toHaveBeenCalledTimes(1);
     expect(WhisperCtor).not.toHaveBeenCalled();
-    expect((out as Record<string, unknown>).kind).toBe("openai");
+    expect((out as unknown as { kind: string }).kind).toBe("openai");
   });
 });
