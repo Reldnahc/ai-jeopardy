@@ -34,6 +34,11 @@ describe("PermissionManager", () => {
     }
   });
 
+  it("require() returns without throwing when allowed", () => {
+    const pm = new PermissionManager();
+    expect(() => pm.require(makeWs("default"), "game:create")).not.toThrow();
+  });
+
   it("guard() emits an error payload when forbidden", () => {
     const pm = new PermissionManager();
     const ws = makeWs("default");
@@ -41,6 +46,13 @@ describe("PermissionManager", () => {
     expect(ws.send).toHaveBeenCalledWith(
       JSON.stringify({ type: "error", code: "forbidden", perm: "admin:panel" }),
     );
+  });
+
+  it("guard() returns true and does not send when allowed", () => {
+    const pm = new PermissionManager();
+    const ws = makeWs("default");
+    expect(pm.guard(ws, "game:create")).toBe(true);
+    expect(ws.send).not.toHaveBeenCalled();
   });
 
   it("uses custom rule when configured", () => {
