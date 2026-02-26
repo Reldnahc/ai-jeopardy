@@ -26,5 +26,13 @@ describe("hostGuard", () => {
     expect(requireHost(null as never, { id: "x" } as never)).toBeNull();
     expect(requireHost(undefined as never, { id: "x" } as never)).toBeUndefined();
   });
-});
 
+  it("requireHost evaluates host check when game exists", () => {
+    const game = {
+      host: "alice",
+      players: [{ username: "alice", id: "sock-a" }],
+    };
+    expect(requireHost(game as never, { id: "sock-a" } as never)).toBe(true);
+    expect(requireHost(game as never, { id: "sock-z" } as never)).toBe(false);
+  });
+});
