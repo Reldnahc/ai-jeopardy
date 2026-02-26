@@ -18,7 +18,7 @@ export const models: Model[] = [
     label: "GPT-4o Mini",
     provider: "openai",
     strengths: ["Stable general performance", "Good concise writing", "Predictable behavior"],
-    bestFor: "Everyday lobby/game generation when you want dependable outputs",
+    bestFor: "Everyday generation when you want dependable outputs",
     price: 0,
   },
   {
