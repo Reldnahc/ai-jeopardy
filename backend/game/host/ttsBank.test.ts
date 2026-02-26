@@ -28,6 +28,22 @@ function makeCtx(overrides: Partial<Ctx> = {}) {
 }
 
 describe("ttsBank", () => {
+  it("ensureAiHostValueTts initializes bank when missing", async () => {
+    const game = {
+      lobbySettings: { narrationEnabled: true },
+      boardData: {
+        firstBoard: { categories: [{ values: [{ value: 200 }] }] },
+        secondBoard: { categories: [] },
+      },
+    } as unknown as Game;
+    const { ctx } = makeCtx();
+
+    await ensureAiHostValueTts({ ctx, game });
+
+    expect(game.aiHostTts).toBeTruthy();
+    expect(game.aiHostTts?.valueAssetsByValue?.["200"]).toBe("asset-1");
+  });
+
   it("ensureAiHostTtsBank returns early when bank already exists", async () => {
     const game = {
       lobbySettings: { narrationEnabled: true },
@@ -38,6 +54,23 @@ describe("ttsBank", () => {
     await ensureAiHostTtsBank({ ctx, game });
 
     expect(ctx.ensureTtsAsset).not.toHaveBeenCalled();
+  });
+
+  it("ensureAiHostTtsBank sets empty bank and returns when narration is disabled", async () => {
+    const game = {
+      lobbySettings: { narrationEnabled: false },
+    } as unknown as Game;
+    const { ctx } = makeCtx();
+
+    await ensureAiHostTtsBank({ ctx, game });
+
+    expect(ctx.ensureTtsAsset).not.toHaveBeenCalled();
+    expect(game.aiHostTts).toEqual(
+      expect.objectContaining({
+        allAssetIds: [],
+        slotAssets: {},
+      }),
+    );
   });
 
   it("ensureAiHostTtsBank builds slot/name/category assets and marks trace", async () => {

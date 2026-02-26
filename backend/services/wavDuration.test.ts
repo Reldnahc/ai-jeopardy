@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { estimateWavDurationMsFromHeaderBytes } from "./wavDuration.js";
 
 function makeMonoPcm16Wav(sampleRate: number, toneMs: number, silenceTailMs: number): Buffer {
@@ -34,6 +34,15 @@ function makeMonoPcm16Wav(sampleRate: number, toneMs: number, silenceTailMs: num
 }
 
 describe("wavDuration", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("returns null for null and short buffers", () => {
+    expect(estimateWavDurationMsFromHeaderBytes(null)).toBeNull();
+    expect(estimateWavDurationMsFromHeaderBytes(Buffer.alloc(10))).toBeNull();
+  });
+
   it("trims trailing PCM silence from full wav bytes", () => {
     const wav = makeMonoPcm16Wav(16_000, 1000, 350);
     const ms = estimateWavDurationMsFromHeaderBytes(wav);
@@ -49,5 +58,52 @@ describe("wavDuration", () => {
     const ms = estimateWavDurationMsFromHeaderBytes(headerOnly);
 
     expect(ms).toBe(1350);
+  });
+
+  it("accepts Uint8Array input", () => {
+    const wav = makeMonoPcm16Wav(16_000, 1000, 0);
+    const ms = estimateWavDurationMsFromHeaderBytes(new Uint8Array(wav));
+    expect(ms).toBe(1000);
+  });
+
+  it("returns null for malformed headers/chunks", () => {
+    const wav = makeMonoPcm16Wav(16_000, 1000, 0);
+
+    const badRiff = Buffer.from(wav);
+    badRiff.write("NOPE", 0, "ascii");
+    expect(estimateWavDurationMsFromHeaderBytes(badRiff)).toBeNull();
+
+    const badWave = Buffer.from(wav);
+    badWave.write("NOPE", 8, "ascii");
+    expect(estimateWavDurationMsFromHeaderBytes(badWave)).toBeNull();
+
+    const badFmtSize = Buffer.from(wav);
+    badFmtSize.writeUInt32LE(12, 16);
+    expect(estimateWavDurationMsFromHeaderBytes(badFmtSize)).toBeNull();
+
+    const noDataChunk = Buffer.from(wav);
+    noDataChunk.write("JUNK", 36, "ascii");
+    expect(estimateWavDurationMsFromHeaderBytes(noDataChunk)).toBeNull();
+  });
+
+  it("returns untrimmed size for non-PCM16 or out-of-bounds data", () => {
+    const wav = makeMonoPcm16Wav(16_000, 1000, 350);
+
+    const floatLike = Buffer.from(wav);
+    floatLike.writeUInt16LE(3, 20); // non-PCM format
+    expect(estimateWavDurationMsFromHeaderBytes(floatLike)).toBe(1350);
+
+    const dataOutOfBounds = Buffer.from(wav);
+    dataOutOfBounds.writeUInt32LE(10_000_000, 40); // data size beyond bytes length
+    expect(estimateWavDurationMsFromHeaderBytes(dataOutOfBounds)).toBe(60_000);
+  });
+
+  it("handles zero data frames and duration finite guard", () => {
+    const wav = makeMonoPcm16Wav(16_000, 1000, 0);
+    wav.writeUInt32LE(0, 40); // zero data size
+    expect(estimateWavDurationMsFromHeaderBytes(wav)).toBe(0);
+
+    vi.spyOn(Number, "isFinite").mockReturnValue(false);
+    expect(estimateWavDurationMsFromHeaderBytes(makeMonoPcm16Wav(16_000, 1000, 0))).toBeNull();
   });
 });

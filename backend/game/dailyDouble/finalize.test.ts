@@ -135,4 +135,78 @@ describe("dailyDouble finalize", () => {
     cb?.();
     expect((ctx.broadcast as ReturnType<typeof vi.fn>).mock.calls.length).toBe(callsBefore);
   });
+
+  it("handles null args, zero wager, existing used set, and missing tts asset fallback", async () => {
+    const game = buildGame({
+      usedDailyDoubles: new Set(["already-used"]),
+      boardData: { ttsByClueKey: {} },
+    });
+    const { ctx } = buildCtx(game);
+
+    await finalizeDailyDoubleWagerAndStartClue("g1", game, ctx, null);
+    expect(game.dailyDouble?.wager).toBe(0);
+    expect(game.usedDailyDoubles?.has("already-used")).toBe(true);
+    expect(game.usedDailyDoubles?.has("firstBoard:400:Q")).toBe(true);
+    expect(ctx.repos.profiles.incrementTrueDailyDoubles).not.toHaveBeenCalled();
+    expect(ctx.aiHostVoiceSequence).toHaveBeenCalledWith(
+      ctx,
+      "g1",
+      game,
+      expect.arrayContaining([expect.objectContaining({ assetId: null })]),
+    );
+  });
+
+  it("timeout callback covers guard-return branches and logs auto-resolve failures", async () => {
+    const game = buildGame();
+    const autoResolveAfterJudgement = vi.fn(async () => {
+      throw new Error("boom");
+    });
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { ctx, getTimeoutCb } = buildCtx(game, { autoResolveAfterJudgement });
+
+    await finalizeDailyDoubleWagerAndStartClue("g1", game, ctx, { wager: 600 });
+    const cb = getTimeoutCb();
+    expect(cb).toBeTypeOf("function");
+
+    const callsBefore = (ctx.broadcast as ReturnType<typeof vi.fn>).mock.calls.length;
+    if (ctx.games) {
+      const sessionId = game.answerSessionId;
+      const answeringKey = game.answeringPlayerKey;
+
+      delete ctx.games.g1; // !g
+      cb?.();
+      expect((ctx.broadcast as ReturnType<typeof vi.fn>).mock.calls.length).toBe(callsBefore);
+
+      ctx.games.g1 = { ...game, answerSessionId: null } as never; // !g.answerSessionId
+      cb?.();
+      expect((ctx.broadcast as ReturnType<typeof vi.fn>).mock.calls.length).toBe(callsBefore);
+
+      ctx.games.g1 = { ...game, answerSessionId: `${sessionId}-other` } as never; // mismatched session
+      cb?.();
+      expect((ctx.broadcast as ReturnType<typeof vi.fn>).mock.calls.length).toBe(callsBefore);
+
+      ctx.games.g1 = {
+        ...game,
+        answerSessionId: sessionId,
+        answeringPlayerKey: `${answeringKey}-other`,
+      } as never; // mismatched answering player
+      cb?.();
+      expect((ctx.broadcast as ReturnType<typeof vi.fn>).mock.calls.length).toBe(callsBefore);
+
+      ctx.games.g1 = {
+        ...game,
+        answerSessionId: sessionId,
+        answeringPlayerKey: answeringKey,
+        selectedClue: null,
+      } as never; // missing selected clue
+      cb?.();
+      expect((ctx.broadcast as ReturnType<typeof vi.fn>).mock.calls.length).toBe(callsBefore);
+
+      ctx.games.g1 = game as never; // valid state
+    }
+
+    cb?.();
+    await Promise.resolve();
+    expect(errorSpy).toHaveBeenCalledWith("[dd-answer-timeout] autoResolve failed:", expect.any(Error));
+  });
 });
