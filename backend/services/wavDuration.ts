@@ -13,8 +13,6 @@ type ParsedWav = {
 };
 
 function parseWav(bytes: Buffer): ParsedWav | null {
-  if (bytes.length < 44) return null;
-
   // "RIFF"
   if (
     bytes[0] !== 0x52 || // R
@@ -83,8 +81,6 @@ function trimTrailingSilencePcm16(bytes: Buffer, wav: ParsedWav): number {
 
   const bytesPerSample = wav.bitsPerSample / 8;
   const frameBytes = wav.channels * bytesPerSample;
-  if (!frameBytes) return wav.dataSize;
-
   const totalFrames = Math.floor(wav.dataSize / frameBytes);
   if (!totalFrames) return wav.dataSize;
 
@@ -120,8 +116,6 @@ export function estimateWavDurationMsFromHeaderBytes(
   if (!wav) return null;
 
   const bytesPerSecond = wav.sampleRate * wav.channels * (wav.bitsPerSample / 8);
-  if (!bytesPerSecond) return null;
-
   const trimmedDataSize = trimTrailingSilencePcm16(bytes, wav);
   const durationMs = Math.round((trimmedDataSize / bytesPerSecond) * 1000);
 
