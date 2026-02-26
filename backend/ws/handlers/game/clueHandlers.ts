@@ -1,5 +1,6 @@
 import type { CtxDeps } from "../../context.types.js";
 import type { WsHandler } from "../types.js";
+import { shouldIncrementStats } from "../../../game/statsGate.js";
 
 type ClueSelectedData = { gameId: string; clue?: Record<string, unknown> };
 type ClueHandlersCtx = CtxDeps<
@@ -72,7 +73,9 @@ export const clueHandlers: Record<string, WsHandler> = {
     }
 
     hctx.cancelAutoUnlock(game);
-    hctx.fireAndForget(hctx.repos.profiles.incrementCluesSelected(callerStable), "Increment Clues");
+    if (shouldIncrementStats(game)) {
+      hctx.fireAndForget(hctx.repos.profiles.incrementCluesSelected(callerStable), "Increment Clues");
+    }
 
     const category =
       String(clueObj.category ?? "").trim() || hctx.findCategoryForClue(game, clueObj);
@@ -144,10 +147,12 @@ export const clueHandlers: Record<string, WsHandler> = {
       const playerUsername = norm(game.selectorKey);
       const playerDisplayname = String(game.selectorName ?? "").trim() || playerUsername;
 
-      hctx.fireAndForget(
-        hctx.repos.profiles.incrementDailyDoubleFound(playerUsername),
-        "Increment Daily Double found",
-      );
+      if (shouldIncrementStats(game)) {
+        hctx.fireAndForget(
+          hctx.repos.profiles.incrementDailyDoubleFound(playerUsername),
+          "Increment Daily Double found",
+        );
+      }
 
       const maxWager = hctx.computeDailyDoubleMaxWager(game, boardKey, playerUsername);
 

@@ -1,5 +1,6 @@
 import type { GameState, PlayerState } from "../../types/runtime.js";
 import type { CtxDeps } from "../../ws/context.types.js";
+import { shouldIncrementStats } from "../statsGate.js";
 
 export type FinalHelpersCtx = CtxDeps<"fireAndForget" | "repos">;
 
@@ -37,6 +38,7 @@ export function applyFinalJeopardyScoring(game: GameState, finalists: string[], 
   const wagers = game.wagers || {};
   const scores = game.scores || {};
   const finalistSet = new Set(finalists);
+  const allowStats = shouldIncrementStats(game);
 
   for (const player of game.players || []) {
     const username = player.username;
@@ -47,10 +49,12 @@ export function applyFinalJeopardyScoring(game: GameState, finalists: string[], 
 
     if (verdicts[username] === "correct") {
       scores[username] = score + wager;
-      ctx.fireAndForget(
-        ctx.repos.profiles.incrementFinalJeopardyCorrects(username),
-        "Increment FJ correct",
-      );
+      if (allowStats) {
+        ctx.fireAndForget(
+          ctx.repos.profiles.incrementFinalJeopardyCorrects(username),
+          "Increment FJ correct",
+        );
+      }
     } else {
       scores[username] = score - wager;
     }

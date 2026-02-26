@@ -1,6 +1,7 @@
 import type { GameState, PlayerState } from "../../../types/runtime.js";
 import type { CtxDeps } from "../../context.types.js";
 import type { WsHandler } from "../types.js";
+import { shouldIncrementStats } from "../../../game/statsGate.js";
 
 type BuzzData = { gameId: string; estimatedServerBuzzAtMs?: number; clientSeq?: number };
 
@@ -37,7 +38,10 @@ export const buzzHandlers: Record<string, WsHandler> = {
       return;
     }
 
-    hctx.fireAndForget(hctx.repos.profiles.incrementTotalBuzzes(stable), "Increment total buzzes");
+    const allowStats = shouldIncrementStats(game);
+    if (allowStats) {
+      hctx.fireAndForget(hctx.repos.profiles.incrementTotalBuzzes(stable), "Increment total buzzes");
+    }
 
     if (!game.buzzLockouts) game.buzzLockouts = {};
 
@@ -122,10 +126,12 @@ export const buzzHandlers: Record<string, WsHandler> = {
         if (!winner?.playerUsername) return;
 
         g.buzzed = winner.playerUsername;
-        hctx.fireAndForget(
-          hctx.repos.profiles.incrementTimesBuzzed(winner.playerUsername),
-          "Increment buzzes won",
-        );
+        if (allowStats) {
+          hctx.fireAndForget(
+            hctx.repos.profiles.incrementTimesBuzzed(winner.playerUsername),
+            "Increment buzzes won",
+          );
+        }
 
         hctx.broadcast(gameId, {
           type: "buzz-result",

@@ -62,6 +62,7 @@ export type GameState = {
     [key: string]: unknown;
   } | null;
   activeBoard?: string;
+  isImportedBoardGame?: boolean;
   selectedClue?: BoardClue | null;
   clearedClues?: Set<string>;
   buzzed?: string | null;

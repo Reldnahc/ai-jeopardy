@@ -1,5 +1,6 @@
 import type { PlayerState } from "../../../types/runtime.js";
 import type { WsHandler } from "../types.js";
+import { shouldIncrementStats } from "../../../game/statsGate.js";
 
 type GameIdData = { gameId: string };
 type PreloadDoneData = { gameId: string; username?: string; token?: number; playerKey?: string };
@@ -107,7 +108,7 @@ export const lobbyStartHandlers: Record<string, WsHandler> = {
       return;
     }
 
-    ctx.applyNewGameState({ game, boardData, timeToBuzz, timeToAnswer });
+    ctx.applyNewGameState({ game, boardData, timeToBuzz, timeToAnswer, usingImportedBoard });
 
     void (async () => {
       try {
@@ -254,11 +255,14 @@ export const lobbyStartHandlers: Record<string, WsHandler> = {
     const selectorName = String(game.selectorName ?? "").trim();
 
     if (selectorName) {
+      const allowStats = shouldIncrementStats(game);
       for (const player of game.players) {
-        ctx.fireAndForget(
-          ctx.repos.profiles.incrementGamesPlayed(player.username),
-          "update games played",
-        );
+        if (allowStats) {
+          ctx.fireAndForget(
+            ctx.repos.profiles.incrementGamesPlayed(player.username),
+            "update games played",
+          );
+        }
       }
 
       game.phase = "welcome";

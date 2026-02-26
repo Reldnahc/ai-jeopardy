@@ -1,6 +1,7 @@
 import type { GameState } from "../../types/runtime.js";
 import type { CtxDeps } from "../../ws/context.types.js";
 import type { ResolverCtx } from "../gameLogic/resolver.js";
+import { shouldIncrementStats } from "../statsGate.js";
 
 export type DailyDoubleFinalizeCtx = ResolverCtx &
   CtxDeps<"clearDdWagerTimer" | "startAnswerWindow" | "games" | "parseClueValue" | "autoResolveAfterJudgement">;
@@ -25,7 +26,7 @@ export async function finalizeDailyDoubleWagerAndStartClue(
   dd.wager = Number(wager || 0);
   dd.stage = "clue";
 
-  if (dd.wager === dd.maxWager) {
+  if (dd.wager === dd.maxWager && shouldIncrementStats(game)) {
     ctx.fireAndForget(
       ctx.repos.profiles.incrementTrueDailyDoubles(dd.playerUsername),
       "Increment true Daily Double",

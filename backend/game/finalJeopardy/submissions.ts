@@ -2,6 +2,7 @@ import type { GameState } from "../../types/runtime.js";
 import type { CtxDeps } from "../../ws/context.types.js";
 import { parseFinalWagerImage } from "../../services/ai/judge/wagerImage.js";
 import type { HostTtsCtx } from "../host/ttsBank.js";
+import { shouldIncrementStats } from "../statsGate.js";
 import { ensureFinalResponseStores, getFinalistUsernames, normalizeFinalWager } from "./helpers.js";
 import { checkAllDrawingsSubmitted, checkAllWagersSubmitted } from "./phases.js";
 import type { FinalJeopardyPhasesCtx } from "./phases.js";
@@ -43,10 +44,12 @@ export function submitWager(
 
   const normalizedWager = normalizeFinalWager(game.scores?.[player], wager);
 
-  ctx.fireAndForget(
-    ctx.repos.profiles.incrementFinalJeopardyParticipations(player),
-    "Increment final jeopardy Participation",
-  );
+  if (shouldIncrementStats(game)) {
+    ctx.fireAndForget(
+      ctx.repos.profiles.incrementFinalJeopardyParticipations(player),
+      "Increment final jeopardy Participation",
+    );
+  }
 
   if (!game.wagers) {
     game.wagers = {};
@@ -81,10 +84,12 @@ export async function submitWagerDrawing(
   if (!game.finalWagerDrawings) game.finalWagerDrawings = {};
   game.finalWagerDrawings[player] = drawing;
 
-  ctx.fireAndForget(
-    ctx.repos.profiles.incrementFinalJeopardyParticipations(player),
-    "Increment final jeopardy Participation",
-  );
+  if (shouldIncrementStats(game)) {
+    ctx.fireAndForget(
+      ctx.repos.profiles.incrementFinalJeopardyParticipations(player),
+      "Increment final jeopardy Participation",
+    );
+  }
   ctx.fireAndForget(
     ctx.ensureFinalJeopardyWager(ctx, game, gameId, player, Number(normalizedWager)),
     "Ensuring final jeopardy wager",

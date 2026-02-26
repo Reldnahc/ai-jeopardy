@@ -2,6 +2,7 @@ import type { GameState, PlayerState } from "../../types/runtime.js";
 import type { CtxDeps } from "../../ws/context.types.js";
 import { finishClueAndReturnToBoard } from "./boardFlow.js";
 import type { BuzzerCtx } from "./buzzer.js";
+import { shouldIncrementStats } from "../statsGate.js";
 import {
   applyScore,
   displaynameFor,
@@ -34,11 +35,14 @@ export async function autoResolveAfterJudgement(
 
   const ddActive = isDailyDoubleActiveForCurrentClue(game);
   const disp = displaynameFor(game, u);
+  const allowStats = shouldIncrementStats(game);
 
   if (verdict === "correct") {
     game.selectedClue.isAnswerRevealed = true;
 
-    ctx.fireAndForget(ctx.repos.profiles.incrementCorrectAnswers(u), "Increment correct answer");
+    if (allowStats) {
+      ctx.fireAndForget(ctx.repos.profiles.incrementCorrectAnswers(u), "Increment correct answer");
+    }
 
     const alive = await ctx.aiHostVoiceSequence(ctx, gameId, game, [
       {
@@ -53,10 +57,12 @@ export async function autoResolveAfterJudgement(
 
     if (ddActive) {
       game.dailyDouble = null;
-      ctx.fireAndForget(
-        ctx.repos.profiles.incrementDailyDoubleCorrect(u),
-        "Increment Daily Double correct answer",
-      );
+      if (allowStats) {
+        ctx.fireAndForget(
+          ctx.repos.profiles.incrementDailyDoubleCorrect(u),
+          "Increment Daily Double correct answer",
+        );
+      }
     }
 
     await ctx.sleep(3000);
@@ -64,7 +70,9 @@ export async function autoResolveAfterJudgement(
     return;
   }
 
-  ctx.fireAndForget(ctx.repos.profiles.incrementWrongAnswers(u), "Increment wrong answer");
+  if (allowStats) {
+    ctx.fireAndForget(ctx.repos.profiles.incrementWrongAnswers(u), "Increment wrong answer");
+  }
 
   if (ddActive) {
     game.buzzerLocked = true;

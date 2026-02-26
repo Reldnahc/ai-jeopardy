@@ -1,6 +1,7 @@
 import { appConfig } from "../../config/appConfig.js";
 import type { GameState } from "../../types/runtime.js";
 import type { CtxDeps } from "../../ws/context.types.js";
+import { shouldIncrementStats } from "../statsGate.js";
 import {
   applyFinalJeopardyScoring,
   buildPodiumPayoutScores,
@@ -198,25 +199,27 @@ export async function finishGame(
     }),
   );
 
-  if (top[0]) {
-    const username = ctx.normalizeName(top[0].username);
-    ctx.fireAndForget(ctx.repos.profiles.incrementGamesWon(username), "incrementGamesWon");
-    ctx.fireAndForget(ctx.repos.profiles.addMoneyWon(username, top[0].score), "addMoneyWon:winner");
-  }
+  if (shouldIncrementStats(game)) {
+    if (top[0]) {
+      const username = ctx.normalizeName(top[0].username);
+      ctx.fireAndForget(ctx.repos.profiles.incrementGamesWon(username), "incrementGamesWon");
+      ctx.fireAndForget(ctx.repos.profiles.addMoneyWon(username, top[0].score), "addMoneyWon:winner");
+    }
 
-  if (top[1]) {
-    const username = ctx.normalizeName(top[1].username);
-    ctx.fireAndForget(ctx.repos.profiles.addMoneyWon(username, 3000), "addMoneyWon:second");
-  }
+    if (top[1]) {
+      const username = ctx.normalizeName(top[1].username);
+      ctx.fireAndForget(ctx.repos.profiles.addMoneyWon(username, 3000), "addMoneyWon:second");
+    }
 
-  if (top[2]) {
-    const username = ctx.normalizeName(top[2].username);
-    ctx.fireAndForget(ctx.repos.profiles.addMoneyWon(username, 2000), "addMoneyWon:third");
-  }
+    if (top[2]) {
+      const username = ctx.normalizeName(top[2].username);
+      ctx.fireAndForget(ctx.repos.profiles.addMoneyWon(username, 2000), "addMoneyWon:third");
+    }
 
-  for (const p of game.players || []) {
-    const username = ctx.normalizeName(p.username);
-    ctx.fireAndForget(ctx.repos.profiles.incrementGamesFinished(username), "incrementGamesFinished");
+    for (const p of game.players || []) {
+      const username = ctx.normalizeName(p.username);
+      ctx.fireAndForget(ctx.repos.profiles.incrementGamesFinished(username), "incrementGamesFinished");
+    }
   }
 
   ctx.broadcast(gameId, { type: "update-scores", scores: game.scores });

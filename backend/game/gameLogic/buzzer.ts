@@ -2,6 +2,7 @@ import type { GameState } from "../../types/runtime.js";
 import type { CtxDeps } from "../../ws/context.types.js";
 import { finishClueAndReturnToBoard } from "./boardFlow.js";
 import type { BoardFlowCtx } from "./boardFlow.js";
+import { shouldIncrementStats } from "../statsGate.js";
 
 export function cancelAutoUnlock(game: GameState) {
   if (game?.autoUnlockTimer) {
@@ -54,11 +55,12 @@ export function doUnlockBuzzerAuthoritative(gameId: string, game: GameState, ctx
 
         const finish = async () => {
           const lockedPlayers = game.clueState?.lockedOut ?? {};
+          const allowStats = shouldIncrementStats(game);
 
           for (const player of game.players) {
             const isLocked = lockedPlayers[player.username] === true;
 
-            if (!isLocked) {
+            if (!isLocked && allowStats) {
               ctx.fireAndForget(
                 ctx.repos.profiles.incrementCluesSkipped(player.username),
                 "incrementCluesSkipped",

@@ -94,11 +94,13 @@ export function applyNewGameState({
   boardData,
   timeToBuzz,
   timeToAnswer,
+  usingImportedBoard,
 }: {
   game: GameState;
   boardData: GameState["boardData"];
   timeToBuzz: number;
   timeToAnswer: number;
+  usingImportedBoard: boolean;
 }) {
   game.buzzed = null;
   game.buzzerLocked = true;
@@ -109,6 +111,7 @@ export function applyNewGameState({
   game.isLoading = true;
   game.timeToBuzz = timeToBuzz;
   game.timeToAnswer = timeToAnswer;
+  game.isImportedBoardGame = Boolean(usingImportedBoard);
   game.isGenerating = false;
   game.activeBoard = "firstBoard";
   game.isFinalJeopardy = false;
