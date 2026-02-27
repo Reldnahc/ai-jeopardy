@@ -19,6 +19,10 @@ export function normalizeRole(raw: unknown): Role {
   return "default";
 }
 
+export function asLadderRole(role: Role): LadderRole {
+  return role === "banned" ? "default" : role;
+}
+
 const ROLE_RANK: Record<LadderRole, number> = {
   default: 0,
   moderator: 1,

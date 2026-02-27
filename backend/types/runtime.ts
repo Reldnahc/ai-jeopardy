@@ -205,7 +205,9 @@ export type WsContext = {
     images?: Record<string, UnknownFn>;
     tts?: Record<string, UnknownFn>;
   };
-  appConfig: { ai: { defaultModel: string; defaultSttProvider: string; defaultTtsProvider: string } };
+  appConfig: {
+    ai: { defaultModel: string; defaultSttProvider: string; defaultTtsProvider: string };
+  };
   modelsByValue?: Record<string, { disabled?: boolean; price?: number }>;
   perms: { can: (ws: SocketState, permission: string, meta?: JsonMap) => boolean };
 
@@ -232,7 +234,6 @@ export type WsContext = {
   getGameOrFail: UnknownFn;
   ensureHostOrFail: UnknownFn;
   ensureLobbySettings: UnknownFn;
-  normalizeRole: UnknownFn;
   resolveModelOrFail: UnknownFn;
   resolveVisualPolicy: UnknownFn;
   resetGenerationProgressAndNotify: UnknownFn;

@@ -1,5 +1,5 @@
-import type { LadderRole, Role } from "../../../shared/roles";
-import { atLeast, normalizeRole, rank } from "../../../shared/roles";
+import type { LadderRole } from "../../../shared/roles";
+import { atLeast, asLadderRole, normalizeRole, rank } from "../../../shared/roles";
 import type { Profile as P } from "../../contexts/ProfileContext";
 
 type CustomField =
@@ -53,10 +53,6 @@ export function normalizeHex(input: string, fallback: string) {
   if (!s) return fallback;
   if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(s)) return s.toLowerCase();
   return fallback;
-}
-
-export function asLadderRole(role: Role): LadderRole {
-  return role === "banned" ? "default" : role;
 }
 
 export function useRoleGate(rawRole: unknown) {

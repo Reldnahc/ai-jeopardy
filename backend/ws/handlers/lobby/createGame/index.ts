@@ -7,7 +7,6 @@ export {
   ensureHostOrFail,
   ensureLobbySettings,
   getGameOrFail,
-  normalizeRole,
   resolveModelOrFail,
   resolveVisualPolicy,
 } from "./guardHelpers.js";

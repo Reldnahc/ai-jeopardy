@@ -1,6 +1,7 @@
 import type { PlayerState } from "../../../types/runtime.js";
 import type { WsHandler } from "../types.js";
 import { shouldIncrementStats } from "../../../game/statsGate.js";
+import { normalizeRole, asLadderRole } from "../../../../shared/roles.js";
 
 type GameIdData = { gameId: string };
 type PreloadDoneData = { gameId: string; username?: string; token?: number; playerKey?: string };
@@ -22,7 +23,8 @@ export const lobbyStartHandlers: Record<string, WsHandler> = {
     const s = ctx.ensureLobbySettings(ctx, game, ctx.appConfig);
     const host = game.host;
     const categories = ctx.normalizeCategories11(game.categories);
-    const role = ctx.normalizeRole(ws);
+    const role = normalizeRole(ws.auth.role);
+    const ladderRole = asLadderRole(role);
     const selectedModel = s.selectedModel;
     const modelAllowed = ctx.resolveModelOrFail({ ws, ctx, gameId, game, selectedModel });
     if (!modelAllowed) return;
@@ -39,7 +41,7 @@ export const lobbyStartHandlers: Record<string, WsHandler> = {
       requestedProvider,
       canUseBrave,
       effectiveImageProvider,
-    } = ctx.resolveVisualPolicy({ role, boardJson, visualMode });
+    } = ctx.resolveVisualPolicy({ role: ladderRole, boardJson, visualMode });
 
     trace.mark("visual_settings", {
       usingImportedBoard,

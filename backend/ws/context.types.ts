@@ -28,7 +28,6 @@ import type {
   getBoardDataOrFail,
   getGameOrFail,
   initPreloadState,
-  normalizeRole,
   resetGenerationProgressAndNotify,
   resolveModelOrFail,
   resolveVisualPolicy,
@@ -201,7 +200,6 @@ export type Ctx = Omit<
   | "getGameOrFail"
   | "ensureHostOrFail"
   | "ensureLobbySettings"
-  | "normalizeRole"
   | "resolveModelOrFail"
   | "resolveVisualPolicy"
   | "resetGenerationProgressAndNotify"
@@ -272,7 +270,6 @@ export type Ctx = Omit<
   getGameOrFail: typeof getGameOrFail;
   ensureHostOrFail: typeof ensureHostOrFail;
   ensureLobbySettings: typeof ensureLobbySettings;
-  normalizeRole: typeof normalizeRole;
   resolveModelOrFail: typeof resolveModelOrFail;
   resolveVisualPolicy: typeof resolveVisualPolicy;
   resetGenerationProgressAndNotify: typeof resetGenerationProgressAndNotify;

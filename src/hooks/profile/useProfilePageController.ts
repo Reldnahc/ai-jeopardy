@@ -2,12 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import type { Board } from "../../types/Board";
 import { Profile as P, useProfile } from "../../contexts/ProfileContext";
 import { useAuth } from "../../contexts/AuthContext";
-import type { LadderRole, Role } from "../../../shared/roles";
+import { asLadderRole, LadderRole, Role } from "../../../shared/roles";
 import { LADDER_ROLES, normalizeRole, rank } from "../../../shared/roles";
 import { getProfilePresentation } from "../../utils/profilePresentation";
 import {
   COLOR_TARGETS,
-  asLadderRole,
   colorPatch,
   getApiBase,
   normalizeHex,
@@ -66,14 +65,8 @@ export function useProfilePageController(usernameParam: string | undefined) {
     maybeClearOverlayIfServerMatches,
   } = useProfileOverlay<P>();
 
-  const {
-    routeProfile,
-    setRouteProfile,
-    routeLoading,
-    routeError,
-    routeGaveUp,
-    retry,
-  } = useRouteProfileLoader({ usernameParam, fetchPublicProfile, applyOverlay });
+  const { routeProfile, setRouteProfile, routeLoading, routeError, routeGaveUp, retry } =
+    useRouteProfileLoader({ usernameParam, fetchPublicProfile, applyOverlay });
 
   const isOwnProfile = useMemo(
     () => Boolean(user?.id && routeProfile?.id && user.id === routeProfile.id),

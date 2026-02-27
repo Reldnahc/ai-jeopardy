@@ -1,5 +1,6 @@
 import type { GameState, SocketState } from "../../../../types/runtime.js";
 import type { Ctx } from "../../../context.types.js";
+import { atLeast, LadderRole } from "../../../../../shared/roles.js";
 
 type CreateGameArgs = { ws: SocketState; ctx: Ctx; gameId: string; game?: GameState | null };
 
@@ -56,10 +57,6 @@ export function ensureLobbySettings(
   return game.lobbySettings;
 }
 
-export function normalizeRole(ws: SocketState): string {
-  return String(ws.auth?.role ?? "default").toLowerCase();
-}
-
 export function resolveModelOrFail({
   ws,
   ctx,
@@ -106,7 +103,7 @@ export function resolveVisualPolicy({
   boardJson,
   visualMode,
 }: {
-  role: string;
+  role: LadderRole;
   boardJson: string;
   visualMode: string;
 }): {
@@ -119,7 +116,7 @@ export function resolveVisualPolicy({
   const usingImportedBoard = Boolean(boardJson && boardJson.trim());
   const effectiveIncludeVisuals = usingImportedBoard ? true : visualMode !== "off";
   const requestedProvider = visualMode === "brave" ? "brave" : "commons";
-  const canUseBrave = role === "admin" || role === "privileged";
+  const canUseBrave = atLeast(role, "privileged");
 
   const effectiveImageProvider = effectiveIncludeVisuals
     ? requestedProvider === "brave" && canUseBrave
