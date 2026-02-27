@@ -13,6 +13,7 @@ import { generateAiCategoryJson, generateAiFinalCategoryJson } from "./boardGene
 type CreateBoardOptions = Partial<VisualSettings> & {
   reasoningEffort?: "off" | "low" | "medium" | "high";
   narrationEnabled?: boolean;
+  ttsVoiceId?: string;
   onProgress?: (p: { done: number; total: number; progress: number }) => void;
   onTtsReady?: (assetId: string) => void;
   trace?: { mark: (event: string, meta?: Record<string, unknown>) => void };
@@ -96,6 +97,7 @@ export async function createBoardData(
 
     reasoningEffort: "off",
     narrationEnabled: false,
+    ttsVoiceId: "kokoro:af_heart",
 
     onProgress: undefined,
     onTtsReady: undefined,
@@ -178,6 +180,7 @@ export async function createBoardData(
         json: ai,
         narrationEnabled: settings.narrationEnabled,
         limitTts,
+        ttsVoiceId: settings.ttsVoiceId,
         onTtsReady: settings.onTtsReady,
         state: ttsState,
       });
@@ -243,6 +246,7 @@ export async function createBoardData(
         json: ai,
         narrationEnabled: settings.narrationEnabled,
         limitTts,
+        ttsVoiceId: settings.ttsVoiceId,
         onTtsReady: settings.onTtsReady,
         state: ttsState,
       });
@@ -297,6 +301,7 @@ export async function createBoardData(
         json: ai,
         narrationEnabled: settings.narrationEnabled,
         limitTts,
+        ttsVoiceId: settings.ttsVoiceId,
         onTtsReady: settings.onTtsReady,
         state: ttsState,
       });

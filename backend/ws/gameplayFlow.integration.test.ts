@@ -44,7 +44,9 @@ function makeHarness(judgeVerdict: "correct" | "incorrect") {
         incrementTimesBuzzed: vi.fn(async () => {}),
       },
     },
-    appConfig: { ai: { defaultModel: "gpt-4o-mini", defaultSttProvider: "openai" } },
+    appConfig: {
+      ai: { defaultModel: "gpt-4o-mini", defaultSttProvider: "openai", defaultTtsProvider: "kokoro" },
+    },
     normalizeCategories11: (arr: unknown[]) => (Array.isArray(arr) && arr.length ? arr : Array(11).fill("C")),
     buildLobbyState: (gameId: string) => ({ type: "lobby-state", gameId }),
     cancelLobbyCleanup: vi.fn(),
@@ -111,7 +113,9 @@ function makeFullHarness() {
         incrementGamesPlayed: vi.fn(async () => {}),
       },
     },
-    appConfig: { ai: { defaultModel: "gpt-4o-mini", defaultSttProvider: "openai" } },
+    appConfig: {
+      ai: { defaultModel: "gpt-4o-mini", defaultSttProvider: "openai", defaultTtsProvider: "kokoro" },
+    },
     normalizeCategories11: (arr: unknown[]) => (Array.isArray(arr) && arr.length ? arr : Array(11).fill("C")),
     buildLobbyState: (gameId: string) => ({ type: "lobby-state", gameId }),
     sendLobbySnapshot: vi.fn(),

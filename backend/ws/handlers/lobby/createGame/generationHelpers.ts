@@ -4,6 +4,11 @@ import { broadcastPreloadBatch } from "./preloadHelpers.js";
 
 type TraceLike = { mark: (name: string, data?: Record<string, unknown>) => void } | null;
 
+function resolveNarrationVoiceId(game: GameState): string {
+  const provider = String(game?.lobbySettings?.ttsProviderName ?? "kokoro").trim().toLowerCase();
+  return provider === "openai" ? "openai:alloy@1.25" : "kokoro:af_heart";
+}
+
 function makePreloadTtsBatcher({
   ctx,
   gameId,
@@ -194,6 +199,7 @@ export async function getBoardDataOrFail({
       imageProvider: effectiveImageProvider,
       maxVisualCluesPerCategory: 2,
       narrationEnabled: Boolean(game?.lobbySettings?.narrationEnabled),
+      ttsVoiceId: resolveNarrationVoiceId(game),
       reasoningEffort: reasoningEffort as "off" | "low" | "medium" | "high",
       trace,
       onTtsReady: (id: string) => ttsBatcher.push(id),

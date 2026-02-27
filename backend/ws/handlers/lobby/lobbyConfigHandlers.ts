@@ -2,6 +2,7 @@ import type { PlayerState } from "../../../types/runtime.js";
 import type { CtxDeps } from "../../context.types.js";
 import type { WsHandler } from "../types.js";
 import { MAX_LOBBY_PLAYERS } from "../../../lobby/constants.js";
+import { atLeast, normalizeRole } from "../../../../shared/roles.js";
 
 type GameIdData = { gameId: string };
 type UpdateLobbySettingsData = { gameId: string; patch?: Record<string, unknown> };
@@ -51,6 +52,8 @@ export const lobbyConfigHandlers: Record<string, WsHandler> = {
           visualMode: "off",
           narrationEnabled: true,
           boardJson: "",
+          sttProviderName: hctx.appConfig.ai.defaultSttProvider,
+          ttsProviderName: hctx.appConfig.ai.defaultTtsProvider,
           categoryRefreshLocked: false,
           categoryPoolPrompt: "",
         };
@@ -58,6 +61,8 @@ export const lobbyConfigHandlers: Record<string, WsHandler> = {
 
       const p =
         typeof patch === "object" && patch !== null ? (patch as Record<string, unknown>) : {};
+      const role = normalizeRole(ws.auth?.role);
+      const canChooseTtsProvider = atLeast(role, "privileged");
 
       if (typeof p.timeToBuzz === "number" && Number.isFinite(p.timeToBuzz)) {
         game.lobbySettings.timeToBuzz = Math.max(1, Math.min(60, Math.floor(p.timeToBuzz)));
@@ -84,6 +89,15 @@ export const lobbyConfigHandlers: Record<string, WsHandler> = {
       }
       if (typeof p.narrationEnabled === "boolean") {
         game.lobbySettings.narrationEnabled = p.narrationEnabled;
+      }
+      if (p.sttProviderName === "openai" || p.sttProviderName === "whisper") {
+        game.lobbySettings.sttProviderName = p.sttProviderName;
+      }
+      if (
+        canChooseTtsProvider &&
+        (p.ttsProviderName === "openai" || p.ttsProviderName === "kokoro")
+      ) {
+        game.lobbySettings.ttsProviderName = p.ttsProviderName;
       }
       if (typeof p.categoryRefreshLocked === "boolean") {
         game.lobbySettings.categoryRefreshLocked = p.categoryRefreshLocked;
@@ -126,6 +140,8 @@ export const lobbyConfigHandlers: Record<string, WsHandler> = {
         visualMode: "off",
         narrationEnabled: true,
         boardJson: "",
+        sttProviderName: hctx.appConfig.ai.defaultSttProvider,
+        ttsProviderName: hctx.appConfig.ai.defaultTtsProvider,
         categoryRefreshLocked: false,
         categoryPoolPrompt: "",
       };

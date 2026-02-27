@@ -65,15 +65,8 @@ export function useGameAudioPlayback({
       const a = audioRef.current;
       if (!a) return false;
 
-      try {
-        a.pause();
-        a.muted = false;
-        const gain = gainNodeRef.current;
-        if (gain) gain.gain.value = audioVolume;
-
-        const blobUrl = getCachedAudioBlobUrl(httpUrl);
-        a.src = blobUrl || httpUrl;
-
+      const tryPlay = async (src: string) => {
+        a.src = src;
         const seekSec = Math.max(0, offsetMs / 1000);
         const seekToOffset = () => {
           try {
@@ -92,6 +85,26 @@ export function useGameAudioPlayback({
 
         if (audioVolume <= 0) return false;
         await a.play();
+        return true;
+      };
+
+      try {
+        a.pause();
+        a.muted = false;
+        const gain = gainNodeRef.current;
+        if (gain) gain.gain.value = audioVolume;
+
+        const blobUrl = getCachedAudioBlobUrl(httpUrl);
+        if (blobUrl) {
+          try {
+            await tryPlay(blobUrl);
+          } catch {
+            // Blob URL can occasionally be stale/invalid; retry direct endpoint.
+            await tryPlay(httpUrl);
+          }
+        } else {
+          await tryPlay(httpUrl);
+        }
         setAudioBlockedByPolicy(false);
         return true;
       } catch (e) {

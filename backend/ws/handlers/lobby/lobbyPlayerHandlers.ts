@@ -98,6 +98,7 @@ export const lobbyPlayerHandlers: Record<string, WsHandler> = {
         narrationEnabled: true,
         boardJson: "",
         sttProviderName: hctx.appConfig.ai.defaultSttProvider,
+        ttsProviderName: hctx.appConfig.ai.defaultTtsProvider,
         categoryRefreshLocked: false,
         categoryPoolPrompt: "",
       },

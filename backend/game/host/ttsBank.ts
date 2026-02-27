@@ -2,6 +2,25 @@ import type { Trace, AiHostTtsBank, Game, CtxDeps } from "../../ws/context.types
 import { AI_HOST_VARIANTS, collectBoardValues, nameCalloutText } from "./variants.js";
 
 export type HostTtsCtx = CtxDeps<"ensureTtsAsset" | "repos" | "broadcast" | "numberToWords">;
+const DEFAULT_HOST_VOICE = "kokoro:af_heart";
+const OPENAI_HOST_VOICE_FAST = "openai:alloy@1.25";
+
+function hostVoiceFromLobby(game: Game): string {
+  const provider = String(game?.lobbySettings?.ttsProviderName ?? "kokoro").trim().toLowerCase();
+  return provider === "openai" ? OPENAI_HOST_VOICE_FAST : DEFAULT_HOST_VOICE;
+}
+
+async function ensureHostTtsAsset(ctx: HostTtsCtx, game: Game, text: string) {
+  const provider = String(game?.lobbySettings?.ttsProviderName ?? "kokoro").trim().toLowerCase();
+  return ctx.ensureTtsAsset(
+    {
+      text,
+      voiceId: hostVoiceFromLobby(game),
+      outputFormat: provider === "openai" ? "mp3" : "wav",
+    },
+    ctx.repos,
+  );
+}
 
 export async function ensureAiHostValueTts(opts: {
   ctx: HostTtsCtx;
@@ -43,13 +62,7 @@ export async function ensureAiHostValueTts(opts: {
 
     jobs.push(
       (async () => {
-        const asset = await ctx.ensureTtsAsset(
-          {
-            text: `For ${v} dollars.`,
-            voiceId: game.ttsProvider ?? "kokoro:af_heart",
-          },
-          ctx.repos,
-        );
+        const asset = await ensureHostTtsAsset(ctx, game, `For ${v} dollars.`);
 
         tts.valueAssetsByValue[k] = asset.id;
         tts.allAssetIds.push(asset.id);
@@ -75,13 +88,7 @@ export async function ensureFinalJeopardyAnswer(
   text: string,
 ): Promise<void> {
   const tts = game.aiHostTts;
-  const asset = await ctx.ensureTtsAsset(
-    {
-      text,
-      voiceId: game.ttsProvider ?? "kokoro:af_heart",
-    },
-    ctx.repos,
-  );
+  const asset = await ensureHostTtsAsset(ctx, game, text);
 
   tts.finalJeopardyAnswersByPlayer["fja" + playerName] = asset.id;
   tts.allAssetIds.push(asset.id);
@@ -97,13 +104,7 @@ export async function ensureFinalJeopardyWager(
   wager: number,
 ): Promise<void> {
   const tts = game.aiHostTts;
-  const asset = await ctx.ensureTtsAsset(
-    {
-      text: ctx.numberToWords(wager),
-      voiceId: game.ttsProvider ?? "kokoro:af_heart",
-    },
-    ctx.repos,
-  );
+  const asset = await ensureHostTtsAsset(ctx, game, ctx.numberToWords(wager));
 
   tts.finalJeopardyWagersByPlayer["fjw" + playerName] = asset.id;
   tts.allAssetIds.push(asset.id);
@@ -158,13 +159,7 @@ export async function ensureAiHostTtsBank(opts: {
     for (const text of variants) {
       slotJobs.push(
         (async () => {
-          const asset = await ctx.ensureTtsAsset(
-            {
-              text,
-              voiceId: game.ttsProvider ?? "kokoro:af_heart",
-            },
-            ctx.repos,
-          );
+          const asset = await ensureHostTtsAsset(ctx, game, text);
 
           out.slotAssets[slot].push(asset.id);
           out.allAssetIds.push(asset.id);
@@ -180,13 +175,7 @@ export async function ensureAiHostTtsBank(opts: {
 
     slotJobs.push(
       (async () => {
-        const asset = await ctx.ensureTtsAsset(
-          {
-            text: nameCalloutText(name),
-            voiceId: game.ttsProvider ?? "kokoro:af_heart",
-          },
-          ctx.repos,
-        );
+        const asset = await ensureHostTtsAsset(ctx, game, nameCalloutText(name));
 
         out.nameAssetsByPlayer[name] = asset.id;
         out.allAssetIds.push(asset.id);
@@ -203,13 +192,7 @@ export async function ensureAiHostTtsBank(opts: {
 
     slotJobs.push(
       (async () => {
-        const asset = await ctx.ensureTtsAsset(
-          {
-            text: categoryName,
-            voiceId: game.ttsProvider ?? "kokoro:af_heart",
-          },
-          ctx.repos,
-        );
+        const asset = await ensureHostTtsAsset(ctx, game, categoryName);
 
         out.categoryAssetsByCategory[categoryName] = asset.id;
         out.allAssetIds.push(asset.id);

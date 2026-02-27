@@ -48,6 +48,7 @@ export function ensureLobbySettings(
     narrationEnabled: false,
     boardJson: "",
     sttProviderName: ctx.appConfig.ai.defaultSttProvider,
+    ttsProviderName: ctx.appConfig.ai.defaultTtsProvider,
     categoryRefreshLocked: false,
     categoryPoolPrompt: "",
   };

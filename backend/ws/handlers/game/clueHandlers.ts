@@ -130,6 +130,15 @@ export const clueHandlers: Record<string, WsHandler> = {
 
     const pad = 25;
     const ttsAssetId = game.boardData?.ttsByClueKey?.[clueKey] || null;
+    const clueQuestion = String(game.selectedClue?.question ?? "").trim();
+
+    // Safety cap for server wait time before unlocking buzzer.
+    // Duration metadata can occasionally overestimate for generated assets.
+    const estimateSpeechMaxMs = (text: string) => {
+      const words = text ? text.split(/\s+/).filter(Boolean).length : 0;
+      const est = 700 + words * 420;
+      return Math.min(14_000, Math.max(2_000, est));
+    };
 
     const broadcastClueSelected = () => {
       hctx.broadcast(gameId, { type: "buzzer-ui-reset" });
@@ -188,9 +197,9 @@ export const clueHandlers: Record<string, WsHandler> = {
     }
 
     await hctx.aiHostVoiceSequence(hctx, gameId, game, [
-      { slot: String(game.selectedClue.category ?? ""), pad },
-      { slot: String(game.selectedClue.value ?? ""), after: broadcastClueSelected },
-      { assetId: ttsAssetId },
+      { slot: String(game.selectedClue.category ?? ""), pad, maxMs: 2_500 },
+      { slot: String(game.selectedClue.value ?? ""), after: broadcastClueSelected, maxMs: 2_000 },
+      { assetId: ttsAssetId, maxMs: estimateSpeechMaxMs(clueQuestion) },
     ]);
 
     hctx.doUnlockBuzzerAuthoritative(gameId, game, ctx);

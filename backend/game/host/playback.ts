@@ -78,9 +78,10 @@ export async function aiHostSayByAsset(
 ): Promise<{ assetId: string; ms: number } | null> {
   if (!assetId) return null;
 
-  const ms = await withTimeout(ctx.getTtsDurationMs(assetId), 1000, 0);
+  const msRaw = await withTimeout(ctx.getTtsDurationMs(assetId), 1000, 0);
+  const ms = Math.max(0, Number(msRaw) || 0);
   aiHostSayAsset(ctx, gameId, game, assetId, ms);
-  return { assetId, ms: Number(ms) || 0 };
+  return { assetId, ms };
 }
 
 export async function aiHostSayByKey(
@@ -111,7 +112,8 @@ export async function aiHostSayByKey(
 
   if (!assetId) return null;
 
-  const ms = await withTimeout(ctx.getTtsDurationMs(assetId), 1000, 0);
+  const msRaw = await withTimeout(ctx.getTtsDurationMs(assetId), 1000, 0);
+  const ms = Math.max(0, Number(msRaw) || 0);
   aiHostSayAsset(ctx, gameId, game, assetId, ms);
-  return { assetId, ms: Number(ms) || 0 };
+  return { assetId, ms };
 }

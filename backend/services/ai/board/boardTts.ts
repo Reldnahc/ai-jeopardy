@@ -10,6 +10,7 @@ type EnqueueCommon = {
   ctx: Ctx;
   narrationEnabled: boolean;
   limitTts: LimiterFn | null;
+  ttsVoiceId: string;
   onTtsReady?: (assetId: string) => void;
   state: BoardTtsState;
 };
@@ -33,6 +34,11 @@ function narrationTextForClue(question: unknown) {
   return `${q}`.trim();
 }
 
+function narrationVoiceFromGame(game: Game): string {
+  const provider = String(game?.lobbySettings?.ttsProviderName ?? "kokoro").trim().toLowerCase();
+  return provider === "openai" ? "openai:alloy@1.25" : "kokoro:af_heart";
+}
+
 export async function ensureBoardNarrationTtsForBoardData(args: {
   ctx: Ctx;
   game: Game;
@@ -42,6 +48,7 @@ export async function ensureBoardNarrationTtsForBoardData(args: {
   trace?: { mark: (event: string, meta?: Record<string, unknown>) => void };
 }) {
   const { ctx, boardData, narrationEnabled, onTtsReady, trace, game } = args;
+  const narrationVoiceId = narrationVoiceFromGame(game);
 
   // Always ensure these fields exist so preload code can rely on them.
   boardData.ttsAssetIds = Array.isArray(boardData.ttsAssetIds) ? boardData.ttsAssetIds : [];
@@ -128,11 +135,11 @@ export async function ensureBoardNarrationTtsForBoardData(args: {
         const key = buildClueKey(boardKey, clue?.value, clue?.question);
 
         // Question narration
-        enqueueClueText(narrationTextForClue(clue?.question), key, game.ttsProvider);
+        enqueueClueText(narrationTextForClue(clue?.question), key, narrationVoiceId);
 
         // Answer narration (FIX)
         // Use the same key scheme unless you have a separate answer-key function.
-        enqueueAnswerText(String(clue?.answer ?? "").trim(), key, game.ttsProvider);
+        enqueueAnswerText(String(clue?.answer ?? "").trim(), key, narrationVoiceId);
       }
     }
   }
@@ -146,8 +153,8 @@ export async function ensureBoardNarrationTtsForBoardData(args: {
 
     const key = `finalJeopardy:?:${q}`;
 
-    enqueueClueText(q, key, game.ttsProvider);
-    enqueueAnswerText(a, key, game.ttsProvider);
+    enqueueClueText(q, key, narrationVoiceId);
+    enqueueAnswerText(a, key, narrationVoiceId);
   }
 
   trace?.mark?.("imported_tts_ensure_begin", { jobs: jobs.length });
@@ -176,11 +183,9 @@ function enqueueOneTts(
   const trimmed = text.trim();
   if (!trimmed) return false;
 
-  const ttsProvider = "kokoro:af_heart";
-
   const p = limitTts(async () => {
     const asset = await ctx.ensureTtsAsset(
-      { text: trimmed, voiceId: ttsProvider ?? "kokoro:af_heart" },
+      { text: trimmed, voiceId: args.ttsVoiceId || "kokoro:af_heart" },
       ctx.repos,
     );
 

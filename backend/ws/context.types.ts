@@ -116,7 +116,7 @@ type BoardDataLike = {
 };
 
 export type Game = {
-  lobbySettings?: { narrationEnabled?: boolean | null } | null;
+  lobbySettings?: { narrationEnabled?: boolean | null; ttsProviderName?: string | null } | null;
   players?: Player[] | null;
   categories?: Category[] | null;
   boardData?: BoardDataLike;
@@ -338,5 +338,6 @@ export type VoiceStep = {
   slot?: string;
   assetId?: string;
   pad?: number;
+  maxMs?: number;
   after?: () => void | Promise<void>;
 };

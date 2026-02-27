@@ -4,6 +4,28 @@ import { normalizeText, hashForRequest } from "./dedupe.js";
 import { selectProvider } from "./providerSelector.js";
 import { getLimiter } from "./limiter.js";
 
+function detectAudioContentType(audioBuffer: Buffer): "audio/wav" | "audio/mpeg" {
+  if (audioBuffer.length >= 12) {
+    const riff = audioBuffer.toString("ascii", 0, 4);
+    const wave = audioBuffer.toString("ascii", 8, 12);
+    if (riff === "RIFF" && wave === "WAVE") return "audio/wav";
+  }
+
+  // MP3 starts with ID3 tag or frame sync 0xFFE.
+  if (audioBuffer.length >= 3) {
+    const id3 = audioBuffer.toString("ascii", 0, 3);
+    if (id3 === "ID3") return "audio/mpeg";
+  }
+  if (audioBuffer.length >= 2) {
+    const b0 = audioBuffer[0];
+    const b1 = audioBuffer[1];
+    if (b0 === 0xff && (b1 & 0xe0) === 0xe0) return "audio/mpeg";
+  }
+
+  // default to requested WAV pipeline behavior
+  return "audio/wav";
+}
+
 export async function ensureTtsAsset(
   input: Partial<TtsRequest> & { text: string },
   repos: EnsureTtsDeps,
@@ -35,6 +57,7 @@ export async function ensureTtsAsset(
     const { audioBuffer } = await provider.synthesize(effectiveReq);
 
     if (!audioBuffer.length) throw new Error(`${provider.name} returned empty audio`);
+    const contentType = detectAudioContentType(audioBuffer);
 
     const id = await repos.tts.upsertTtsAsset(
       sha256,
@@ -46,6 +69,7 @@ export async function ensureTtsAsset(
       effectiveReq.voiceId,
       effectiveReq.engine,
       effectiveReq.languageCode,
+      contentType,
     );
 
     if (!id) throw new Error("Failed to upsert tts_assets");

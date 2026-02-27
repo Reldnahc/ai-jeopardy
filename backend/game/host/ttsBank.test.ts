@@ -42,6 +42,50 @@ describe("ttsBank", () => {
 
     expect(game.aiHostTts).toBeTruthy();
     expect(game.aiHostTts?.valueAssetsByValue?.["200"]).toBe("asset-1");
+    expect(ctx.ensureTtsAsset).toHaveBeenCalledWith(
+      expect.objectContaining({ voiceId: "kokoro:af_heart", outputFormat: "wav" }),
+      expect.anything(),
+    );
+  });
+
+  it("ensureAiHostValueTts does not fallback when primary host tts fails", async () => {
+    const game = {
+      lobbySettings: { narrationEnabled: true, ttsProviderName: "kokoro" },
+      boardData: {
+        firstBoard: { categories: [{ values: [{ value: 200 }] }] },
+        secondBoard: { categories: [] },
+      },
+    } as unknown as Game;
+
+    const ensureTtsAsset = vi.fn().mockRejectedValueOnce(new Error("kokoro offline"));
+    const { ctx } = makeCtx({ ensureTtsAsset });
+
+    await expect(ensureAiHostValueTts({ ctx, game })).rejects.toThrow("kokoro offline");
+
+    expect(ensureTtsAsset).toHaveBeenCalledTimes(1);
+    expect(ensureTtsAsset).toHaveBeenCalledWith(
+      expect.objectContaining({ voiceId: "kokoro:af_heart" }),
+      expect.anything(),
+    );
+  });
+
+  it("ensureAiHostValueTts uses openai voice when ttsProviderName is openai", async () => {
+    const game = {
+      lobbySettings: { narrationEnabled: true, ttsProviderName: "openai" },
+      boardData: {
+        firstBoard: { categories: [{ values: [{ value: 200 }] }] },
+        secondBoard: { categories: [] },
+      },
+    } as unknown as Game;
+    const ensureTtsAsset = vi.fn().mockResolvedValueOnce({ id: "asset-openai" });
+    const { ctx } = makeCtx({ ensureTtsAsset });
+
+    await ensureAiHostValueTts({ ctx, game });
+
+    expect(ensureTtsAsset).toHaveBeenCalledWith(
+      expect.objectContaining({ voiceId: "openai:alloy@1.25", outputFormat: "mp3" }),
+      expect.anything(),
+    );
   });
 
   it("ensureAiHostTtsBank returns early when bank already exists", async () => {

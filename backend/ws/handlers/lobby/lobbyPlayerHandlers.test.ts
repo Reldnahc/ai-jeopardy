@@ -12,7 +12,13 @@ function makeCtx(overrides: Record<string, unknown> = {}) {
     {
       games: {},
       normalizeCategories11: vi.fn(() => Array(11).fill("Category")),
-      appConfig: { ai: { defaultModel: "gpt-4o-mini", defaultSttProvider: "openai" } },
+      appConfig: {
+        ai: {
+          defaultModel: "gpt-4o-mini",
+          defaultSttProvider: "openai",
+          defaultTtsProvider: "kokoro",
+        },
+      },
       buildLobbyState: vi.fn((gameId: string) => ({ type: "lobby-state", gameId })),
       cancelLobbyCleanup: vi.fn(),
       scheduleLobbyCleanupIfEmpty: vi.fn(),

@@ -68,4 +68,16 @@ describe("sequence", () => {
     expect(alive).toBe(true);
     expect(ctx.sleepAndCheckGame).toHaveBeenCalledWith(0, "g1");
   });
+
+  it("caps sleep time with step maxMs when measured duration is too large", async () => {
+    const game = {} as unknown as Game;
+    const { ctx } = makeCtx();
+
+    vi.mocked(playback.aiHostSayByKey).mockResolvedValueOnce({ assetId: "k1", ms: 5000 });
+
+    const alive = await aiHostVoiceSequence(ctx, "g1", game, [{ slot: "correct", maxMs: 1200 }]);
+
+    expect(alive).toBe(true);
+    expect(ctx.sleepAndCheckGame).toHaveBeenCalledWith(1200, "g1");
+  });
 });

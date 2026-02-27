@@ -15,6 +15,8 @@ export type LobbySettings = {
   visualMode: "off" | "commons" | "brave";
   narrationEnabled: boolean;
   boardJson: string;
+  sttProviderName?: "openai" | "whisper";
+  ttsProviderName?: "kokoro" | "openai";
   categoryRefreshLocked?: boolean;
   categoryPoolPrompt?: string;
 };

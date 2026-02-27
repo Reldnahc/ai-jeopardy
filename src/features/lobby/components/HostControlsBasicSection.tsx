@@ -3,16 +3,22 @@ import React from "react";
 interface HostControlsBasicSectionProps {
   timeToBuzz: number;
   timeToAnswer: number;
+  ttsProviderName: "kokoro" | "openai";
+  showTtsProviderControl: boolean;
   onTimeToBuzzChange: (time: number) => void;
   onTimeToAnswerChange: (time: number) => void;
+  onTtsProviderChange: (provider: "kokoro" | "openai") => void;
   onCreateGame: () => void;
 }
 
 const HostControlsBasicSection: React.FC<HostControlsBasicSectionProps> = ({
   timeToBuzz,
   timeToAnswer,
+  ttsProviderName,
+  showTtsProviderControl,
   onTimeToBuzzChange,
   onTimeToAnswerChange,
+  onTtsProviderChange,
   onCreateGame,
 }) => {
   const handleTimeChange = (
@@ -37,7 +43,9 @@ const HostControlsBasicSection: React.FC<HostControlsBasicSectionProps> = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div
+            className={`grid grid-cols-1 ${showTtsProviderControl ? "sm:grid-cols-3" : "sm:grid-cols-2"} gap-4`}
+          >
             <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
               <label className="block text-sm font-medium text-gray-800 mb-2">Time to Buzz</label>
 
@@ -85,6 +93,23 @@ const HostControlsBasicSection: React.FC<HostControlsBasicSectionProps> = ({
                 How long the buzzed player has to respond.
               </div>
             </div>
+
+            {showTtsProviderControl && (
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                <label className="block text-sm font-medium text-gray-800 mb-2">Host Voice Provider</label>
+
+                <select
+                  value={ttsProviderName}
+                  onChange={(e) => onTtsProviderChange(e.target.value as "kokoro" | "openai")}
+                  className="p-2 rounded-md border border-gray-300 text-black w-full bg-white"
+                >
+                  <option value="kokoro">Kokoro</option>
+                  <option value="openai">OpenAI</option>
+                </select>
+
+                <div className="mt-2 text-xs text-gray-500">Controls AI host narration provider.</div>
+              </div>
+            )}
           </div>
         </div>
       </div>

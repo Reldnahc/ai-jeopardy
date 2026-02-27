@@ -47,6 +47,7 @@ export type GameState = {
     narrationEnabled?: boolean;
     boardJson?: string;
     sttProviderName?: string;
+    ttsProviderName?: string;
     categoryRefreshLocked?: boolean;
     categoryPoolPrompt?: string;
     [key: string]: unknown;
@@ -204,7 +205,7 @@ export type WsContext = {
     images?: Record<string, UnknownFn>;
     tts?: Record<string, UnknownFn>;
   };
-  appConfig: { ai: { defaultModel: string; defaultSttProvider: string } };
+  appConfig: { ai: { defaultModel: string; defaultSttProvider: string; defaultTtsProvider: string } };
   modelsByValue?: Record<string, { disabled?: boolean; price?: number }>;
   perms: { can: (ws: SocketState, permission: string, meta?: JsonMap) => boolean };
 

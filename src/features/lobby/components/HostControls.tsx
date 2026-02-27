@@ -24,6 +24,7 @@ const HostControls: React.FC<HostControlsProps> = ({
   const visualMode = lobbySettings?.visualMode ?? "off";
   const reasoningEffort = lobbySettings?.reasoningEffort ?? "off";
   const boardJson = lobbySettings?.boardJson ?? "";
+  const ttsProviderName = lobbySettings?.ttsProviderName ?? "kokoro";
 
   const setTimeToBuzz = (time: number) => {
     updateLobbySettings({ timeToBuzz: time });
@@ -47,6 +48,7 @@ const HostControls: React.FC<HostControlsProps> = ({
 
   const canUsePremium = gate.atLeast("privileged");
   const canUseBrave = gate.atLeast("privileged");
+  const canChooseTtsProvider = gate.atLeast("privileged");
 
   const isReasoningLevelLocked = (level: ReasoningEffortSetting) => {
     if (level === "off" || level === "low") return false;
@@ -60,8 +62,11 @@ const HostControls: React.FC<HostControlsProps> = ({
           <HostControlsBasicSection
             timeToBuzz={timeToBuzz}
             timeToAnswer={timeToAnswer}
+            ttsProviderName={ttsProviderName}
+            showTtsProviderControl={canChooseTtsProvider}
             onTimeToBuzzChange={setTimeToBuzz}
             onTimeToAnswerChange={setTimeToAnswer}
+            onTtsProviderChange={(value) => updateLobbySettings({ ttsProviderName: value })}
             onCreateGame={onCreateGame}
           />
 

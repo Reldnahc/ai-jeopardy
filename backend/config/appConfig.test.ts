@@ -4,6 +4,7 @@ const baseEnv = {
   PORT: 3002,
   CORS_ORIGINS: ["http://localhost:5173"],
   OPENAI_DEFAULT_MODEL: "gpt-4o-mini",
+  KOKORO_URL: "",
   WHISPER_URL: "",
   OPENAI_STT_MODEL: "gpt-4o-mini-transcribe",
   OPENAI_JUDGE_MODEL: "gpt-4o-mini",
@@ -15,10 +16,10 @@ const baseEnv = {
   FINAL_WAGER_SECONDS: 30,
 };
 
-async function loadAppConfig(whisperUrl: string) {
+async function loadAppConfig(whisperUrl: string, kokoroUrl = "") {
   vi.resetModules();
   vi.doMock("./env.js", () => ({
-    env: { ...baseEnv, WHISPER_URL: whisperUrl },
+    env: { ...baseEnv, WHISPER_URL: whisperUrl, KOKORO_URL: kokoroUrl },
   }));
   const mod = await import("./appConfig.js");
   return mod.appConfig;
@@ -38,5 +39,15 @@ describe("appConfig", () => {
   it("falls back to openai as default stt provider when whisper url is empty", async () => {
     const appConfig = await loadAppConfig("");
     expect(appConfig.ai.defaultSttProvider).toBe("openai");
+  });
+
+  it("selects kokoro as default tts provider when kokoro url is configured", async () => {
+    const appConfig = await loadAppConfig("", "http://kokoro.local");
+    expect(appConfig.ai.defaultTtsProvider).toBe("kokoro");
+  });
+
+  it("falls back to openai as default tts provider when kokoro url is empty", async () => {
+    const appConfig = await loadAppConfig("", "");
+    expect(appConfig.ai.defaultTtsProvider).toBe("openai");
   });
 });

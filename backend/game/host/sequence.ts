@@ -14,8 +14,14 @@ export async function aiHostVoiceSequence(
       ? await aiHostSayByKey(ctx, gameId, game, step.slot)
       : await aiHostSayByAsset(ctx, gameId, game, step.assetId);
 
-    const ms = said?.ms ?? 0;
-    const alive = await ctx.sleepAndCheckGame(ms + (step.pad ?? 0), gameId);
+    const measuredMs = Math.max(0, Number(said?.ms ?? 0) || 0);
+    const maxMs =
+      typeof step.maxMs === "number" && Number.isFinite(step.maxMs) && step.maxMs >= 0
+        ? Math.round(step.maxMs)
+        : null;
+    const waitMs = maxMs == null ? measuredMs : Math.min(measuredMs, maxMs);
+
+    const alive = await ctx.sleepAndCheckGame(waitMs + (step.pad ?? 0), gameId);
     if (!alive) return false;
 
     if (typeof step.after === "function") {

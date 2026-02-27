@@ -4,8 +4,13 @@ import { createCtx } from "../../../test/createCtx.js";
 import { lobbyConfigHandlers } from "./lobbyConfigHandlers.js";
 import { MAX_LOBBY_PLAYERS } from "../../../lobby/constants.js";
 
-function makeWs(): SocketState {
-  return { id: "ws-1", send: vi.fn(), gameId: "g1" } as unknown as SocketState;
+function makeWs(role: "default" | "privileged" | "admin" = "privileged"): SocketState {
+  return {
+    id: "ws-1",
+    send: vi.fn(),
+    gameId: "g1",
+    auth: { role, isAuthed: true, userId: "u1" },
+  } as unknown as SocketState;
 }
 
 function makeGame(overrides: Partial<GameState> = {}): GameState {
@@ -21,6 +26,8 @@ function makeGame(overrides: Partial<GameState> = {}): GameState {
       visualMode: "off",
       narrationEnabled: true,
       boardJson: "",
+      sttProviderName: "openai",
+      ttsProviderName: "kokoro",
       categoryPoolPrompt: "",
     },
     ...overrides,
@@ -32,7 +39,9 @@ function makeCtx(game: GameState, overrides: Record<string, unknown> = {}) {
     {
       games: { g1: game },
       isHostSocket: vi.fn(() => true),
-      appConfig: { ai: { defaultModel: "gpt-4o-mini" } },
+      appConfig: {
+        ai: { defaultModel: "gpt-4o-mini", defaultSttProvider: "openai", defaultTtsProvider: "kokoro" },
+      },
       broadcast: vi.fn(),
       requireHost: vi.fn(() => true),
       buildLobbyState: vi.fn(() => ({ type: "lobby-state", gameId: "g1" })),
@@ -108,6 +117,7 @@ describe("lobbyConfigHandlers", () => {
           reasoningEffort: "high",
           visualMode: "brave",
           narrationEnabled: false,
+          ttsProviderName: "openai",
         },
       },
       ctx,
@@ -119,16 +129,39 @@ describe("lobbyConfigHandlers", () => {
     expect(game.lobbySettings?.reasoningEffort).toBe("high");
     expect(game.lobbySettings?.visualMode).toBe("brave");
     expect(game.lobbySettings?.narrationEnabled).toBe(false);
+    expect(game.lobbySettings?.ttsProviderName).toBe("openai");
     expect(ctx.broadcast).toHaveBeenCalledWith(
       "g1",
       expect.objectContaining({ type: "lobby-settings-updated" }),
     );
   });
 
+  it("update-lobby-settings ignores ttsProviderName patch for non-privileged role", async () => {
+    const ws = makeWs("default");
+    const game = makeGame({ lobbySettings: { ...makeGame().lobbySettings, ttsProviderName: "kokoro" } });
+    const ctx = makeCtx(game);
+
+    await lobbyConfigHandlers["update-lobby-settings"]({
+      ws,
+      data: { gameId: "g1", patch: { ttsProviderName: "openai" } },
+      ctx,
+    });
+
+    expect(game.lobbySettings?.ttsProviderName).toBe("kokoro");
+  });
+
   it("update-lobby-settings initializes defaults when lobbySettings missing", async () => {
     const ws = makeWs();
     const game = makeGame({ lobbySettings: undefined });
-    const ctx = makeCtx(game, { appConfig: { ai: { defaultModel: "gpt-default" } } });
+    const ctx = makeCtx(game, {
+      appConfig: {
+        ai: {
+          defaultModel: "gpt-default",
+          defaultSttProvider: "openai",
+          defaultTtsProvider: "kokoro",
+        },
+      },
+    });
 
     await lobbyConfigHandlers["update-lobby-settings"]({
       ws,
@@ -138,6 +171,8 @@ describe("lobbyConfigHandlers", () => {
 
     expect(game.lobbySettings).toMatchObject({
       selectedModel: "gpt-default",
+      sttProviderName: "openai",
+      ttsProviderName: "kokoro",
       boardJson: '{"ok":true}',
       categoryPoolPrompt: "",
     });
