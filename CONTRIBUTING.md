@@ -6,10 +6,21 @@ Thanks for considering a contribution.
 
 1. Install dependencies:
    - `npm ci`
-2. Run the app locally:
-   - `npm run dev` for the frontend
-   - `npm run dev:backend` for the backend
-   - or use Docker: `npm run dev:docker`
+2. Create a `.env` from `.env.example` and set at least:
+   - `DATABASE_URL`
+   - `OPENAI_API_KEY`
+   - `JWT_SECRET`
+   - `NODE_ENV=development`
+3. Apply database schema:
+   - `backend/migration/001_init.sql`
+4. Run locally (two terminals):
+   - `npm run dev:web` (frontend at `http://localhost:5173`)
+   - `npm run dev:backend` (backend at `http://localhost:3002`)
+5. Optional Docker development stack:
+   - `npm run dev:docker`
+
+If you run local `kokoro` and `whisper` services, a CUDA-capable NVIDIA GPU is strongly recommended for usable performance.
+If you do not want local TTS/STT containers, remove or disable `kokoro` and `whisper` from the compose setup and omit `KOKORO_URL`/`WHISPER_URL`.
 
 ## Testing and Linting
 

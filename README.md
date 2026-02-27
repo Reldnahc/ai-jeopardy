@@ -2,6 +2,35 @@
 
 Self-hostable multiplayer Jeopardy-style game with AI-generated boards, narration, and judging.
 
+## Quickstart
+
+1. Copy env template and set required values:
+
+```bash
+cp .env.example .env
+```
+
+Minimum for `docker-compose.yml`:
+
+- `DATABASE_PASSWORD`
+- `JWT_SECRET`
+- `OPENAI_API_KEY`
+- `CORS_ORIGINS` (set to your app origin)
+
+2. Update `docker-compose.yml` volume paths for your machine.
+3. Ensure `backend/migration/001_init.sql` is available in the directory mounted to `/docker-entrypoint-initdb.d` for first boot.
+4. Start the stack:
+
+```bash
+docker compose up -d
+```
+
+5. Open `http://<your-host>:3002`.
+
+If you do not want local `kokoro`/`whisper`, remove those services plus related `depends_on` and env vars (`KOKORO_URL`, `WHISPER_URL`) from the `app` service.
+
+Note: OpenAI-based STT/TTS can become expensive with sustained usage. Running local `kokoro`/`whisper` can reduce ongoing API costs.
+
 ## Features
 
 - Real-time multiplayer gameplay over WebSockets
@@ -10,6 +39,19 @@ Self-hostable multiplayer Jeopardy-style game with AI-generated boards, narratio
 - Optional local TTS/STT services (`kokoro`, `whisper`) with OpenAI fallback
 - User accounts, profiles, stats, and leaderboard
 - PostgreSQL-backed storage for boards and generated media assets
+
+## Feature Matrix
+
+| Capability | OpenAI-only setup | OpenAI + Kokoro/Whisper setup |
+|---|---|---|
+| Core multiplayer gameplay | Yes | Yes |
+| AI board generation | Yes | Yes |
+| AI answer judging | Yes | Yes |
+| TTS narration | Yes (OpenAI provider) | Yes (Kokoro preferred, OpenAI fallback) |
+| STT transcription | Yes (OpenAI provider) | Yes (Whisper preferred, OpenAI fallback) |
+| Local/self-hosted speech services | No | Yes |
+| Best speech throughput/latency | Limited by external API | Better with local GPU-backed services |
+| Ongoing speech cost | Higher (per-request API charges) | Lower (self-hosted compute) |
 
 ## Tech Stack
 
@@ -64,32 +106,9 @@ Optional:
 
 You can start from `.env.example` and adjust values for your setup.
 
-## Local Development
-
-1. Install dependencies:
-
-```bash
-npm ci
-```
-
-2. Apply database schema (`backend/migration/001_init.sql`) to your Postgres database.
-3. Set `.env` values (at minimum: `DATABASE_URL`, `OPENAI_API_KEY`, `JWT_SECRET`, `NODE_ENV=development`).
-4. Run web and backend in separate terminals:
-
-```bash
-npm run dev:web
-npm run dev:backend
-```
-
-Frontend runs at `http://localhost:5173` and backend at `http://localhost:3002`.
+For development and contribution workflows, see `CONTRIBUTING.md`.
 
 ## Docker Workflows
-
-Development stack:
-
-```bash
-npm run dev:docker
-```
 
 Production-style stack:
 
@@ -99,10 +118,12 @@ docker compose up -d
 
 `docker-compose.yml` expects Postgres credentials via `DATABASE_PASSWORD` and mounts an init SQL directory at `/docker-entrypoint-initdb.d`. Ensure `001_init.sql` is present in the mounted SQL directory on first boot.
 
+If you do not want local TTS/STT services, remove `kokoro` and `whisper` from `docker-compose.yml`, and remove related `depends_on`/env entries from `app` (`KOKORO_URL`, `WHISPER_URL`). In that mode, speech features fall back to OpenAI-backed providers where applicable.
+
+If you do run `kokoro`/`whisper`, a CUDA-capable NVIDIA GPU is strongly recommended for usable performance.
+
 ## Useful Scripts
 
-- `npm run dev:web` - start Vite dev server
-- `npm run dev:backend` - start backend with `tsx`
 - `npm run build` - build frontend and backend
 - `npm run start` - run compiled backend (`dist-backend`)
 - `npm run test` - run unit/integration tests (Vitest)
