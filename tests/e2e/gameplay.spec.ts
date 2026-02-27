@@ -1,53 +1,59 @@
 import { expect, test } from "@playwright/test";
 
-test.describe("Gameplay", () => {
-  test("host can create a game and play a clue", async ({ page }) => {
+const MOCK_API = "http://127.0.0.1:3102";
+
+async function resetMock(request: import("@playwright/test").APIRequestContext) {
+  const res = await request.post(`${MOCK_API}/test/reset`);
+  expect(res.ok()).toBeTruthy();
+}
+
+async function signup(page: import("@playwright/test").Page, username: string) {
+  await page.getByRole("button", { name: "Login / Signup" }).click();
+  await page.getByPlaceholder("username").first().fill(username);
+  await page.locator('input[type="password"]').first().fill("password123");
+  await page.getByRole("button", { name: "Sign Up" }).click();
+  await expect(page.getByRole("button", { name: "Login / Signup" })).not.toBeVisible();
+}
+
+test.describe("Gameplay E2E", () => {
+  test("host and player can run a real clue flow", async ({ browser, page, request }) => {
+    await resetMock(request);
+
+    // Host setup
     await page.goto("/");
+    await signup(page, "e2ehost");
 
-    await page.getByRole("button", { name: "Login / Signup" }).click();
-    await page.getByPlaceholder("username").first().fill("e2ehost");
-    await page.locator('input[type="password"]').first().fill("password123");
-    await page.getByRole("button", { name: "Sign Up" }).click();
-    await expect(page.getByRole("button", { name: "Login / Signup" })).not.toBeVisible();
-
-    for (let i = 0; i < 6; i += 1) {
-      if (/\/lobby\/E2E01$/.test(page.url())) break;
-      const createVisible = await page
-        .getByRole("button", { name: "Create Game" })
-        .isVisible({ timeout: 500 })
-        .catch(() => false);
-      if (createVisible) {
-        await page.getByRole("button", { name: "Create Game" }).click();
-      }
-      await page.waitForTimeout(300);
-    }
+    await page.getByRole("button", { name: "Create Game" }).click();
     await expect(page).toHaveURL(/\/lobby\/E2E01$/);
 
+    // Player setup in a second browser context
+    const playerContext = await browser.newContext();
+    const playerPage = await playerContext.newPage();
+    await playerPage.goto("/");
+    await signup(playerPage, "e2eplayer");
+    await playerPage.getByLabel("Game ID:").fill("E2E01");
+    await playerPage.getByRole("button", { name: "Join Game" }).click();
+    await expect(playerPage).toHaveURL(/\/lobby\/E2E01$/);
+
+    // Host starts game, both should transition
     await page.getByRole("button", { name: "Start Game" }).click();
-    try {
-      await expect(page).toHaveURL(/\/game\/E2E01$/, { timeout: 3_000 });
-    } catch {
-      await page.goto("/game/E2E01");
-    }
     await expect(page).toHaveURL(/\/game\/E2E01$/);
-    await page.evaluate(() => {
-      localStorage.setItem(
-        "ai_jeopardy_session",
-        JSON.stringify({
-          gameId: "E2E01",
-          playerKey: "e2e-player-key",
-          username: "e2ehost",
-          displayname: "E2E Host",
-          isHost: true,
-        }),
-      );
-    });
-    await page.reload();
+    await expect(playerPage).toHaveURL(/\/game\/E2E01$/);
 
+    // First clue is active after game starts; both clients should see it
     await expect(page.getByText(/e2e clue question/i)).toBeVisible();
+    await expect(playerPage.getByText(/e2e clue question/i)).toBeVisible();
 
-    await page.getByRole("button", { name: "Buzz!" }).click();
+    // Player buzzes; backend applies score + resolves clue for both clients
+    await playerPage.getByRole("button", { name: "Buzz!" }).click();
+    const stateRes = await request.get(`${MOCK_API}/test/state`);
+    expect(stateRes.ok()).toBeTruthy();
+    const stateJson = (await stateRes.json()) as { scores?: Record<string, number> };
+    expect(stateJson.scores?.e2eplayer).toBe(200);
+
     await expect(page.getByText(/e2e clue question/i)).not.toBeVisible();
-    await expect(page.getByText("200", { exact: true })).not.toBeVisible();
+    await expect(playerPage.getByText(/e2e clue question/i)).not.toBeVisible();
+
+    await playerContext.close();
   });
 });
