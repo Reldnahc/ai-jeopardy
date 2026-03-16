@@ -23,6 +23,7 @@ This plan normalizes code style and patterns based on the conventions that alrea
 - Completed: extracted pure game socket helpers out of `src/features/game/socket/useGameSocketSync.ts`.
 - Completed: extracted ProfileContext request helpers out of `src/contexts/ProfileContext.tsx`.
 - Completed: extracted ProfileContext shared types, store hook, and bootstrap effects out of `src/contexts/ProfileContext.tsx`.
+- Completed: extracted WebSocketContext socket lifecycle into `src/contexts/useWebSocketConnection.ts` and slimmed `src/contexts/WebSocketContext.tsx` down to a thin provider.
 - Completed: extracted benchmark workflow timing, usage, and summary helpers out of `backend/services/ai/board/boardBenchmarkWorkflow.ts`.
 - Completed: extracted benchmark workflow board-generation helpers out of `backend/services/ai/board/boardBenchmarkWorkflow.ts`.
 - Completed: extracted benchmark workflow classifier helpers out of `backend/services/ai/board/boardBenchmarkWorkflow.ts`.
@@ -100,6 +101,7 @@ This plan normalizes code style and patterns based on the conventions that alrea
   - Extracted ProfileContext shared contracts into `src/contexts/profileContext.types.ts`.
   - Extracted ProfileContext cache/request state into `src/contexts/profileContext.store.ts`.
   - Extracted ProfileContext auth/bootstrap effects into `src/contexts/profileContext.bootstrap.ts`.
+  - Extracted WebSocketContext time-sync and socket lifecycle logic into `src/contexts/webSocketContext.helpers.ts` and `src/contexts/useWebSocketConnection.ts`.
   - Extracted profile page role/boards helpers into `src/hooks/profile/profilePageController.helpers.ts`.
   - Extracted profile page request helpers into `src/hooks/profile/profilePageController.requests.ts`.
   - Extracted profile page mutation flow into `src/hooks/profile/useProfilePageMutations.ts`.
@@ -139,6 +141,7 @@ This plan normalizes code style and patterns based on the conventions that alrea
 - Keep helper builders local to the spec file unless reuse is proven.
 - Keep Playwright specs scenario-oriented with small local setup helpers.
 - Add or update targeted tests when refactors change parsing, payload handling, or exported contracts.
+- Keep shared browser-facing helper modules testable under the default Node Vitest environment.
 
 ## High-Value Targets
 
