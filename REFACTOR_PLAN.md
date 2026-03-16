@@ -12,6 +12,7 @@ This plan normalizes code style and patterns based on the conventions that alrea
 - Completed: normalized backend player payload serialization through a shared helper across lobby snapshots and socket handlers.
 - Completed: centralized empty lobby locked-category defaults into a shared backend helper.
 - Completed: centralized repeated lobby socket error-and-snapshot responses into a shared backend helper.
+- Completed: extracted lobby category-pool replacement logic out of `lobbyCategoryHandlers.ts`.
 - Pending: broader file decomposition for oversized controllers, hooks, and route modules.
 
 ## Chosen Defaults
@@ -74,6 +75,7 @@ This plan normalizes code style and patterns based on the conventions that alrea
 - Completed so far:
   - Extracted shared HTTP parsing helpers into `backend/http/httpParsing.ts`.
   - Extracted route-specific profile parsing and auth-user helpers into `backend/http/profileRouteHelpers.ts`.
+  - Extracted category-pool replacement logic into `backend/lobby/categoryPoolRefresh.ts`.
 - Remaining:
   - Split large hooks and components by concern before adding more state branches.
   - Extract route/body parsing helpers from additional large HTTP route modules.

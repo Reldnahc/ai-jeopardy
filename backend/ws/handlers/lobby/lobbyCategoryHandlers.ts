@@ -1,6 +1,7 @@
 import type { CtxDeps } from "../../context.types.js";
 import type { WsHandler } from "../types.js";
 import type { GameState } from "../../../types/runtime.js";
+import { buildRefreshedLobbyCategories } from "../../../lobby/categoryPoolRefresh.js";
 import { createEmptyLockedCategories } from "../../../lobby/lockedCategories.js";
 import { getUniqueCategories } from "../../../services/categories/getUniqueCategories.js";
 import { shuffle, normalizeCategory } from "../../../services/categories/categoryUtils.js";
@@ -330,46 +331,14 @@ export const lobbyCategoryHandlers: Record<string, WsHandler> = {
       game.categoryPoolNextAllowedAtMs = game.categoryPoolGeneratedAtMs + 60_000;
       game.categoryPoolGenerating = false;
 
-      const poolSet = pool.map((c) => String(c ?? "").trim()).filter(Boolean);
-      const shuffledPool = shuffle(poolSet);
       const normalizedCurrent = hctx.normalizeCategories11(game.categories);
-      const lockedFirst = game.lockedCategories?.firstBoard ?? Array(5).fill(false);
-      const lockedSecond = game.lockedCategories?.secondBoard ?? Array(5).fill(false);
-      const lockedFinal = game.lockedCategories?.finalJeopardy ?? Array(1).fill(false);
-      const isLockedAt = (idx: number): boolean => {
-        if (idx >= 0 && idx <= 4) return Boolean(lockedFirst[idx]);
-        if (idx >= 5 && idx <= 9) return Boolean(lockedSecond[idx - 5]);
-        if (idx === 10) return Boolean(lockedFinal[0]);
-        return false;
-      };
-
-      const lockedCategories = normalizedCurrent
-        .map((c, idx) => (isLockedAt(idx) ? String(c ?? "").trim() : ""))
-        .filter(Boolean);
-      const lockedKeys = new Set(lockedCategories.map(normalizeCategory));
-
-      const poolWithoutLocked = shuffledPool.filter((c) => {
-        const key = normalizeCategory(String(c ?? ""));
-        return key && !lockedKeys.has(key);
-      });
-
-      const unlockedIndexes = Array.from({ length: 11 }, (_, idx) => idx).filter(
-        (idx) => !isLockedAt(idx),
+      game.categories = hctx.normalizeCategories11(
+        buildRefreshedLobbyCategories({
+          currentCategories: normalizedCurrent,
+          lockedCategories: game.lockedCategories,
+          pool,
+        }),
       );
-      const needed = unlockedIndexes.length;
-      const replacement = poolWithoutLocked.slice(0, needed);
-      if (replacement.length < needed) {
-        const exclude = [...lockedCategories, ...replacement];
-        replacement.push(...getUniqueCategories(needed - replacement.length, { exclude }));
-      }
-
-      const nextCategories = [...normalizedCurrent];
-      let replacementIdx = 0;
-      for (const idx of unlockedIndexes) {
-        nextCategories[idx] = replacement[replacementIdx] ?? nextCategories[idx] ?? "";
-        replacementIdx += 1;
-      }
-      game.categories = hctx.normalizeCategories11(nextCategories);
 
       hctx.broadcast(gameId, {
         type: "categories-updated",
