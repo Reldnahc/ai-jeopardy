@@ -12,6 +12,20 @@ import React, {
 import { useAuth } from "./AuthContext";
 import { ProfileIconName } from "../components/common/profileIcons.tsx";
 import { Role } from "../../shared/roles.ts";
+import {
+  getApiBase,
+  getErrorMessage,
+  getMissingProfileUsernames,
+  isFreshCacheEntry,
+  mergeDefined,
+  normalizeUsername,
+  patchCachedProfile,
+  PROFILE_TTL_MS,
+  readCachedProfile,
+  safeJson,
+  upsertCachedProfile,
+  type ProfilesByUsername,
+} from "./profileContext.helpers.ts";
 
 export interface ProfileStats {
   boards_generated?: number | null;
@@ -63,14 +77,7 @@ export interface Profile extends ProfileCustomization, ProfileStats {
   updated_at?: string;
 }
 
-interface CachedProfile {
-  profile: Profile;
-  cachedAt: number;
-}
-
-const PROFILE_TTL_MS = 60_000;
-
-type ProfilesByUsername = Record<string, CachedProfile>;
+type ProfilesByUsernameState = ProfilesByUsername<Profile>;
 
 interface ProfileContextType {
   /** Authenticated user's profile (/me). */
@@ -114,46 +121,11 @@ const ProfileContext = createContext<ProfileContextType>({
   setProfileExplicit: () => {},
 });
 
-function getErrorMessage(e: unknown): string {
-  if (e instanceof Error) return e.message;
-  return String(e);
-}
-
-function getApiBase() {
-  if (import.meta.env.DEV) return import.meta.env.VITE_API_BASE || "http://localhost:3002";
-  return "";
-}
-
-function normalizeUsername(u: unknown) {
-  return String(u ?? "")
-    .trim()
-    .toLowerCase();
-}
-
-function mergeDefined<T extends object>(prev: T, patch: Partial<T>): T {
-  const next: T = { ...prev };
-  (Object.keys(patch) as Array<keyof T>).forEach((k) => {
-    const v = patch[k];
-    if (v !== undefined) {
-      next[k] = v;
-    }
-  });
-  return next;
-}
-
-async function safeJson(res: Response) {
-  try {
-    return await res.json();
-  } catch {
-    return null;
-  }
-}
-
 export const ProfileProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { token, user, loading: authLoading } = useAuth();
 
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [profilesByUsername, setProfilesByUsername] = useState<ProfilesByUsername>({});
+  const [profilesByUsername, setProfilesByUsername] = useState<ProfilesByUsernameState>({});
   const [profileLoading, setProfileLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -162,36 +134,12 @@ export const ProfileProvider: React.FC<{ children: ReactNode }> = ({ children })
   const inFlightPublic = useRef(new Set<string>());
 
   const cacheUpsert = useCallback((p: Profile) => {
-    const u = normalizeUsername(p.username);
-    if (!u) return;
-
-    setProfilesByUsername((prev) => {
-      const existing = prev[u];
-      if (!existing) {
-        return { ...prev, [u]: { profile: p, cachedAt: Date.now() } };
-      }
-
-      // Always merge; server can correct optimistic mistakes.
-      return {
-        ...prev,
-        [u]: {
-          profile: mergeDefined(existing.profile, p),
-          cachedAt: Date.now(),
-        },
-      };
-    });
+    setProfilesByUsername((prev) => upsertCachedProfile(prev, p));
   }, []);
 
   const getProfileByUsername = useCallback(
     (uRaw: string | null | undefined): Profile | null => {
-      const u = normalizeUsername(uRaw);
-      if (!u) return null;
-
-      const entry = profilesByUsername[u];
-      if (!entry) return null;
-
-      // Freshness should only affect fetch decisions, not rendering.
-      return entry.profile;
+      return readCachedProfile(profilesByUsername, uRaw);
     },
     [profilesByUsername],
   );
@@ -201,14 +149,9 @@ export const ProfileProvider: React.FC<{ children: ReactNode }> = ({ children })
       const u = normalizeUsername(uRaw);
       if (!u) return null;
 
-      // cached + fresh?
       const entry = profilesByUsername[u];
-      if (entry) {
-        const isFresh = Date.now() - entry.cachedAt < PROFILE_TTL_MS;
-        if (isFresh) return entry.profile;
-      }
+      if (isFreshCacheEntry(entry, Date.now(), PROFILE_TTL_MS)) return entry.profile;
 
-      // in-flight?
       if (inFlightPublic.current.has(u)) return null;
       inFlightPublic.current.add(u);
 
@@ -242,19 +185,9 @@ export const ProfileProvider: React.FC<{ children: ReactNode }> = ({ children })
 
       if (usernames.length === 0) return;
 
-      // only fetch ones not in cache AND not already in flight
-      const now = Date.now();
-
-      const missing = usernames.filter((u) => {
-        const entry = profilesByUsername[u];
-        if (!entry) return true;
-
-        const isFresh = now - entry.cachedAt < PROFILE_TTL_MS;
-        return !isFresh;
-      });
+      const missing = getMissingProfileUsernames(usernames, profilesByUsername);
       if (missing.length === 0) return;
 
-      // mark in-flight per username so multiple callers don't race
       for (const u of missing) inFlightPublic.current.add(u);
 
       try {
@@ -331,20 +264,7 @@ export const ProfileProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     const optimistic = { ...patch } as Partial<Profile>;
 
-    setProfilesByUsername((prev) => {
-      const existing = prev[u];
-      if (!existing) return prev;
-
-      const nextProfile = mergeDefined(existing.profile, optimistic);
-
-      return {
-        ...prev,
-        [u]: {
-          profile: nextProfile,
-          cachedAt: Date.now(),
-        },
-      };
-    });
+    setProfilesByUsername((prev) => patchCachedProfile(prev, u, optimistic));
 
     setProfile((prev) => {
       if (!prev) return prev;

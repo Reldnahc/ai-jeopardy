@@ -16,6 +16,7 @@ This plan normalizes code style and patterns based on the conventions that alrea
 - Completed: extracted profile moderation access and patch logic out of `backend/http/profileRoutes.ts`.
 - Completed: extracted profile customization patch parsing out of `backend/http/profileRoutes.ts`.
 - Completed: extracted Board Creator template/parse/validation helpers out of `src/pages/BoardCreator.tsx`.
+- Completed: extracted ProfileContext cache and freshness helpers out of `src/contexts/ProfileContext.tsx`.
 - Pending: broader file decomposition for oversized controllers, hooks, and route modules.
 
 ## Chosen Defaults
@@ -82,6 +83,7 @@ This plan normalizes code style and patterns based on the conventions that alrea
   - Extracted category-pool replacement logic into `backend/lobby/categoryPoolRefresh.ts`.
   - Extracted profile moderation logic into `backend/http/profileModeration.ts`.
   - Extracted Board Creator pure helpers into `src/features/boardCreator/boardCreatorUtils.ts`.
+  - Extracted ProfileContext cache/freshness helpers into `src/contexts/profileContext.helpers.ts`.
 - Remaining:
   - Split large hooks and components by concern before adding more state branches.
   - Extract route/body parsing helpers from additional large HTTP route modules.
