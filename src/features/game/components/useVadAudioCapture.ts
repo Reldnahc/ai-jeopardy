@@ -27,6 +27,8 @@ type UseVadAudioCaptureOptions = {
   onError?: (err: unknown) => void;
 };
 
+type WebkitAudioWindow = Window & { webkitAudioContext?: typeof AudioContext };
+
 function pickMimeType(): string {
   const preferred = "audio/webm;codecs=opus";
   if (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(preferred))
@@ -37,9 +39,8 @@ function pickMimeType(): string {
 }
 
 function createAudioContext(): AudioContext {
-  const ctor =
-    window.AudioContext ||
-    (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  const audioWindow = window as WebkitAudioWindow;
+  const ctor = audioWindow.AudioContext || audioWindow.webkitAudioContext;
   if (!ctor) throw new Error("AudioContext not supported");
   return new ctor();
 }

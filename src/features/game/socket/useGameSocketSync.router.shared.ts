@@ -14,7 +14,7 @@ import type {
   TtsReady,
 } from "./useGameSocketSync.types.ts";
 
-export type SocketMessage = { type?: string; [key: string]: unknown };
+export type SocketMessage = { type: string; [key: string]: unknown };
 
 export const norm = (v: unknown) =>
   String(v ?? "")

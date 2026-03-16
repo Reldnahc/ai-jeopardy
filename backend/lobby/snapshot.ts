@@ -1,8 +1,9 @@
 import { games } from "../state/gamesStore.js";
 import { normalizeCategories11 } from "../validation/boardImport.js";
 import type { GameState, PlayerState, SocketState } from "../types/runtime.js";
+import type { LobbyStateMessage } from "../../shared/types/lobby.js";
 
-export const buildLobbyState = (gameId: string, ws: SocketState) => {
+export const buildLobbyState = (gameId: string, ws: SocketState): LobbyStateMessage | null => {
   const game = games[gameId];
   if (!game) return null;
 
@@ -16,7 +17,7 @@ export const buildLobbyState = (gameId: string, ws: SocketState) => {
       displayname: p.displayname,
       online: p?.online !== false,
     })),
-    host: game.host,
+    host: typeof game.host === "string" ? game.host : null,
     categories: normalizeCategories11(game.categories),
     lockedCategories: game.lockedCategories,
     inLobby: game.inLobby,

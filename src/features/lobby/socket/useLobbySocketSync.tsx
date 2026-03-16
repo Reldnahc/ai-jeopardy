@@ -144,7 +144,7 @@ export function useLobbySocketSync({
     if (!gameId) return;
 
     const unsubscribe = subscribe((message) => {
-      routeLobbySocketMessage(message as { type?: string; [key: string]: unknown }, {
+      routeLobbySocketMessage(message, {
         gameId,
         username,
         requestLobbyState,

@@ -1,7 +1,7 @@
 import { pickCommonsImageForQueries } from "../commonsService.js";
 import { pickBraveImageForQueries } from "../braveImageService.js";
 import { ingestImageToDbFromUrl } from "../imageAssetService.js";
-import { Ctx } from "../../ws/context.types.js";
+import type { Ctx } from "../../ws/context.types.js";
 
 type TraceLike = { mark: (event: string, meta?: Record<string, unknown>) => void };
 type VisualClue = {
@@ -10,6 +10,7 @@ type VisualClue = {
   media?: { type: "image"; assetId: string };
 };
 type VisualCategory = { values?: VisualClue[] };
+type ImageRepos = Parameters<typeof ingestImageToDbFromUrl>[2];
 
 export type VisualSettings = {
   includeVisuals: boolean;
@@ -68,6 +69,14 @@ export function makeLimiter(maxConcurrent: number) {
     });
 }
 
+function hasImageRepos(repos: Ctx["repos"]): repos is ImageRepos {
+  return Boolean(
+    repos?.images &&
+      typeof repos.images.getIdBySha256 === "function" &&
+      typeof repos.images.upsertImageAsset === "function",
+  );
+}
+
 export async function populateCategoryVisuals(
   ctx: Ctx,
   cat: VisualCategory,
@@ -118,6 +127,10 @@ export async function populateCategoryVisuals(
         continue;
       }
 
+      if (!hasImageRepos(ctx.repos)) {
+        throw new Error("populateCategoryVisuals: missing image repository");
+      }
+
       const assetId = await ingestImageToDbFromUrl(
         found.downloadUrl,
         {
@@ -127,21 +140,7 @@ export async function populateCategoryVisuals(
           attribution: found.attribution,
           trace: settings.trace,
         },
-        ctx.repos as unknown as {
-          images?: {
-            getIdBySha256(sha256: string): Promise<string | null>;
-            upsertImageAsset(
-              sha256: string,
-              bytes: Buffer,
-              size: number,
-              width: number | null,
-              height: number | null,
-              sourceUrl: string | null,
-              license: string | null,
-              attribution: string | null,
-            ): Promise<string | null>;
-          };
-        },
+        ctx.repos,
       );
 
       clue.media = { type: "image", assetId };

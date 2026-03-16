@@ -1,31 +1,7 @@
 import type React from "react";
 import type { AlertButton } from "../../../contexts/AlertContext.tsx";
 
-export type LockedCategories = {
-  firstBoard: boolean[];
-  secondBoard: boolean[];
-  finalJeopardy: boolean[];
-};
-
-export type LobbySettings = {
-  timeToBuzz: number;
-  timeToAnswer: number;
-  selectedModel: string;
-  reasoningEffort: "off" | "low" | "medium" | "high";
-  visualMode: "off" | "commons" | "brave";
-  narrationEnabled: boolean;
-  boardJson: string;
-  sttProviderName?: "openai" | "whisper";
-  ttsProviderName?: "kokoro" | "openai";
-  categoryRefreshLocked?: boolean;
-  categoryPoolPrompt?: string;
-};
-
-export type CategoryPoolState = {
-  nextAllowedAtMs: number | null;
-  lastGeneratedAtMs: number | null;
-  generating: boolean;
-};
+export type { CategoryPoolState, LobbySettings, LockedCategories } from "../../../../shared/types/lobby.ts";
 
 export type UseLobbySocketSyncArgs = {
   gameId?: string;

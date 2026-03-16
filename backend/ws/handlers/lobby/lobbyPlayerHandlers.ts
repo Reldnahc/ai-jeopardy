@@ -3,6 +3,7 @@ import type { CtxDeps } from "../../context.types.js";
 import type { WsHandler } from "../types.js";
 import { MAX_LOBBY_PLAYERS } from "../../../lobby/constants.js";
 import { getUniqueCategories } from "../../../services/categories/getUniqueCategories.js";
+import type { LobbyCreatedMessage, LobbyPlayerSummary } from "../../../../shared/types/lobby.js";
 
 type CreateLobbyData = {
   username?: string;
@@ -118,13 +119,13 @@ export const lobbyPlayerHandlers: Record<string, WsHandler> = {
       type: "lobby-created",
       gameId: newGameId,
       categories: hctx.games[newGameId].categories,
-      players: hctx.games[newGameId].players.map((p: PlayerState) => ({
+      players: hctx.games[newGameId].players.map((p: PlayerState): LobbyPlayerSummary => ({
         username: p.username,
         displayname: p.displayname,
         online: Boolean(p.online),
       })),
       host: u,
-    });
+    } satisfies LobbyCreatedMessage);
 
     sendTimed("lobby-state", hctx.buildLobbyState(newGameId, ws));
 

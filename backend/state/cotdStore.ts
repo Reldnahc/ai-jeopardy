@@ -1,17 +1,14 @@
-type CategoryOfTheDay = {
-  category: string;
-  description: string;
-};
+import type { CategoryOfTheDayPayload } from "../../shared/types/lobby.js";
 
-let cotd: CategoryOfTheDay = {
+let cotd: CategoryOfTheDayPayload = {
   category: "",
   description: "",
 };
 
-export function getCOTD(): CategoryOfTheDay {
+export function getCOTD(): CategoryOfTheDayPayload {
   return cotd;
 }
 
-export function setCOTD(next: CategoryOfTheDay): void {
+export function setCOTD(next: CategoryOfTheDayPayload): void {
   cotd = next;
 }

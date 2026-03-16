@@ -176,7 +176,7 @@ export function useGameSocketSync({ gameId, username }: UseGameSocketSyncArgs) {
     if (!isSocketReady) return;
 
     return subscribe((message) => {
-      routeGameSocketMessage(message as { type?: string; [key: string]: unknown }, {
+      routeGameSocketMessage(message, {
         gameId,
         myUsername,
         nowMs,

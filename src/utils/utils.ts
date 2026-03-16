@@ -32,10 +32,5 @@ export async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> 
     throw new Error(getErrorMessage(payload, fallback));
   }
 
-  // If the server returns empty body on 204 etc
-  if (payload === null) {
-    return null as unknown as T;
-  }
-
   return payload as T;
 }

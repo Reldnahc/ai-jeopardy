@@ -1,11 +1,17 @@
 import type { LobbySocketMessage, LobbySocketRouterDeps } from "./useLobbySocketSync.router.shared.ts";
+import {
+  isCreateBoardFailedMessage,
+  isGenerationProgressMessage,
+  isPreloadImagesMessage,
+  isPreloadStartMessage,
+} from "../../../../shared/types/lobby.ts";
 
 export function routeLobbyPreloadMessage(
   message: LobbySocketMessage,
   d: LobbySocketRouterDeps,
 ): boolean {
-  if (message.type === "generation-progress") {
-    const m = message as { progress?: unknown };
+  if (isGenerationProgressMessage(message)) {
+    const m = message;
     const p = typeof m.progress === "number" ? m.progress : 0;
     d.setLoadingProgress(Math.max(0, Math.min(1, p)));
     return true;
@@ -18,13 +24,12 @@ export function routeLobbyPreloadMessage(
     return true;
   }
 
-  if (message.type === "create-board-failed") {
+  if (isCreateBoardFailedMessage(message)) {
     d.setIsLoading(false);
     d.setIsPreloadingImages(false);
     d.setPreloadAssetIds(null);
 
-    const m = message as { message?: string };
-    const alertContent = m.message ?? "Unknown error.";
+    const alertContent = message.message ?? "Unknown error.";
     void d.showAlert("Game Start Failed", alertContent, [
       {
         label: "Okay",
@@ -43,13 +48,8 @@ export function routeLobbyPreloadMessage(
     return true;
   }
 
-  if (message.type === "preload-images") {
-    const m = message as {
-      assetIds?: string[];
-      ttsAssetIds?: string[];
-      token?: number;
-      final?: boolean;
-    };
+  if (isPreloadImagesMessage(message)) {
+    const m = message;
 
     const tok = Number(m.token);
     if (Number.isFinite(tok)) d.setPreloadToken(tok);
@@ -74,9 +74,8 @@ export function routeLobbyPreloadMessage(
     return true;
   }
 
-  if (message.type === "preload-start") {
-    const m = message as { token?: number };
-    const tok = Number(m.token);
+  if (isPreloadStartMessage(message)) {
+    const tok = Number(message.token);
     d.setPreloadToken(Number.isFinite(tok) ? tok : 0);
     d.setPreloadFinalToken(null);
     d.setPreloadAssetIds(null);

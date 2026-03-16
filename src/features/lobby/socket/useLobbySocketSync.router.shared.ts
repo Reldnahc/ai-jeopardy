@@ -2,9 +2,9 @@ import type React from "react";
 import type { Player } from "../../../types/Lobby.ts";
 import type { BoardType } from "../../../utils/lobbySections.ts";
 import type { AlertButton } from "../../../contexts/AlertContext.tsx";
-import type { LobbySettings, LockedCategories, CategoryPoolState } from "./useLobbySocketSync.types.ts";
+import type { CategoryPoolState, LobbyInboundMessage, LobbySettings, LockedCategories } from "../../../../shared/types/lobby.ts";
 
-export type LobbySocketMessage = { type?: string; [key: string]: unknown };
+export type LobbySocketMessage = LobbyInboundMessage;
 
 export type LobbySocketRouterDeps = {
   gameId?: string;

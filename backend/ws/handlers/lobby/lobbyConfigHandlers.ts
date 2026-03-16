@@ -3,6 +3,10 @@ import type { CtxDeps } from "../../context.types.js";
 import type { WsHandler } from "../types.js";
 import { MAX_LOBBY_PLAYERS } from "../../../lobby/constants.js";
 import { atLeast, normalizeRole } from "../../../../shared/roles.js";
+import type {
+  CheckLobbyResponseMessage,
+  LobbySettingsUpdatedMessage,
+} from "../../../../shared/types/lobby.js";
 
 type GameIdData = { gameId: string };
 type UpdateLobbySettingsData = { gameId: string; patch?: Record<string, unknown> };
@@ -106,11 +110,13 @@ export const lobbyConfigHandlers: Record<string, WsHandler> = {
         game.lobbySettings.categoryPoolPrompt = p.categoryPoolPrompt;
       }
 
-      hctx.broadcast(gameId, {
+      const payload: LobbySettingsUpdatedMessage = {
         type: "lobby-settings-updated",
         gameId,
         lobbySettings: game.lobbySettings,
-      });
+      };
+
+      hctx.broadcast(gameId, payload);
     } catch (e) {
       console.error("update-lobby-settings failed:", e);
       ws.send(JSON.stringify({ type: "error", message: "update-lobby-settings failed" }));
@@ -157,11 +163,13 @@ export const lobbyConfigHandlers: Record<string, WsHandler> = {
 
     game.lobbySettings.categoryPoolPrompt = String(prompt ?? "").slice(0, 500);
 
-    hctx.broadcast(gameId, {
+    const payload: LobbySettingsUpdatedMessage = {
       type: "lobby-settings-updated",
       gameId,
       lobbySettings: game.lobbySettings,
-    });
+    };
+
+    hctx.broadcast(gameId, payload);
   },
 
   "check-lobby": async ({ ws, data, ctx }) => {
@@ -197,15 +205,15 @@ export const lobbyConfigHandlers: Record<string, WsHandler> = {
 
     const isValid = Boolean(inLobby && !isFull);
 
-    ws.send(
-      JSON.stringify({
-        type: "check-lobby-response",
-        isValid,
-        isFull,
-        maxPlayers: MAX_LOBBY_PLAYERS,
-        gameId,
-      }),
-    );
+    const payload: CheckLobbyResponseMessage = {
+      type: "check-lobby-response",
+      isValid,
+      isFull,
+      maxPlayers: MAX_LOBBY_PLAYERS,
+      gameId,
+    };
+
+    ws.send(JSON.stringify(payload));
   },
 
   "promote-host": async ({ ws, data, ctx }) => {

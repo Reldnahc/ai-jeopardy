@@ -1,13 +1,21 @@
-import type { Player } from "../../../types/Lobby.ts";
 import type { LobbySocketMessage, LobbySocketRouterDeps } from "./useLobbySocketSync.router.shared.ts";
-import type { LockedCategories, LobbySettings } from "./useLobbySocketSync.types.ts";
+import type { LockedCategories } from "./useLobbySocketSync.types.ts";
+import {
+  isCategoriesUpdatedMessage,
+  isCategoryLockUpdatedMessage,
+  isCategoryPoolStatusMessage,
+  isCategoryUpdatedMessage,
+  isLobbySettingsUpdatedMessage,
+  isLobbyStateMessage,
+  isPlayerListUpdateMessage,
+} from "../../../../shared/types/lobby.ts";
 
 export function routeLobbySnapshotMessage(
   message: LobbySocketMessage,
   d: LobbySocketRouterDeps,
 ): boolean {
-  if (message.type === "player-list-update") {
-    const m = message as { players: Player[]; host: string };
+  if (isPlayerListUpdateMessage(message)) {
+    const m = message;
 
     const hostUsername = String(m.host ?? "")
       .trim()
@@ -35,24 +43,8 @@ export function routeLobbySnapshotMessage(
     return true;
   }
 
-  if (message.type === "lobby-state") {
-    const m = message as {
-      players: Player[];
-      host: string;
-      categories?: string[];
-      inLobby?: boolean;
-      isGenerating?: boolean;
-      isLoading?: boolean;
-      generationProgress?: number | null;
-      lockedCategories?: LockedCategories;
-      you?: { isHost?: boolean; playerName?: string; playerKey?: string };
-      lobbySettings?: LobbySettings | null;
-      categoryPoolState?: {
-        nextAllowedAtMs?: number | null;
-        lastGeneratedAtMs?: number | null;
-        generating?: boolean;
-      };
-    };
+  if (isLobbyStateMessage(message)) {
+    const m = message;
 
     d.setPlayers(Array.isArray(m.players) ? m.players : []);
     d.setHost(m.host ?? null);
@@ -113,25 +105,19 @@ export function routeLobbySnapshotMessage(
     return true;
   }
 
-  if (message.type === "category-lock-updated") {
-    const m = message as { boardType: unknown; index: number; locked: boolean };
+  if (isCategoryLockUpdatedMessage(message)) {
+    const m = message;
     const bt = m.boardType;
-    if (bt === "firstBoard" || bt === "secondBoard" || bt === "finalJeopardy") {
-      d.setLockedCategories((prev) => {
-        const updated: LockedCategories = { ...prev };
-        updated[bt][m.index] = Boolean(m.locked);
-        return updated;
-      });
-    }
+    d.setLockedCategories((prev) => {
+      const updated: LockedCategories = { ...prev };
+      updated[bt][m.index] = Boolean(m.locked);
+      return updated;
+    });
     return true;
   }
 
-  if (message.type === "category-updated") {
-    const m = message as {
-      boardType: "firstBoard" | "secondBoard" | "finalJeopardy";
-      index: number;
-      value: string;
-    };
+  if (isCategoryUpdatedMessage(message)) {
+    const m = message;
 
     d.setCategories((prev) => {
       const nextBoard = [...(prev[m.boardType] ?? [])];
@@ -141,24 +127,18 @@ export function routeLobbySnapshotMessage(
     return true;
   }
 
-  if (message.type === "categories-updated") {
-    const m = message as { categories: string[] };
-    if (Array.isArray(m.categories)) d.setCategories(d.unflattenBySections(m.categories));
+  if (isCategoriesUpdatedMessage(message)) {
+    d.setCategories(d.unflattenBySections(message.categories));
     return true;
   }
 
-  if (message.type === "lobby-settings-updated") {
-    const m = message as { lobbySettings?: LobbySettings | null };
-    if (m.lobbySettings) d.setLobbySettings(m.lobbySettings);
+  if (isLobbySettingsUpdatedMessage(message)) {
+    d.setLobbySettings(message.lobbySettings);
     return true;
   }
 
-  if (message.type === "category-pool-status") {
-    const m = message as {
-      nextAllowedAtMs?: number | null;
-      lastGeneratedAtMs?: number | null;
-      generating?: boolean;
-    };
+  if (isCategoryPoolStatusMessage(message)) {
+    const m = message;
     d.setCategoryPoolState({
       nextAllowedAtMs: m.nextAllowedAtMs ?? null,
       lastGeneratedAtMs: m.lastGeneratedAtMs ?? null,

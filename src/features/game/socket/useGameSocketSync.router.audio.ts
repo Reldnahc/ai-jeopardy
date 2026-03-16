@@ -1,15 +1,15 @@
 import { preloadAudio, ttsUrl } from "../../../hooks/game/usePreload.ts";
+import { isLobbySettingsUpdatedMessage } from "../../../../shared/types/lobby.ts";
+import {
+  isAiHostSayMessage,
+  isPreloadFinalJeopardyAssetMessage,
+  isTtsReadyMessage,
+} from "./useGameSocketSync.guards.ts";
 import type { GameSocketRouterDeps, SocketMessage } from "./useGameSocketSync.router.shared.ts";
 
 export function routeAudioMessage(message: SocketMessage, d: GameSocketRouterDeps): boolean {
-  if (message.type === "ai-host-say") {
-    const m = message as {
-      text?: string;
-      assetId?: string;
-      startedAtMs?: number;
-      durationMs?: number;
-      elapsedMs?: number;
-    };
+  if (isAiHostSayMessage(message)) {
+    const m = message;
 
     const assetId = typeof m.assetId === "string" ? m.assetId.trim() : "";
     if (assetId) {
@@ -49,9 +49,8 @@ export function routeAudioMessage(message: SocketMessage, d: GameSocketRouterDep
     return true;
   }
 
-  if (message.type === "tts-ready") {
-    const m = message as { requestId?: string; assetId: string; url: string };
-    d.setTtsReady({ requestId: m.requestId, assetId: m.assetId, url: m.url });
+  if (isTtsReadyMessage(message)) {
+    d.setTtsReady({ requestId: message.requestId, assetId: message.assetId, url: message.url });
     return true;
   }
 
@@ -60,15 +59,13 @@ export function routeAudioMessage(message: SocketMessage, d: GameSocketRouterDep
     return true;
   }
 
-  if (message.type === "preload-final-jeopardy-asset") {
-    const m = message as { assetId: string };
-    void preloadAudio(ttsUrl(m.assetId));
+  if (isPreloadFinalJeopardyAssetMessage(message)) {
+    void preloadAudio(ttsUrl(message.assetId));
     return true;
   }
 
-  if (message.type === "lobby-settings-updated") {
-    const m = message as { lobbySettings?: { narrationEnabled?: boolean } | null };
-    d.setNarrationEnabled(Boolean(m.lobbySettings?.narrationEnabled));
+  if (isLobbySettingsUpdatedMessage(message)) {
+    d.setNarrationEnabled(Boolean(message.lobbySettings?.narrationEnabled));
     return true;
   }
 

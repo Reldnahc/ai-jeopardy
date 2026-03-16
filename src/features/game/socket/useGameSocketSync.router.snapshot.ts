@@ -1,12 +1,12 @@
 import type { Clue } from "../../../../shared/types/board.ts";
-import type { GameStateMessage } from "./useGameSocketSync.types.ts";
 import type { GameSocketRouterDeps, SocketMessage } from "./useGameSocketSync.router.shared.ts";
+import { isGameStateMessage } from "./useGameSocketSync.guards.ts";
 import { norm } from "./useGameSocketSync.router.shared.ts";
 
 export function routeSnapshotMessage(message: SocketMessage, d: GameSocketRouterDeps): boolean {
-  if (message.type !== "game-state") return false;
+  if (!isGameStateMessage(message)) return false;
 
-  const m = message as GameStateMessage;
+  const m = message;
 
   if (typeof m.playerBuzzLockoutUntil === "number") {
     d.applyLockoutUntil(m.playerBuzzLockoutUntil);

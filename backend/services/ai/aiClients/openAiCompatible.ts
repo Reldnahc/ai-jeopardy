@@ -4,6 +4,9 @@ import { modelsByValue } from "../../../../shared/models.js";
 import type { AiCallOptions } from "./types.js";
 
 type ChatCreateParams = Parameters<OpenAI["chat"]["completions"]["create"]>[0];
+type ReasoningChatCreateParams = ChatCreateParams & {
+  reasoning_effort: "low" | "medium" | "high";
+};
 
 export async function callOpenAiCompatibleJson(args: {
   client: OpenAI;
@@ -25,7 +28,7 @@ export async function callOpenAiCompatibleJson(args: {
       ]
     : prompt;
 
-  const payload = {
+  const payload: ChatCreateParams = {
     model,
     messages: [
       { role: "system" as const, content: options.systemPrompt! },
@@ -35,13 +38,14 @@ export async function callOpenAiCompatibleJson(args: {
   };
 
   if (includeReasoningEffort) {
-    return client.chat.completions.create({
+    const payloadWithReasoning: ReasoningChatCreateParams = {
       ...payload,
       reasoning_effort: effort,
-    } as unknown as ChatCreateParams);
+    };
+    return client.chat.completions.create(payloadWithReasoning);
   }
 
-  return client.chat.completions.create(payload as ChatCreateParams);
+  return client.chat.completions.create(payload);
 }
 
 export function modelSupportsReasoningEffort(model: string) {

@@ -1,6 +1,7 @@
 import type { PlayerState } from "../../types/runtime.js";
 import { normalizeRole } from "../../../shared/roles.js";
 import type { Role } from "../../../shared/roles.js";
+import type { CategoryOfTheDayMessage } from "../../../shared/types/lobby.js";
 import type { WsHandler, WsHandlerArgs } from "./types.js";
 import type { CtxDeps } from "../context.types.js";
 
@@ -57,11 +58,12 @@ export const userHandlers: Record<string, WsHandler> = {
   },
   "check-cotd": async ({ ws, ctx }: WsHandlerArgs) => {
     const hctx = ctx as UserHandlersCtx;
+    const payload: CategoryOfTheDayMessage = {
+      type: "category-of-the-day",
+      cotd: hctx.getCOTD(),
+    };
     ws.send(
-      JSON.stringify({
-        type: "category-of-the-day",
-        cotd: hctx.getCOTD(),
-      }),
+      JSON.stringify(payload),
     );
   },
   "request-player-list": async ({ ws, data, ctx }: WsHandlerArgs<RequestPlayerListData>) => {

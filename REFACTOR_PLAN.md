@@ -1,0 +1,110 @@
+# Refactor Plan
+
+This plan normalizes code style and patterns based on the conventions that already appear most often in this repository.
+
+## Progress
+
+- Completed: shared lobby wire contracts and guard-based narrowing for the main lobby socket flow.
+- Completed: core game snapshot and audio socket narrowing, plus removal of all remaining non-test `as unknown as` casts.
+- In progress: message narrowing for the remaining game board and answer socket routers.
+- Pending: broader file decomposition for oversized controllers, hooks, and route modules.
+
+## Chosen Defaults
+
+- Formatting follows `.prettierrc`: 2 spaces, semicolons, double quotes, trailing commas, 100-character line width.
+- Keep explicit local import extensions such as `.ts`, `.tsx`, and `.js`.
+- Prefer relative imports over adding path aliases.
+- Use `import type` for type-only imports.
+- Prefer `type` aliases for unions, helper payloads, DTOs, and shared domain shapes.
+- Prefer `interface` for React props and context contracts in UI code.
+- `backend/` and `shared/` should prefer named exports.
+- `src/pages/`, `src/components/`, and `src/features/**/components/` should default-export the primary component in the file.
+- `src/hooks/`, `src/utils/`, router helpers, and other non-UI modules should prefer named exports.
+- Prefer plain function components for new or normalized React components.
+- Avoid adding new `as unknown as` casts; normalize boundary payloads with helpers or type guards instead.
+
+## Audit Summary
+
+- The repo already has a clear formatting baseline from Prettier and ESLint.
+- Explicit file extensions in local imports are already common and should be preserved.
+- `import type` is already widely used and should be normalized repo-wide.
+- `type` aliases are more common overall than `interface`.
+- React props in `src/` are more commonly modeled with `interface ...Props`.
+- Default exports are mainly a frontend component pattern. Backend and shared modules mostly use named exports.
+- The biggest consistency and safety issue is repeated boundary casting with `as unknown as`.
+
+## Prioritized Workstreams
+
+### 1. Low-Risk Mechanical Normalization
+
+- Normalize type-only imports to `import type`.
+- Keep import ordering consistent within files without introducing a new tooling rule.
+- Preserve explicit file extensions in local imports.
+- Fix export-style outliers so each layer matches the dominant convention.
+
+### 2. Boundary Type Cleanup
+
+- Status: In progress.
+- Completed so far:
+  - Moved the main lobby socket wire contracts into `shared/types/lobby.ts`.
+  - Replaced the main lobby frontend socket casts with guard-based narrowing.
+  - Aligned backend lobby and COTD emitters with the shared lobby message contracts.
+  - Added core game socket guards for snapshot and audio hydration paths.
+  - Removed all remaining non-test `as unknown as` casts.
+- Remaining:
+  - Replace the remaining `message as ...` casts in the game board and answer routers.
+  - Continue moving reusable socket payload contracts into shared or local guard modules where it reduces boundary casting.
+
+### 3. Frontend Component Normalization
+
+- Normalize new or touched components toward plain function components.
+- Keep props types local and named `...Props`.
+- Preserve default exports for top-level UI components.
+- Keep hook logic in hooks and avoid growing page components with transport or data-massaging logic.
+
+### 4. Oversized File Decomposition
+
+- Split large hooks and components by concern before adding more state branches.
+- Extract route/body parsing helpers from large HTTP route modules.
+- Extract workflow steps from large backend orchestration modules into helper files.
+
+### 5. Backend Module Consistency
+
+- Keep route modules structured as imports, local helpers/types, exported `registerXRoutes`.
+- Keep websocket handler files structured as imports, payload/helper definitions, exported handler map.
+- Preserve repository factory patterns such as `createRepos` and `createXRepo`.
+- Prefer helper functions over inline cleanup logic repeated across handlers and services.
+
+### 6. Test Pattern Normalization
+
+- Keep Vitest mocks at the top of the file with `vi.hoisted` and `vi.mock` before the import under test.
+- Keep helper builders local to the spec file unless reuse is proven.
+- Keep Playwright specs scenario-oriented with small local setup helpers.
+- Add or update targeted tests when refactors change parsing, payload handling, or exported contracts.
+
+## High-Value Targets
+
+These files are strong candidates for the first structural cleanup pass:
+
+- `src/hooks/profile/useProfilePageController.ts`
+- `src/features/game/socket/useGameSocketSync.ts`
+- `src/pages/BoardCreator.tsx`
+- `src/contexts/ProfileContext.tsx`
+- `backend/http/profileRoutes.ts`
+- `backend/services/ai/board/boardBenchmarkWorkflow.ts`
+
+## Suggested Execution Order
+
+1. Normalize imports and export-style outliers.
+2. Remove the worst `as unknown as` cases at the frontend/backend boundaries.
+3. Extract shared payload types into `shared/`.
+4. Split oversized hooks and route modules by concern.
+5. Run targeted tests after each pass and run broader lint/test checks at the end of each workstream.
+
+## Verification Expectations
+
+- Run the narrowest relevant tests first.
+- Run `npm run lint` for TypeScript and React code changes.
+- Run focused Vitest files for touched backend routes, handlers, repositories, or hooks.
+- Run `npm run test` after broad normalization passes.
+- If a refactor affects user flows, run the relevant Playwright spec or document why it was skipped.

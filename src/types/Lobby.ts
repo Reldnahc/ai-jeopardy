@@ -1,5 +1,1 @@
-export type Player = {
-  username: string;
-  displayname: string;
-  online?: boolean;
-};
+export type { LobbyPlayerSummary as Player } from "../../shared/types/lobby.ts";

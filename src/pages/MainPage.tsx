@@ -10,8 +10,12 @@ import FeaturedCategoryCard from "../components/main/mainPage/FeaturedCategoryCa
 import GameActionsSection from "../components/main/mainPage/GameActionsSection.tsx";
 import DiscoveryLinks from "../components/main/mainPage/DiscoveryLinks.tsx";
 import HowToPlaySection from "../components/main/mainPage/HowToPlaySection.tsx";
-import { Player } from "../types/Lobby.ts";
 import { useGameSession } from "../hooks/useGameSession.ts";
+import {
+  isCategoryOfTheDayMessage,
+  isCheckLobbyResponseMessage,
+  isLobbyCreatedMessage,
+} from "../../shared/types/lobby.ts";
 
 const ADJECTIVES = ["Hallucinated", "Intelligent", "Dreamt", "Generated", "Conjured", "Created"];
 
@@ -57,17 +61,15 @@ export default function MainPage() {
     return subscribe((message) => {
       switch (message.type) {
         case "category-of-the-day": {
-          const m = message as unknown as { cotd: { category: string; description: string } };
+          if (!isCategoryOfTheDayMessage(message)) return;
+          const m = message;
           setCotd(m.cotd);
           return;
         }
 
         case "lobby-created": {
-          const m = message as unknown as {
-            gameId: string;
-            players: Player[];
-            categories: string[];
-          };
+          if (!isLobbyCreatedMessage(message)) return;
+          const m = message;
 
           setIsCreatingLobby(false);
 
@@ -95,12 +97,8 @@ export default function MainPage() {
         }
 
         case "check-lobby-response": {
-          const m = message as unknown as {
-            isValid: boolean;
-            isFull?: boolean;
-            maxPlayers?: number;
-            gameId: string;
-          };
+          if (!isCheckLobbyResponseMessage(message)) return;
+          const m = message;
 
           if (m.isFull) {
             void showAlert(

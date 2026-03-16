@@ -1,11 +1,12 @@
 import type { LobbySocketMessage, LobbySocketRouterDeps } from "./useLobbySocketSync.router.shared.ts";
+import { isCheckLobbyResponseMessage, isSocketErrorMessage } from "../../../../shared/types/lobby.ts";
 
 export function routeLobbyControlMessage(
   message: LobbySocketMessage,
   d: LobbySocketRouterDeps,
 ): boolean {
-  if (message.type === "check-lobby-response") {
-    const m = message as { isValid: boolean; isFull?: boolean; maxPlayers?: number };
+  if (isCheckLobbyResponseMessage(message)) {
+    const m = message;
 
     if (!m.isValid) {
       if (m.isFull) {
@@ -42,8 +43,8 @@ export function routeLobbyControlMessage(
     return true;
   }
 
-  if (message.type === "error") {
-    const m = message as { message?: string };
+  if (isSocketErrorMessage(message)) {
+    const m = message;
     const msg = String(m.message ?? "");
     if (msg.toLowerCase().includes("category refresh")) {
       void d.showAlert("Category Refresh", msg, [
