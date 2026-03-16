@@ -14,7 +14,7 @@ import {
 import type { Repos } from "../repositories/index.js";
 import type { CustomizationPatch } from "../repositories/profile/profile.types.js";
 import { containsProfanity } from "../services/profanityService.js";
-import { normalizeRole, isBanned, rank, type LadderRole } from "../../shared/roles.js";
+import { resolveProfileModerationAccess, applyProfileModerationPatch } from "./profileModeration.js";
 
 type ProfileRepos = Pick<Repos, "profiles" | "boards">;
 
@@ -186,88 +186,18 @@ export function registerProfileRoutes(app: Application, repos: ProfileRepos) {
       if (!username) return res.status(400).json({ error: "Missing username" });
 
       const body = asRecord(req.body);
+      const access = await resolveProfileModerationAccess({ repos, actorId, username });
+      if (!access.ok) return res.status(access.status).json({ error: access.error });
 
-      // Find target
-      const targetProfile = await repos.profiles.getPublicProfileByUsername(username);
-      if (!targetProfile) return res.status(404).json({ error: "Target not found" });
+      const result = await applyProfileModerationPatch({
+        repos,
+        targetUserId: access.targetUserId,
+        actorRank: access.actorRank,
+        body,
+      });
+      if (!result.ok) return res.status(result.status).json({ error: result.error });
 
-      const targetUserId = String(targetProfile.id ?? "");
-      if (!targetUserId) return res.status(500).json({ error: "Target missing id" });
-
-      // DB roles are authoritative
-      const actorRoleRaw = await repos.profiles.getRoleById(actorId);
-      const targetRoleRaw = await repos.profiles.getRoleById(targetUserId);
-
-      if (!actorRoleRaw) return res.status(403).json({ error: "Unauthorized" });
-      if (!targetRoleRaw) return res.status(404).json({ error: "Target not found" });
-
-      const actorRole = normalizeRole(actorRoleRaw);
-      const targetRole = normalizeRole(targetRoleRaw);
-
-      if (isBanned(actorRole)) return res.status(403).json({ error: "Banned" });
-
-      const actorRank = rank(actorRole as LadderRole);
-      const targetEffectiveRank = targetRole === "banned" ? -1 : rank(targetRole as LadderRole);
-
-      // must be strictly higher than target to touch them
-      if (targetEffectiveRank >= actorRank) {
-        return res.status(403).json({ error: "Cannot modify peer/superior" });
-      }
-
-      let changed = false;
-
-      // --- Bio moderation (mods+) ---
-      if ("bio" in body) {
-        if (actorRank < rank("moderator")) {
-          return res.status(403).json({ error: "Forbidden" });
-        }
-
-        const nextBio = asTrimmedString(body.bio);
-
-        // If non-empty, enforce profanity rule (optional but consistent)
-        if (nextBio.length > 0 && containsProfanity(nextBio)) {
-          return res.status(400).json({ error: "Bio contains prohibited language." });
-        }
-
-        // Set bio. Your "delete bio" uses "".
-        await repos.profiles.updateCustomization(targetUserId, { bio: nextBio });
-        changed = true;
-      }
-
-      // --- Role changes ---
-      if ("role" in body) {
-        const newRole = normalizeRole(body.role);
-
-        // Ban: moderators+
-        if (newRole === "banned") {
-          if (actorRank < rank("moderator")) {
-            return res.status(403).json({ error: "Forbidden" });
-          }
-
-          // already checked peer/superior above
-          await repos.profiles.setRoleById(targetUserId, "banned");
-          changed = true;
-        } else {
-          // Ladder role change: privileged+
-          if (actorRank < rank("privileged")) {
-            return res.status(403).json({ error: "Forbidden" });
-          }
-
-          const newLadderRole = newRole as LadderRole;
-
-          // Can't grant peer/superior role
-          if (rank(newLadderRole) >= actorRank) {
-            return res.status(403).json({ error: "Cannot grant peer/superior role" });
-          }
-
-          // This allows BOTH promote and demote:
-          // any role below actor is valid, regardless of target's current role.
-          await repos.profiles.setRoleById(targetUserId, newLadderRole);
-          changed = true;
-        }
-      }
-
-      if (!changed) {
+      if (!result.changed) {
         return res.status(400).json({ error: "No supported fields to update" });
       }
 
