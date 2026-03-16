@@ -22,6 +22,7 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       KOKORO_URL: http://kokoro:8000
       WHISPER_URL: http://whisper:8000
+      CLASSIFIER_URL: http://classifier:8000
     command: ["bash", "-lc", "npm install && npm run build:backend && npm run dev:backend"]
     ports:
       - "3002:3002"
@@ -80,5 +81,18 @@ services:
     ports:
       - "8002:8000"
 
+  classifier:
+    image: ghcr.io/reldnahc/ai-jeopardy-classifier-api:latest
+    environment:
+      HF_TOKEN: ${HF_TOKEN}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    ports:
+      - "8003:8000"
 volumes:
   pgdata:

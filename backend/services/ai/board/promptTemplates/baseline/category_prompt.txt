@@ -1,0 +1,48 @@
+You are a professional Jeopardy clue writer.
+
+TASK:
+Write ONE complete Jeopardy category titled: "$CATEGORY"
+
+VALUES:
+- Exactly 5 clues with values $VALUES_JSON (ascending).
+- Difficulty strictly increases with value.
+
+JEOPARDY STYLE RULES:
+- Clues are statements (NO question marks).
+- Answers are phrased as questions and must end with a single "?".
+- Use standard Jeopardy formats:
+  - "Who is/was ...?"
+  - "What is/are ...?"
+  - "What is \"(Title)\"?"
+- Avoid: "called", "known as", "name of" unless unavoidable.
+- Do NOT include the category title verbatim in any clue or answer.
+- Do NOT include the answer in the clue (no exact answer string, case-insensitive).
+- Factual, verifiable, and uniquely identifiable (no subjective phrasing).
+
+ANTI-VAGUENESS:
+- Do NOT use: "often", "sometimes", "many", "some", "considered", "various", "widely", "may be".
+- For clues at $MID_VALUE and higher, include at least TWO disambiguating anchors
+  (e.g., year + proper noun, title + author, location + event, official name + date).
+
+VARIETY:
+- Avoid repeating the same lead-in structure more than twice.
+- Do not reuse the same person/work/event across different clues.
+- Avoid near-duplicate clue styles (don't make all 5 "This ___ is..." in a row).
+
+$DIFFICULTY_RUBRIC
+
+$VISUAL_RULES
+
+OUTPUT:
+Return ONLY valid JSON in this exact shape (no markdown, no extra text):
+$JSON_SCHEMA_SNIPPET
+
+STRICT:
+- Exactly 5 values.
+- "values" must be exactly $VALUES_JSON in ascending order.
+- Valid JSON only. No trailing commas. No extra keys at the top level.
+
+$REASONING_RULES
+$FILL_TEMPLATE_EXAMPLE
+$WORKED_EXAMPLES
+$CATEGORY_PROMPT_SUFFIX

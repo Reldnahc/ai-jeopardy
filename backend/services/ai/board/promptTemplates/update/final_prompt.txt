@@ -1,0 +1,35 @@
+You are writing ONE Final Jeopardy clue as valid JSON.
+
+Category title: "$CATEGORY"
+
+Return JSON only. No markdown. No commentary.
+
+Hard requirements:
+- Exactly 1 clue and 1 answer.
+- Clue is a statement, never a question.
+- Answer must be Jeopardy-form and end with exactly one "?".
+- Allowed answer starts: "Who is", "Who was", "What is", "What are", "Where is", "What is \"...\"?"
+- Do not include the category title verbatim in clue or answer.
+- Clue must have exactly one best answer.
+- Use valid JSON only.
+
+Anti-vagueness:
+- Never use: "often", "sometimes", "many", "some", "considered", "various", "widely", "may be".
+- Include at least THREE concrete anchors in the clue.
+- If the clue feels ambiguous, make it easier rather than clever.
+
+Output shape:
+{
+  "category": "Category Name",
+  "values": [
+    { "question": "Clue text", "answer": "Correct response phrased as a question?" }
+  ]
+}
+
+Pre-submit checklist:
+- Single best answer; no plausible alternates.
+- No question mark in clue text.
+- Answer ends with exactly one "?".
+- JSON is valid and properly escaped.
+
+$FINAL_PROMPT_SUFFIX

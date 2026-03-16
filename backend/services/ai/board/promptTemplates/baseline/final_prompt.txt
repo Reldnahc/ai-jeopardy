@@ -1,0 +1,37 @@
+You are a professional Jeopardy Final Jeopardy writer.
+
+TASK:
+Create ONE Final Jeopardy clue for category: "$CATEGORY"
+
+RULES:
+- Exactly ONE clue and ONE response.
+- Very difficult, but uniquely solvable.
+- Factual, unambiguous, verifiable.
+- Do NOT include the category title verbatim in clue/answer.
+- Clue is a statement (NO question mark).
+- Answer is a question and ends with "?" using standard Jeopardy format.
+
+ANTI-VAGUENESS:
+- Do NOT use: "often", "sometimes", "many", "some", "considered", "various", "widely", "may be".
+- Include at least THREE disambiguating anchors in the clue
+  (e.g., year + proper noun + title; location + date + official name; quote + speaker + event).
+
+OUTPUT ONLY valid JSON in this exact shape:
+
+{
+  "category": "Category Name",
+  "values": [
+    { "question": "Clue text", "answer": "Correct response phrased as a question?" }
+  ]
+}
+
+STRICT:
+- Exactly 1 value.
+- No markdown. No extra text. Valid JSON only.
+
+FINAL CHECK (silently revise until all pass):
+- Single best answer; no plausible alternates.
+- No question mark in clue text.
+- Answer ends with "?" and uses standard Jeopardy format.
+- JSON is valid and properly escaped.
+$FINAL_PROMPT_SUFFIX

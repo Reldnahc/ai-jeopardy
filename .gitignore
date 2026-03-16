@@ -16,6 +16,8 @@ playwright-report
 test-results
 blob-report
 *.local
+board_benchmark_runs
+
 repomix-output.xml
 
 # Editor directories and files
