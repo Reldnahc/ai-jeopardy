@@ -25,6 +25,7 @@ This plan normalizes code style and patterns based on the conventions that alrea
 - Completed: extracted benchmark workflow board-generation helpers out of `backend/services/ai/board/boardBenchmarkWorkflow.ts`.
 - Completed: extracted benchmark workflow classifier helpers out of `backend/services/ai/board/boardBenchmarkWorkflow.ts`.
 - Completed: extracted benchmark workflow artifact writers out of `backend/services/ai/board/boardBenchmarkWorkflow.ts`.
+- Completed: extracted game socket local state and router-dependency assembly out of `src/features/game/socket/useGameSocketSync.ts`.
 - Pending: broader file decomposition for oversized controllers, hooks, and route modules.
 
 ## Chosen Defaults
@@ -97,6 +98,7 @@ This plan normalizes code style and patterns based on the conventions that alrea
   - Extracted profile page request helpers into `src/hooks/profile/profilePageController.requests.ts`.
   - Extracted profile page mutation flow into `src/hooks/profile/useProfilePageMutations.ts`.
   - Extracted pure game socket helpers into `src/features/game/socket/useGameSocketSync.helpers.ts`.
+  - Extracted game socket local state, refs, and router dependency assembly into `src/features/game/socket/useGameSocketSync.state.ts`.
   - Extracted benchmark workflow timing, usage, and summary logic into `backend/services/ai/board/boardBenchmarkWorkflow.summary.ts`.
   - Extracted benchmark workflow shared request/result types into `backend/services/ai/board/boardBenchmarkWorkflow.types.ts`.
   - Extracted benchmark workflow board-generation jobs and board assembly into `backend/services/ai/board/boardBenchmarkGeneration.ts`.
