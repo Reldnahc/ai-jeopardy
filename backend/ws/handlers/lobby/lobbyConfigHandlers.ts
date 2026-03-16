@@ -4,6 +4,7 @@ import type { WsHandler } from "../types.js";
 import { MAX_LOBBY_PLAYERS } from "../../../lobby/constants.js";
 import { toPlayerPayloads } from "../../../lobby/playerPayloads.js";
 import { ensureGameLobbySettings } from "../../../lobby/settings.js";
+import { sendLobbyErrorAndSnapshot } from "../../../lobby/socketErrors.js";
 import { atLeast, normalizeRole } from "../../../../shared/roles.js";
 import type {
   CheckLobbyResponseMessage,
@@ -128,10 +129,12 @@ export const lobbyConfigHandlers: Record<string, WsHandler> = {
     const lobbySettings = ensureGameLobbySettings(game, hctx.appConfig.ai);
 
     if (lobbySettings.categoryRefreshLocked) {
-      ws.send(
-        JSON.stringify({ type: "error", message: "Category refresh is locked by the host." }),
-      );
-      hctx.sendLobbySnapshot(ws, gameId);
+      sendLobbyErrorAndSnapshot({
+        ws,
+        gameId,
+        sendLobbySnapshot: hctx.sendLobbySnapshot,
+        message: "Category refresh is locked by the host.",
+      });
       return;
     }
 

@@ -5,6 +5,7 @@ import { createEmptyLockedCategories } from "../../../lobby/lockedCategories.js"
 import { getUniqueCategories } from "../../../services/categories/getUniqueCategories.js";
 import { shuffle, normalizeCategory } from "../../../services/categories/categoryUtils.js";
 import { generateCategoryPoolFromAi } from "../../../services/ai/categoryPool.js";
+import { sendLobbyErrorAndSnapshot } from "../../../lobby/socketErrors.js";
 import { atLeast, normalizeRole } from "../../../../shared/roles.js";
 
 type ToggleLockCategoryData = {
@@ -103,8 +104,12 @@ export const lobbyCategoryHandlers: Record<string, WsHandler> = {
     if (idx === null || !isBoardIndexInRange(bt, idx)) return;
 
     if (isLockedCategory(game.lockedCategories, bt, idx)) {
-      ws.send(JSON.stringify({ type: "error", message: "That category is locked." }));
-      hctx.sendLobbySnapshot(ws, gameId);
+      sendLobbyErrorAndSnapshot({
+        ws,
+        gameId,
+        sendLobbySnapshot: hctx.sendLobbySnapshot,
+        message: "That category is locked.",
+      });
       return;
     }
 
@@ -135,8 +140,12 @@ export const lobbyCategoryHandlers: Record<string, WsHandler> = {
     }
 
     if (!chosen) {
-      ws.send(JSON.stringify({ type: "error", message: "No unique random category available." }));
-      hctx.sendLobbySnapshot(ws, gameId);
+      sendLobbyErrorAndSnapshot({
+        ws,
+        gameId,
+        sendLobbySnapshot: hctx.sendLobbySnapshot,
+        message: "No unique random category available.",
+      });
       return;
     }
 
@@ -168,37 +177,55 @@ export const lobbyCategoryHandlers: Record<string, WsHandler> = {
 
       const bt = isBoardType(boardType) ? boardType : null;
       if (!bt) {
-        ws.send(JSON.stringify({ type: "error", message: `Invalid boardType: ${String(bt)}` }));
-        hctx.sendLobbySnapshot(ws, gameId);
+        sendLobbyErrorAndSnapshot({
+          ws,
+          gameId,
+          sendLobbySnapshot: hctx.sendLobbySnapshot,
+          message: `Invalid boardType: ${String(bt)}`,
+        });
         return;
       }
 
       const idx = bt === "finalJeopardy" ? 0 : parseBoardIndex(index);
       if (idx === null) {
-        ws.send(JSON.stringify({ type: "error", message: `Invalid index: ${String(index)}` }));
-        hctx.sendLobbySnapshot(ws, gameId);
+        sendLobbyErrorAndSnapshot({
+          ws,
+          gameId,
+          sendLobbySnapshot: hctx.sendLobbySnapshot,
+          message: `Invalid index: ${String(index)}`,
+        });
         return;
       }
 
       if (!isBoardIndexInRange(bt, idx)) {
-        ws.send(JSON.stringify({ type: "error", message: `Index out of range for ${bt}.` }));
-        hctx.sendLobbySnapshot(ws, gameId);
+        sendLobbyErrorAndSnapshot({
+          ws,
+          gameId,
+          sendLobbySnapshot: hctx.sendLobbySnapshot,
+          message: `Index out of range for ${bt}.`,
+        });
         return;
       }
 
       if (isLockedCategory(game.lockedCategories, bt, idx)) {
-        ws.send(JSON.stringify({ type: "error", message: "That category is locked." }));
-        hctx.sendLobbySnapshot(ws, gameId);
+        sendLobbyErrorAndSnapshot({
+          ws,
+          gameId,
+          sendLobbySnapshot: hctx.sendLobbySnapshot,
+          message: "That category is locked.",
+        });
         return;
       }
 
       const globalIndex = toGlobalCategoryIndex(bt, idx);
 
       if (!Array.isArray(game.categories) || globalIndex < 0 || globalIndex > 10) {
-        ws.send(
-          JSON.stringify({ type: "error", message: "Server error: invalid categories state." }),
-        );
-        ctx.sendLobbySnapshot(ws, gameId);
+        sendLobbyErrorAndSnapshot({
+          ws,
+          gameId,
+          sendLobbySnapshot: ctx.sendLobbySnapshot,
+          message: "Server error: invalid categories state.",
+        });
         return;
       }
 
@@ -252,10 +279,12 @@ export const lobbyCategoryHandlers: Record<string, WsHandler> = {
 
     const locked = Boolean(game.lobbySettings?.categoryRefreshLocked);
     if (locked) {
-      ws.send(
-        JSON.stringify({ type: "error", message: "Category refresh is locked by the host." }),
-      );
-      hctx.sendLobbySnapshot(ws, gameId);
+      sendLobbyErrorAndSnapshot({
+        ws,
+        gameId,
+        sendLobbySnapshot: hctx.sendLobbySnapshot,
+        message: "Category refresh is locked by the host.",
+      });
       return;
     }
 
@@ -264,22 +293,23 @@ export const lobbyCategoryHandlers: Record<string, WsHandler> = {
     const role = normalizeRole(ws.auth?.role);
     const bypassCooldown = atLeast(role, "privileged");
     if (!bypassCooldown && nextAllowed && now < nextAllowed) {
-      ws.send(
-        JSON.stringify({
-          type: "error",
-          message: "Category pool refresh is on cooldown.",
-          nextAllowedAtMs: nextAllowed,
-        }),
-      );
-      hctx.sendLobbySnapshot(ws, gameId);
+      sendLobbyErrorAndSnapshot({
+        ws,
+        gameId,
+        sendLobbySnapshot: hctx.sendLobbySnapshot,
+        message: "Category pool refresh is on cooldown.",
+        extra: { nextAllowedAtMs: nextAllowed },
+      });
       return;
     }
 
     if (game.categoryPoolGenerating) {
-      ws.send(
-        JSON.stringify({ type: "error", message: "Category pool refresh already in progress." }),
-      );
-      hctx.sendLobbySnapshot(ws, gameId);
+      sendLobbyErrorAndSnapshot({
+        ws,
+        gameId,
+        sendLobbySnapshot: hctx.sendLobbySnapshot,
+        message: "Category pool refresh already in progress.",
+      });
       return;
     }
 
@@ -355,8 +385,12 @@ export const lobbyCategoryHandlers: Record<string, WsHandler> = {
     } catch (e) {
       console.error("[refresh-category-pool] failed:", e);
       game.categoryPoolGenerating = false;
-      ws.send(JSON.stringify({ type: "error", message: "Failed to refresh category pool." }));
-      hctx.sendLobbySnapshot(ws, gameId);
+      sendLobbyErrorAndSnapshot({
+        ws,
+        gameId,
+        sendLobbySnapshot: hctx.sendLobbySnapshot,
+        message: "Failed to refresh category pool.",
+      });
     }
   },
 };

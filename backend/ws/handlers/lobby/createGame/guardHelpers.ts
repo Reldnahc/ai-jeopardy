@@ -1,6 +1,7 @@
 import type { GameState, SocketState } from "../../../../types/runtime.js";
 import type { Ctx } from "../../../context.types.js";
 import { ensureGameLobbySettings } from "../../../../lobby/settings.js";
+import { sendLobbyErrorAndSnapshot } from "../../../../lobby/socketErrors.js";
 import { atLeast, LadderRole } from "../../../../../shared/roles.js";
 
 type CreateGameArgs = { ws: SocketState; ctx: Ctx; gameId: string; game?: GameState | null };
@@ -27,8 +28,12 @@ export function ensureHostOrFail({
   game,
 }: CreateGameArgs & { game: GameState }): boolean {
   if (!ctx.isHostSocket(game, ws)) {
-    ws.send(JSON.stringify({ type: "error", message: "Only the host can start the game." }));
-    ctx.sendLobbySnapshot(ws, gameId);
+    sendLobbyErrorAndSnapshot({
+      ws,
+      gameId,
+      sendLobbySnapshot: ctx.sendLobbySnapshot,
+      message: "Only the host can start the game.",
+    });
     return false;
   }
   return true;
@@ -52,15 +57,23 @@ export function resolveModelOrFail({
   const m = ctx.modelsByValue?.[selectedModel];
 
   if (!m) {
-    ws.send(JSON.stringify({ type: "error", message: "Unknown model selected." }));
-    ctx.sendLobbySnapshot(ws, gameId);
+    sendLobbyErrorAndSnapshot({
+      ws,
+      gameId,
+      sendLobbySnapshot: ctx.sendLobbySnapshot,
+      message: "Unknown model selected.",
+    });
     return false;
   }
 
   if (m.disabled) {
-    ws.send(JSON.stringify({ type: "error", message: "That model is currently disabled." }));
     game.lobbySettings.selectedModel = ctx.appConfig.ai.defaultGenerationModel;
-    ctx.sendLobbySnapshot(ws, gameId);
+    sendLobbyErrorAndSnapshot({
+      ws,
+      gameId,
+      sendLobbySnapshot: ctx.sendLobbySnapshot,
+      message: "That model is currently disabled.",
+    });
     return false;
   }
 
@@ -68,14 +81,13 @@ export function resolveModelOrFail({
   if (isPaidModel) {
     const allowed = ctx.perms.can(ws, "models:use-any", { selectedModel, gameId });
     if (!allowed) {
-      ws.send(
-        JSON.stringify({
-          type: "error",
-          message: "Your account is not allowed to use paid models.",
-        }),
-      );
       game.lobbySettings.selectedModel = ctx.appConfig.ai.defaultGenerationModel;
-      ctx.sendLobbySnapshot(ws, gameId);
+      sendLobbyErrorAndSnapshot({
+        ws,
+        gameId,
+        sendLobbySnapshot: ctx.sendLobbySnapshot,
+        message: "Your account is not allowed to use paid models.",
+      });
       return false;
     }
   }
