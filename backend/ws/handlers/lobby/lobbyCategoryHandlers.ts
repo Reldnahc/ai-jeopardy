@@ -1,6 +1,7 @@
 import type { CtxDeps } from "../../context.types.js";
 import type { WsHandler } from "../types.js";
 import type { GameState } from "../../../types/runtime.js";
+import { createEmptyLockedCategories } from "../../../lobby/lockedCategories.js";
 import { getUniqueCategories } from "../../../services/categories/getUniqueCategories.js";
 import { shuffle, normalizeCategory } from "../../../services/categories/categoryUtils.js";
 import { generateCategoryPoolFromAi } from "../../../services/ai/categoryPool.js";
@@ -75,11 +76,7 @@ export const lobbyCategoryHandlers: Record<string, WsHandler> = {
     if (idx === null || !isBoardIndexInRange(bt, idx)) return;
 
     if (!game.lockedCategories) {
-      game.lockedCategories = {
-        firstBoard: Array(5).fill(false),
-        secondBoard: Array(5).fill(false),
-        finalJeopardy: Array(1).fill(false),
-      };
+      game.lockedCategories = createEmptyLockedCategories();
     }
 
     const nextLocked = !game.lockedCategories[bt][idx];

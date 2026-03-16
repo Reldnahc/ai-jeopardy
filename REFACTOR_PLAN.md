@@ -10,6 +10,7 @@ This plan normalizes code style and patterns based on the conventions that alrea
 - Completed: extracted shared HTTP parsing helpers and route-specific profile parsing helpers out of `backend/http/profileRoutes.ts`.
 - Completed: centralized repeated backend lobby settings defaults into a shared helper used by lobby creation and update flows.
 - Completed: normalized backend player payload serialization through a shared helper across lobby snapshots and socket handlers.
+- Completed: centralized empty lobby locked-category defaults into a shared backend helper.
 - Pending: broader file decomposition for oversized controllers, hooks, and route modules.
 
 ## Chosen Defaults
@@ -83,6 +84,7 @@ This plan normalizes code style and patterns based on the conventions that alrea
 - Completed so far:
   - Centralized repeated backend lobby settings defaults into `backend/lobby/settings.ts`.
   - Centralized backend player payload serialization into `backend/lobby/playerPayloads.ts`.
+  - Centralized empty locked-category defaults into `backend/lobby/lockedCategories.ts`.
 - Keep route modules structured as imports, local helpers/types, exported `registerXRoutes`.
 - Keep websocket handler files structured as imports, payload/helper definitions, exported handler map.
 - Preserve repository factory patterns such as `createRepos` and `createXRepo`.

@@ -2,6 +2,7 @@ import type { JsonMap, PlayerState } from "../../../types/runtime.js";
 import type { CtxDeps } from "../../context.types.js";
 import type { WsHandler } from "../types.js";
 import { MAX_LOBBY_PLAYERS } from "../../../lobby/constants.js";
+import { createEmptyLockedCategories } from "../../../lobby/lockedCategories.js";
 import { toPlayerPayloads } from "../../../lobby/playerPayloads.js";
 import { createDefaultLobbySettings } from "../../../lobby/settings.js";
 import { getUniqueCategories } from "../../../services/categories/getUniqueCategories.js";
@@ -93,11 +94,7 @@ export const lobbyPlayerHandlers: Record<string, WsHandler> = {
       createdAt: Date.now(),
       categories: generatedCategories,
       lobbySettings: createDefaultLobbySettings(hctx.appConfig.ai),
-      lockedCategories: {
-        firstBoard: Array(5).fill(false),
-        secondBoard: Array(5).fill(false),
-        finalJeopardy: Array(1).fill(false),
-      },
+      lockedCategories: createEmptyLockedCategories(),
       activeBoard: "firstBoard",
       isFinalJeopardy: false,
       finalJeopardyStage: null,
