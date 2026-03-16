@@ -16,6 +16,13 @@ import type {
   UseGameSocketSyncArgs,
 } from "./useGameSocketSync.types.ts";
 import { routeGameSocketMessage } from "./useGameSocketSync.router.ts";
+import {
+  createInitialBoardData,
+  getSocketClueKey,
+  makeAiHostAssetPayload,
+  normalizeSocketUsername,
+  resolveScoreDelta,
+} from "./useGameSocketSync.helpers.ts";
 export type {
   AnswerCaptureStartMsg,
   AnswerProcessingMsg,
@@ -23,36 +30,15 @@ export type {
   DailyDoubleWagerCaptureStartMsg,
 } from "./useGameSocketSync.types.ts";
 
-// ---------- helpers ----------
-const norm = (v: unknown) =>
-  String(v ?? "")
-    .trim()
-    .toLowerCase();
-
-function makeAiHostAssetPayload(args: {
-  seq: number;
-  assetId: string;
-  startedAtMs?: number | null;
-  offsetMs: number;
-}): string {
-  const startedAt = Number.isFinite(args.startedAtMs ?? NaN) ? Number(args.startedAtMs) : 0;
-  const receivedAt = Date.now();
-  return `${args.seq}::${args.assetId}::${startedAt}::${Math.max(0, Math.round(args.offsetMs))}::${receivedAt}`;
-}
-
 export function useGameSocketSync({ gameId, username }: UseGameSocketSyncArgs) {
   const { isSocketReady, sendJson, subscribe, nowMs } = useWebSocket();
 
-  const myUsername = norm(username);
+  const myUsername = normalizeSocketUsername(username);
 
   const [host, setHost] = useState<string | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [scores, setScores] = useState<Record<string, number>>({});
-  const [boardData, setBoardData] = useState<BoardData>({
-    firstBoard: { categories: [{ category: "", values: [] }] },
-    secondBoard: { categories: [{ category: "", values: [] }] },
-    finalJeopardy: { categories: [{ category: "", values: [] }] },
-  });
+  const [boardData, setBoardData] = useState<BoardData>(() => createInitialBoardData());
 
   const [activeBoard, setActiveBoard] = useState<ActiveBoard>("firstBoard");
   const [selectedClue, setSelectedClue] = useState<Clue | null>(null);
@@ -121,11 +107,7 @@ export function useGameSocketSync({ gameId, username }: UseGameSocketSyncArgs) {
   };
 
   const getClueKey = useCallback((clue?: Pick<Clue, "value" | "question"> | null) => {
-    if (!clue) return null;
-    const value = String(clue.value ?? "");
-    const question = String(clue.question ?? "").trim();
-    if (!question) return null;
-    return `${value}:${question}`;
+    return getSocketClueKey(clue);
   }, []);
 
   const resetLocalTimerState = useCallback(() => {
@@ -168,7 +150,7 @@ export function useGameSocketSync({ gameId, username }: UseGameSocketSyncArgs) {
 
   // Host is now username-based
   const isHost = useMemo(() => {
-    const h = norm(host);
+    const h = normalizeSocketUsername(host);
     return Boolean(h && myUsername && h === myUsername);
   }, [host, myUsername]);
 
@@ -254,12 +236,17 @@ export function useGameSocketSync({ gameId, username }: UseGameSocketSyncArgs) {
     (player: string, delta: number, lastQuestionValue: number) => {
       if (!gameId) return;
 
-      if (isFinalJeopardy && allWagersSubmitted) {
-        const w = Math.abs(wagers[player] ?? 0);
-        delta = delta < 0 ? -w : w;
-      } else {
+      if (!isFinalJeopardy || !allWagersSubmitted) {
         void lastQuestionValue;
       }
+
+      delta = resolveScoreDelta({
+        player,
+        delta,
+        isFinalJeopardy,
+        allWagersSubmitted,
+        wagers,
+      });
 
       sendJson({ type: "update-score", gameId, username: player, delta });
     },
