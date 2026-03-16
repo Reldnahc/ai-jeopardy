@@ -15,6 +15,7 @@ This plan normalizes code style and patterns based on the conventions that alrea
 - Completed: extracted lobby category-pool replacement logic out of `lobbyCategoryHandlers.ts`.
 - Completed: extracted profile moderation access and patch logic out of `backend/http/profileRoutes.ts`.
 - Completed: extracted profile customization patch parsing out of `backend/http/profileRoutes.ts`.
+- Completed: extracted Board Creator template/parse/validation helpers out of `src/pages/BoardCreator.tsx`.
 - Pending: broader file decomposition for oversized controllers, hooks, and route modules.
 
 ## Chosen Defaults
@@ -80,6 +81,7 @@ This plan normalizes code style and patterns based on the conventions that alrea
   - Extracted profile customization patch parsing into `backend/http/profileCustomization.ts`.
   - Extracted category-pool replacement logic into `backend/lobby/categoryPoolRefresh.ts`.
   - Extracted profile moderation logic into `backend/http/profileModeration.ts`.
+  - Extracted Board Creator pure helpers into `src/features/boardCreator/boardCreatorUtils.ts`.
 - Remaining:
   - Split large hooks and components by concern before adding more state branches.
   - Extract route/body parsing helpers from additional large HTTP route modules.
@@ -100,6 +102,8 @@ This plan normalizes code style and patterns based on the conventions that alrea
 
 ### 6. Test Pattern Normalization
 
+- Completed so far:
+  - Expanded Vitest include patterns so `src/**/*.test.ts[x]` helper tests run in the default suite.
 - Keep Vitest mocks at the top of the file with `vi.hoisted` and `vi.mock` before the import under test.
 - Keep helper builders local to the spec file unless reuse is proven.
 - Keep Playwright specs scenario-oriented with small local setup helpers.
