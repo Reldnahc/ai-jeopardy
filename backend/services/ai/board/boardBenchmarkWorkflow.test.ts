@@ -11,6 +11,7 @@ import {
   summarizeClassifierResults,
   summarizeUsage,
 } from "./boardBenchmarkWorkflow.js";
+import { buildBenchmarkSummary } from "./boardBenchmarkWorkflow.summary.js";
 import { buildCategoryPromptFromWorkflow } from "./boardPromptTemplates.js";
 
 describe("board benchmark workflow helpers", () => {
@@ -195,6 +196,161 @@ describe("board benchmark workflow helpers", () => {
     expect(usage.completion_tokens).toBe(600);
     expect(usage.total_tokens).toBe(1800);
     expect(usage.cost_usd).toBeGreaterThan(0);
+  });
+
+  it("builds workflow summaries from mixed run results", () => {
+    const successfulRun = {
+      workflow: "wf",
+      board_set_id: "board-1",
+      provider: "openai" as const,
+      model: "gpt-5-mini",
+      classifier_endpoint: "http://classifier",
+      config_file: "config.json",
+      generated_at: "2026-03-16 10:00:00",
+      board: {
+        board_set_id: "board-1",
+        workflow: "wf",
+        provider: "openai" as const,
+        model: "gpt-5-mini",
+        categories: ["Cat"],
+        firstBoard: { categories: [] },
+        secondBoard: { categories: [] },
+        finalJeopardy: { categories: [] },
+      },
+      metrics: {
+        total_clues: 2,
+        valid_clues: 1,
+        invalid_clues: 1,
+        valid_rate: 0.5,
+        average_confidence: 0.6,
+        invalid_reason_counts: { vague: 1 },
+        by_board_type: {
+          firstBoard: { total_clues: 1, valid_clues: 1, invalid_clues: 0, valid_rate: 1 },
+          secondBoard: { total_clues: 0, valid_clues: 0, invalid_clues: 0, valid_rate: 0 },
+          finalJeopardy: { total_clues: 1, valid_clues: 0, invalid_clues: 1, valid_rate: 0 },
+        },
+      },
+      timing: {
+        total_ms: 200,
+        generation_ms: 120,
+        classifier_ms: 80,
+        total_seconds: 0.2,
+        generation_seconds: 0.12,
+        classifier_seconds: 0.08,
+        clues_per_second: 10,
+        request_queue_ms: 15,
+        request_service_ms: 25,
+        avg_request_queue_ms: 15,
+        avg_request_service_ms: 25,
+        max_request_queue_ms: 15,
+        max_request_service_ms: 25,
+        max_active_requests_seen: 2,
+      },
+      usage: {
+        prompt_tokens: 100,
+        completion_tokens: 50,
+        total_tokens: 150,
+        reasoning_tokens: 0,
+        requests_with_usage: 1,
+        requests_missing_usage: 0,
+        average_tokens_per_request: 150,
+        cost_usd: 0.00012,
+      },
+      request_usage: [
+        {
+          provider: "openai" as const,
+          model: "gpt-5-mini",
+          section: "firstBoard" as const,
+          category_name: "Cat",
+          prompt_tokens: 100,
+          completion_tokens: 50,
+          total_tokens: 150,
+          reasoning_tokens: 0,
+          cost_usd: 0.00012,
+          queue_ms: 15,
+          service_ms: 25,
+          total_ms: 40,
+          active_requests_at_start: 1,
+          active_requests_at_end: 0,
+        },
+      ],
+      scored_clues: [
+        {
+          board_set_id: "board-1",
+          workflow: "wf",
+          board_type: "firstBoard" as const,
+          category_index: 0,
+          clue_index: 0,
+          category: "Cat",
+          value: 200,
+          question: "Q1",
+          answer: "A1",
+          classifier_valid: true,
+          classifier_confidence: 0.9,
+          classifier_reason: null,
+        },
+        {
+          board_set_id: "board-1",
+          workflow: "wf",
+          board_type: "finalJeopardy" as const,
+          category_index: 0,
+          clue_index: 0,
+          category: "Final",
+          value: 0,
+          question: "Q2",
+          answer: "A2",
+          classifier_valid: false,
+          classifier_confidence: 0.3,
+          classifier_reason: "vague",
+        },
+      ],
+      invalid_clues: [
+        {
+          board_type: "finalJeopardy" as const,
+          category_index: 0,
+          clue_index: 0,
+          category: "Final",
+          value: 0,
+          question: "Q2",
+          answer: "A2",
+          classifier_reason: "vague",
+          classifier_confidence: 0.3,
+        },
+      ],
+      status: "success" as const,
+    };
+
+    const failedRun = {
+      workflow: "wf",
+      board_set_id: "board-2",
+      provider: "openai" as const,
+      model: "gpt-5-mini",
+      classifier_endpoint: "http://classifier",
+      config_file: "config.json",
+      generated_at: "2026-03-16 10:05:00",
+      status: "failed" as const,
+      error: "boom",
+    };
+
+    const summary = buildBenchmarkSummary([successfulRun, failedRun], {
+      wf: { wall_clock_ms: 250 },
+    });
+
+    expect(summary.success_count).toBe(1);
+    expect(summary.failure_count).toBe(1);
+    expect(summary.runs[0]).toMatchObject({
+      workflow: "wf",
+      board_set_id: "board-1",
+      valid_rate: 0.5,
+    });
+    expect(summary.workflow_leaderboard[0]).toMatchObject({
+      workflow: "wf",
+      boards_generated: 1,
+      valid_rate: 0.5,
+      usage: { total_tokens: 150 },
+      timing: { total_ms: 250, max_active_requests_seen: 2 },
+    });
+    expect(summary.failed_runs).toEqual([failedRun]);
   });
 });
 
