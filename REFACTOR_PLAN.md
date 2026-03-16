@@ -14,6 +14,7 @@ This plan normalizes code style and patterns based on the conventions that alrea
 - Completed: centralized repeated lobby socket error-and-snapshot responses into a shared backend helper.
 - Completed: extracted lobby category-pool replacement logic out of `lobbyCategoryHandlers.ts`.
 - Completed: extracted profile moderation access and patch logic out of `backend/http/profileRoutes.ts`.
+- Completed: extracted profile customization patch parsing out of `backend/http/profileRoutes.ts`.
 - Pending: broader file decomposition for oversized controllers, hooks, and route modules.
 
 ## Chosen Defaults
@@ -76,6 +77,7 @@ This plan normalizes code style and patterns based on the conventions that alrea
 - Completed so far:
   - Extracted shared HTTP parsing helpers into `backend/http/httpParsing.ts`.
   - Extracted route-specific profile parsing and auth-user helpers into `backend/http/profileRouteHelpers.ts`.
+  - Extracted profile customization patch parsing into `backend/http/profileCustomization.ts`.
   - Extracted category-pool replacement logic into `backend/lobby/categoryPoolRefresh.ts`.
   - Extracted profile moderation logic into `backend/http/profileModeration.ts`.
 - Remaining:

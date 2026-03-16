@@ -3,7 +3,6 @@ import type { Application, Request, Response } from "express";
 import { requireAuth } from "./requireAuth.js";
 import {
   asRecord,
-  asTrimmedString,
   getAuthedUserId,
   normalizeUsername,
   parseBatchUsernames,
@@ -12,15 +11,13 @@ import {
   parseSearchLimit,
 } from "./profileRouteHelpers.js";
 import type { Repos } from "../repositories/index.js";
-import type { CustomizationPatch } from "../repositories/profile/profile.types.js";
-import { containsProfanity } from "../services/profanityService.js";
 import { resolveProfileModerationAccess, applyProfileModerationPatch } from "./profileModeration.js";
+import { buildProfileCustomizationPatch } from "./profileCustomization.js";
 
 type ProfileRepos = Pick<Repos, "profiles" | "boards">;
 
 export {
   asRecord,
-  asTrimmedString,
   clampFiniteNumber,
   getAuthedUserId,
   normalizeUsername,
@@ -92,39 +89,10 @@ export function registerProfileRoutes(app: Application, repos: ProfileRepos) {
       const userId = getAuthedUserId(req);
       if (!userId) return res.status(401).json({ error: "Unauthorized" });
       const body = asRecord(req.body);
+      const result = buildProfileCustomizationPatch(body);
+      if (!result.ok) return res.status(result.status).json({ error: result.error });
 
-      const patch: CustomizationPatch = {};
-
-      if ("bio" in body) {
-        patch.bio = body.bio === null ? null : asTrimmedString(body.bio);
-
-        if (typeof patch.bio === "string" && patch.bio.length > 0) {
-          if (containsProfanity(patch.bio)) {
-            return res.status(400).json({ error: "Bio contains prohibited language." });
-          }
-        }
-      }
-      if ("font" in body) patch.font = body.font === null ? null : asTrimmedString(body.font);
-      if ("icon" in body) patch.icon = body.icon === null ? null : asTrimmedString(body.icon);
-
-      if ("color" in body && body.color !== undefined) patch.color = asTrimmedString(body.color);
-      if ("text_color" in body && body.text_color !== undefined)
-        patch.text_color = asTrimmedString(body.text_color);
-
-      if ("name_color" in body && body.name_color !== undefined)
-        patch.name_color = asTrimmedString(body.name_color);
-
-      if ("border" in body && body.border !== undefined)
-        patch.border = asTrimmedString(body.border);
-      if ("border_color" in body && body.border_color !== undefined)
-        patch.border_color = asTrimmedString(body.border_color);
-
-      if ("background" in body && body.background !== undefined)
-        patch.background = asTrimmedString(body.background);
-      if ("background_color" in body && body.background_color !== undefined)
-        patch.background_color = asTrimmedString(body.background_color);
-
-      const profile = await repos.profiles.updateCustomization(userId, patch);
+      const profile = await repos.profiles.updateCustomization(userId, result.patch);
       if (!profile) return res.status(400).json({ error: "No supported fields to update" });
 
       return res.json({ profile });
