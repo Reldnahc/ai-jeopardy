@@ -25,6 +25,7 @@ This plan normalizes code style and patterns based on the conventions that alrea
 - Completed: extracted ProfileContext shared types, store hook, and bootstrap effects out of `src/contexts/ProfileContext.tsx`.
 - Completed: extracted WebSocketContext socket lifecycle into `src/contexts/useWebSocketConnection.ts` and slimmed `src/contexts/WebSocketContext.tsx` down to a thin provider.
 - Completed: extracted board creation settings, section builders, and daily-double assembly out of `backend/services/ai/board/board.ts`.
+- Completed: extracted preload URL helpers, DOM preload adapters, and queue state out of `src/hooks/game/usePreload.ts`.
 - Completed: extracted benchmark workflow timing, usage, and summary helpers out of `backend/services/ai/board/boardBenchmarkWorkflow.ts`.
 - Completed: extracted benchmark workflow board-generation helpers out of `backend/services/ai/board/boardBenchmarkWorkflow.ts`.
 - Completed: extracted benchmark workflow classifier helpers out of `backend/services/ai/board/boardBenchmarkWorkflow.ts`.
@@ -107,6 +108,7 @@ This plan normalizes code style and patterns based on the conventions that alrea
   - Extracted profile page request helpers into `src/hooks/profile/profilePageController.requests.ts`.
   - Extracted profile page mutation flow into `src/hooks/profile/useProfilePageMutations.ts`.
   - Extracted profile page local drafts, toggles, and board-loading effects into `src/hooks/profile/useProfilePageUiState.ts`.
+  - Extracted preload queue state into `src/hooks/game/usePreloadUrlQueue.ts` and preload helpers into `src/hooks/game/preload.helpers.ts` and `src/hooks/game/preload.dom.ts`.
   - Extracted pure game socket helpers into `src/features/game/socket/useGameSocketSync.helpers.ts`.
   - Extracted game socket local state, refs, and router dependency assembly into `src/features/game/socket/useGameSocketSync.state.ts`.
   - Extracted benchmark workflow timing, usage, and summary logic into `backend/services/ai/board/boardBenchmarkWorkflow.summary.ts`.
