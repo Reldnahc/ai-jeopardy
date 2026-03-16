@@ -21,12 +21,21 @@ describe("judge heuristics", () => {
     expect(isLikelyEquivalentFast("an exoplanet", "an exoplanet")).toBe(true);
     expect(isLikelyEquivalentFast("exoplanet", "an exoplanet")).toBe(true);
     expect(isLikelyEquivalentFast("an exoplanet", "an exoplaet")).toBe(true);
+    expect(isLikelyEquivalentFast("new yrok city", "new york city")).toBe(true);
+    expect(isLikelyEquivalentFast("u s a", "usa")).toBe(true);
+    expect(isLikelyEquivalentFast("fbi", "federal bureau of investigation")).toBe(true);
+    expect(isLikelyEquivalentFast("un", "united nations")).toBe(true);
+    expect(isLikelyEquivalentFast("the beatle", "the beatles")).toBe(true);
+    expect(isLikelyEquivalentFast("amazon", "amazon river")).toBe(true);
+    expect(isLikelyEquivalentFast("sahara", "sahara desert")).toBe(true);
+    expect(isLikelyEquivalentFast("african elephant", "elephant")).toBe(true);
   });
 
   it("rejects risky non-equivalent matches", () => {
     expect(isLikelyEquivalentFast("a car", "a cat")).toBe(false);
-    expect(isLikelyEquivalentFast("new yrok city", "new york city")).toBe(false);
+    expect(isLikelyEquivalentFast("la", "l a")).toBe(false);
+    expect(isLikelyEquivalentFast("mars", "marks")).toBe(false);
+    expect(isLikelyEquivalentFast("cat", "california academy of sciences")).toBe(false);
     expect(isLikelyEquivalentFast("", "an exoplanet")).toBe(false);
   });
 });
-

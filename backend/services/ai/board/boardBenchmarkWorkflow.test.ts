@@ -6,6 +6,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   chooseBoardSetsForWorkflow,
+  extractOpenAiUsage,
+  getApiKeyNameForProvider,
   summarizeClassifierResults,
   summarizeUsage,
 } from "./boardBenchmarkWorkflow.js";
@@ -122,6 +124,11 @@ describe("board benchmark workflow helpers", () => {
         total_tokens: 1500,
         reasoning_tokens: 0,
         cost_usd: 0.00045,
+        queue_ms: 0,
+        service_ms: 0,
+        total_ms: 0,
+        active_requests_at_start: null,
+        active_requests_at_end: null,
       },
       {
         provider: "openai",
@@ -133,6 +140,11 @@ describe("board benchmark workflow helpers", () => {
         total_tokens: 1200,
         reasoning_tokens: 0,
         cost_usd: 0.00036,
+        queue_ms: 0,
+        service_ms: 0,
+        total_ms: 0,
+        active_requests_at_start: null,
+        active_requests_at_end: null,
       },
       {
         provider: "openai",
@@ -144,6 +156,11 @@ describe("board benchmark workflow helpers", () => {
         total_tokens: null,
         reasoning_tokens: null,
         cost_usd: null,
+        queue_ms: 0,
+        service_ms: 0,
+        total_ms: 0,
+        active_requests_at_start: null,
+        active_requests_at_end: null,
       },
     ]);
 
@@ -154,6 +171,30 @@ describe("board benchmark workflow helpers", () => {
     expect(usage.requests_missing_usage).toBe(1);
     expect(usage.average_tokens_per_request).toBe(1350);
     expect(usage.cost_usd).toBe(0.00081);
+  });
+
+  it("maps DeepSeek workflows to the DeepSeek API key", () => {
+    expect(getApiKeyNameForProvider("deepseek")).toBe("DEEPSEEK_API_KEY");
+    expect(getApiKeyNameForProvider("openai")).toBe("OPENAI_API_KEY");
+    expect(getApiKeyNameForProvider("anthropic")).toBe("ANTHROPIC_API_KEY");
+  });
+
+  it("extracts usage from OpenAI-compatible prompt/completion token fields", () => {
+    const usage = extractOpenAiUsage(
+      {
+        usage: {
+          prompt_tokens: 1200,
+          completion_tokens: 600,
+          total_tokens: 1800,
+        },
+      },
+      "deepseek-chat",
+    );
+
+    expect(usage.prompt_tokens).toBe(1200);
+    expect(usage.completion_tokens).toBe(600);
+    expect(usage.total_tokens).toBe(1800);
+    expect(usage.cost_usd).toBeGreaterThan(0);
   });
 });
 

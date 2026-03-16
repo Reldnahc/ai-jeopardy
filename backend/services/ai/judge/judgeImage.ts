@@ -1,4 +1,4 @@
-import { callOpenAiJson, parseOpenAiJson } from "../openaiClient.js";
+import { callAiJson, parseAiJson } from "../aiClients/index.js";
 import type { JudgeImageResult } from "./types.js";
 import { normalizeJeopardyText, hasAnyAlphaNum } from "./normalize.js";
 import { inferAnswerType, isTooGeneric } from "./heuristics.js";
@@ -17,13 +17,13 @@ export async function judgeImage(
     answerType,
   });
 
-  const r = await callOpenAiJson(appConfig.ai.imageJudgeModel, prompt, {
+  const r = await callAiJson(appConfig.ai.imageJudgeModel, prompt, {
     image: imageUrl,
   });
 
   let parsed: unknown = null;
   try {
-    parsed = parseOpenAiJson(r);
+    parsed = parseAiJson(r);
   } catch {
     parsed = null;
   }

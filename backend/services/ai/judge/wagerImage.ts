@@ -1,5 +1,5 @@
 import { appConfig } from "../../../config/appConfig.js";
-import { callOpenAiJson, parseOpenAiJson } from "../openaiClient.js";
+import { callAiJson, parseAiJson } from "../aiClients/index.js";
 
 type ParsedWagerImage = {
   wager: number | null;
@@ -50,8 +50,8 @@ Rules:
 `.trim();
 
   try {
-    const r = await callOpenAiJson(appConfig.ai.imageJudgeModel, prompt, { image: imageUrl });
-    const parsed = parseOpenAiJson<{
+    const r = await callAiJson(appConfig.ai.imageJudgeModel, prompt, { image: imageUrl });
+    const parsed = parseAiJson<{
       transcript?: unknown;
       wager?: unknown;
       confidence?: unknown;
@@ -72,7 +72,12 @@ Rules:
 
     const fallback = parseSignedIntFromTranscript(transcript);
     if (fallback != null) {
-      return { wager: fallback, transcript, confidence: Math.max(0.5, confidence), reason: "fallback" };
+      return {
+        wager: fallback,
+        transcript,
+        confidence: Math.max(0.5, confidence),
+        reason: "fallback",
+      };
     }
 
     return { wager: null, transcript, confidence, reason: reason ?? "unreadable" };

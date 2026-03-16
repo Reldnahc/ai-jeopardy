@@ -30,14 +30,14 @@ describe("openaiClient", () => {
 
   it("parseOpenAiJson strips markdown code fences", () => {
     const out = parseOpenAiJson<{ value: number }>({
-      choices: [{ message: { content: "```json\n{\"value\":42}\n```" } }],
+      choices: [{ message: { content: '```json\n{"value":42}\n```' } }],
     });
     expect(out.value).toBe(42);
   });
 
   it("parseOpenAiJson throws when content is missing", () => {
     expect(() => parseOpenAiJson({ choices: [{ message: {} }] })).toThrow(
-      "OpenAI response missing message content.",
+      "AI response missing JSON text content.",
     );
   });
 
@@ -48,10 +48,15 @@ describe("openaiClient", () => {
       expect.objectContaining({
         model: "gpt-4o-mini",
         response_format: { type: "json_object" },
-        messages: [{ role: "user", content: "Hello" }],
+        messages: [
+          { role: "system", content: "Return only valid JSON. No markdown." },
+          { role: "user", content: "Hello" },
+        ],
       }),
     );
-    expect((createMock.mock.calls[0]?.[0] as Record<string, unknown>).reasoning_effort).toBeUndefined();
+    expect(
+      (createMock.mock.calls[0]?.[0] as Record<string, unknown>).reasoning_effort,
+    ).toBeUndefined();
   });
 
   it("callOpenAiJson includes reasoning_effort for supported models", async () => {
@@ -71,6 +76,7 @@ describe("openaiClient", () => {
     expect(createMock).toHaveBeenCalledWith(
       expect.objectContaining({
         messages: [
+          { role: "system", content: "Return only valid JSON. No markdown." },
           {
             role: "user",
             content: [
@@ -83,4 +89,3 @@ describe("openaiClient", () => {
     );
   });
 });
-

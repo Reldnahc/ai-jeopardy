@@ -1,21 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { callOpenAiJsonMock, parseOpenAiJsonMock } = vi.hoisted(() => ({
-  callOpenAiJsonMock: vi.fn(),
-  parseOpenAiJsonMock: vi.fn(),
+const { callAiJsonMock, parseAiJsonMock } = vi.hoisted(() => ({
+  callAiJsonMock: vi.fn(),
+  parseAiJsonMock: vi.fn(),
 }));
 
-vi.mock("../openaiClient.js", () => ({
-  callOpenAiJson: callOpenAiJsonMock,
-  parseOpenAiJson: parseOpenAiJsonMock,
+vi.mock("../aiClients/index.js", () => ({
+  callAiJson: callAiJsonMock,
+  parseAiJson: parseAiJsonMock,
 }));
 
 import { parseFinalWagerImage } from "./wagerImage.js";
 
 describe("parseFinalWagerImage", () => {
   beforeEach(() => {
-    callOpenAiJsonMock.mockReset();
-    parseOpenAiJsonMock.mockReset();
+    callAiJsonMock.mockReset();
+    parseAiJsonMock.mockReset();
   });
 
   it("returns zero-max fallback when max wager is not positive or image missing", async () => {
@@ -31,12 +31,12 @@ describe("parseFinalWagerImage", () => {
       confidence: 1,
       reason: "zero-max",
     });
-    expect(callOpenAiJsonMock).not.toHaveBeenCalled();
+    expect(callAiJsonMock).not.toHaveBeenCalled();
   });
 
   it("uses model wager when parse returns numeric-like wager", async () => {
-    callOpenAiJsonMock.mockResolvedValueOnce({ any: true });
-    parseOpenAiJsonMock.mockReturnValueOnce({
+    callAiJsonMock.mockResolvedValueOnce({ any: true });
+    parseAiJsonMock.mockReturnValueOnce({
       transcript: "$1,200",
       wager: "$1,200",
       confidence: 1.3,
@@ -53,8 +53,8 @@ describe("parseFinalWagerImage", () => {
   });
 
   it("falls back to transcript number extraction when model wager is null", async () => {
-    callOpenAiJsonMock.mockResolvedValueOnce({ any: true });
-    parseOpenAiJsonMock.mockReturnValueOnce({
+    callAiJsonMock.mockResolvedValueOnce({ any: true });
+    parseAiJsonMock.mockReturnValueOnce({
       transcript: "I wager - 700",
       wager: null,
       confidence: 0.2,
@@ -71,8 +71,8 @@ describe("parseFinalWagerImage", () => {
   });
 
   it("returns unreadable when no numeric wager can be parsed", async () => {
-    callOpenAiJsonMock.mockResolvedValueOnce({ any: true });
-    parseOpenAiJsonMock.mockReturnValueOnce({
+    callAiJsonMock.mockResolvedValueOnce({ any: true });
+    parseAiJsonMock.mockReturnValueOnce({
       transcript: "all in maybe?",
       wager: null,
       confidence: 0.7,
@@ -89,7 +89,7 @@ describe("parseFinalWagerImage", () => {
   });
 
   it("returns model-error when model call fails", async () => {
-    callOpenAiJsonMock.mockRejectedValueOnce(new Error("boom"));
+    callAiJsonMock.mockRejectedValueOnce(new Error("boom"));
 
     const out = await parseFinalWagerImage("img", 2000);
     expect(out).toEqual({

@@ -2,16 +2,19 @@ import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-import Anthropic from "@anthropic-ai/sdk";
-import OpenAI from "openai";
-
+import type { Provider } from "../../../../shared/models.js";
 import {
   buildCategoryPromptFromWorkflow,
   buildFinalPromptFromWorkflow,
   type BenchmarkPromptWorkflow,
   valuesFor,
-  type ReasoningEffort,
 } from "./boardPromptTemplates.js";
+import {
+  callAiJson,
+  parseAiJson,
+  resolveProviderForModel,
+  type ReasoningEffort,
+} from "../aiClients/index.js";
 
 const DEFAULT_CONFIG_FILE = "board_benchmark_config.json";
 const DEFAULT_DOTENV_FILE = ".env";
@@ -22,8 +25,6 @@ const DEFAULT_MAX_OUTPUT_TOKENS = 4000;
 const DEFAULT_MAX_RETRIES = 2;
 const DEFAULT_MAX_CONCURRENCY = 64;
 const DEFAULT_REQUEST_SPACING_SECONDS = 0;
-
-type Provider = "openai" | "anthropic";
 
 type BenchmarkBoardSet = {
   board_id: string;
@@ -168,7 +169,7 @@ type RunTiming = {
   max_active_requests_seen: number | null;
 };
 
-type RequestUsage = {
+type RequestUsageCore = {
   provider: Provider;
   model: string;
   section: "firstBoard" | "secondBoard" | "finalJeopardy";
@@ -178,6 +179,9 @@ type RequestUsage = {
   total_tokens: number | null;
   reasoning_tokens: number | null;
   cost_usd: number | null;
+};
+
+type RequestUsage = RequestUsageCore & {
   queue_ms: number;
   service_ms: number;
   total_ms: number;
@@ -215,6 +219,8 @@ const MODEL_PRICING_USD_PER_1M: Partial<Record<string, PriceModel>> = {
   // so use the current Claude Sonnet family base pricing.
   "claude-sonnet-4-6": { inputPer1M: 3, outputPer1M: 15 },
   "claude-haiku-4-5": { inputPer1M: 1, outputPer1M: 5 },
+  "deepseek-chat": { inputPer1M: 0.28, outputPer1M: 0.42 },
+  "deepseek-reasoner": { inputPer1M: 0.28, outputPer1M: 0.42 },
 };
 
 const REQUEST_DEBUG = process.env.BENCHMARK_REQUEST_DEBUG === "1";
@@ -263,6 +269,12 @@ function parseDotenv(filePath: string) {
     values[key] = value;
   }
   return values;
+}
+
+export function getApiKeyNameForProvider(provider: Provider) {
+  if (provider === "openai") return "OPENAI_API_KEY";
+  if (provider === "anthropic") return "ANTHROPIC_API_KEY";
+  return "DEEPSEEK_API_KEY";
 }
 
 function getConfigValue(name: string, dotenvValues: Record<string, string>, fallback?: string) {
@@ -340,6 +352,14 @@ function safeNumber(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
+function firstNumber(...values: unknown[]) {
+  for (const value of values) {
+    const normalized = safeNumber(value);
+    if (normalized != null) return normalized;
+  }
+  return null;
+}
+
 function estimateRequestCostUsd(args: {
   model: string;
   promptTokens: number | null;
@@ -408,19 +428,25 @@ export function summarizeUsage(requests: RequestUsage[]): UsageSummary {
   };
 }
 
-function extractOpenAiUsage(response: unknown, model: string) {
+export function extractOpenAiUsage(response: unknown, model: string) {
   const root = response as {
     usage?: {
+      prompt_tokens?: unknown;
+      completion_tokens?: unknown;
       input_tokens?: unknown;
       output_tokens?: unknown;
       total_tokens?: unknown;
+      completion_tokens_details?: { reasoning_tokens?: unknown };
       output_tokens_details?: { reasoning_tokens?: unknown };
     };
   };
-  const promptTokens = safeNumber(root.usage?.input_tokens);
-  const completionTokens = safeNumber(root.usage?.output_tokens);
+  const promptTokens = firstNumber(root.usage?.input_tokens, root.usage?.prompt_tokens);
+  const completionTokens = firstNumber(root.usage?.output_tokens, root.usage?.completion_tokens);
   const totalTokens = safeNumber(root.usage?.total_tokens);
-  const reasoningTokens = safeNumber(root.usage?.output_tokens_details?.reasoning_tokens);
+  const reasoningTokens = firstNumber(
+    root.usage?.output_tokens_details?.reasoning_tokens,
+    root.usage?.completion_tokens_details?.reasoning_tokens,
+  );
 
   return {
     prompt_tokens: promptTokens,
@@ -464,21 +490,6 @@ function extractAnthropicUsage(response: unknown, model: string) {
       reasoningTokens: null,
     }),
   };
-}
-
-function stripJsonWrappers(text: string) {
-  const stripped = text.trim();
-  if (!stripped.startsWith("```")) return stripped;
-
-  const lines = stripped.split(/\r?\n/);
-  if (lines.at(-1)?.trim() === "```") {
-    return lines.slice(1, -1).join("\n").trim();
-  }
-  return lines.slice(1).join("\n").trim();
-}
-
-function parseJsonText(text: string) {
-  return JSON.parse(stripJsonWrappers(text)) as unknown;
 }
 
 function requireString(value: unknown, label: string) {
@@ -571,45 +582,6 @@ function makeRequestThrottler(spacingSeconds: number) {
   };
 }
 
-function extractAnthropicText(response: Awaited<ReturnType<Anthropic["messages"]["create"]>>) {
-  const root = response as { content?: Array<{ type?: string; text?: string }> };
-  const parts = (root.content ?? [])
-    .filter((part) => part.type === "text")
-    .map((part) => part.text)
-    .filter((text): text is string => typeof text === "string" && text.trim().length > 0);
-
-  if (!parts.length) {
-    throw new Error("Anthropic response did not contain text output.");
-  }
-  return parts.join("\n");
-}
-
-function extractOpenAiText(response: Awaited<ReturnType<OpenAI["responses"]["create"]>>) {
-  const root = response as {
-    output_text?: unknown;
-    output?: Array<{ content?: Array<{ text?: unknown }> }>;
-  };
-
-  if (typeof root.output_text === "string" && root.output_text.trim()) {
-    return root.output_text;
-  }
-
-  const texts: string[] = [];
-  for (const item of root.output ?? []) {
-    if (!Array.isArray(item.content)) continue;
-    for (const content of item.content) {
-      if (typeof content.text === "string" && content.text.trim()) {
-        texts.push(content.text);
-      }
-    }
-  }
-
-  if (!texts.length) {
-    throw new Error("OpenAI response did not contain text output.");
-  }
-  return texts.join("\n");
-}
-
 async function callProviderJson(args: {
   provider: Provider;
   apiKey: string;
@@ -622,51 +594,27 @@ async function callProviderJson(args: {
   throttle: () => Promise<void>;
 }): Promise<{
   data: unknown;
-  usage: Omit<RequestUsage, "provider" | "model" | "section" | "category_name">;
+  usage: Omit<RequestUsageCore, "provider" | "model" | "section" | "category_name">;
 }> {
-  const {
-    provider,
-    apiKey,
-    model,
-    systemPrompt,
-    prompt,
-    maxOutputTokens,
-    maxRetries,
-    reasoningEffort,
-    throttle,
-  } = args;
+  const { provider, apiKey, model, systemPrompt, prompt, maxRetries, reasoningEffort, throttle } =
+    args;
 
   for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
     try {
       await throttle();
 
-      if (provider === "openai") {
-        const client = new OpenAI({ apiKey });
-        const response = await client.responses.create({
-          model,
-          instructions: systemPrompt,
-          input: prompt,
-          max_output_tokens: maxOutputTokens,
-          ...(reasoningEffort && reasoningEffort !== "off"
-            ? { reasoning: { effort: reasoningEffort } }
-            : {}),
-        });
-        return {
-          data: parseJsonText(extractOpenAiText(response)),
-          usage: extractOpenAiUsage(response, model),
-        };
-      }
-
-      const client = new Anthropic({ apiKey });
-      const response = await client.messages.create({
-        model,
-        max_tokens: maxOutputTokens,
-        system: systemPrompt,
-        messages: [{ role: "user", content: prompt }],
+      const response = await callAiJson(model, prompt, {
+        reasoningEffort,
+        systemPrompt,
+        providerOverride: provider,
+        apiKeyOverride: apiKey,
       });
       return {
-        data: parseJsonText(extractAnthropicText(response)),
-        usage: extractAnthropicUsage(response, model),
+        data: parseAiJson(response),
+        usage:
+          provider === "anthropic"
+            ? extractAnthropicUsage(response, model)
+            : extractOpenAiUsage(response, model),
       };
     } catch (error) {
       if (attempt >= maxRetries) throw error;
@@ -675,27 +623,6 @@ async function callProviderJson(args: {
   }
 
   throw new Error("Unreachable");
-}
-
-async function mapWithConcurrency<T, R>(
-  items: T[],
-  concurrency: number,
-  worker: (item: T, index: number) => Promise<R>,
-) {
-  const results = new Array<R>(items.length);
-  let cursor = 0;
-
-  const runners = Array.from({ length: Math.max(1, concurrency) }, async () => {
-    while (true) {
-      const index = cursor;
-      cursor += 1;
-      if (index >= items.length) return;
-      results[index] = await worker(items[index], index);
-    }
-  });
-
-  await Promise.all(runners);
-  return results;
 }
 
 function createAsyncLimiter(concurrency: number) {
@@ -1110,8 +1037,14 @@ async function generateBoard(
   const workflowName = requireString(workflow.name, "workflow.name");
   const provider = workflow.provider;
   const model = requireString(workflow.model, "workflow.model");
+  const inferredProvider = resolveProviderForModel(model);
+  if (provider !== inferredProvider) {
+    throw new Error(
+      `Workflow ${workflowName} provider/model mismatch: provider=${provider} model=${model} resolves to ${inferredProvider}.`,
+    );
+  }
 
-  const apiKeyName = provider === "openai" ? "OPENAI_API_KEY" : "ANTHROPIC_API_KEY";
+  const apiKeyName = getApiKeyNameForProvider(provider);
   const apiKey = getConfigValue(apiKeyName, dotenvValues);
   if (!apiKey) {
     throw new Error(`${apiKeyName} not found in env or .env`);

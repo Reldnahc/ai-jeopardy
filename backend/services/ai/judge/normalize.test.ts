@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { clampLen, hasAnyAlphaNum, normalizeJeopardyText } from "./normalize.js";
+import {
+  buildNormalizedAnswerVariants,
+  clampLen,
+  hasAnyAlphaNum,
+  normalizeJeopardyText,
+} from "./normalize.js";
 
 describe("judge normalize", () => {
   it("strips jeopardy-style question prefixes", () => {
@@ -11,10 +16,29 @@ describe("judge normalize", () => {
     expect(normalizeJeopardyText("there's an exoplanet")).toBe("an exoplanet");
     expect(normalizeJeopardyText("the answer is Saturn")).toBe("saturn");
     expect(normalizeJeopardyText("I think it's Jupiter")).toBe("jupiter");
+    expect(normalizeJeopardyText("Could it be Neptune")).toBe("neptune");
+    expect(normalizeJeopardyText("My answer is Mercury")).toBe("mercury");
   });
 
   it("normalizes punctuation and whitespace", () => {
     expect(normalizeJeopardyText("  It's...   New-York!!  ")).toBe("new york");
+    expect(normalizeJeopardyText("O'Brien & Sons")).toBe("obrien and sons");
+    expect(normalizeJeopardyText("What is Mercury, I think?")).toBe("mercury");
+    expect(normalizeJeopardyText("To- To- Tokyo")).toBe("tokyo");
+    expect(normalizeJeopardyText("five")).toBe("5");
+  });
+
+  it("builds normalized correction variants", () => {
+    expect(buildNormalizedAnswerVariants("Michelangelo - no wait, Leonardo da Vinci")).toEqual([
+      "michelangelo no wait leonardo da vinci",
+      "michelangelo",
+      "leonardo da vinci",
+    ]);
+    expect(buildNormalizedAnswerVariants("silver, no gold")).toEqual([
+      "silver no gold",
+      "silver",
+      "gold",
+    ]);
   });
 
   it("hasAnyAlphaNum detects meaningful text", () => {

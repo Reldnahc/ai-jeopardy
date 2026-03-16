@@ -17,6 +17,7 @@ test-results
 blob-report
 *.local
 board_benchmark_runs
+judge_case_runs
 
 repomix-output.xml
 

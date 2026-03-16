@@ -5,6 +5,8 @@ const ORIGINAL_ENV = { ...process.env };
 function setRequiredBaseEnv() {
   process.env.DATABASE_URL = "postgres://test";
   process.env.OPENAI_API_KEY = "key";
+  process.env.ANTHROPIC_API_KEY = "";
+  process.env.DEEPSEEK_API_KEY = "";
   process.env.JWT_SECRET = "secret";
   process.env.NODE_ENV = "test";
 }
@@ -22,12 +24,15 @@ describe("env config", () => {
   it("loads fallback values for optional settings", async () => {
     process.env = {};
     setRequiredBaseEnv();
+    delete process.env.NODE_ENV;
 
     const mod = await loadEnvModule();
     expect(mod.env.PORT).toBe(3002);
     expect(mod.env.CORS_ORIGINS.length).toBeGreaterThan(0);
     expect(mod.env.FINAL_DRAW_SECONDS).toBe(30);
     expect(mod.env.FINAL_WAGER_SECONDS).toBe(30);
+    expect(mod.env.NODE_ENV).toBe("development");
+    expect(mod.env.AI_JUDGE_MODEL).toBe("deepseek-chat");
   });
 
   it("parses optional csv and number env values", async () => {
@@ -49,11 +54,19 @@ describe("env config", () => {
     process.env.KOKORO_URL = "http://kokoro.local";
     process.env.WHISPER_URL = "http://whisper.local";
     process.env.DEFAULT_MODEL = "gpt-custom";
+    process.env.ANTHROPIC_API_KEY = "anthropic-key";
+    process.env.DEEPSEEK_API_KEY = "deepseek-key";
+    process.env.DEEPSEEK_BASE_URL = "https://deepseek.example";
+    process.env.JUDGE_MODEL = "deepseek-chat";
 
     const mod = await loadEnvModule();
     expect(mod.env.KOKORO_URL).toBe("http://kokoro.local");
     expect(mod.env.WHISPER_URL).toBe("http://whisper.local");
     expect(mod.env.OPENAI_DEFAULT_MODEL).toBe("gpt-custom");
+    expect(mod.env.ANTHROPIC_API_KEY).toBe("anthropic-key");
+    expect(mod.env.DEEPSEEK_API_KEY).toBe("deepseek-key");
+    expect(mod.env.DEEPSEEK_BASE_URL).toBe("https://deepseek.example");
+    expect(mod.env.AI_JUDGE_MODEL).toBe("deepseek-chat");
   });
 
   it("throws when a required env variable is missing", async () => {
@@ -62,7 +75,9 @@ describe("env config", () => {
     process.env.JWT_SECRET = "secret";
     process.env.NODE_ENV = "test";
 
-    await expect(loadEnvModule()).rejects.toThrow("Missing required environment variable: DATABASE_URL");
+    await expect(loadEnvModule()).rejects.toThrow(
+      "Missing required environment variable: DATABASE_URL",
+    );
   });
 
   it("throws when optional numeric env var is invalid", async () => {

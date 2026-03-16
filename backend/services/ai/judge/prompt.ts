@@ -53,21 +53,32 @@ ACCEPTANCE RULES:
   (e.g., "USA" vs "United States of America", "UAE" vs "United Arab Emirates", "WHO" vs "World Health Organization").
 - Accept widely-used alternate names / aliases if they refer to the same entity in the clue context
   (e.g., "Holland" vs "Netherlands" when clearly intended by the clue).
-- Do NOT require the response to be phrased as a question.
+- Do NOT require the response to be phrased as a question. Strip any leading "What is", "Who is", "Where is", etc.
+  and trailing "?" before evaluating — treat the remainder as the player's answer.
+- If the clue itself explicitly names the player's response as a former name, alternate name, or alias of the
+  expected answer, accept it. (e.g., clue says "formerly called Constantinople" and player answers
+  "Constantinople" → correct, even though the expected answer is "Istanbul".)
 - If expected is a PERSON:
-  - Accept last name only, or first name only, IF the clue context makes it unambiguous.
-  - If the clue context suggests multiple plausible people with that name, mark incorrect.
+  - Accept last name only IF the clue context makes the intended person clear — i.e., a reasonable person
+    reading the clue would have only one person in mind. Common surnames are fine if the clue is specific
+    enough (e.g., "released Thriller in 1982" → "Jackson" is acceptable).
+  - Do NOT accept first name only unless it is a mononym or so uniquely associated with one person that no
+    reasonable alternative exists (e.g., "Cher", "Voltaire", "Michelangelo"). Common first names like
+    "Albert", "John", "James", "Mary", "Michael" are never uniquely identifying on their own — mark incorrect.
+  - If in doubt, mark incorrect.
 - If expected is a PLACE:
   - Accept common short forms and abbreviations IF the clue context makes it the same place.
   - Accept omission of generic geographic feature words when the remaining name still clearly refers to the same place
     in context (e.g., "Sahara" for "Sahara Desert", "Amazon" for "Amazon River").
+  - Do NOT accept a city when the expected answer is a country, or vice versa, unless the city is so dominant
+    it unambiguously stands in for the country in common usage (e.g., "Luxembourg" city for Luxembourg country).
 - If expected is a TITLE:
   - Accept dropping leading articles (The/A/An) and minor title wording variants if the clue context and core title match.
 - If expected is a NUMBER/DATE:
   - Accept common spoken/written variants (e.g., "nineteen sixty-nine" for "1969", "July 4th" for "July 4").
 
 DO NOT ACCEPT (even if related):
-- Answers that are merely adjacent, in the same category, or “close” but not the same specific answer.
+- Answers that are merely adjacent, in the same category, or "close" but not the same specific answer.
 - Broader categories when a specific answer is required by the clue.
 - Partial info that could match many answers, unless the clue context makes it uniquely identifying.
 
@@ -110,7 +121,8 @@ TRANSCRIPTION RULES:
 JUDGING RULES:
 - Ignore articles ("a", "an", "the"), punctuation, and minor spelling differences.
 - Do NOT require phrasing as a question.
-- If expected is a PERSON: accept last name only if unambiguous.
+- If expected is a PERSON: accept last name only if unambiguous. Do NOT accept first name only unless
+  it is a mononym or uniquely identifying name (e.g., "Cher", "Voltaire").
 - If expected is a NUMBER/DATE: accept common written/spoken variants.
 - Do NOT accept "close" or merely related answers.
 - If you are unsure, return "incorrect".

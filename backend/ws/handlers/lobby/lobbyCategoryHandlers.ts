@@ -3,7 +3,7 @@ import type { WsHandler } from "../types.js";
 import type { GameState } from "../../../types/runtime.js";
 import { getUniqueCategories } from "../../../services/categories/getUniqueCategories.js";
 import { shuffle, normalizeCategory } from "../../../services/categories/categoryUtils.js";
-import { generateCategoryPoolFromOpenAi } from "../../../services/ai/categoryPool.js";
+import { generateCategoryPoolFromAi } from "../../../services/ai/categoryPool.js";
 import { atLeast, normalizeRole } from "../../../../shared/roles.js";
 
 type ToggleLockCategoryData = {
@@ -294,7 +294,7 @@ export const lobbyCategoryHandlers: Record<string, WsHandler> = {
     });
 
     try {
-      const pool = await generateCategoryPoolFromOpenAi({
+      const pool = await generateCategoryPoolFromAi({
         count: 60,
         prompt: game.lobbySettings?.categoryPoolPrompt ?? "",
       });

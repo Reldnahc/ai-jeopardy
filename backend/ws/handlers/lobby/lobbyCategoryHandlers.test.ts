@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getUniqueCategories } from "../../../services/categories/getUniqueCategories.js";
-import { generateCategoryPoolFromOpenAi } from "../../../services/ai/categoryPool.js";
+import { generateCategoryPoolFromAi } from "../../../services/ai/categoryPool.js";
 import { lobbyCategoryHandlers } from "./lobbyCategoryHandlers.js";
 import type { GameState, SocketState } from "../../../types/runtime.js";
 import { createCtx } from "../../../test/createCtx.js";
@@ -9,12 +9,12 @@ vi.mock("../../../services/categories/getUniqueCategories.js", () => ({
   getUniqueCategories: vi.fn(),
 }));
 vi.mock("../../../services/ai/categoryPool.js", () => ({
-  generateCategoryPoolFromOpenAi: vi.fn(),
+  generateCategoryPoolFromAi: vi.fn(),
 }));
 
 beforeEach(() => {
   vi.mocked(getUniqueCategories).mockReset();
-  vi.mocked(generateCategoryPoolFromOpenAi).mockReset();
+  vi.mocked(generateCategoryPoolFromAi).mockReset();
 });
 
 function makeWs(role: string = "default"): SocketState {
@@ -28,19 +28,7 @@ function makeWs(role: string = "default"): SocketState {
 
 function makeGame(overrides: Partial<GameState> = {}): GameState {
   return {
-    categories: [
-      "A",
-      "B",
-      "C",
-      "D",
-      "E",
-      "F",
-      "G",
-      "H",
-      "I",
-      "J",
-      "K",
-    ],
+    categories: ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K"],
     lockedCategories: {
       firstBoard: [false, false, false, false, false],
       secondBoard: [false, false, false, false, false],
@@ -77,7 +65,12 @@ describe("lobbyCategoryHandlers", () => {
     expect(game.lockedCategories?.firstBoard?.[2]).toBe(true);
     expect(ctx.broadcast).toHaveBeenCalledWith(
       "g1",
-      expect.objectContaining({ type: "category-lock-updated", boardType: "firstBoard", index: 2, locked: true }),
+      expect.objectContaining({
+        type: "category-lock-updated",
+        boardType: "firstBoard",
+        index: 2,
+        locked: true,
+      }),
     );
   });
 
@@ -95,7 +88,12 @@ describe("lobbyCategoryHandlers", () => {
     expect(game.lockedCategories?.firstBoard?.[2]).toBe(true);
     expect(ctx.broadcast).toHaveBeenCalledWith(
       "g1",
-      expect.objectContaining({ type: "category-lock-updated", boardType: "firstBoard", index: 2, locked: true }),
+      expect.objectContaining({
+        type: "category-lock-updated",
+        boardType: "firstBoard",
+        index: 2,
+        locked: true,
+      }),
     );
   });
 
@@ -113,7 +111,12 @@ describe("lobbyCategoryHandlers", () => {
     expect(game.lockedCategories?.finalJeopardy?.[0]).toBe(true);
     expect(ctx.broadcast).toHaveBeenCalledWith(
       "g1",
-      expect.objectContaining({ type: "category-lock-updated", boardType: "finalJeopardy", index: 0, locked: true }),
+      expect.objectContaining({
+        type: "category-lock-updated",
+        boardType: "finalJeopardy",
+        index: 0,
+        locked: true,
+      }),
     );
   });
 
@@ -148,7 +151,9 @@ describe("lobbyCategoryHandlers", () => {
       ctx,
     });
 
-    expect(ws.send).toHaveBeenCalledWith(JSON.stringify({ type: "error", message: "That category is locked." }));
+    expect(ws.send).toHaveBeenCalledWith(
+      JSON.stringify({ type: "error", message: "That category is locked." }),
+    );
     expect(ctx.sendLobbySnapshot).toHaveBeenCalledWith(ws, "g1");
   });
 
@@ -363,7 +368,12 @@ describe("lobbyCategoryHandlers", () => {
     expect(game.categories?.[6]).toBe("New Cat");
     expect(ctx.broadcast).toHaveBeenCalledWith(
       "g1",
-      expect.objectContaining({ type: "category-updated", boardType: "secondBoard", index: 1, value: "New Cat" }),
+      expect.objectContaining({
+        type: "category-updated",
+        boardType: "secondBoard",
+        index: 1,
+        value: "New Cat",
+      }),
     );
   });
 
@@ -453,7 +463,7 @@ describe("lobbyCategoryHandlers", () => {
     });
     const ctx = makeCtx(game);
 
-    vi.mocked(generateCategoryPoolFromOpenAi).mockResolvedValue([
+    vi.mocked(generateCategoryPoolFromAi).mockResolvedValue([
       "P1",
       "P2",
       "P3",
@@ -506,8 +516,10 @@ describe("lobbyCategoryHandlers", () => {
       ctx,
     });
 
-    expect(ws.send).toHaveBeenCalledWith(expect.stringContaining("Category pool refresh is on cooldown."));
-    expect(generateCategoryPoolFromOpenAi).not.toHaveBeenCalled();
+    expect(ws.send).toHaveBeenCalledWith(
+      expect.stringContaining("Category pool refresh is on cooldown."),
+    );
+    expect(generateCategoryPoolFromAi).not.toHaveBeenCalled();
   });
 
   it("refresh-category-pool blocks when host lock is enabled", async () => {
@@ -558,7 +570,7 @@ describe("lobbyCategoryHandlers", () => {
     });
     const ctx = makeCtx(game);
 
-    vi.mocked(generateCategoryPoolFromOpenAi).mockResolvedValue([
+    vi.mocked(generateCategoryPoolFromAi).mockResolvedValue([
       "P1",
       "P2",
       "P3",
@@ -579,7 +591,7 @@ describe("lobbyCategoryHandlers", () => {
       ctx,
     });
 
-    expect(generateCategoryPoolFromOpenAi).toHaveBeenCalled();
+    expect(generateCategoryPoolFromAi).toHaveBeenCalled();
     expect(ws.send).not.toHaveBeenCalledWith(expect.stringContaining("on cooldown"));
     expect(ctx.broadcast).toHaveBeenCalledWith(
       "g1",

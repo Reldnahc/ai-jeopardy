@@ -1,0 +1,594 @@
+[
+  {
+    "name": "Exact Match",
+    "category": "Space",
+    "question": "This planet is known for its rings.",
+    "expectedAnswer": "Saturn",
+    "transcript": "Saturn",
+    "expectedVerdict": "correct"
+  },
+  {
+    "name": "Exact Match - As Question",
+    "category": "Space",
+    "question": "This planet is known for its rings.",
+    "expectedAnswer": "Saturn",
+    "transcript": "What is Saturn?",
+    "expectedVerdict": "correct"
+  },
+  {
+    "name": "Last Name Only - Unambiguous",
+    "category": "History",
+    "question": "This 16th president of the United States issued the Emancipation Proclamation.",
+    "expectedAnswer": "Abraham Lincoln",
+    "transcript": "Lincoln",
+    "expectedVerdict": "correct"
+  },
+  {
+    "name": "Last Name Only - Unambiguous - As Question",
+    "category": "History",
+    "question": "This 16th president of the United States issued the Emancipation Proclamation.",
+    "expectedAnswer": "Abraham Lincoln",
+    "transcript": "Who is Lincoln?",
+    "expectedVerdict": "correct"
+  },
+  {
+    "name": "First Name Only - Ambiguous",
+    "category": "Science",
+    "question": "This scientist developed the theory of general relativity.",
+    "expectedAnswer": "Albert Einstein",
+    "transcript": "Albert",
+    "expectedVerdict": "incorrect"
+  },
+  {
+    "name": "First Name Only - Ambiguous - As Question",
+    "category": "Science",
+    "question": "This scientist developed the theory of general relativity.",
+    "expectedAnswer": "Albert Einstein",
+    "transcript": "Who is Albert?",
+    "expectedVerdict": "incorrect"
+  },
+  {
+    "name": "Contextual Alias - Holland",
+    "category": "Countries",
+    "question": "This European country is often informally called Holland.",
+    "expectedAnswer": "Netherlands",
+    "transcript": "Holland",
+    "expectedVerdict": "correct"
+  },
+  {
+    "name": "Contextual Alias - Holland - As Question",
+    "category": "Countries",
+    "question": "This European country is often informally called Holland.",
+    "expectedAnswer": "Netherlands",
+    "transcript": "What is Holland?",
+    "expectedVerdict": "correct"
+  },
+  {
+    "name": "City Instead of Country",
+    "category": "Geography",
+    "question": "This country is home to the Colosseum.",
+    "expectedAnswer": "Italy",
+    "transcript": "Rome",
+    "expectedVerdict": "incorrect"
+  },
+  {
+    "name": "City Instead of Country - As Question",
+    "category": "Geography",
+    "question": "This country is home to the Colosseum.",
+    "expectedAnswer": "Italy",
+    "transcript": "What is Rome?",
+    "expectedVerdict": "incorrect"
+  },
+  {
+    "name": "Country Instead of City",
+    "category": "Geography",
+    "question": "This city is the capital of Australia.",
+    "expectedAnswer": "Canberra",
+    "transcript": "Australia",
+    "expectedVerdict": "incorrect"
+  },
+  {
+    "name": "Country Instead of City - As Question",
+    "category": "Geography",
+    "question": "This city is the capital of Australia.",
+    "expectedAnswer": "Canberra",
+    "transcript": "What is Australia?",
+    "expectedVerdict": "incorrect"
+  },
+  {
+    "name": "Wrong Animal",
+    "category": "Animals",
+    "question": "This common household pet is known for purring.",
+    "expectedAnswer": "cat",
+    "transcript": "dog",
+    "expectedVerdict": "incorrect"
+  },
+  {
+    "name": "Wrong Animal - As Question",
+    "category": "Animals",
+    "question": "This common household pet is known for purring.",
+    "expectedAnswer": "cat",
+    "transcript": "What is a dog?",
+    "expectedVerdict": "incorrect"
+  },
+  {
+    "name": "Self-Correction to Right Answer",
+    "category": "Art",
+    "question": "He painted the Mona Lisa.",
+    "expectedAnswer": "Leonardo da Vinci",
+    "transcript": "Michelangelo — no wait, Leonardo da Vinci",
+    "expectedVerdict": "correct"
+  },
+  {
+    "name": "Self-Correction to Right Answer - As Question",
+    "category": "Art",
+    "question": "He painted the Mona Lisa.",
+    "expectedAnswer": "Leonardo da Vinci",
+    "transcript": "Who is Michelangelo — no wait, who is Leonardo da Vinci?",
+    "expectedVerdict": "correct"
+  },
+  {
+    "name": "Self-Correction to Wrong Answer",
+    "category": "Art",
+    "question": "He painted the Sistine Chapel ceiling.",
+    "expectedAnswer": "Michelangelo",
+    "transcript": "Michelangelo — actually no, Leonardo da Vinci",
+    "expectedVerdict": "incorrect"
+  },
+  {
+    "name": "Self-Correction to Wrong Answer - As Question",
+    "category": "Art",
+    "question": "He painted the Sistine Chapel ceiling.",
+    "expectedAnswer": "Michelangelo",
+    "transcript": "Who is Michelangelo — actually no, who is Leonardo da Vinci?",
+    "expectedVerdict": "incorrect"
+  },
+  {
+    "name": "Chemical Name for Formula",
+    "category": "Science",
+    "question": "The chemical formula for table salt.",
+    "expectedAnswer": "NaCl",
+    "transcript": "sodium chloride",
+    "expectedVerdict": "correct"
+  },
+  {
+    "name": "Chemical Name for Formula - As Question",
+    "category": "Science",
+    "question": "The chemical formula for table salt.",
+    "expectedAnswer": "NaCl",
+    "transcript": "What is sodium chloride?",
+    "expectedVerdict": "correct"
+  },
+  {
+    "name": "Wrong Chemical Formula",
+    "category": "Science",
+    "question": "This is the chemical formula for water.",
+    "expectedAnswer": "H2O",
+    "transcript": "H2O2",
+    "expectedVerdict": "incorrect"
+  },
+  {
+    "name": "Wrong Chemical Formula - As Question",
+    "category": "Science",
+    "question": "This is the chemical formula for water.",
+    "expectedAnswer": "H2O",
+    "transcript": "What is H2O2?",
+    "expectedVerdict": "incorrect"
+  },
+  {
+    "name": "Off By One Year",
+    "category": "History",
+    "question": "This is the year World War II ended.",
+    "expectedAnswer": "1945",
+    "transcript": "1944",
+    "expectedVerdict": "incorrect"
+  },
+  {
+    "name": "Off By One Year - As Question",
+    "category": "History",
+    "question": "This is the year World War II ended.",
+    "expectedAnswer": "1945",
+    "transcript": "What is 1944?",
+    "expectedVerdict": "incorrect"
+  },
+  {
+    "name": "Number as Word",
+    "category": "Math",
+    "question": "The number of sides on a pentagon.",
+    "expectedAnswer": "5",
+    "transcript": "five",
+    "expectedVerdict": "correct"
+  },
+  {
+    "name": "Number as Word - As Question",
+    "category": "Math",
+    "question": "The number of sides on a pentagon.",
+    "expectedAnswer": "5",
+    "transcript": "What is five?",
+    "expectedVerdict": "correct"
+  },
+  {
+    "name": "Stuttered But Correct",
+    "category": "Geography",
+    "question": "This city is the capital of Japan.",
+    "expectedAnswer": "Tokyo",
+    "transcript": "To- To- Tokyo",
+    "expectedVerdict": "correct"
+  },
+  {
+    "name": "Stuttered But Correct - As Question",
+    "category": "Geography",
+    "question": "This city is the capital of Japan.",
+    "expectedAnswer": "Tokyo",
+    "transcript": "What is To- To- Tokyo?",
+    "expectedVerdict": "correct"
+  },
+  {
+    "name": "Hedged But Correct",
+    "category": "Science",
+    "question": "This is the closest planet to the sun.",
+    "expectedAnswer": "Mercury",
+    "transcript": "I think it's Mercury",
+    "expectedVerdict": "correct"
+  },
+  {
+    "name": "Hedged But Correct - As Question",
+    "category": "Science",
+    "question": "This is the closest planet to the sun.",
+    "expectedAnswer": "Mercury",
+    "transcript": "What is Mercury, I think?",
+    "expectedVerdict": "correct"
+  },
+  {
+    "name": "Hedged and Wrong",
+    "category": "Science",
+    "question": "This is the closest planet to the sun.",
+    "expectedAnswer": "Mercury",
+    "transcript": "I think it's Venus",
+    "expectedVerdict": "incorrect"
+  },
+  {
+    "name": "Hedged and Wrong - As Question",
+    "category": "Science",
+    "question": "This is the closest planet to the sun.",
+    "expectedAnswer": "Mercury",
+    "transcript": "What is Venus, I think?",
+    "expectedVerdict": "incorrect"
+  },
+  {
+    "name": "Vague Non-Answer",
+    "category": "Science",
+    "question": "This force keeps planets in orbit around the sun.",
+    "expectedAnswer": "gravity",
+    "transcript": "a natural force",
+    "expectedVerdict": "incorrect"
+  },
+  {
+    "name": "Vague Non-Answer - As Question",
+    "category": "Science",
+    "question": "This force keeps planets in orbit around the sun.",
+    "expectedAnswer": "gravity",
+    "transcript": "What is a natural force?",
+    "expectedVerdict": "incorrect"
+  },
+  {
+    "name": "Blank Transcript",
+    "category": "Science",
+    "question": "This is the largest planet in our solar system.",
+    "expectedAnswer": "Jupiter",
+    "transcript": "",
+    "expectedVerdict": "incorrect"
+  },
+  {
+    "name": "Answer Embedded in Sentence",
+    "category": "History",
+    "question": "He is credited with inventing the telephone.",
+    "expectedAnswer": "Alexander Graham Bell",
+    "transcript": "That would be Alexander Graham Bell",
+    "expectedVerdict": "correct"
+  },
+  {
+    "name": "Answer Embedded in Sentence - As Question",
+    "category": "History",
+    "question": "He is credited with inventing the telephone.",
+    "expectedAnswer": "Alexander Graham Bell",
+    "transcript": "Who is Alexander Graham Bell?",
+    "expectedVerdict": "correct"
+  },
+  {
+    "name": "Acronym for Full Name",
+    "category": "Science",
+    "question": "This US space agency launched the Apollo missions.",
+    "expectedAnswer": "NASA",
+    "transcript": "National Aeronautics and Space Administration",
+    "expectedVerdict": "correct"
+  },
+  {
+    "name": "Acronym for Full Name - As Question",
+    "category": "Science",
+    "question": "This US space agency launched the Apollo missions.",
+    "expectedAnswer": "NASA",
+    "transcript": "What is the National Aeronautics and Space Administration?",
+    "expectedVerdict": "correct"
+  },
+  {
+    "name": "Full Name for Acronym",
+    "category": "Organizations",
+    "question": "Founded in 1945, this international peacekeeping body has 193 member states.",
+    "expectedAnswer": "United Nations",
+    "transcript": "UN",
+    "expectedVerdict": "correct"
+  },
+  {
+    "name": "Full Name for Acronym - As Question",
+    "category": "Organizations",
+    "question": "Founded in 1945, this international peacekeeping body has 193 member states.",
+    "expectedAnswer": "United Nations",
+    "transcript": "What is the UN?",
+    "expectedVerdict": "correct"
+  },
+  {
+    "name": "Related but Wrong - Same Category",
+    "category": "Animals",
+    "question": "This is the fastest land animal.",
+    "expectedAnswer": "cheetah",
+    "transcript": "leopard",
+    "expectedVerdict": "incorrect"
+  },
+  {
+    "name": "Related but Wrong - Same Category - As Question",
+    "category": "Animals",
+    "question": "This is the fastest land animal.",
+    "expectedAnswer": "cheetah",
+    "transcript": "What is a leopard?",
+    "expectedVerdict": "incorrect"
+  },
+  {
+    "name": "Supertype Instead of Specific",
+    "category": "Animals",
+    "question": "This black and white bear native to China eats almost exclusively bamboo.",
+    "expectedAnswer": "giant panda",
+    "transcript": "bear",
+    "expectedVerdict": "incorrect"
+  },
+  {
+    "name": "Supertype Instead of Specific - As Question",
+    "category": "Animals",
+    "question": "This black and white bear native to China eats almost exclusively bamboo.",
+    "expectedAnswer": "giant panda",
+    "transcript": "What is a bear?",
+    "expectedVerdict": "incorrect"
+  },
+  {
+    "name": "Specific Instead of General - Acceptable",
+    "category": "Animals",
+    "question": "This large tusked animal is the largest land animal on Earth.",
+    "expectedAnswer": "elephant",
+    "transcript": "African elephant",
+    "expectedVerdict": "correct"
+  },
+  {
+    "name": "Specific Instead of General - Acceptable - As Question",
+    "category": "Animals",
+    "question": "This large tusked animal is the largest land animal on Earth.",
+    "expectedAnswer": "elephant",
+    "transcript": "What is an African elephant?",
+    "expectedVerdict": "correct"
+  },
+  {
+    "name": "Drop Generic Geographic Word",
+    "category": "Geography",
+    "question": "This is the longest river in South America.",
+    "expectedAnswer": "Amazon River",
+    "transcript": "Amazon",
+    "expectedVerdict": "correct"
+  },
+  {
+    "name": "Drop Generic Geographic Word - As Question",
+    "category": "Geography",
+    "question": "This is the longest river in South America.",
+    "expectedAnswer": "Amazon River",
+    "transcript": "What is the Amazon?",
+    "expectedVerdict": "correct"
+  },
+  {
+    "name": "Drop Desert From Name",
+    "category": "Geography",
+    "question": "This is the largest hot desert in the world.",
+    "expectedAnswer": "Sahara Desert",
+    "transcript": "Sahara",
+    "expectedVerdict": "correct"
+  },
+  {
+    "name": "Drop Desert From Name - As Question",
+    "category": "Geography",
+    "question": "This is the largest hot desert in the world.",
+    "expectedAnswer": "Sahara Desert",
+    "transcript": "What is the Sahara?",
+    "expectedVerdict": "correct"
+  },
+  {
+    "name": "Drop Leading Article From Title",
+    "category": "Literature",
+    "question": "This Fitzgerald novel features Jay Gatsby.",
+    "expectedAnswer": "The Great Gatsby",
+    "transcript": "Great Gatsby",
+    "expectedVerdict": "correct"
+  },
+  {
+    "name": "Drop Leading Article From Title - As Question",
+    "category": "Literature",
+    "question": "This Fitzgerald novel features Jay Gatsby.",
+    "expectedAnswer": "The Great Gatsby",
+    "transcript": "What is Great Gatsby?",
+    "expectedVerdict": "correct"
+  },
+  {
+    "name": "Wrong Book Same Author",
+    "category": "Literature",
+    "question": "This Fitzgerald novel features Jay Gatsby.",
+    "expectedAnswer": "The Great Gatsby",
+    "transcript": "Tender Is the Night",
+    "expectedVerdict": "incorrect"
+  },
+  {
+    "name": "Wrong Book Same Author - As Question",
+    "category": "Literature",
+    "question": "This Fitzgerald novel features Jay Gatsby.",
+    "expectedAnswer": "The Great Gatsby",
+    "transcript": "What is Tender Is the Night?",
+    "expectedVerdict": "incorrect"
+  },
+  {
+    "name": "Common Misspelling",
+    "category": "Science",
+    "question": "This is the most abundant gas in Earth's atmosphere.",
+    "expectedAnswer": "nitrogen",
+    "transcript": "nitrojen",
+    "expectedVerdict": "correct"
+  },
+  {
+    "name": "Common Misspelling - As Question",
+    "category": "Science",
+    "question": "This is the most abundant gas in Earth's atmosphere.",
+    "expectedAnswer": "nitrogen",
+    "transcript": "What is nitrojen?",
+    "expectedVerdict": "correct"
+  },
+  {
+    "name": "Completely Wrong",
+    "category": "Geography",
+    "question": "This is the capital of France.",
+    "expectedAnswer": "Paris",
+    "transcript": "Berlin",
+    "expectedVerdict": "incorrect"
+  },
+  {
+    "name": "Completely Wrong - As Question",
+    "category": "Geography",
+    "question": "This is the capital of France.",
+    "expectedAnswer": "Paris",
+    "transcript": "What is Berlin?",
+    "expectedVerdict": "incorrect"
+  },
+  {
+    "name": "Nonsense Answer",
+    "category": "History",
+    "question": "This person was the first man to walk on the moon.",
+    "expectedAnswer": "Neil Armstrong",
+    "transcript": "uhh I dunno",
+    "expectedVerdict": "incorrect"
+  },
+  {
+    "name": "Penultimate Answer in Self-Correction",
+    "category": "Science",
+    "question": "This element has the atomic number 79.",
+    "expectedAnswer": "gold",
+    "transcript": "silver, no gold",
+    "expectedVerdict": "correct"
+  },
+  {
+    "name": "Penultimate Answer in Self-Correction - As Question",
+    "category": "Science",
+    "question": "This element has the atomic number 79.",
+    "expectedAnswer": "gold",
+    "transcript": "What is silver — no, what is gold?",
+    "expectedVerdict": "correct"
+  },
+  {
+    "name": "Wrong Element Same Period",
+    "category": "Science",
+    "question": "This element has the atomic number 79.",
+    "expectedAnswer": "gold",
+    "transcript": "platinum",
+    "expectedVerdict": "incorrect"
+  },
+  {
+    "name": "Wrong Element Same Period - As Question",
+    "category": "Science",
+    "question": "This element has the atomic number 79.",
+    "expectedAnswer": "gold",
+    "transcript": "What is platinum?",
+    "expectedVerdict": "incorrect"
+  },
+  {
+    "name": "Alternate Historical Name Accepted",
+    "category": "Geography",
+    "question": "This city, formerly called Byzantium and Constantinople, is Turkey's most populous city.",
+    "expectedAnswer": "Istanbul",
+    "transcript": "Constantinople",
+    "expectedVerdict": "correct"
+  },
+  {
+    "name": "Alternate Historical Name Accepted - As Question",
+    "category": "Geography",
+    "question": "This city, formerly called Byzantium and Constantinople, is Turkey's most populous city.",
+    "expectedAnswer": "Istanbul",
+    "transcript": "What is Constantinople?",
+    "expectedVerdict": "correct"
+  },
+  {
+    "name": "Former Name Not Applicable to Clue",
+    "category": "Geography",
+    "question": "This is the current capital city of Kazakhstan.",
+    "expectedAnswer": "Astana",
+    "transcript": "Almaty",
+    "expectedVerdict": "incorrect"
+  },
+  {
+    "name": "Former Name Not Applicable to Clue - As Question",
+    "category": "Geography",
+    "question": "This is the current capital city of Kazakhstan.",
+    "expectedAnswer": "Astana",
+    "transcript": "What is Almaty?",
+    "expectedVerdict": "incorrect"
+  },
+  {
+    "name": "Wrong King",
+    "category": "History",
+    "question": "This English king signed the Magna Carta in 1215.",
+    "expectedAnswer": "King John",
+    "transcript": "King Henry",
+    "expectedVerdict": "incorrect"
+  },
+  {
+    "name": "Wrong King - As Question",
+    "category": "History",
+    "question": "This English king signed the Magna Carta in 1215.",
+    "expectedAnswer": "King John",
+    "transcript": "Who is King Henry?",
+    "expectedVerdict": "incorrect"
+  },
+  {
+    "name": "Phonetic Transcription of Foreign Name",
+    "category": "Classical Music",
+    "question": "This German composer wrote the 'Moonlight Sonata'.",
+    "expectedAnswer": "Beethoven",
+    "transcript": "Bay-toven",
+    "expectedVerdict": "correct"
+  },
+  {
+    "name": "Phonetic Transcription of Foreign Name - As Question",
+    "category": "Classical Music",
+    "question": "This German composer wrote the 'Moonlight Sonata'.",
+    "expectedAnswer": "Beethoven",
+    "transcript": "Who is Bay-toven?",
+    "expectedVerdict": "correct"
+  },
+  {
+    "name": "Wrong Composer Same Era",
+    "category": "Classical Music",
+    "question": "This German composer wrote the 'Moonlight Sonata'.",
+    "expectedAnswer": "Beethoven",
+    "transcript": "Mozart",
+    "expectedVerdict": "incorrect"
+  },
+  {
+    "name": "Wrong Composer Same Era - As Question",
+    "category": "Classical Music",
+    "question": "This German composer wrote the 'Moonlight Sonata'.",
+    "expectedAnswer": "Beethoven",
+    "transcript": "Who is Mozart?",
+    "expectedVerdict": "incorrect"
+  }
+]

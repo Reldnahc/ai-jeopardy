@@ -10,19 +10,21 @@ export type CallOpenAiJson = (
 ) => Promise<unknown>;
 
 export type ParseOpenAiJson = <T>(raw: unknown) => T;
+export type CallAiJson = CallOpenAiJson;
+export type ParseAiJson = ParseOpenAiJson;
 
 export async function generateAiCategoryJson(args: {
-  callOpenAiJson: CallOpenAiJson;
-  parseOpenAiJson: ParseOpenAiJson;
+  callAiJson: CallAiJson;
+  parseAiJson: ParseAiJson;
   model: string;
   prompt: string;
   reasoningEffort?: ReasoningEffort;
   errorLabel: string;
 }): Promise<AiCategoryJson> {
-  const { callOpenAiJson, parseOpenAiJson, model, prompt, reasoningEffort, errorLabel } = args;
+  const { callAiJson, parseAiJson, model, prompt, reasoningEffort, errorLabel } = args;
 
-  const raw = await callOpenAiJson(model, prompt, { reasoningEffort });
-  const ai = parseOpenAiJson<unknown>(raw);
+  const raw = await callAiJson(model, prompt, { reasoningEffort });
+  const ai = parseAiJson<unknown>(raw);
 
   if (!isAiCategoryJson(ai)) {
     throw new Error(`${errorLabel} missing required fields`);
@@ -32,17 +34,17 @@ export async function generateAiCategoryJson(args: {
 }
 
 export async function generateAiFinalCategoryJson(args: {
-  callOpenAiJson: CallOpenAiJson;
-  parseOpenAiJson: ParseOpenAiJson;
+  callAiJson: CallAiJson;
+  parseAiJson: ParseAiJson;
   model: string;
   prompt: string;
   reasoningEffort?: ReasoningEffort;
   errorLabel: string;
 }): Promise<AiFinalCategoryJson> {
-  const { callOpenAiJson, parseOpenAiJson, model, prompt, reasoningEffort, errorLabel } = args;
+  const { callAiJson, parseAiJson, model, prompt, reasoningEffort, errorLabel } = args;
 
-  const raw = await callOpenAiJson(model, prompt, { reasoningEffort });
-  const ai = parseOpenAiJson<unknown>(raw);
+  const raw = await callAiJson(model, prompt, { reasoningEffort });
+  const ai = parseAiJson<unknown>(raw);
 
   if (!isAiFinalCategoryJson(ai)) {
     throw new Error(`${errorLabel} missing required fields`);

@@ -1,4 +1,4 @@
-import { callOpenAiJson, parseOpenAiJson } from "./openaiClient.js";
+import { callAiJson, parseAiJson } from "./aiClients/index.js";
 import { appConfig } from "../../config/appConfig.js";
 
 export type CategoryOfTheDay = {
@@ -91,9 +91,9 @@ Return JSON only:
 async function generateOnce(): Promise<CategoryOfTheDay> {
   const prompt = buildCategoryOfTheDayPrompt();
 
-  const response = await callOpenAiJson(appConfig.ai.cotdModel, prompt, {});
+  const response = await callAiJson(appConfig.ai.cotdModel, prompt, {});
 
-  return parseOpenAiJson<CategoryOfTheDay>(response);
+  return parseAiJson<CategoryOfTheDay>(response);
 }
 
 export async function createCategoryOfTheDay(): Promise<CategoryOfTheDay> {
@@ -108,12 +108,12 @@ Generate a DIFFERENT category with a different wording and theme.
 Return JSON only with the same schema.
 `.trim();
 
-    const response2 = await callOpenAiJson(appConfig.ai.cotdModel, prompt2, {
+    const response2 = await callAiJson(appConfig.ai.cotdModel, prompt2, {
       // temperature: 1.1,
       // presence_penalty: 0.7,
     });
 
-    out = parseOpenAiJson<CategoryOfTheDay>(response2);
+    out = parseAiJson<CategoryOfTheDay>(response2);
   }
 
   // record

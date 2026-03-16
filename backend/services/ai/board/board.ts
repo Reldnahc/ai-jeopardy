@@ -138,8 +138,8 @@ export async function createBoardData(
   // TTS state
   const ttsState = createBoardTtsState();
 
-  // OpenAI client (dynamic import kept)
-  const { callOpenAiJson, parseOpenAiJson } = await import("../openaiClient.js");
+  // AI client dispatches by model provider at runtime.
+  const { callAiJson, parseAiJson } = await import("../aiClients/index.js");
   trace?.mark("createBoardData_begin");
 
   try {
@@ -159,8 +159,8 @@ export async function createBoardData(
       });
 
       const ai = await generateAiCategoryJson({
-        callOpenAiJson,
-        parseOpenAiJson,
+        callAiJson,
+        parseAiJson,
         model,
         prompt,
         reasoningEffort: settings.reasoningEffort,
@@ -225,8 +225,8 @@ export async function createBoardData(
       });
 
       const ai = await generateAiCategoryJson({
-        callOpenAiJson,
-        parseOpenAiJson,
+        callAiJson,
+        parseAiJson,
         model,
         prompt,
         reasoningEffort: settings.reasoningEffort,
@@ -281,8 +281,8 @@ export async function createBoardData(
       const prompt = finalPrompt(finalCategory);
 
       const ai = await generateAiFinalCategoryJson({
-        callOpenAiJson,
-        parseOpenAiJson,
+        callAiJson,
+        parseAiJson,
         model,
         prompt,
         reasoningEffort: settings.reasoningEffort,

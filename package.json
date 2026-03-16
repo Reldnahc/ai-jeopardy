@@ -21,6 +21,7 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "benchmark:boards": "tsx backend/services/ai/board/boardBenchmarkWorkflow.ts",
+    "judge:cases": "tsx backend/services/ai/judge/judgeModelCli.ts",
     "preview": "vite preview",
     "predeploy": "npm run build:web",
     "deploy": "gh-pages -d dist --cname ai-jeopardy.com",

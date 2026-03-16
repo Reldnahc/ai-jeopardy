@@ -23,6 +23,7 @@ services:
       KOKORO_URL: http://kokoro:8000
       WHISPER_URL: http://whisper:8000
       CLASSIFIER_URL: http://classifier:8000
+      JUDGE_MODEL: deepseek-chat
     command: ["bash", "-lc", "npm install && npm run build:backend && npm run dev:backend"]
     ports:
       - "3002:3002"
@@ -94,5 +95,6 @@ services:
               capabilities: [gpu]
     ports:
       - "8003:8000"
+
 volumes:
   pgdata:

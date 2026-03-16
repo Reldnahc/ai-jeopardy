@@ -1,5 +1,5 @@
 // backend/services/ai/judge/wagerParse.ts
-import { callOpenAiJson, parseOpenAiJson } from "../openaiClient.js";
+import { callAiJson, parseAiJson } from "../aiClients/index.js";
 import { appConfig } from "../../../config/appConfig.js";
 
 export type WagerParseResult = {
@@ -116,11 +116,11 @@ export async function parseDailyDoubleWager(args: {
   const prompt = buildWagerPrompt({ transcript, maxWager });
   const model = String(appConfig.ai.judgeModel);
 
-  const r = await callOpenAiJson(model, prompt, { reasoningEffort: "off" });
+  const r = await callAiJson(model, prompt, { reasoningEffort: "off" });
 
   let parsed: unknown = null;
   try {
-    parsed = parseOpenAiJson(r);
+    parsed = parseAiJson(r);
   } catch {
     parsed = null;
   }

@@ -1,52 +1,52 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { envMock, callOpenAiJsonMock, parseOpenAiJsonMock } = vi.hoisted(() => ({
+const { envMock, callAiJsonMock, parseAiJsonMock } = vi.hoisted(() => ({
   envMock: { OPENAI_CATEGORY_POOL_MODEL: "gpt-default" },
-  callOpenAiJsonMock: vi.fn(),
-  parseOpenAiJsonMock: vi.fn(),
+  callAiJsonMock: vi.fn(),
+  parseAiJsonMock: vi.fn(),
 }));
 
 vi.mock("../../config/env.js", () => ({
   env: envMock,
 }));
 
-vi.mock("./openaiClient.js", () => ({
-  callOpenAiJson: callOpenAiJsonMock,
-  parseOpenAiJson: parseOpenAiJsonMock,
+vi.mock("./aiClients/index.js", () => ({
+  callAiJson: callAiJsonMock,
+  parseAiJson: parseAiJsonMock,
 }));
 
-import { generateCategoryPoolFromOpenAi } from "./categoryPool.js";
+import { generateCategoryPoolFromAi } from "./categoryPool.js";
 
 describe("ai/categoryPool", () => {
   beforeEach(() => {
-    callOpenAiJsonMock.mockReset();
-    parseOpenAiJsonMock.mockReset();
-    callOpenAiJsonMock.mockResolvedValue({ raw: true });
+    callAiJsonMock.mockReset();
+    parseAiJsonMock.mockReset();
+    callAiJsonMock.mockResolvedValue({ raw: true });
   });
 
   it("clamps count and uses default model and trimmed prompt", async () => {
-    parseOpenAiJsonMock.mockReturnValue({
+    parseAiJsonMock.mockReturnValue({
       categories: ["  Space Probes ", "Space Probes", "", "Moons & Rings"],
     });
 
-    const out = await generateCategoryPoolFromOpenAi({ count: 5, prompt: "  space  " });
+    const out = await generateCategoryPoolFromAi({ count: 5, prompt: "  space  " });
 
-    expect(callOpenAiJsonMock).toHaveBeenCalledWith(
+    expect(callAiJsonMock).toHaveBeenCalledWith(
       "gpt-default",
       expect.stringContaining("exactly 20 unique category names."),
     );
-    expect(callOpenAiJsonMock.mock.calls[0]?.[1] as string).toContain("User prompt: space");
+    expect(callAiJsonMock.mock.calls[0]?.[1] as string).toContain("User prompt: space");
     expect(out).toEqual(["Space Probes", "Moons & Rings"]);
   });
 
   it("respects model override and upper count clamp", async () => {
-    parseOpenAiJsonMock.mockReturnValue({
+    parseAiJsonMock.mockReturnValue({
       categories: Array.from({ length: 260 }, (_, i) => `Category ${i}`),
     });
 
-    const out = await generateCategoryPoolFromOpenAi({ count: 999, model: "gpt-custom" });
+    const out = await generateCategoryPoolFromAi({ count: 999, model: "gpt-custom" });
 
-    expect(callOpenAiJsonMock).toHaveBeenCalledWith(
+    expect(callAiJsonMock).toHaveBeenCalledWith(
       "gpt-custom",
       expect.stringContaining("exactly 200 unique category names."),
     );
@@ -55,10 +55,10 @@ describe("ai/categoryPool", () => {
   });
 
   it("throws when no usable categories are returned", async () => {
-    parseOpenAiJsonMock.mockReturnValue({ categories: [null, " ", ""] });
+    parseAiJsonMock.mockReturnValue({ categories: [null, " ", ""] });
 
-    await expect(generateCategoryPoolFromOpenAi({ count: 50 })).rejects.toThrow(
-      "OpenAI returned no categories.",
+    await expect(generateCategoryPoolFromAi({ count: 50 })).rejects.toThrow(
+      "AI model returned no categories.",
     );
   });
 });

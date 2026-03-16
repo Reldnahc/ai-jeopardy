@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { callOpenAiJsonMock, parseOpenAiJsonMock, appConfigMock } = vi.hoisted(() => ({
-  callOpenAiJsonMock: vi.fn(),
-  parseOpenAiJsonMock: vi.fn(),
+const { callAiJsonMock, parseAiJsonMock, appConfigMock } = vi.hoisted(() => ({
+  callAiJsonMock: vi.fn(),
+  parseAiJsonMock: vi.fn(),
   appConfigMock: { ai: { cotdModel: "cotd-model" } },
 }));
 
-vi.mock("./openaiClient.js", () => ({
-  callOpenAiJson: callOpenAiJsonMock,
-  parseOpenAiJson: parseOpenAiJsonMock,
+vi.mock("./aiClients/index.js", () => ({
+  callAiJson: callAiJsonMock,
+  parseAiJson: parseAiJsonMock,
 }));
 
 vi.mock("../../config/appConfig.js", () => ({
@@ -18,26 +18,25 @@ vi.mock("../../config/appConfig.js", () => ({
 describe("ai/categoryOfTheDay", () => {
   beforeEach(() => {
     vi.resetModules();
-    callOpenAiJsonMock.mockReset();
-    parseOpenAiJsonMock.mockReset();
-    callOpenAiJsonMock.mockResolvedValue({ raw: true });
+    callAiJsonMock.mockReset();
+    parseAiJsonMock.mockReset();
+    callAiJsonMock.mockResolvedValue({ raw: true });
   });
 
   it("returns first generated category when not similar", async () => {
-    parseOpenAiJsonMock.mockReturnValue({
+    parseAiJsonMock.mockReturnValue({
       category: "Space Oddities",
       description: "A playful journey through unusual moments in space exploration.",
     });
 
-    const { __resetCategoryOfTheDayStateForTests, createCategoryOfTheDay } = await import(
-      "./categoryOfTheDay.js"
-    );
+    const { __resetCategoryOfTheDayStateForTests, createCategoryOfTheDay } =
+      await import("./categoryOfTheDay.js");
     __resetCategoryOfTheDayStateForTests();
     const out = await createCategoryOfTheDay();
 
     expect(out.category).toBe("Space Oddities");
-    expect(callOpenAiJsonMock).toHaveBeenCalledTimes(1);
-    expect(callOpenAiJsonMock).toHaveBeenCalledWith(
+    expect(callAiJsonMock).toHaveBeenCalledTimes(1);
+    expect(callAiJsonMock).toHaveBeenCalledWith(
       "cotd-model",
       expect.stringContaining("Category of the Day"),
       {},
@@ -45,7 +44,7 @@ describe("ai/categoryOfTheDay", () => {
   });
 
   it("retries once when first result is too similar to recent category", async () => {
-    parseOpenAiJsonMock
+    parseAiJsonMock
       .mockReturnValueOnce({
         category: "Whimsical Wonders",
         description: "A fun category about odd and delightful facts.",
@@ -59,17 +58,16 @@ describe("ai/categoryOfTheDay", () => {
         description: "Untold stories and little-known events from around the world.",
       });
 
-    const { __resetCategoryOfTheDayStateForTests, createCategoryOfTheDay } = await import(
-      "./categoryOfTheDay.js"
-    );
+    const { __resetCategoryOfTheDayStateForTests, createCategoryOfTheDay } =
+      await import("./categoryOfTheDay.js");
     __resetCategoryOfTheDayStateForTests();
 
     await createCategoryOfTheDay();
     const out = await createCategoryOfTheDay();
 
     expect(out.category).toBe("Hidden Histories");
-    expect(callOpenAiJsonMock).toHaveBeenCalledTimes(3);
-    expect(callOpenAiJsonMock.mock.calls[2]?.[1] as string).toContain("too similar to recent ones");
+    expect(callAiJsonMock).toHaveBeenCalledTimes(3);
+    expect(callAiJsonMock.mock.calls[2]?.[1] as string).toContain("too similar to recent ones");
   });
 
   it("helper utilities cover shape, similarity, and prompt rendering", async () => {
