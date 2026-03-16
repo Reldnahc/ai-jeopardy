@@ -1,26 +1,43 @@
 import type { Clue } from "../../../../shared/types/board.ts";
-import type { Player } from "../../../types/Lobby.ts";
-import type { SelectedClueFromServer } from "./useGameSocketSync.types.ts";
+import {
+  isAllCluesClearedMessage,
+  isAllDrawingsSubmittedMessage,
+  isAllWagersSubmittedMessage,
+  isAnswerRevealedMessage,
+  isBuzzDeniedMessage,
+  isBuzzResultMessage,
+  isClearedCluesSyncMessage,
+  isClueClearedMessage,
+  isClueSelectedMessage,
+  isDisplayFinalistMessage,
+  isFinalJeopardyMessage,
+  isFinalScoreScreenMessage,
+  isPhaseChangedMessage,
+  isPlayerListUpdateGameMessage,
+  isReturnedToBoardMessage,
+  isTimerEndMessage,
+  isTimerStartMessage,
+  isUpdateScoreMessage,
+  isUpdateScoresMessage,
+} from "./useGameSocketSync.guards.ts";
 import type { GameSocketRouterDeps, SocketMessage } from "./useGameSocketSync.router.shared.ts";
 import { norm } from "./useGameSocketSync.router.shared.ts";
 
 export function routeBoardMessage(message: SocketMessage, d: GameSocketRouterDeps): boolean {
-  if (message.type === "buzz-denied") {
-    const m = message as { lockoutUntil: number; reason?: string };
-    d.applyLockoutUntil(Number(m.lockoutUntil || 0));
-    if (m.reason === "already-attempted") d.setHasBuzzedCurrentClue(true);
+  if (isBuzzDeniedMessage(message)) {
+    d.applyLockoutUntil(Number(message.lockoutUntil || 0));
+    if (message.reason === "already-attempted") d.setHasBuzzedCurrentClue(true);
     return true;
   }
 
-  if (message.type === "final-jeopardy") {
-    const m = message as { finalists?: string[] };
+  if (isFinalJeopardyMessage(message)) {
     d.setActiveBoard("finalJeopardy");
     d.setIsFinalJeopardy(true);
     d.setAllWagersSubmitted(false);
     d.setWagers({});
     d.setFinalPlacements([]);
     d.setFinalWagerDrawings({});
-    d.setFinalists(Array.isArray(m.finalists) ? m.finalists : [""]);
+    d.setFinalists(Array.isArray(message.finalists) ? message.finalists : [""]);
     d.setSelectedClue(null);
     d.setBuzzResult(null);
     d.setBuzzResultDisplay(null);
@@ -28,50 +45,37 @@ export function routeBoardMessage(message: SocketMessage, d: GameSocketRouterDep
     return true;
   }
 
-  if (message.type === "cleared-clues-sync") {
-    const m = message as { clearedClues: string[] };
-    d.setClearedClues(new Set(m.clearedClues ?? []));
+  if (isClearedCluesSyncMessage(message)) {
+    d.setClearedClues(new Set(message.clearedClues ?? []));
     return true;
   }
 
-  if (message.type === "phase-changed") {
-    const m = message as {
-      phase?: string | null;
-      selectorKey?: string | null;
-      selectorName?: string | null;
-    };
-    d.setPhase(m.phase ?? null);
-    d.setSelectorKey(m.selectorKey ?? null);
-    d.setSelectorName(m.selectorName ?? null);
+  if (isPhaseChangedMessage(message)) {
+    d.setPhase(message.phase ?? null);
+    d.setSelectorKey(message.selectorKey ?? null);
+    d.setSelectorName(message.selectorName ?? null);
     return true;
   }
 
-  if (message.type === "all-wagers-submitted") {
-    const m = message as {
-      wagers: Record<string, number>;
-      finalists: string[];
-      wagerDrawings?: Record<string, string>;
-    };
+  if (isAllWagersSubmittedMessage(message)) {
     d.setAllWagersSubmitted(true);
-    d.setWagers(m.wagers);
-    d.setFinalWagers(m.wagers);
-    d.setFinalWagerDrawings(m.wagerDrawings ?? {});
-    d.setFinalists(m.finalists);
+    d.setWagers(message.wagers);
+    d.setFinalWagers(message.wagers);
+    d.setFinalWagerDrawings(message.wagerDrawings ?? {});
+    d.setFinalists(message.finalists);
     return true;
   }
 
-  if (message.type === "player-list-update") {
-    const m = message as { players: Player[]; host: string };
-    d.setPlayers(m.players);
-    d.setHost(m.host);
+  if (isPlayerListUpdateGameMessage(message)) {
+    d.setPlayers(message.players);
+    d.setHost(message.host);
     return true;
   }
 
-  if (message.type === "buzz-result") {
-    const m = message as { username: string; displayname: string };
-    d.setBuzzResult(m.username);
-    d.setBuzzResultDisplay(m.displayname);
-    if (norm(m.username) === d.myUsername) d.setHasBuzzedCurrentClue(true);
+  if (isBuzzResultMessage(message)) {
+    d.setBuzzResult(message.username);
+    d.setBuzzResultDisplay(message.displayname);
+    if (norm(message.username) === d.myUsername) d.setHasBuzzedCurrentClue(true);
     d.resetLocalTimerState();
     return true;
   }
@@ -86,49 +90,43 @@ export function routeBoardMessage(message: SocketMessage, d: GameSocketRouterDep
     return true;
   }
 
-  if (message.type === "clue-selected") {
-    const m = message as { clue: SelectedClueFromServer; clearedClues?: string[] };
-    const selected = { ...(m.clue as Clue), showAnswer: Boolean(m.clue.isAnswerRevealed) };
+  if (isClueSelectedMessage(message)) {
+    const selected: Clue = { ...message.clue, showAnswer: Boolean(message.clue.isAnswerRevealed) };
     d.setSelectedClue(selected);
     const clueKey = d.getClueKey(selected);
     if (clueKey !== d.currentClueKeyRef.current) {
       d.currentClueKeyRef.current = clueKey;
       d.setHasBuzzedCurrentClue(false);
     }
-    if (m.clearedClues) d.setClearedClues(new Set(m.clearedClues));
+    if (message.clearedClues) d.setClearedClues(new Set(message.clearedClues));
     return true;
   }
 
-  if (message.type === "timer-start") {
-    const m = message as { endTime: number; duration: number; timerVersion: number };
-    d.timerVersionRef.current = m.timerVersion;
-    d.setTimerEndTime(m.endTime);
-    d.setTimerDuration(m.duration);
+  if (isTimerStartMessage(message)) {
+    d.timerVersionRef.current = message.timerVersion;
+    d.setTimerEndTime(message.endTime);
+    d.setTimerDuration(message.duration);
     return true;
   }
 
-  if (message.type === "timer-end") {
-    const m = message as { timerVersion: number };
-    if (m.timerVersion === d.timerVersionRef.current) d.resetLocalTimerState();
+  if (isTimerEndMessage(message)) {
+    if (message.timerVersion === d.timerVersionRef.current) d.resetLocalTimerState();
     return true;
   }
 
-  if (message.type === "answer-revealed") {
-    const m = message as { clue?: SelectedClueFromServer };
-    if (m.clue) d.setSelectedClue({ ...(m.clue as Clue), showAnswer: true });
+  if (isAnswerRevealedMessage(message)) {
+    if (message.clue) d.setSelectedClue({ ...message.clue, showAnswer: true });
     d.resetLocalTimerState();
     return true;
   }
 
-  if (message.type === "all-clues-cleared") {
-    const m = message as { clearedClues?: string[] };
-    if (Array.isArray(m.clearedClues)) d.setClearedClues(new Set(m.clearedClues));
+  if (isAllCluesClearedMessage(message)) {
+    if (Array.isArray(message.clearedClues)) d.setClearedClues(new Set(message.clearedClues));
     return true;
   }
 
-  if (message.type === "clue-cleared") {
-    const m = message as { clueId: string };
-    d.setClearedClues((prev) => new Set(prev).add(m.clueId));
+  if (isClueClearedMessage(message)) {
+    d.setClearedClues((prev) => new Set(prev).add(message.clueId));
     return true;
   }
 
@@ -137,8 +135,7 @@ export function routeBoardMessage(message: SocketMessage, d: GameSocketRouterDep
     return true;
   }
 
-  if (message.type === "returned-to-board") {
-    const m = message as { boardSelectionLocked?: boolean };
+  if (isReturnedToBoardMessage(message)) {
     d.setSelectedClue(null);
     d.currentClueKeyRef.current = null;
     d.setHasBuzzedCurrentClue(false);
@@ -150,7 +147,7 @@ export function routeBoardMessage(message: SocketMessage, d: GameSocketRouterDep
     d.setAnswerError(null);
     d.setAiHostText(null);
     d.clearDdWagerUi();
-    d.setBoardSelectionLocked(m.boardSelectionLocked ?? null);
+    d.setBoardSelectionLocked(message.boardSelectionLocked ?? null);
     d.resetLocalTimerState();
     return true;
   }
@@ -163,34 +160,29 @@ export function routeBoardMessage(message: SocketMessage, d: GameSocketRouterDep
     return true;
   }
 
-  if (message.type === "display-finalist") {
-    const m = message as { finalist: string };
+  if (isDisplayFinalistMessage(message)) {
     d.setShowWager(false);
-    d.setSelectedFinalist(m.finalist);
+    d.setSelectedFinalist(message.finalist);
     return true;
   }
 
-  if (message.type === "update-score") {
-    const m = message as { username: string; score: number };
-    d.setScores((prev) => ({ ...prev, [m.username]: m.score }));
+  if (isUpdateScoreMessage(message)) {
+    d.setScores((prev) => ({ ...prev, [message.username]: message.score }));
     return true;
   }
 
-  if (message.type === "update-scores") {
-    const m = message as { scores: Record<string, number> };
-    d.setScores(m.scores);
+  if (isUpdateScoresMessage(message)) {
+    d.setScores(message.scores);
     return true;
   }
 
-  if (message.type === "all-drawings-submitted") {
-    const m = message as { drawings: Record<string, string> };
-    d.setDrawings(m.drawings);
+  if (isAllDrawingsSubmittedMessage(message)) {
+    d.setDrawings(message.drawings);
     return true;
   }
 
-  if (message.type === "final-score-screen") {
-    const m = message as { finalPlacements?: string[] };
-    d.setFinalPlacements(Array.isArray(m.finalPlacements) ? m.finalPlacements : []);
+  if (isFinalScoreScreenMessage(message)) {
+    d.setFinalPlacements(Array.isArray(message.finalPlacements) ? message.finalPlacements : []);
     d.setIsGameOver(true);
     return true;
   }

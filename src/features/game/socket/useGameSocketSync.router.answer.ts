@@ -1,52 +1,52 @@
-import type {
-  AnswerCaptureStartMsg,
-  AnswerErrorMsg,
-  AnswerProcessingMsg,
-  AnswerResultMsg,
-  AnswerTranscriptMsg,
-  DailyDoubleShowModalMsg,
-  DailyDoubleWagerCaptureStartMsg,
-  DailyDoubleWagerHeardMsg,
-  DailyDoubleWagerLockedMsg,
-} from "./useGameSocketSync.types.ts";
+import {
+  isAnswerCaptureStartMessage,
+  isAnswerErrorMessage,
+  isAnswerProcessingMessage,
+  isAnswerResultMessage,
+  isAnswerTranscriptMessage,
+  isDailyDoubleErrorMessage,
+  isDailyDoubleShowModalMessage,
+  isDailyDoubleWagerCaptureStartMessage,
+  isDailyDoubleWagerHeardMessage,
+  isDailyDoubleWagerLockedMessage,
+  isDailyDoubleWagerParseFailedMessage,
+} from "./useGameSocketSync.guards.ts";
 import type { GameSocketRouterDeps, SocketMessage } from "./useGameSocketSync.router.shared.ts";
 
 export function routeAnswerMessage(message: SocketMessage, d: GameSocketRouterDeps): boolean {
-  if (message.type === "answer-processing") {
-    d.setAnswerProcessing(message as AnswerProcessingMsg);
+  if (isAnswerProcessingMessage(message)) {
+    d.setAnswerProcessing(message);
     return true;
   }
 
-  if (message.type === "answer-capture-start") {
-    const m = message as AnswerCaptureStartMsg;
-    d.setAnswerCapture(m);
+  if (isAnswerCaptureStartMessage(message)) {
+    d.setAnswerCapture(message);
     d.setAnswerTranscript(null);
     d.setAnswerResult(null);
     d.setAnswerError(null);
     return true;
   }
 
-  if (message.type === "answer-transcript") {
+  if (isAnswerTranscriptMessage(message)) {
     d.setAnswerProcessing(null);
-    d.setAnswerTranscript(message as AnswerTranscriptMsg);
+    d.setAnswerTranscript(message);
     return true;
   }
 
-  if (message.type === "answer-result") {
+  if (isAnswerResultMessage(message)) {
     d.setAnswerProcessing(null);
-    d.setAnswerResult(message as AnswerResultMsg);
+    d.setAnswerResult(message);
     return true;
   }
 
-  if (message.type === "answer-error") {
-    const m = message as AnswerErrorMsg;
+  if (isAnswerErrorMessage(message)) {
     d.setAnswerProcessing(null);
-    d.setAnswerError(String(m.message || "Answer error"));
+    d.setAnswerError(String(message.message || "Answer error"));
     return true;
   }
 
-  if (message.type === "daily-double-show-modal") {
-    d.setShowDdModal(message as DailyDoubleShowModalMsg);
+  if (isDailyDoubleShowModalMessage(message)) {
+    d.setShowDdModal(message);
     return true;
   }
 
@@ -55,35 +55,32 @@ export function routeAnswerMessage(message: SocketMessage, d: GameSocketRouterDe
     return true;
   }
 
-  if (message.type === "daily-double-wager-parse-failed") {
-    const m = message as { reason?: string };
-    d.setDdWagerError(`Didn't catch that (${m.reason ?? "unknown"}). Try again.`);
+  if (isDailyDoubleWagerParseFailedMessage(message)) {
+    d.setDdWagerError(`Didn't catch that (${message.reason ?? "unknown"}). Try again.`);
     return true;
   }
 
-  if (message.type === "daily-double-wager-capture-start") {
-    const m = message as DailyDoubleWagerCaptureStartMsg;
-    d.setDdWagerCapture(m);
+  if (isDailyDoubleWagerCaptureStartMessage(message)) {
+    d.setDdWagerCapture(message);
     d.setDdWagerHeard(null);
     d.setDdWagerLocked(null);
     d.setDdWagerError(null);
     return true;
   }
 
-  if (message.type === "daily-double-wager-heard") {
-    d.setDdWagerHeard(message as DailyDoubleWagerHeardMsg);
+  if (isDailyDoubleWagerHeardMessage(message)) {
+    d.setDdWagerHeard(message);
     return true;
   }
 
-  if (message.type === "daily-double-wager-locked") {
-    d.setDdWagerLocked(message as DailyDoubleWagerLockedMsg);
+  if (isDailyDoubleWagerLockedMessage(message)) {
+    d.setDdWagerLocked(message);
     d.setDdWagerCapture(null);
     return true;
   }
 
-  if (message.type === "daily-double-error") {
-    const m = message as { message?: string };
-    d.setDdWagerError(String(m.message || "Daily Double error"));
+  if (isDailyDoubleErrorMessage(message)) {
+    d.setDdWagerError(String(message.message || "Daily Double error"));
     return true;
   }
 

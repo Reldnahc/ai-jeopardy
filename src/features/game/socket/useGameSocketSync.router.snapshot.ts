@@ -1,4 +1,3 @@
-import type { Clue } from "../../../../shared/types/board.ts";
 import type { GameSocketRouterDeps, SocketMessage } from "./useGameSocketSync.router.shared.ts";
 import { isGameStateMessage } from "./useGameSocketSync.guards.ts";
 import { norm } from "./useGameSocketSync.router.shared.ts";
@@ -87,10 +86,10 @@ export function routeSnapshotMessage(message: SocketMessage, d: GameSocketRouter
 
   const selectedFromState =
     m.selectedClue && m.phase !== "DD_WAGER_CAPTURE"
-      ? ({
-          ...(m.selectedClue as Clue),
+      ? {
+          ...m.selectedClue,
           showAnswer: Boolean(m.selectedClue.isAnswerRevealed),
-        } as Clue)
+        }
       : null;
 
   d.setSelectedClue(selectedFromState);

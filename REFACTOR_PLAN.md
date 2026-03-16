@@ -6,7 +6,7 @@ This plan normalizes code style and patterns based on the conventions that alrea
 
 - Completed: shared lobby wire contracts and guard-based narrowing for the main lobby socket flow.
 - Completed: core game snapshot and audio socket narrowing, plus removal of all remaining non-test `as unknown as` casts.
-- In progress: message narrowing for the remaining game board and answer socket routers.
+- Completed: message narrowing for the remaining game board and answer socket routers.
 - Pending: broader file decomposition for oversized controllers, hooks, and route modules.
 
 ## Chosen Defaults
@@ -50,10 +50,11 @@ This plan normalizes code style and patterns based on the conventions that alrea
   - Replaced the main lobby frontend socket casts with guard-based narrowing.
   - Aligned backend lobby and COTD emitters with the shared lobby message contracts.
   - Added core game socket guards for snapshot and audio hydration paths.
+  - Added guard-based narrowing for the remaining game board and answer router payloads.
   - Removed all remaining non-test `as unknown as` casts.
 - Remaining:
-  - Replace the remaining `message as ...` casts in the game board and answer routers.
   - Continue moving reusable socket payload contracts into shared or local guard modules where it reduces boundary casting.
+  - Apply the same boundary-cleanup approach to other large route/controller modules as they are decomposed.
 
 ### 3. Frontend Component Normalization
 
