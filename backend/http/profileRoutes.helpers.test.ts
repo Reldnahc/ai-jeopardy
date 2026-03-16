@@ -8,7 +8,7 @@ import {
   parseBoardsLimit,
   parseBoardsOffset,
   parseSearchLimit,
-} from "./profileRoutes.js";
+} from "./profileRouteHelpers.js";
 
 describe("profileRoutes helpers", () => {
   it("normalizes usernames and trims strings", () => {

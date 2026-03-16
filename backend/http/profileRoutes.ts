@@ -1,6 +1,16 @@
 // backend/http/profileRoutes.ts
 import type { Application, Request, Response } from "express";
 import { requireAuth } from "./requireAuth.js";
+import {
+  asRecord,
+  asTrimmedString,
+  getAuthedUserId,
+  normalizeUsername,
+  parseBatchUsernames,
+  parseBoardsLimit,
+  parseBoardsOffset,
+  parseSearchLimit,
+} from "./profileRouteHelpers.js";
 import type { Repos } from "../repositories/index.js";
 import type { CustomizationPatch } from "../repositories/profile/profile.types.js";
 import { containsProfanity } from "../services/profanityService.js";
@@ -8,53 +18,17 @@ import { normalizeRole, isBanned, rank, type LadderRole } from "../../shared/rol
 
 type ProfileRepos = Pick<Repos, "profiles" | "boards">;
 
-export function normalizeUsername(u: unknown): string {
-  return String(u ?? "")
-    .trim()
-    .toLowerCase();
-}
-
-export function asRecord(v: unknown): Record<string, unknown> {
-  return typeof v === "object" && v !== null ? (v as Record<string, unknown>) : {};
-}
-
-export function asTrimmedString(v: unknown): string {
-  return String(v ?? "").trim();
-}
-
-export function clampFiniteNumber(
-  raw: unknown,
-  fallback: number,
-  min: number,
-  max: number,
-): number {
-  const parsed = Number(raw);
-  if (!Number.isFinite(parsed)) return fallback;
-  return Math.min(Math.max(parsed, min), max);
-}
-
-export function parseSearchLimit(raw: unknown): number {
-  return clampFiniteNumber(raw, 5, 1, 20);
-}
-
-export function parseBoardsLimit(raw: unknown): number {
-  return clampFiniteNumber(raw, 10, 1, 50);
-}
-
-export function parseBoardsOffset(raw: unknown): number {
-  return clampFiniteNumber(raw, 0, 0, Number.MAX_SAFE_INTEGER);
-}
-
-export function parseBatchUsernames(raw: unknown): string[] {
-  const list = Array.isArray(raw) ? raw : typeof raw === "string" ? raw.split(",") : [];
-  return list.map(normalizeUsername).filter(Boolean).slice(0, 50);
-}
-
-export function getAuthedUserId(req: Request): string | null {
-  const userIdRaw = req.user?.sub ?? req.user?.id ?? req.user?.userId;
-  if (!userIdRaw) return null;
-  return String(userIdRaw);
-}
+export {
+  asRecord,
+  asTrimmedString,
+  clampFiniteNumber,
+  getAuthedUserId,
+  normalizeUsername,
+  parseBatchUsernames,
+  parseBoardsLimit,
+  parseBoardsOffset,
+  parseSearchLimit,
+} from "./profileRouteHelpers.js";
 
 export function registerProfileRoutes(app: Application, repos: ProfileRepos) {
   // --- Me ------------------------------------------------------------

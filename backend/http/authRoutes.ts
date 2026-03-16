@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { signJwt, verifyJwt } from "../auth/jwt.js";
 import type { Repos } from "../repositories/index.js";
 import { containsProfanity } from "../services/profanityService.js";
+import { asRecord, normalizeEmail, normalizeUsername } from "./httpParsing.js";
 
 type JwtPayload = {
   sub?: string;
@@ -17,23 +18,6 @@ type JwtPayload = {
 };
 
 export type AuthRepos = Pick<Repos, "profiles">;
-
-function normalizeEmail(email: unknown): string | null {
-  const v = String(email ?? "")
-    .trim()
-    .toLowerCase();
-  return v.length ? v : null;
-}
-
-function normalizeUsername(username: unknown): string {
-  return String(username ?? "")
-    .trim()
-    .toLowerCase();
-}
-
-function asRecord(v: unknown): Record<string, unknown> {
-  return typeof v === "object" && v !== null ? (v as Record<string, unknown>) : {};
-}
 
 export function registerAuthRoutes(app: Application, repos: AuthRepos) {
   // Signup (email optional)

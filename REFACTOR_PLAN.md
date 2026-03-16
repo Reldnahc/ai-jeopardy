@@ -7,6 +7,7 @@ This plan normalizes code style and patterns based on the conventions that alrea
 - Completed: shared lobby wire contracts and guard-based narrowing for the main lobby socket flow.
 - Completed: core game snapshot and audio socket narrowing, plus removal of all remaining non-test `as unknown as` casts.
 - Completed: message narrowing for the remaining game board and answer socket routers.
+- Completed: extracted shared HTTP parsing helpers and route-specific profile parsing helpers out of `backend/http/profileRoutes.ts`.
 - Pending: broader file decomposition for oversized controllers, hooks, and route modules.
 
 ## Chosen Defaults
@@ -65,9 +66,14 @@ This plan normalizes code style and patterns based on the conventions that alrea
 
 ### 4. Oversized File Decomposition
 
-- Split large hooks and components by concern before adding more state branches.
-- Extract route/body parsing helpers from large HTTP route modules.
-- Extract workflow steps from large backend orchestration modules into helper files.
+- Status: In progress.
+- Completed so far:
+  - Extracted shared HTTP parsing helpers into `backend/http/httpParsing.ts`.
+  - Extracted route-specific profile parsing and auth-user helpers into `backend/http/profileRouteHelpers.ts`.
+- Remaining:
+  - Split large hooks and components by concern before adding more state branches.
+  - Extract route/body parsing helpers from additional large HTTP route modules.
+  - Extract workflow steps from large backend orchestration modules into helper files.
 
 ### 5. Backend Module Consistency
 
