@@ -2,8 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { Board } from "../../types/Board";
 import { Profile as P, useProfile } from "../../contexts/ProfileContext";
 import { useAuth } from "../../contexts/AuthContext";
-import { asLadderRole, LadderRole, Role } from "../../../shared/roles";
-import { LADDER_ROLES, normalizeRole, rank } from "../../../shared/roles";
+import { LadderRole } from "../../../shared/roles";
 import { getProfilePresentation } from "../../utils/profilePresentation";
 import {
   COLOR_TARGETS,
@@ -19,6 +18,12 @@ import {
   type ModerationPatch,
   type PatchMeResponse,
 } from "./profilePageController.shared";
+import {
+  buildProfileRoleState,
+  getNameHexForFontPreview,
+  getSavedHexForTarget,
+  loadProfileBoards,
+} from "./profilePageController.helpers";
 import { useProfileOverlay } from "./useProfileOverlay";
 import { useRouteProfileLoader } from "./useRouteProfileLoader";
 
@@ -73,12 +78,6 @@ export function useProfilePageController(usernameParam: string | undefined) {
     [user?.id, routeProfile?.id],
   );
 
-  const getSavedHexForTarget = (p: P, target: ColorTarget) => {
-    const meta = COLOR_TARGETS.find((t) => t.key === target)!;
-    const current = (p[target] ?? meta.defaultHex) as string;
-    return normalizeHex(current, meta.defaultHex);
-  };
-
   const cancelHexDraft = () => {
     if (!routeProfile) return;
     setHexDraft(getSavedHexForTarget(routeProfile, colorTarget));
@@ -106,29 +105,13 @@ export function useProfilePageController(usernameParam: string | undefined) {
 
   useEffect(() => {
     const run = async () => {
-      try {
-        setBoardsLoading(true);
-        setLocalError(null);
+      setBoardsLoading(true);
+      setLocalError(null);
 
-        const u = normalizeUsername(usernameParam);
-        if (!u) {
-          setBoards([]);
-          setLocalError("Missing username");
-          return;
-        }
-
-        const api = getApiBase();
-        const res = await fetch(`${api}/api/profile/${encodeURIComponent(u)}/boards?limit=5`);
-        const data = await res.json();
-        if (!res.ok) throw new Error(data?.error || "Failed to load boards");
-
-        setBoards((data.boards ?? []) as Board[]);
-      } catch (e: unknown) {
-        setLocalError(toErrorMessage(e));
-        setBoards([]);
-      } finally {
-        setBoardsLoading(false);
-      }
+      const result = await loadProfileBoards(usernameParam);
+      setBoards(result.boards);
+      setLocalError(result.error);
+      setBoardsLoading(false);
     };
 
     void run();
@@ -247,29 +230,17 @@ export function useProfilePageController(usernameParam: string | undefined) {
       defaultNameColor: "#3b82f6",
     });
   }, [routeProfile]);
-
-  const targetRole: Role = normalizeRole(routeProfile?.role);
-  const targetLadder: LadderRole = asLadderRole(targetRole);
-
-  const viewerRank = viewerGate.rank;
-  const targetRank = rank(targetLadder);
-
-  const canTouchTarget = viewerRank > targetRank;
-
-  const canModerate = viewerGate.atLeast("moderator") && canTouchTarget;
-  const canPromote = viewerGate.atLeast("privileged") && canTouchTarget;
-  const canBan = viewerGate.atLeast("moderator") && canTouchTarget;
-
-  const viewerIsCreator = viewerGate.role === "creator";
-
-  const promotableRoles: LadderRole[] = viewerIsCreator
-    ? [...LADDER_ROLES]
-    : (LADDER_ROLES.filter((r) => rank(r) < viewerRank) as LadderRole[]);
-
-  const targetNormalizedRole = normalizeRole(routeProfile?.role);
-  const promotableRolesFiltered = promotableRoles.filter((r) => r !== targetNormalizedRole);
-
-  const canShowPromote = canPromote && promotableRolesFiltered.length > 0;
+  const {
+    canModerate,
+    canShowPromote,
+    canBan,
+    promotableRolesFiltered,
+    roleInfo,
+  } = buildProfileRoleState({
+    viewerRank: viewerGate.rank,
+    viewerRole: viewerGate.role,
+    targetRoleRaw: routeProfile?.role,
+  });
 
   const doDeleteBio = async () => {
     if (!routeProfile) return;
@@ -285,25 +256,7 @@ export function useProfilePageController(usernameParam: string | undefined) {
     if (!routeProfile) return;
     await patchAnyProfile(routeProfile.username, { role: "banned" });
   };
-
-  const roleMeta: Record<LadderRole | "banned", { label: string; className: string }> = {
-    default: { label: "Player", className: "text-gray-600" },
-    moderator: { label: "Moderator", className: "text-blue-600" },
-    privileged: { label: "Privileged", className: "text-emerald-600" },
-    admin: { label: "Admin", className: "text-red-500" },
-    head_admin: { label: "Head Admin", className: "text-amber-700" },
-    creator: { label: "Creator", className: "text-purple-600" },
-    banned: { label: "Banned", className: "text-red-800 line-through" },
-  };
-
-  const normalizedRouteRole = normalizeRole(routeProfile?.role);
-  const roleInfo = roleMeta[normalizedRouteRole];
-
-  const nameColorMeta = COLOR_TARGETS.find((t) => t.key === "name_color")!;
-  const nameHexForFontPreview = normalizeHex(
-    String(routeProfile?.name_color ?? nameColorMeta.defaultHex),
-    nameColorMeta.defaultHex,
-  );
+  const nameHexForFontPreview = getNameHexForFontPreview(routeProfile);
 
   return {
     loading,
