@@ -14,7 +14,7 @@ function makeCtx(overrides: Record<string, unknown> = {}) {
       normalizeCategories11: vi.fn(() => Array(11).fill("Category")),
       appConfig: {
         ai: {
-          defaultModel: "gpt-4o-mini",
+          defaultGenerationModel: "gpt-4o-mini",
           defaultSttProvider: "openai",
           defaultTtsProvider: "kokoro",
         },

@@ -3,15 +3,13 @@ import type { ReasoningEffort } from "./boardPrompts.js";
 import type { AiCategoryJson, AiFinalCategoryJson } from "./boardSchemas.js";
 import { isAiCategoryJson, isAiFinalCategoryJson } from "./boardSchemas.js";
 
-export type CallOpenAiJson = (
+export type CallAiJson = (
   model: string,
   prompt: string,
   opts: { reasoningEffort?: ReasoningEffort },
 ) => Promise<unknown>;
 
-export type ParseOpenAiJson = <T>(raw: unknown) => T;
-export type CallAiJson = CallOpenAiJson;
-export type ParseAiJson = ParseOpenAiJson;
+export type ParseAiJson = <T>(raw: unknown) => T;
 
 export async function generateAiCategoryJson(args: {
   callAiJson: CallAiJson;

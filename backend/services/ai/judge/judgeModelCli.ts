@@ -2,12 +2,12 @@ import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
+import { appConfig } from "../../../config/appConfig.js";
 import { summarizeAiUsage } from "../usage.js";
 import { judgeClueAnswerWithModelDetailed } from "./judgeText.js";
 import type { Verdict } from "./types.js";
 
 const DEFAULT_CASES_FILE = "backend/services/ai/judge/judgeModelCases.example.json";
-const DEFAULT_MODEL = "deepseek-chat";
 const DEFAULT_CONCURRENCY = 8;
 const DEFAULT_OUTPUT_DIR = "judge_case_runs";
 
@@ -20,9 +20,9 @@ export type JudgeCase = {
   expectedVerdict?: Verdict;
 };
 
-export function normalizeJudgeModel(model: string) {
+export function normalizeJudgeModel(model?: string) {
   const trimmed = String(model ?? "").trim();
-  return trimmed || DEFAULT_MODEL;
+  return trimmed || appConfig.ai.judgeModel;
 }
 
 export function normalizeConcurrency(value: unknown) {
@@ -34,7 +34,6 @@ export function normalizeConcurrency(value: unknown) {
 }
 
 export function parseCliArgs(argv: string[]) {
-  let model = DEFAULT_MODEL;
   let casesFile = DEFAULT_CASES_FILE;
   let concurrency = DEFAULT_CONCURRENCY;
   let outputDir = DEFAULT_OUTPUT_DIR;
@@ -42,7 +41,6 @@ export function parseCliArgs(argv: string[]) {
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--model") {
-      model = normalizeJudgeModel(argv[index + 1] ?? model);
       index += 1;
       continue;
     }
@@ -62,7 +60,7 @@ export function parseCliArgs(argv: string[]) {
     }
   }
 
-  return { model, casesFile, concurrency, outputDir };
+  return { model: normalizeJudgeModel(), casesFile, concurrency, outputDir };
 }
 
 function requireString(value: unknown, label: string) {

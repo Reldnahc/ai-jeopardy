@@ -6,13 +6,13 @@ const baseEnv = {
   OPENAI_API_KEY: "openai-key",
   ANTHROPIC_API_KEY: "",
   DEEPSEEK_API_KEY: "",
-  OPENAI_DEFAULT_MODEL: "gpt-4o-mini",
-  AI_JUDGE_MODEL: "deepseek-chat",
+  DEFAULT_GENERATION_MODEL: "gpt-4o-mini",
+  JUDGE_MODEL: "deepseek-chat",
   KOKORO_URL: "",
   WHISPER_URL: "",
-  OPENAI_STT_MODEL: "gpt-4o-mini-transcribe",
-  OPENAI_IMAGE_JUDGE_MODEL: "gpt-4.1-mini",
-  OPENAI_COTD_MODEL: "gpt-4o-mini",
+  STT_MODEL: "gpt-4o-mini-transcribe",
+  IMAGE_JUDGE_MODEL: "gpt-4.1-mini",
+  COTD_MODEL: "gpt-4o-mini",
   BUZZ_LOCKOUT_MS: 1,
   CLUE_ANSWER_TIMEOUT_MS: 10000,
   FINAL_DRAW_SECONDS: 30,
@@ -76,7 +76,7 @@ describe("appConfig", () => {
   it("uses the provider-neutral judge model config", async () => {
     vi.resetModules();
     vi.doMock("./env.js", () => ({
-      env: { ...baseEnv, AI_JUDGE_MODEL: "deepseek-chat" },
+      env: { ...baseEnv, JUDGE_MODEL: "deepseek-chat" },
     }));
     const mod = await import("./appConfig.js");
     expect(mod.appConfig.ai.judgeModel).toBe("deepseek-chat");

@@ -32,7 +32,7 @@ describe("env config", () => {
     expect(mod.env.FINAL_DRAW_SECONDS).toBe(30);
     expect(mod.env.FINAL_WAGER_SECONDS).toBe(30);
     expect(mod.env.NODE_ENV).toBe("development");
-    expect(mod.env.AI_JUDGE_MODEL).toBe("deepseek-chat");
+    expect(mod.env.JUDGE_MODEL).toBe("deepseek-chat");
   });
 
   it("parses optional csv and number env values", async () => {
@@ -53,8 +53,10 @@ describe("env config", () => {
     setRequiredBaseEnv();
     process.env.KOKORO_URL = "http://kokoro.local";
     process.env.WHISPER_URL = "http://whisper.local";
-    process.env.DEFAULT_MODEL = "gpt-custom";
+    process.env.DEFAULT_GENERATION_MODEL = "gpt-custom";
+    process.env.OPENAI_BASE_URL = "https://openai.example";
     process.env.ANTHROPIC_API_KEY = "anthropic-key";
+    process.env.ANTHROPIC_BASE_URL = "https://anthropic.example";
     process.env.DEEPSEEK_API_KEY = "deepseek-key";
     process.env.DEEPSEEK_BASE_URL = "https://deepseek.example";
     process.env.JUDGE_MODEL = "deepseek-chat";
@@ -62,11 +64,13 @@ describe("env config", () => {
     const mod = await loadEnvModule();
     expect(mod.env.KOKORO_URL).toBe("http://kokoro.local");
     expect(mod.env.WHISPER_URL).toBe("http://whisper.local");
-    expect(mod.env.OPENAI_DEFAULT_MODEL).toBe("gpt-custom");
+    expect(mod.env.DEFAULT_GENERATION_MODEL).toBe("gpt-custom");
+    expect(mod.env.OPENAI_BASE_URL).toBe("https://openai.example");
     expect(mod.env.ANTHROPIC_API_KEY).toBe("anthropic-key");
+    expect(mod.env.ANTHROPIC_BASE_URL).toBe("https://anthropic.example");
     expect(mod.env.DEEPSEEK_API_KEY).toBe("deepseek-key");
     expect(mod.env.DEEPSEEK_BASE_URL).toBe("https://deepseek.example");
-    expect(mod.env.AI_JUDGE_MODEL).toBe("deepseek-chat");
+    expect(mod.env.JUDGE_MODEL).toBe("deepseek-chat");
   });
 
   it("throws when a required env variable is missing", async () => {

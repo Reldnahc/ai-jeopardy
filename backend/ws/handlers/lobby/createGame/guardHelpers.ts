@@ -36,14 +36,14 @@ export function ensureHostOrFail({
 export function ensureLobbySettings(
   ctx: Ctx,
   game: GameState,
-  appConfig: { ai: { defaultModel: string } },
+  appConfig: { ai: { defaultGenerationModel: string } },
 ): NonNullable<GameState["lobbySettings"]> {
   if (game.lobbySettings) return game.lobbySettings;
 
   game.lobbySettings = {
     timeToBuzz: 10,
     timeToAnswer: 10,
-    selectedModel: appConfig.ai.defaultModel,
+    selectedModel: appConfig.ai.defaultGenerationModel,
     reasoningEffort: "off",
     visualMode: "off",
     narrationEnabled: false,
@@ -74,7 +74,7 @@ export function resolveModelOrFail({
 
   if (m.disabled) {
     ws.send(JSON.stringify({ type: "error", message: "That model is currently disabled." }));
-    game.lobbySettings.selectedModel = ctx.appConfig.ai.defaultModel;
+    game.lobbySettings.selectedModel = ctx.appConfig.ai.defaultGenerationModel;
     ctx.sendLobbySnapshot(ws, gameId);
     return false;
   }
@@ -89,7 +89,7 @@ export function resolveModelOrFail({
           message: "Your account is not allowed to use paid models.",
         }),
       );
-      game.lobbySettings.selectedModel = ctx.appConfig.ai.defaultModel;
+      game.lobbySettings.selectedModel = ctx.appConfig.ai.defaultGenerationModel;
       ctx.sendLobbySnapshot(ws, gameId);
       return false;
     }

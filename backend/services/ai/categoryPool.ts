@@ -17,7 +17,7 @@ export async function generateCategoryPoolFromAi(opts: {
   prompt?: string;
 }): Promise<string[]> {
   const count = Math.max(20, Math.min(200, Math.floor(opts.count)));
-  const model = opts.model || env.OPENAI_CATEGORY_POOL_MODEL;
+  const model = opts.model || env.CATEGORY_POOL_MODEL;
   const userPrompt = String(opts.prompt ?? "").trim();
 
   const prompt = [
@@ -62,5 +62,3 @@ export async function generateCategoryPoolFromAi(opts: {
 
   return out.slice(0, count);
 }
-
-export const generateCategoryPoolFromOpenAi = generateCategoryPoolFromAi;

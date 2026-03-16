@@ -40,7 +40,11 @@ function makeCtx(game: GameState, overrides: Record<string, unknown> = {}) {
       games: { g1: game },
       isHostSocket: vi.fn(() => true),
       appConfig: {
-        ai: { defaultModel: "gpt-4o-mini", defaultSttProvider: "openai", defaultTtsProvider: "kokoro" },
+        ai: {
+          defaultGenerationModel: "gpt-4o-mini",
+          defaultSttProvider: "openai",
+          defaultTtsProvider: "kokoro",
+        },
       },
       broadcast: vi.fn(),
       requireHost: vi.fn(() => true),
@@ -138,7 +142,9 @@ describe("lobbyConfigHandlers", () => {
 
   it("update-lobby-settings ignores ttsProviderName patch for non-privileged role", async () => {
     const ws = makeWs("default");
-    const game = makeGame({ lobbySettings: { ...makeGame().lobbySettings, ttsProviderName: "kokoro" } });
+    const game = makeGame({
+      lobbySettings: { ...makeGame().lobbySettings, ttsProviderName: "kokoro" },
+    });
     const ctx = makeCtx(game);
 
     await lobbyConfigHandlers["update-lobby-settings"]({
@@ -156,7 +162,7 @@ describe("lobbyConfigHandlers", () => {
     const ctx = makeCtx(game, {
       appConfig: {
         ai: {
-          defaultModel: "gpt-default",
+          defaultGenerationModel: "gpt-default",
           defaultSttProvider: "openai",
           defaultTtsProvider: "kokoro",
         },

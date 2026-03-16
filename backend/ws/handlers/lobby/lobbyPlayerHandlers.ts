@@ -92,7 +92,7 @@ export const lobbyPlayerHandlers: Record<string, WsHandler> = {
       lobbySettings: {
         timeToBuzz: 10,
         timeToAnswer: 10,
-        selectedModel: hctx.appConfig.ai.defaultModel,
+        selectedModel: hctx.appConfig.ai.defaultGenerationModel,
         reasoningEffort: "off",
         visualMode: "off",
         narrationEnabled: true,

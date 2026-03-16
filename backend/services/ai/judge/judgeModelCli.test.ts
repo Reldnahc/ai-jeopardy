@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { appConfig } from "../../../config/appConfig.js";
 
 const { judgeClueAnswerWithModelDetailedMock, readFileSyncMock } = vi.hoisted(() => ({
   judgeClueAnswerWithModelDetailedMock: vi.fn(),
@@ -32,7 +33,7 @@ describe("judgeModelCli", () => {
 
   it("normalizes judge model names", () => {
     expect(normalizeJudgeModel("deepseek-chat")).toBe("deepseek-chat");
-    expect(normalizeJudgeModel("  ")).toBe("deepseek-chat");
+    expect(normalizeJudgeModel("  ")).toBe(appConfig.ai.judgeModel);
   });
 
   it("normalizes concurrency values", () => {
@@ -45,7 +46,7 @@ describe("judgeModelCli", () => {
     expect(
       parseCliArgs([
         "--model",
-        "deepseek-chat",
+        "gpt-4o-mini",
         "--cases",
         "cases.json",
         "--concurrency",
@@ -54,7 +55,7 @@ describe("judgeModelCli", () => {
         "judge_reports",
       ]),
     ).toEqual({
-      model: "deepseek-chat",
+      model: appConfig.ai.judgeModel,
       casesFile: "cases.json",
       concurrency: 12,
       outputDir: "judge_reports",

@@ -36,9 +36,12 @@ export const env = Object.freeze({
   // required core
   DATABASE_URL: requireEnv("DATABASE_URL"),
   OPENAI_API_KEY: requireEnv("OPENAI_API_KEY"),
+  OPENAI_BASE_URL: optionalEnv("OPENAI_BASE_URL", ""),
   ANTHROPIC_API_KEY: optionalEnv("ANTHROPIC_API_KEY", ""),
+  ANTHROPIC_BASE_URL: optionalEnv("ANTHROPIC_BASE_URL", ""),
   DEEPSEEK_API_KEY: optionalEnv("DEEPSEEK_API_KEY", ""),
   DEEPSEEK_BASE_URL: optionalEnv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
+
   JWT_SECRET: requireEnv("JWT_SECRET"),
   NODE_ENV: optionalEnv("NODE_ENV", "development"),
 
@@ -50,12 +53,12 @@ export const env = Object.freeze({
   BRAVE_API_KEY: optionalEnv("BRAVE_API_KEY", ""),
 
   // AI models
-  OPENAI_DEFAULT_MODEL: optionalEnv("DEFAULT_MODEL", "deepseek-chat"),
-  AI_JUDGE_MODEL: optionalEnv("JUDGE_MODEL", optionalEnv("OPENAI_JUDGE_MODEL", "deepseek-chat")),
-  OPENAI_STT_MODEL: optionalEnv("OPENAI_STT_MODEL", "gpt-4o-mini-transcribe"),
-  OPENAI_IMAGE_JUDGE_MODEL: optionalEnv("OPENAI_IMAGE_JUDGE_MODEL", "gpt-4.1-mini"),
-  OPENAI_COTD_MODEL: optionalEnv("OPENAI_COTD_MODEL", "gpt-4o-mini"),
-  OPENAI_CATEGORY_POOL_MODEL: optionalEnv("OPENAI_CATEGORY_POOL_MODEL", "gpt-4o-mini"),
+  DEFAULT_GENERATION_MODEL: optionalEnv("DEFAULT_GENERATION_MODEL", "deepseek-chat"),
+  JUDGE_MODEL: optionalEnv("JUDGE_MODEL", "deepseek-chat"),
+  STT_MODEL: optionalEnv("STT_MODEL", "gpt-4o-mini-transcribe"),
+  IMAGE_JUDGE_MODEL: optionalEnv("IMAGE_JUDGE_MODEL", "gpt-4.1-mini"),
+  COTD_MODEL: optionalEnv("COTD_MODEL", "gpt-4o-mini"),
+  CATEGORY_POOL_MODEL: optionalEnv("CATEGORY_POOL_MODEL", "gpt-4o-mini"),
 
   // server
   PORT: optionalNumber("PORT", 3002),

@@ -8,16 +8,16 @@ export const appConfig = Object.freeze({
   },
 
   ai: {
-    defaultModel: env.OPENAI_DEFAULT_MODEL,
+    defaultGenerationModel: env.DEFAULT_GENERATION_MODEL,
     hasOpenAiApiKey: Boolean(env.OPENAI_API_KEY),
     hasAnthropicApiKey: Boolean(env.ANTHROPIC_API_KEY),
     hasDeepSeekApiKey: Boolean(env.DEEPSEEK_API_KEY),
     defaultSttProvider: env.WHISPER_URL ? "whisper" : "openai",
     defaultTtsProvider: env.KOKORO_URL ? "kokoro" : "openai",
-    sttModel: env.OPENAI_STT_MODEL,
-    judgeModel: env.AI_JUDGE_MODEL,
-    imageJudgeModel: env.OPENAI_IMAGE_JUDGE_MODEL,
-    cotdModel: env.OPENAI_COTD_MODEL,
+    sttModel: env.STT_MODEL,
+    judgeModel: env.JUDGE_MODEL,
+    imageJudgeModel: env.IMAGE_JUDGE_MODEL,
+    cotdModel: env.COTD_MODEL,
   },
 
   gameplay: {

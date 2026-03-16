@@ -206,7 +206,7 @@ export type WsContext = {
     tts?: Record<string, UnknownFn>;
   };
   appConfig: {
-    ai: { defaultModel: string; defaultSttProvider: string; defaultTtsProvider: string };
+    ai: { defaultGenerationModel: string; defaultSttProvider: string; defaultTtsProvider: string };
   };
   modelsByValue?: Record<string, { disabled?: boolean; price?: number }>;
   perms: { can: (ws: SocketState, permission: string, meta?: JsonMap) => boolean };

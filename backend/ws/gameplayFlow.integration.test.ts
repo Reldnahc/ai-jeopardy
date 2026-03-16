@@ -19,9 +19,7 @@ function makeWs(id: string): WsWithMessages {
 }
 
 function parseTypes(calls: Array<unknown[]>): string[] {
-  return calls
-    .map((c) => c[1] as { type?: string })
-    .map((payload) => String(payload?.type ?? ""));
+  return calls.map((c) => c[1] as { type?: string }).map((payload) => String(payload?.type ?? ""));
 }
 
 function makeHarness(judgeVerdict: "correct" | "incorrect") {
@@ -45,29 +43,40 @@ function makeHarness(judgeVerdict: "correct" | "incorrect") {
       },
     },
     appConfig: {
-      ai: { defaultModel: "gpt-4o-mini", defaultSttProvider: "openai", defaultTtsProvider: "kokoro" },
+      ai: {
+        defaultGenerationModel: "gpt-4o-mini",
+        defaultSttProvider: "openai",
+        defaultTtsProvider: "kokoro",
+      },
     },
-    normalizeCategories11: (arr: unknown[]) => (Array.isArray(arr) && arr.length ? arr : Array(11).fill("C")),
+    normalizeCategories11: (arr: unknown[]) =>
+      Array.isArray(arr) && arr.length ? arr : Array(11).fill("C"),
     buildLobbyState: (gameId: string) => ({ type: "lobby-state", gameId }),
     cancelLobbyCleanup: vi.fn(),
     scheduleLobbyCleanupIfEmpty: vi.fn(),
     broadcast,
-    playerStableId: (p: { username?: string }) => String(p?.username ?? "").trim().toLowerCase(),
+    playerStableId: (p: { username?: string }) =>
+      String(p?.username ?? "")
+        .trim()
+        .toLowerCase(),
     checkAllWagersSubmitted: vi.fn(),
     checkAllDrawingsSubmitted: vi.fn(),
-    getPlayerForSocket: (game: GameState, ws: SocketState) => game.players?.find((p) => p.id === ws.id) ?? null,
+    getPlayerForSocket: (game: GameState, ws: SocketState) =>
+      game.players?.find((p) => p.id === ws.id) ?? null,
     cancelAutoUnlock: vi.fn(),
     fireAndForget: (p: PromiseLike<unknown>) => {
       void p;
     },
     findCategoryForClue: () => "",
     computeDailyDoubleMaxWager: vi.fn(() => 1000),
-    aiHostVoiceSequence: vi.fn(async (_ctx, _gameId, _game, steps: Array<{ after?: () => unknown }>) => {
-      for (const step of steps) {
-        if (typeof step.after === "function") await step.after();
-      }
-      return true;
-    }),
+    aiHostVoiceSequence: vi.fn(
+      async (_ctx, _gameId, _game, steps: Array<{ after?: () => unknown }>) => {
+        for (const step of steps) {
+          if (typeof step.after === "function") await step.after();
+        }
+        return true;
+      },
+    ),
     startDdWagerCapture: vi.fn(),
     doUnlockBuzzerAuthoritative: (_gameId: string, game: GameState) => {
       game.buzzerLocked = false;
@@ -114,30 +123,41 @@ function makeFullHarness() {
       },
     },
     appConfig: {
-      ai: { defaultModel: "gpt-4o-mini", defaultSttProvider: "openai", defaultTtsProvider: "kokoro" },
+      ai: {
+        defaultGenerationModel: "gpt-4o-mini",
+        defaultSttProvider: "openai",
+        defaultTtsProvider: "kokoro",
+      },
     },
-    normalizeCategories11: (arr: unknown[]) => (Array.isArray(arr) && arr.length ? arr : Array(11).fill("C")),
+    normalizeCategories11: (arr: unknown[]) =>
+      Array.isArray(arr) && arr.length ? arr : Array(11).fill("C"),
     buildLobbyState: (gameId: string) => ({ type: "lobby-state", gameId }),
     sendLobbySnapshot: vi.fn(),
     cancelLobbyCleanup: vi.fn(),
     scheduleLobbyCleanupIfEmpty: vi.fn(),
     broadcast,
-    playerStableId: (p: { username?: string }) => String(p?.username ?? "").trim().toLowerCase(),
+    playerStableId: (p: { username?: string }) =>
+      String(p?.username ?? "")
+        .trim()
+        .toLowerCase(),
     checkAllWagersSubmitted: vi.fn(),
     checkAllDrawingsSubmitted: vi.fn(),
-    getPlayerForSocket: (game: GameState, ws: SocketState) => game.players?.find((p) => p.id === ws.id) ?? null,
+    getPlayerForSocket: (game: GameState, ws: SocketState) =>
+      game.players?.find((p) => p.id === ws.id) ?? null,
     cancelAutoUnlock: vi.fn(),
     fireAndForget: (p: PromiseLike<unknown>) => {
       void p;
     },
     findCategoryForClue: () => "",
     computeDailyDoubleMaxWager: vi.fn(() => 1000),
-    aiHostVoiceSequence: vi.fn(async (_ctx, _gameId, _game, steps: Array<{ after?: () => unknown }>) => {
-      for (const step of steps) {
-        if (typeof step.after === "function") await step.after();
-      }
-      return true;
-    }),
+    aiHostVoiceSequence: vi.fn(
+      async (_ctx, _gameId, _game, steps: Array<{ after?: () => unknown }>) => {
+        for (const step of steps) {
+          if (typeof step.after === "function") await step.after();
+        }
+        return true;
+      },
+    ),
     startDdWagerCapture: vi.fn((gameId: string, game: GameState) => {
       game.phase = "DD_WAGER_CAPTURE";
       game.ddWagerSessionId = "dd-session";
@@ -157,9 +177,11 @@ function makeFullHarness() {
     aiHostSayByKey: vi.fn(async () => {}),
     clearAnswerWindow: vi.fn(),
     startGameTimer: vi.fn(),
-    startAnswerWindow: vi.fn((gameId: string, _game: GameState, _broadcast: unknown, _ms: number, cb: () => void) => {
-      startAnswerWindowCallbacks[gameId] = cb;
-    }),
+    startAnswerWindow: vi.fn(
+      (gameId: string, _game: GameState, _broadcast: unknown, _ms: number, cb: () => void) => {
+        startAnswerWindowCallbacks[gameId] = cb;
+      },
+    ),
     parseClueValue: vi.fn((v: unknown) => Number(String(v ?? "").replace(/[^0-9]/g, "")) || 0),
     autoResolveAfterJudgement,
     transcribeAnswerAudio: vi.fn(async () => "A"),
@@ -206,28 +228,30 @@ function makeFullHarness() {
       ttsByAnswerKey: {},
     })),
     safeAbortGeneration: vi.fn(),
-    applyNewGameState: vi.fn(({ game, boardData, timeToBuzz, timeToAnswer }: Record<string, unknown>) => {
-      const g = game as GameState;
-      g.boardData = boardData as never;
-      g.inLobby = true;
-      g.timeToBuzz = Number(timeToBuzz ?? 10);
-      g.timeToAnswer = Number(timeToAnswer ?? 10);
-      g.players = g.players || [];
-      g.scores = g.scores || {};
-      g.clearedClues = g.clearedClues || new Set();
-      g.activeBoard = "firstBoard";
-      g.buzzLockouts = {};
-      g.buzzerLocked = true;
-      g.lobbySettings = g.lobbySettings || {
-        timeToBuzz: 10,
-        timeToAnswer: 10,
-        selectedModel: "gpt-4o-mini",
-        reasoningEffort: "off",
-        visualMode: "off",
-        narrationEnabled: true,
-        boardJson: "",
-      };
-    }),
+    applyNewGameState: vi.fn(
+      ({ game, boardData, timeToBuzz, timeToAnswer }: Record<string, unknown>) => {
+        const g = game as GameState;
+        g.boardData = boardData as never;
+        g.inLobby = true;
+        g.timeToBuzz = Number(timeToBuzz ?? 10);
+        g.timeToAnswer = Number(timeToAnswer ?? 10);
+        g.players = g.players || [];
+        g.scores = g.scores || {};
+        g.clearedClues = g.clearedClues || new Set();
+        g.activeBoard = "firstBoard";
+        g.buzzLockouts = {};
+        g.buzzerLocked = true;
+        g.lobbySettings = g.lobbySettings || {
+          timeToBuzz: 10,
+          timeToAnswer: 10,
+          selectedModel: "gpt-4o-mini",
+          reasoningEffort: "off",
+          visualMode: "off",
+          narrationEnabled: true,
+          boardJson: "",
+        };
+      },
+    ),
     ensureAiHostValueTts: vi.fn(async () => {}),
     broadcastPreloadBatch: vi.fn(),
     setupPreloadHandshake: vi.fn(async ({ game }: { game: GameState }) => {
@@ -338,13 +362,7 @@ describe("ws gameplay integration", () => {
 
     expect(game.phase).toBe("RESULT");
     expect(game.answerVerdict).toBe("correct");
-    expect(autoResolveAfterJudgement).toHaveBeenCalledWith(
-      ctx,
-      gameId,
-      game,
-      "alice",
-      "correct",
-    );
+    expect(autoResolveAfterJudgement).toHaveBeenCalledWith(ctx, gameId, game, "alice", "correct");
 
     const emittedTypes = parseTypes((broadcast as ReturnType<typeof vi.fn>).mock.calls);
     expect(emittedTypes).toContain("clue-selected");
@@ -428,14 +446,10 @@ describe("ws gameplay integration", () => {
 
     expect(game.phase).toBe("RESULT");
     expect(game.answerVerdict).toBe("incorrect");
-    expect(autoResolveAfterJudgement).toHaveBeenCalledWith(
-      ctx,
-      gameId,
-      game,
-      "alice",
-      "incorrect",
+    expect(autoResolveAfterJudgement).toHaveBeenCalledWith(ctx, gameId, game, "alice", "incorrect");
+    expect(parseTypes((broadcast as ReturnType<typeof vi.fn>).mock.calls)).toContain(
+      "answer-result",
     );
-    expect(parseTypes((broadcast as ReturnType<typeof vi.fn>).mock.calls)).toContain("answer-result");
   });
 
   it("daily double wager path reprompts on unparsable audio then finalizes on valid parse", async () => {
@@ -446,7 +460,12 @@ describe("ws gameplay integration", () => {
       ddWagerSessionId: "dd-1",
       lobbySettings: { sttProviderName: "openai" },
       players: [{ id: "ws-dd", username: "alice", displayname: "Alice" }],
-      dailyDouble: { playerUsername: "alice", playerDisplayname: "Alice", maxWager: 1000, clueKey: "k1" },
+      dailyDouble: {
+        playerUsername: "alice",
+        playerDisplayname: "Alice",
+        maxWager: 1000,
+        clueKey: "k1",
+      },
       usedDailyDoubles: new Set(),
     } as unknown as GameState;
     (ctx.parseDailyDoubleWager as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
@@ -495,11 +514,24 @@ describe("ws gameplay integration", () => {
     const ws = makeWs("ws-fj");
     games.g1 = {} as GameState;
 
-    await routeWsMessage(ws, JSON.stringify({ type: "submit-wager", gameId: "g1", player: "alice", wager: 500 }), ctx as never);
-    await routeWsMessage(ws, JSON.stringify({ type: "submit-drawing", gameId: "g1", player: "alice", drawing: "img" }), ctx as never);
     await routeWsMessage(
       ws,
-      JSON.stringify({ type: "submit-final-wager-drawing", gameId: "g1", player: "alice", drawing: "img2" }),
+      JSON.stringify({ type: "submit-wager", gameId: "g1", player: "alice", wager: 500 }),
+      ctx as never,
+    );
+    await routeWsMessage(
+      ws,
+      JSON.stringify({ type: "submit-drawing", gameId: "g1", player: "alice", drawing: "img" }),
+      ctx as never,
+    );
+    await routeWsMessage(
+      ws,
+      JSON.stringify({
+        type: "submit-final-wager-drawing",
+        gameId: "g1",
+        player: "alice",
+        drawing: "img2",
+      }),
       ctx as never,
     );
 
@@ -519,7 +551,15 @@ describe("ws gameplay integration", () => {
         { id: "ws-other", username: "alice", displayname: "Alice", online: true },
       ],
       inLobby: true,
-      lobbySettings: { timeToBuzz: 10, timeToAnswer: 10, selectedModel: "gpt-4o-mini", reasoningEffort: "off", visualMode: "off", narrationEnabled: true, boardJson: "" },
+      lobbySettings: {
+        timeToBuzz: 10,
+        timeToAnswer: 10,
+        selectedModel: "gpt-4o-mini",
+        reasoningEffort: "off",
+        visualMode: "off",
+        narrationEnabled: true,
+        boardJson: "",
+      },
     } as unknown as GameState;
 
     await routeWsMessage(
@@ -527,13 +567,27 @@ describe("ws gameplay integration", () => {
       JSON.stringify({ type: "update-lobby-settings", gameId: "g1", patch: { timeToBuzz: 12 } }),
       ctx as never,
     );
-    expect(other.messages.some((m) => m.includes("Only the host can update lobby settings"))).toBe(true);
+    expect(other.messages.some((m) => m.includes("Only the host can update lobby settings"))).toBe(
+      true,
+    );
 
-    await routeWsMessage(other, JSON.stringify({ type: "unlock-buzzer", gameId: "g1" }), ctx as never);
-    expect(parseTypes((broadcast as ReturnType<typeof vi.fn>).mock.calls)).not.toContain("buzzer-unlocked");
+    await routeWsMessage(
+      other,
+      JSON.stringify({ type: "unlock-buzzer", gameId: "g1" }),
+      ctx as never,
+    );
+    expect(parseTypes((broadcast as ReturnType<typeof vi.fn>).mock.calls)).not.toContain(
+      "buzzer-unlocked",
+    );
 
-    await routeWsMessage(host, JSON.stringify({ type: "unlock-buzzer", gameId: "g1" }), ctx as never);
-    expect(parseTypes((broadcast as ReturnType<typeof vi.fn>).mock.calls)).toContain("buzzer-unlocked");
+    await routeWsMessage(
+      host,
+      JSON.stringify({ type: "unlock-buzzer", gameId: "g1" }),
+      ctx as never,
+    );
+    expect(parseTypes((broadcast as ReturnType<typeof vi.fn>).mock.calls)).toContain(
+      "buzzer-unlocked",
+    );
   });
 
   it("reconnects player to existing in-progress game and preserves session fields", async () => {
@@ -575,7 +629,15 @@ describe("ws gameplay integration", () => {
         { id: "ws-host", username: "host", displayname: "Host", online: true },
         { id: "ws-p2", username: "alice", displayname: "Alice", online: true },
       ],
-      lobbySettings: { timeToBuzz: 10, timeToAnswer: 10, selectedModel: "gpt-4o-mini", reasoningEffort: "off", visualMode: "off", narrationEnabled: true, boardJson: "" },
+      lobbySettings: {
+        timeToBuzz: 10,
+        timeToAnswer: 10,
+        selectedModel: "gpt-4o-mini",
+        reasoningEffort: "off",
+        visualMode: "off",
+        narrationEnabled: true,
+        boardJson: "",
+      },
       categories: ["A"],
       scores: { host: 0, alice: 0 },
       clearedClues: new Set(),
@@ -585,14 +647,32 @@ describe("ws gameplay integration", () => {
     await routeWsMessage(host, JSON.stringify({ type: "create-game", gameId: "g1" }), ctx as never);
     expect(games.g1.preload?.active).toBe(true);
 
-    await routeWsMessage(host, JSON.stringify({ type: "preload-done", gameId: "g1", username: "host", token: 1 }), ctx as never);
-    expect(parseTypes((broadcast as ReturnType<typeof vi.fn>).mock.calls)).not.toContain("start-game");
-    await routeWsMessage(p2, JSON.stringify({ type: "preload-done", gameId: "g1", username: "alice", token: 1 }), ctx as never);
+    await routeWsMessage(
+      host,
+      JSON.stringify({ type: "preload-done", gameId: "g1", username: "host", token: 1 }),
+      ctx as never,
+    );
+    expect(parseTypes((broadcast as ReturnType<typeof vi.fn>).mock.calls)).not.toContain(
+      "start-game",
+    );
+    await routeWsMessage(
+      p2,
+      JSON.stringify({ type: "preload-done", gameId: "g1", username: "alice", token: 1 }),
+      ctx as never,
+    );
     expect(parseTypes((broadcast as ReturnType<typeof vi.fn>).mock.calls)).toContain("start-game");
 
-    await routeWsMessage(host, JSON.stringify({ type: "game-ready", gameId: "g1", username: "host" }), ctx as never);
+    await routeWsMessage(
+      host,
+      JSON.stringify({ type: "game-ready", gameId: "g1", username: "host" }),
+      ctx as never,
+    );
     expect(games.g1.phase).toBeNull();
-    await routeWsMessage(p2, JSON.stringify({ type: "game-ready", gameId: "g1", username: "alice" }), ctx as never);
+    await routeWsMessage(
+      p2,
+      JSON.stringify({ type: "game-ready", gameId: "g1", username: "alice" }),
+      ctx as never,
+    );
     expect(games.g1.phase).toBe("welcome");
     await vi.advanceTimersByTimeAsync(650);
     expect(games.g1.phase).toBe("board");
@@ -618,8 +698,16 @@ describe("ws gameplay integration", () => {
       scores: { alice: 0, bob: 0 },
     } as unknown as GameState;
 
-    await routeWsMessage(a, JSON.stringify({ type: "buzz", gameId: "g1", estimatedServerBuzzAtMs: now + 10 }), ctx as never);
-    await routeWsMessage(b, JSON.stringify({ type: "buzz", gameId: "g1", estimatedServerBuzzAtMs: now + 2 }), ctx as never);
+    await routeWsMessage(
+      a,
+      JSON.stringify({ type: "buzz", gameId: "g1", estimatedServerBuzzAtMs: now + 10 }),
+      ctx as never,
+    );
+    await routeWsMessage(
+      b,
+      JSON.stringify({ type: "buzz", gameId: "g1", estimatedServerBuzzAtMs: now + 2 }),
+      ctx as never,
+    );
     await vi.advanceTimersByTimeAsync(60);
     expect(parseTypes((broadcast as ReturnType<typeof vi.fn>).mock.calls)).toContain("buzz-result");
     expect(games.g1.buzzed).toBe("bob");
@@ -627,7 +715,8 @@ describe("ws gameplay integration", () => {
 
   it("answer window timeout auto-resolves incorrect when no audio is submitted", async () => {
     vi.useFakeTimers();
-    const { ctx, games, broadcast, autoResolveAfterJudgement, startAnswerWindowCallbacks } = makeFullHarness();
+    const { ctx, games, broadcast, autoResolveAfterJudgement, startAnswerWindowCallbacks } =
+      makeFullHarness();
     const a = makeWs("ws-a");
     games.g1 = {
       players: [{ id: "ws-a", username: "alice", displayname: "Alice" }],
@@ -647,8 +736,16 @@ describe("ws gameplay integration", () => {
     expect(typeof cb).toBe("function");
     cb?.();
 
-    expect(parseTypes((broadcast as ReturnType<typeof vi.fn>).mock.calls)).toContain("answer-result");
-    expect(autoResolveAfterJudgement).toHaveBeenCalledWith(ctx, "g1", games.g1, "alice", "incorrect");
+    expect(parseTypes((broadcast as ReturnType<typeof vi.fn>).mock.calls)).toContain(
+      "answer-result",
+    );
+    expect(autoResolveAfterJudgement).toHaveBeenCalledWith(
+      ctx,
+      "g1",
+      games.g1,
+      "alice",
+      "incorrect",
+    );
   });
 
   it("board progression integration: mark-all-complete clears and triggers transition check", async () => {
@@ -658,11 +755,24 @@ describe("ws gameplay integration", () => {
       activeBoard: "firstBoard",
       clearedClues: new Set(),
       boardData: {
-        firstBoard: { categories: [{ values: [{ value: 200, question: "Q1" }, { value: 400, question: "Q2" }] }] },
+        firstBoard: {
+          categories: [
+            {
+              values: [
+                { value: 200, question: "Q1" },
+                { value: 400, question: "Q2" },
+              ],
+            },
+          ],
+        },
       },
     } as unknown as GameState;
 
-    await routeWsMessage(ws, JSON.stringify({ type: "mark-all-complete", gameId: "g1" }), ctx as never);
+    await routeWsMessage(
+      ws,
+      JSON.stringify({ type: "mark-all-complete", gameId: "g1" }),
+      ctx as never,
+    );
     expect(games.g1.clearedClues?.has("200-Q1")).toBe(true);
     expect(games.g1.clearedClues?.has("400-Q2")).toBe(true);
     expect(ctx.checkBoardTransition).toHaveBeenCalled();
@@ -672,9 +782,9 @@ describe("ws gameplay integration", () => {
     const { ctx } = makeFullHarness();
     const ws = makeWs("ws-auth");
     (ctx.verifyJwt as ReturnType<typeof vi.fn>).mockReturnValue({ sub: "u1", role: "admin" });
-    (ctx.repos as { profiles: { getRoleById: ReturnType<typeof vi.fn> } }).profiles.getRoleById.mockResolvedValue(
-      "moderator",
-    );
+    (
+      ctx.repos as { profiles: { getRoleById: ReturnType<typeof vi.fn> } }
+    ).profiles.getRoleById.mockResolvedValue("moderator");
 
     await routeWsMessage(ws, JSON.stringify({ type: "auth", token: "good-token" }), ctx as never);
     const payload = ws.messages.map((m) => JSON.parse(m)).find((m) => m.type === "auth-result");

@@ -47,7 +47,7 @@ export const lobbyConfigHandlers: Record<string, WsHandler> = {
         game.lobbySettings = {
           timeToBuzz: 10,
           timeToAnswer: 10,
-          selectedModel: hctx.appConfig.ai.defaultModel,
+          selectedModel: hctx.appConfig.ai.defaultGenerationModel,
           reasoningEffort: "off",
           visualMode: "off",
           narrationEnabled: true,
@@ -135,7 +135,7 @@ export const lobbyConfigHandlers: Record<string, WsHandler> = {
       game.lobbySettings = {
         timeToBuzz: 10,
         timeToAnswer: 10,
-        selectedModel: hctx.appConfig.ai.defaultModel,
+        selectedModel: hctx.appConfig.ai.defaultGenerationModel,
         reasoningEffort: "off",
         visualMode: "off",
         narrationEnabled: true,
@@ -189,7 +189,10 @@ export const lobbyConfigHandlers: Record<string, WsHandler> = {
     );
 
     const isFull = Boolean(
-      inLobby && game?.players?.length != null && game.players.length >= MAX_LOBBY_PLAYERS && !isAlreadyInLobby,
+      inLobby &&
+      game?.players?.length != null &&
+      game.players.length >= MAX_LOBBY_PLAYERS &&
+      !isAlreadyInLobby,
     );
 
     const isValid = Boolean(inLobby && !isFull);

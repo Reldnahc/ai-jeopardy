@@ -42,16 +42,16 @@ Note: OpenAI-based STT/TTS can become expensive with sustained usage. Running lo
 
 ## Feature Matrix
 
-| Capability | OpenAI-only setup | OpenAI + Kokoro/Whisper setup |
-|---|---|---|
-| Core multiplayer gameplay | Yes | Yes |
-| AI board generation | Yes | Yes |
-| AI answer judging | Yes | Yes |
-| TTS narration | Yes (OpenAI provider) | Yes (Kokoro preferred, OpenAI fallback) |
-| STT transcription | Yes (OpenAI provider) | Yes (Whisper preferred, OpenAI fallback) |
-| Local/self-hosted speech services | No | Yes |
-| Best speech throughput/latency | Limited by external API | Better with local GPU-backed services |
-| Ongoing speech cost | Higher (per-request API charges) | Lower (self-hosted compute) |
+| Capability                        | OpenAI-only setup                | OpenAI + Kokoro/Whisper setup            |
+| --------------------------------- | -------------------------------- | ---------------------------------------- |
+| Core multiplayer gameplay         | Yes                              | Yes                                      |
+| AI board generation               | Yes                              | Yes                                      |
+| AI answer judging                 | Yes                              | Yes                                      |
+| TTS narration                     | Yes (OpenAI provider)            | Yes (Kokoro preferred, OpenAI fallback)  |
+| STT transcription                 | Yes (OpenAI provider)            | Yes (Whisper preferred, OpenAI fallback) |
+| Local/self-hosted speech services | No                               | Yes                                      |
+| Best speech throughput/latency    | Limited by external API          | Better with local GPU-backed services    |
+| Ongoing speech cost               | Higher (per-request API charges) | Lower (self-hosted compute)              |
 
 ## Tech Stack
 
@@ -88,17 +88,20 @@ Required:
 
 Optional:
 
+- `OPENAI_BASE_URL` (optional OpenAI API override; defaults to official OpenAI endpoint)
+- `ANTHROPIC_BASE_URL` (optional Anthropic API override; defaults to official Anthropic endpoint)
+- `DEEPSEEK_BASE_URL` (default `https://api.deepseek.com`)
 - `KOKORO_URL` (enables Kokoro TTS routing)
 - `WHISPER_URL` (enables Whisper STT routing)
 - `BRAVE_API_KEY` (image search support)
 - `PORT` (default `3002`)
 - `CORS_ORIGINS` (comma-separated, default `http://localhost:5173`)
-- `DEFAULT_MODEL` (default `gpt-4o-mini`)
-- `OPENAI_JUDGE_MODEL` (default `gpt-4o-mini`)
-- `OPENAI_STT_MODEL` (default `gpt-4o-mini-transcribe`)
-- `OPENAI_IMAGE_JUDGE_MODEL` (default `gpt-4.1-mini`)
-- `OPENAI_COTD_MODEL` (default `gpt-4o-mini`)
-- `OPENAI_CATEGORY_POOL_MODEL` (default `gpt-4o-mini`)
+- `DEFAULT_GENERATION_MODEL` (default `deepseek-chat`)
+- `JUDGE_MODEL` (default `deepseek-chat`)
+- `STT_MODEL` (default `gpt-4o-mini-transcribe`)
+- `IMAGE_JUDGE_MODEL` (default `gpt-4.1-mini`)
+- `COTD_MODEL` (default `gpt-4o-mini`)
+- `CATEGORY_POOL_MODEL` (default `gpt-4o-mini`)
 - `BUZZ_LOCKOUT_MS` (default `1`)
 - `CLUE_ANSWER_TIMEOUT_MS` (default `10000`)
 - `FINAL_DRAW_SECONDS` (default `30`)

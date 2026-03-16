@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { envMock, callAiJsonMock, parseAiJsonMock } = vi.hoisted(() => ({
-  envMock: { OPENAI_CATEGORY_POOL_MODEL: "gpt-default" },
+  envMock: { CATEGORY_POOL_MODEL: "gpt-default" },
   callAiJsonMock: vi.fn(),
   parseAiJsonMock: vi.fn(),
 }));
