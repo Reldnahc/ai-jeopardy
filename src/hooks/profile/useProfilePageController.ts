@@ -7,16 +7,11 @@ import { getProfilePresentation } from "../../utils/profilePresentation";
 import {
   COLOR_TARGETS,
   colorPatch,
-  getApiBase,
   normalizeHex,
-  normalizeUsername,
   prettyRoleLabel,
-  toErrorMessage,
   useRoleGate,
   type ColorTarget,
   type CustomPatch,
-  type ModerationPatch,
-  type PatchMeResponse,
 } from "./profilePageController.shared";
 import {
   buildProfileRoleState,
@@ -24,6 +19,7 @@ import {
   getSavedHexForTarget,
   loadProfileBoards,
 } from "./profilePageController.helpers";
+import { useProfilePageMutations } from "./useProfilePageMutations";
 import { useProfileOverlay } from "./useProfileOverlay";
 import { useRouteProfileLoader } from "./useRouteProfileLoader";
 
@@ -117,103 +113,23 @@ export function useProfilePageController(usernameParam: string | undefined) {
     void run();
   }, [usernameParam]);
 
-  const saveCustomization = async (patch: CustomPatch) => {
-    if (!token) return;
-
-    addOverlay(patch);
-    setRouteProfile((prev) => (prev ? applyOverlay({ ...prev, ...patch }) : prev));
-
-    applyProfilePatch(patch);
-    if (routeProfile?.username) patchProfileByUsername(routeProfile.username, patch);
-
-    try {
-      const api = getApiBase();
-      const res = await fetch(`${api}/api/profile/me`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(patch),
-      });
-
-      const data = (await res.json()) as PatchMeResponse;
-      if (!res.ok) throw new Error(data?.error || "Failed to update profile");
-
-      if (data.profile) {
-        const serverProfile = data.profile;
-
-        maybeClearOverlayIfServerMatches(serverProfile, patch);
-
-        const merged = applyOverlay(serverProfile)!;
-
-        applyProfilePatch(merged);
-        patchProfileByUsername(serverProfile.username, merged);
-        setRouteProfile((prev) => (prev ? { ...prev, ...merged } : merged));
-
-        const now = Date.now();
-        if (
-          Object.keys(pendingOverlayRef.current).length > 0 &&
-          now - pendingSinceRef.current > 3000
-        ) {
-          clearOverlay();
-        }
-      }
-    } catch (e: unknown) {
-      setLocalError(toErrorMessage(e));
-      clearOverlay();
-
-      await refetchProfile();
-
-      try {
-        const u = normalizeUsername(usernameParam);
-        if (u) {
-          const p = await fetchPublicProfile(u);
-          setRouteProfile(p);
-        }
-      } catch {
-        // ignore
-      }
-    }
-  };
-
-  const patchAnyProfile = async (targetUsername: string, patch: ModerationPatch) => {
-    if (!token) return;
-
-    addOverlay(patch);
-    setRouteProfile((prev) => (prev ? applyOverlay({ ...prev, ...patch }) : prev));
-
-    applyProfilePatch(patch);
-    patchProfileByUsername(targetUsername, patch);
-
-    try {
-      const api = getApiBase();
-      const res = await fetch(`${api}/api/profile/${encodeURIComponent(targetUsername)}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(patch),
-      });
-
-      const data = (await res.json()) as { profile?: P; error?: string };
-      if (!res.ok) throw new Error(data?.error || "Failed to update profile");
-
-      if (data.profile) {
-        const serverProfile = data.profile;
-        const merged = applyOverlay(serverProfile)!;
-
-        applyProfilePatch(merged);
-        patchProfileByUsername(serverProfile.username, merged);
-        setRouteProfile((prev) => (prev ? { ...prev, ...merged } : merged));
-      }
-    } catch (e: unknown) {
-      setLocalError(toErrorMessage(e));
-      clearOverlay();
-      await refetchProfile();
-    }
-  };
+  const { saveCustomization, patchAnyProfile } = useProfilePageMutations({
+    token,
+    usernameParam,
+    routeProfile,
+    applyOverlay,
+    addOverlay,
+    clearOverlay,
+    maybeClearOverlayIfServerMatches,
+    pendingOverlayRef,
+    pendingSinceRef,
+    setRouteProfile,
+    setLocalError,
+    applyProfilePatch,
+    patchProfileByUsername,
+    refetchProfile,
+    fetchPublicProfile,
+  });
 
   const commitHexDraft = async () => {
     const meta = COLOR_TARGETS.find((t) => t.key === colorTarget)!;
