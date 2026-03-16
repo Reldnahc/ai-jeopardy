@@ -13,7 +13,6 @@ import { useAuth } from "./AuthContext";
 import { ProfileIconName } from "../components/common/profileIcons.tsx";
 import { Role } from "../../shared/roles.ts";
 import {
-  getApiBase,
   getErrorMessage,
   getMissingProfileUsernames,
   isFreshCacheEntry,
@@ -22,10 +21,14 @@ import {
   patchCachedProfile,
   PROFILE_TTL_MS,
   readCachedProfile,
-  safeJson,
   upsertCachedProfile,
   type ProfilesByUsername,
 } from "./profileContext.helpers.ts";
+import {
+  requestMeProfile,
+  requestPublicProfile,
+  requestPublicProfiles,
+} from "./profileContext.requests.ts";
 
 export interface ProfileStats {
   boards_generated?: number | null;
@@ -156,20 +159,7 @@ export const ProfileProvider: React.FC<{ children: ReactNode }> = ({ children })
       inFlightPublic.current.add(u);
 
       try {
-        const api = getApiBase();
-        const res = await fetch(`${api}/api/profile/${encodeURIComponent(u)}`, {
-          cache: "no-store",
-        });
-
-        if (!res.ok) {
-          const data = await safeJson(res);
-          throw new Error(data?.error || "Failed to load profile");
-        }
-
-        const data = await safeJson(res);
-        if (!data) throw new Error("Failed to load profile");
-
-        const p = data.profile as Profile;
+        const p = await requestPublicProfile<Profile>(u);
         if (p) cacheUpsert(p);
         return p ?? null;
       } finally {
@@ -191,19 +181,7 @@ export const ProfileProvider: React.FC<{ children: ReactNode }> = ({ children })
       for (const u of missing) inFlightPublic.current.add(u);
 
       try {
-        const api = getApiBase();
-        const qs = new URLSearchParams();
-        for (const u of missing.slice(0, 50)) qs.append("u", u);
-
-        const res = await fetch(`${api}/api/profile/batch?${qs.toString()}`, { cache: "no-store" });
-
-        if (!res.ok) {
-          const data = await safeJson(res);
-          throw new Error(data?.error || "Failed to load profiles");
-        }
-
-        const data = await safeJson(res);
-        const arr = (data?.profiles ?? []) as Profile[];
+        const arr = await requestPublicProfiles<Profile>(missing);
 
         for (const p of arr) if (p) cacheUpsert(p);
       } finally {
@@ -217,22 +195,7 @@ export const ProfileProvider: React.FC<{ children: ReactNode }> = ({ children })
     if (!token) return null;
 
     const myReq = ++meSeq.current;
-
-    const api = getApiBase();
-    const res = await fetch(`${api}/api/profile/me`, {
-      headers: { Authorization: `Bearer ${token}` },
-      cache: "no-store",
-    });
-
-    if (!res.ok) {
-      const data = await safeJson(res);
-      throw new Error(data?.error || "Failed to load profile");
-    }
-
-    const data = await safeJson(res);
-    if (!data) throw new Error("Failed to load profile");
-
-    const p = data.profile as Profile;
+    const p = await requestMeProfile<Profile>(token);
     if (p) {
       cacheUpsert(p);
       if (myReq === meSeq.current) {

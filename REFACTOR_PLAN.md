@@ -19,6 +19,7 @@ This plan normalizes code style and patterns based on the conventions that alrea
 - Completed: extracted ProfileContext cache and freshness helpers out of `src/contexts/ProfileContext.tsx`.
 - Completed: extracted profile page role/boards helpers out of `src/hooks/profile/useProfilePageController.ts`.
 - Completed: extracted pure game socket helpers out of `src/features/game/socket/useGameSocketSync.ts`.
+- Completed: extracted ProfileContext request helpers out of `src/contexts/ProfileContext.tsx`.
 - Pending: broader file decomposition for oversized controllers, hooks, and route modules.
 
 ## Chosen Defaults
@@ -86,6 +87,7 @@ This plan normalizes code style and patterns based on the conventions that alrea
   - Extracted profile moderation logic into `backend/http/profileModeration.ts`.
   - Extracted Board Creator pure helpers into `src/features/boardCreator/boardCreatorUtils.ts`.
   - Extracted ProfileContext cache/freshness helpers into `src/contexts/profileContext.helpers.ts`.
+  - Extracted ProfileContext request helpers into `src/contexts/profileContext.requests.ts`.
   - Extracted profile page role/boards helpers into `src/hooks/profile/profilePageController.helpers.ts`.
   - Extracted pure game socket helpers into `src/features/game/socket/useGameSocketSync.helpers.ts`.
 - Remaining:
