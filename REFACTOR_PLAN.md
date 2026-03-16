@@ -23,6 +23,8 @@ This plan normalizes code style and patterns based on the conventions that alrea
 - Completed: extracted ProfileContext request helpers out of `src/contexts/ProfileContext.tsx`.
 - Completed: extracted benchmark workflow timing, usage, and summary helpers out of `backend/services/ai/board/boardBenchmarkWorkflow.ts`.
 - Completed: extracted benchmark workflow board-generation helpers out of `backend/services/ai/board/boardBenchmarkWorkflow.ts`.
+- Completed: extracted benchmark workflow classifier helpers out of `backend/services/ai/board/boardBenchmarkWorkflow.ts`.
+- Completed: extracted benchmark workflow artifact writers out of `backend/services/ai/board/boardBenchmarkWorkflow.ts`.
 - Pending: broader file decomposition for oversized controllers, hooks, and route modules.
 
 ## Chosen Defaults
@@ -98,10 +100,12 @@ This plan normalizes code style and patterns based on the conventions that alrea
   - Extracted benchmark workflow timing, usage, and summary logic into `backend/services/ai/board/boardBenchmarkWorkflow.summary.ts`.
   - Extracted benchmark workflow shared request/result types into `backend/services/ai/board/boardBenchmarkWorkflow.types.ts`.
   - Extracted benchmark workflow board-generation jobs and board assembly into `backend/services/ai/board/boardBenchmarkGeneration.ts`.
+  - Extracted benchmark workflow classifier batching, transport, and scored-clue assembly into `backend/services/ai/board/boardBenchmarkClassifier.ts`.
+  - Extracted benchmark workflow JSON artifact writing into `backend/services/ai/board/boardBenchmarkArtifacts.ts`.
 - Remaining:
   - Split large hooks and components by concern before adding more state branches.
   - Extract route/body parsing helpers from additional large HTTP route modules.
-  - Continue extracting classifier and persistence steps from large backend orchestration modules such as `boardBenchmarkWorkflow.ts`.
+  - Continue extracting config/bootstrap and provider-request setup steps from large backend orchestration modules such as `boardBenchmarkWorkflow.ts`.
 
 ### 5. Backend Module Consistency
 

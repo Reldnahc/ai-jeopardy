@@ -13,6 +13,15 @@ import {
   type BoardGenerationResult,
 } from "./boardBenchmarkGeneration.js";
 import {
+  flattenBoardClues,
+  scoreBoardClues,
+} from "./boardBenchmarkClassifier.js";
+import {
+  writeBenchmarkSummaryArtifact,
+  writeFailedRunArtifact,
+  writeSuccessfulRunArtifacts,
+} from "./boardBenchmarkArtifacts.js";
+import {
   buildBenchmarkSummary,
   computeRunTiming,
   extractAnthropicUsage,
@@ -23,14 +32,10 @@ import {
 } from "./boardBenchmarkWorkflow.summary.js";
 import type {
   AnyRunResult,
-  BenchmarkBoard,
-  ClassifierResult,
   FailedRunResult,
-  FlattenedClue,
   RequestUsage,
   RequestUsageCore,
   RunResult,
-  ScoredClue,
 } from "./boardBenchmarkWorkflow.types.js";
 import {
   callAiJson,
@@ -103,11 +108,6 @@ function parseCliArgs(argv: string[]) {
 
 function loadJsonFile<T>(filePath: string): T {
   return JSON.parse(fs.readFileSync(filePath, "utf8")) as T;
-}
-
-function saveJsonFile(filePath: string, data: unknown) {
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, `${JSON.stringify(data, null, 2)}\n`, "utf8");
 }
 
 function parseDotenv(filePath: string) {
@@ -268,62 +268,6 @@ function createActiveRequestTracker() {
       return { active, maxSeen };
     },
   };
-}
-
-function classifierBatches<T>(items: T[], batchSize: number) {
-  const batches: T[][] = [];
-  for (let index = 0; index < items.length; index += batchSize) {
-    batches.push(items.slice(index, index + batchSize));
-  }
-  return batches;
-}
-
-async function callClassifier(endpoint: string, clues: FlattenedClue[]) {
-  const payload = clues.map((clue) => ({
-    category: clue.category,
-    question: clue.question,
-    answer: clue.answer,
-  }));
-
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  if (!response.ok) {
-    throw new Error(`Classifier request failed with status ${response.status}.`);
-  }
-
-  const parsed = (await response.json()) as unknown;
-  if (!Array.isArray(parsed) || parsed.length !== clues.length) {
-    throw new Error("Classifier returned an invalid response.");
-  }
-  return parsed as ClassifierResult[];
-}
-
-function flattenBoardClues(board: BenchmarkBoard, boardSetId: string, workflowName: string) {
-  const clues: FlattenedClue[] = [];
-
-  for (const sectionName of ["firstBoard", "secondBoard", "finalJeopardy"] as const) {
-    const categories = board[sectionName].categories;
-    categories.forEach((category, categoryIndex) => {
-      category.values.forEach((clue, clueIndex) => {
-        clues.push({
-          board_set_id: boardSetId,
-          workflow: workflowName,
-          board_type: sectionName,
-          category_index: categoryIndex,
-          clue_index: clueIndex,
-          category: clue.category,
-          value: clue.value,
-          question: clue.question,
-          answer: clue.answer,
-        });
-      });
-    });
-  }
-
-  return clues;
 }
 
 export function chooseBoardSetsForWorkflow(
@@ -569,21 +513,13 @@ export async function runBenchmark(
           const generationMs = Date.now() - generationStartedAt;
           const clues = flattenBoardClues(board, boardSetId, workflowName);
           const requestUsage = board.requestUsage;
-          const scoredClues: ScoredClue[] = [];
 
           const classifierStartedAt = Date.now();
-          for (const batch of classifierBatches(clues, classifierBatchSize)) {
-            const results = await callClassifier(classifierEndpoint, batch);
-            batch.forEach((clue, index) => {
-              const result = results[index];
-              scoredClues.push({
-                ...clue,
-                classifier_valid: result.valid,
-                classifier_confidence: result.confidence ?? null,
-                classifier_reason: result.reason ?? null,
-              });
-            });
-          }
+          const scoredClues = await scoreBoardClues({
+            endpoint: classifierEndpoint,
+            clues,
+            batchSize: classifierBatchSize,
+          });
           const classifierMs = Date.now() - classifierStartedAt;
 
           const metrics = summarizeClassifierResults(scoredClues);
@@ -612,20 +548,10 @@ export async function runBenchmark(
             status: "success",
           };
 
-          const runFile = path.join(outputDir, `${timestamp}_${workflowName}_${boardSetId}.json`);
-          const invalidFile = path.join(
+          const { runFile } = writeSuccessfulRunArtifacts({
             outputDir,
-            `${timestamp}_${workflowName}_${boardSetId}_invalid.json`,
-          );
-          saveJsonFile(runFile, runResult);
-          saveJsonFile(invalidFile, {
-            workflow: workflowName,
-            board_set_id: boardSetId,
-            invalid_clue_count: invalidClues.length,
-            timing,
-            usage: runResult.usage,
-            request_usage: requestUsage,
-            invalid_clues: invalidClues,
+            timestamp,
+            runResult,
           });
           console.log(
             `  valid_rate=${(metrics.valid_rate * 100).toFixed(2)}% valid=${metrics.valid_clues}/${metrics.total_clues} wall=${timing.total_seconds}s gen=${timing.generation_seconds}s cls=${timing.classifier_seconds}s q_avg=${timing.avg_request_queue_ms ?? "n/a"}ms svc_avg=${timing.avg_request_service_ms ?? "n/a"}ms max_active=${timing.max_active_requests_seen ?? "n/a"} cps=${timing.clues_per_second} tokens=${runResult.usage.total_tokens} cost=${runResult.usage.cost_usd ?? "n/a"} saved=${path.basename(runFile)}`,
@@ -644,11 +570,11 @@ export async function runBenchmark(
             status: "failed",
             error: message,
           };
-          const failedFile = path.join(
+          const failedFile = writeFailedRunArtifact({
             outputDir,
-            `${timestamp}_${workflowName}_${boardSetId}_failed.json`,
-          );
-          saveJsonFile(failedFile, failedRun);
+            timestamp,
+            failedRun,
+          });
           console.log(`  failed error=${message} saved=${path.basename(failedFile)}`);
           return failedRun;
         }
@@ -668,7 +594,7 @@ export async function runBenchmark(
     run_count: runResults.length,
     summary: buildBenchmarkSummary(runResults, workflowTimingByName),
   };
-  saveJsonFile(path.join(outputDir, `${timestamp}_summary.json`), summary);
+  writeBenchmarkSummaryArtifact({ outputDir, timestamp, summary });
   return summary;
 }
 
