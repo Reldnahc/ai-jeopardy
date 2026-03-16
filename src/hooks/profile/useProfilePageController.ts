@@ -1,8 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
-import type { Board } from "../../types/Board";
+import { useMemo } from "react";
 import { Profile as P, useProfile } from "../../contexts/ProfileContext";
 import { useAuth } from "../../contexts/AuthContext";
-import { LadderRole } from "../../../shared/roles";
 import { getProfilePresentation } from "../../utils/profilePresentation";
 import {
   COLOR_TARGETS,
@@ -16,10 +14,9 @@ import {
 import {
   buildProfileRoleState,
   getNameHexForFontPreview,
-  getSavedHexForTarget,
-  loadProfileBoards,
 } from "./profilePageController.helpers";
 import { useProfilePageMutations } from "./useProfilePageMutations";
+import { useProfilePageUiState } from "./useProfilePageUiState";
 import { useProfileOverlay } from "./useProfileOverlay";
 import { useRouteProfileLoader } from "./useRouteProfileLoader";
 
@@ -41,22 +38,6 @@ export function useProfilePageController(usernameParam: string | undefined) {
 
   const viewerGate = useRoleGate(user?.role ?? profile?.role ?? null);
 
-  const [boards, setBoards] = useState<Board[]>([]);
-  const [boardsLoading, setBoardsLoading] = useState(true);
-  const [localError, setLocalError] = useState<string | null>(null);
-
-  const [bioDraft, setBioDraft] = useState<string>("");
-  const [savingBio, setSavingBio] = useState(false);
-
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [colorTarget, setColorTarget] = useState<ColorTarget>("color");
-  const [hexDraft, setHexDraft] = useState<string>("#3b82f6");
-
-  const [promoteOpen, setPromoteOpen] = useState(false);
-  const [banOpen, setBanOpen] = useState(false);
-  const [promoteDraft, setPromoteDraft] = useState<LadderRole | "">("");
-  const [banCheck, setBanCheck] = useState(false);
-
   const {
     pendingOverlayRef,
     pendingSinceRef,
@@ -74,44 +55,34 @@ export function useProfilePageController(usernameParam: string | undefined) {
     [user?.id, routeProfile?.id],
   );
 
-  const cancelHexDraft = () => {
-    if (!routeProfile) return;
-    setHexDraft(getSavedHexForTarget(routeProfile, colorTarget));
-  };
-
-  useEffect(() => {
-    setBioDraft(routeProfile?.bio ?? "");
-  }, [routeProfile?.bio, routeProfile?.id]);
-
-  useEffect(() => {
-    if (!routeProfile) return;
-    const meta = COLOR_TARGETS.find((t) => t.key === colorTarget)!;
-    const current = routeProfile[colorTarget] ?? meta.defaultHex;
-    setHexDraft(normalizeHex(String(current), meta.defaultHex));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    routeProfile?.id,
-    routeProfile?.color,
-    routeProfile?.text_color,
-    routeProfile?.name_color,
-    routeProfile?.border_color,
-    routeProfile?.background_color,
+  const {
+    boards,
+    boardsLoading,
+    localError,
+    setLocalError,
+    bioDraft,
+    setBioDraft,
+    savingBio,
+    setSavingBio,
+    settingsOpen,
+    setSettingsOpen,
     colorTarget,
-  ]);
-
-  useEffect(() => {
-    const run = async () => {
-      setBoardsLoading(true);
-      setLocalError(null);
-
-      const result = await loadProfileBoards(usernameParam);
-      setBoards(result.boards);
-      setLocalError(result.error);
-      setBoardsLoading(false);
-    };
-
-    void run();
-  }, [usernameParam]);
+    setColorTarget,
+    hexDraft,
+    setHexDraft,
+    cancelHexDraft,
+    promoteOpen,
+    setPromoteOpen,
+    banOpen,
+    setBanOpen,
+    promoteDraft,
+    setPromoteDraft,
+    banCheck,
+    setBanCheck,
+  } = useProfilePageUiState({
+    routeProfile,
+    usernameParam,
+  });
 
   const { saveCustomization, patchAnyProfile } = useProfilePageMutations({
     token,
@@ -132,7 +103,7 @@ export function useProfilePageController(usernameParam: string | undefined) {
   });
 
   const commitHexDraft = async () => {
-    const meta = COLOR_TARGETS.find((t) => t.key === colorTarget)!;
+    const meta = COLOR_TARGETS.find((target) => target.key === colorTarget)!;
     const next = normalizeHex(hexDraft, meta.defaultHex);
     setHexDraft(next);
     await saveCustomization(colorPatch(colorTarget, next));

@@ -19,6 +19,7 @@ This plan normalizes code style and patterns based on the conventions that alrea
 - Completed: extracted ProfileContext cache and freshness helpers out of `src/contexts/ProfileContext.tsx`.
 - Completed: extracted profile page role/boards helpers out of `src/hooks/profile/useProfilePageController.ts`.
 - Completed: extracted profile page request and mutation helpers out of `src/hooks/profile/useProfilePageController.ts`.
+- Completed: extracted profile page local UI state and effects out of `src/hooks/profile/useProfilePageController.ts`.
 - Completed: extracted pure game socket helpers out of `src/features/game/socket/useGameSocketSync.ts`.
 - Completed: extracted ProfileContext request helpers out of `src/contexts/ProfileContext.tsx`.
 - Completed: extracted ProfileContext shared types, store hook, and bootstrap effects out of `src/contexts/ProfileContext.tsx`.
@@ -102,6 +103,7 @@ This plan normalizes code style and patterns based on the conventions that alrea
   - Extracted profile page role/boards helpers into `src/hooks/profile/profilePageController.helpers.ts`.
   - Extracted profile page request helpers into `src/hooks/profile/profilePageController.requests.ts`.
   - Extracted profile page mutation flow into `src/hooks/profile/useProfilePageMutations.ts`.
+  - Extracted profile page local drafts, toggles, and board-loading effects into `src/hooks/profile/useProfilePageUiState.ts`.
   - Extracted pure game socket helpers into `src/features/game/socket/useGameSocketSync.helpers.ts`.
   - Extracted game socket local state, refs, and router dependency assembly into `src/features/game/socket/useGameSocketSync.state.ts`.
   - Extracted benchmark workflow timing, usage, and summary logic into `backend/services/ai/board/boardBenchmarkWorkflow.summary.ts`.
