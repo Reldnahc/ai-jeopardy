@@ -26,6 +26,7 @@ This plan normalizes code style and patterns based on the conventions that alrea
 - Completed: extracted benchmark workflow board-generation helpers out of `backend/services/ai/board/boardBenchmarkWorkflow.ts`.
 - Completed: extracted benchmark workflow classifier helpers out of `backend/services/ai/board/boardBenchmarkWorkflow.ts`.
 - Completed: extracted benchmark workflow artifact writers out of `backend/services/ai/board/boardBenchmarkWorkflow.ts`.
+- Completed: extracted benchmark workflow config/bootstrap helpers and execution runner out of `backend/services/ai/board/boardBenchmarkWorkflow.ts`.
 - Completed: extracted game socket local state and router-dependency assembly out of `src/features/game/socket/useGameSocketSync.ts`.
 - Pending: broader file decomposition for oversized controllers, hooks, and route modules.
 
@@ -108,10 +109,12 @@ This plan normalizes code style and patterns based on the conventions that alrea
   - Extracted benchmark workflow board-generation jobs and board assembly into `backend/services/ai/board/boardBenchmarkGeneration.ts`.
   - Extracted benchmark workflow classifier batching, transport, and scored-clue assembly into `backend/services/ai/board/boardBenchmarkClassifier.ts`.
   - Extracted benchmark workflow JSON artifact writing into `backend/services/ai/board/boardBenchmarkArtifacts.ts`.
+  - Extracted benchmark workflow config parsing, constants, and board-set selection into `backend/services/ai/board/boardBenchmarkConfig.ts`.
+  - Extracted benchmark workflow provider/runtime setup and per-board execution into `backend/services/ai/board/boardBenchmarkExecution.ts`.
 - Remaining:
   - Split large hooks and components by concern before adding more state branches.
   - Extract route/body parsing helpers from additional large HTTP route modules.
-  - Continue extracting config/bootstrap and provider-request setup steps from large backend orchestration modules such as `boardBenchmarkWorkflow.ts`.
+  - Continue targeting remaining stateful frontend controllers and hooks that still mix local UI state with transport orchestration.
 
 ### 5. Backend Module Consistency
 
@@ -144,7 +147,6 @@ These files are strong candidates for the first structural cleanup pass:
 - `src/pages/BoardCreator.tsx`
 - `src/contexts/ProfileContext.tsx`
 - `backend/http/profileRoutes.ts`
-- `backend/services/ai/board/boardBenchmarkWorkflow.ts`
 
 ## Suggested Execution Order
 
