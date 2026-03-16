@@ -8,6 +8,7 @@ This plan normalizes code style and patterns based on the conventions that alrea
 - Completed: core game snapshot and audio socket narrowing, plus removal of all remaining non-test `as unknown as` casts.
 - Completed: message narrowing for the remaining game board and answer socket routers.
 - Completed: extracted shared HTTP parsing helpers and route-specific profile parsing helpers out of `backend/http/profileRoutes.ts`.
+- Completed: centralized repeated backend lobby settings defaults into a shared helper used by lobby creation and update flows.
 - Pending: broader file decomposition for oversized controllers, hooks, and route modules.
 
 ## Chosen Defaults
@@ -77,6 +78,9 @@ This plan normalizes code style and patterns based on the conventions that alrea
 
 ### 5. Backend Module Consistency
 
+- Status: In progress.
+- Completed so far:
+  - Centralized repeated backend lobby settings defaults into `backend/lobby/settings.ts`.
 - Keep route modules structured as imports, local helpers/types, exported `registerXRoutes`.
 - Keep websocket handler files structured as imports, payload/helper definitions, exported handler map.
 - Preserve repository factory patterns such as `createRepos` and `createXRepo`.

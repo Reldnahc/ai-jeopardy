@@ -2,6 +2,7 @@ import type { PlayerState } from "../../../types/runtime.js";
 import type { CtxDeps } from "../../context.types.js";
 import type { WsHandler } from "../types.js";
 import { MAX_LOBBY_PLAYERS } from "../../../lobby/constants.js";
+import { ensureGameLobbySettings } from "../../../lobby/settings.js";
 import { atLeast, normalizeRole } from "../../../../shared/roles.js";
 import type {
   CheckLobbyResponseMessage,
@@ -47,21 +48,7 @@ export const lobbyConfigHandlers: Record<string, WsHandler> = {
         return;
       }
 
-      if (!game.lobbySettings) {
-        game.lobbySettings = {
-          timeToBuzz: 10,
-          timeToAnswer: 10,
-          selectedModel: hctx.appConfig.ai.defaultGenerationModel,
-          reasoningEffort: "off",
-          visualMode: "off",
-          narrationEnabled: true,
-          boardJson: "",
-          sttProviderName: hctx.appConfig.ai.defaultSttProvider,
-          ttsProviderName: hctx.appConfig.ai.defaultTtsProvider,
-          categoryRefreshLocked: false,
-          categoryPoolPrompt: "",
-        };
-      }
+      const lobbySettings = ensureGameLobbySettings(game, hctx.appConfig.ai);
 
       const p =
         typeof patch === "object" && patch !== null ? (patch as Record<string, unknown>) : {};
@@ -69,13 +56,13 @@ export const lobbyConfigHandlers: Record<string, WsHandler> = {
       const canChooseTtsProvider = atLeast(role, "privileged");
 
       if (typeof p.timeToBuzz === "number" && Number.isFinite(p.timeToBuzz)) {
-        game.lobbySettings.timeToBuzz = Math.max(1, Math.min(60, Math.floor(p.timeToBuzz)));
+        lobbySettings.timeToBuzz = Math.max(1, Math.min(60, Math.floor(p.timeToBuzz)));
       }
       if (typeof p.timeToAnswer === "number" && Number.isFinite(p.timeToAnswer)) {
-        game.lobbySettings.timeToAnswer = Math.max(1, Math.min(60, Math.floor(p.timeToAnswer)));
+        lobbySettings.timeToAnswer = Math.max(1, Math.min(60, Math.floor(p.timeToAnswer)));
       }
       if (typeof p.selectedModel === "string" && p.selectedModel.trim()) {
-        game.lobbySettings.selectedModel = p.selectedModel.trim();
+        lobbySettings.selectedModel = p.selectedModel.trim();
       }
       if (
         p.reasoningEffort === "off" ||
@@ -83,37 +70,37 @@ export const lobbyConfigHandlers: Record<string, WsHandler> = {
         p.reasoningEffort === "medium" ||
         p.reasoningEffort === "high"
       ) {
-        game.lobbySettings.reasoningEffort = p.reasoningEffort;
+        lobbySettings.reasoningEffort = p.reasoningEffort;
       }
       if (p.visualMode === "off" || p.visualMode === "commons" || p.visualMode === "brave") {
-        game.lobbySettings.visualMode = p.visualMode;
+        lobbySettings.visualMode = p.visualMode;
       }
       if (typeof p.boardJson === "string") {
-        game.lobbySettings.boardJson = p.boardJson;
+        lobbySettings.boardJson = p.boardJson;
       }
       if (typeof p.narrationEnabled === "boolean") {
-        game.lobbySettings.narrationEnabled = p.narrationEnabled;
+        lobbySettings.narrationEnabled = p.narrationEnabled;
       }
       if (p.sttProviderName === "openai" || p.sttProviderName === "whisper") {
-        game.lobbySettings.sttProviderName = p.sttProviderName;
+        lobbySettings.sttProviderName = p.sttProviderName;
       }
       if (
         canChooseTtsProvider &&
         (p.ttsProviderName === "openai" || p.ttsProviderName === "kokoro")
       ) {
-        game.lobbySettings.ttsProviderName = p.ttsProviderName;
+        lobbySettings.ttsProviderName = p.ttsProviderName;
       }
       if (typeof p.categoryRefreshLocked === "boolean") {
-        game.lobbySettings.categoryRefreshLocked = p.categoryRefreshLocked;
+        lobbySettings.categoryRefreshLocked = p.categoryRefreshLocked;
       }
       if (typeof p.categoryPoolPrompt === "string") {
-        game.lobbySettings.categoryPoolPrompt = p.categoryPoolPrompt;
+        lobbySettings.categoryPoolPrompt = p.categoryPoolPrompt;
       }
 
       const payload: LobbySettingsUpdatedMessage = {
         type: "lobby-settings-updated",
         gameId,
-        lobbySettings: game.lobbySettings,
+        lobbySettings,
       };
 
       hctx.broadcast(gameId, payload);
@@ -137,23 +124,9 @@ export const lobbyConfigHandlers: Record<string, WsHandler> = {
       return;
     }
 
-    if (!game.lobbySettings) {
-      game.lobbySettings = {
-        timeToBuzz: 10,
-        timeToAnswer: 10,
-        selectedModel: hctx.appConfig.ai.defaultGenerationModel,
-        reasoningEffort: "off",
-        visualMode: "off",
-        narrationEnabled: true,
-        boardJson: "",
-        sttProviderName: hctx.appConfig.ai.defaultSttProvider,
-        ttsProviderName: hctx.appConfig.ai.defaultTtsProvider,
-        categoryRefreshLocked: false,
-        categoryPoolPrompt: "",
-      };
-    }
+    const lobbySettings = ensureGameLobbySettings(game, hctx.appConfig.ai);
 
-    if (game.lobbySettings.categoryRefreshLocked) {
+    if (lobbySettings.categoryRefreshLocked) {
       ws.send(
         JSON.stringify({ type: "error", message: "Category refresh is locked by the host." }),
       );
@@ -161,12 +134,12 @@ export const lobbyConfigHandlers: Record<string, WsHandler> = {
       return;
     }
 
-    game.lobbySettings.categoryPoolPrompt = String(prompt ?? "").slice(0, 500);
+    lobbySettings.categoryPoolPrompt = String(prompt ?? "").slice(0, 500);
 
     const payload: LobbySettingsUpdatedMessage = {
       type: "lobby-settings-updated",
       gameId,
-      lobbySettings: game.lobbySettings,
+      lobbySettings,
     };
 
     hctx.broadcast(gameId, payload);

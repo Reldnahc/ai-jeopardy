@@ -57,6 +57,14 @@ describe("lobbyPlayerHandlers", () => {
     expect(game.host).toBe("alice");
     expect(game.inLobby).toBe(true);
     expect(game.players[0]).toMatchObject({ username: "alice", displayname: "Alice" });
+    expect(game.lobbySettings).toMatchObject({
+      selectedModel: "gpt-4o-mini",
+      sttProviderName: "openai",
+      ttsProviderName: "kokoro",
+      narrationEnabled: true,
+      categoryRefreshLocked: false,
+      categoryPoolPrompt: "",
+    });
     expect(ws.send).toHaveBeenCalledWith(expect.stringContaining('"type":"lobby-created"'));
     expect(ws.send).toHaveBeenCalledWith(expect.stringContaining('"type":"lobby-state"'));
   });

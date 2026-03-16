@@ -1,5 +1,6 @@
 import type { GameState, SocketState } from "../../../../types/runtime.js";
 import type { Ctx } from "../../../context.types.js";
+import { ensureGameLobbySettings } from "../../../../lobby/settings.js";
 import { atLeast, LadderRole } from "../../../../../shared/roles.js";
 
 type CreateGameArgs = { ws: SocketState; ctx: Ctx; gameId: string; game?: GameState | null };
@@ -34,27 +35,11 @@ export function ensureHostOrFail({
 }
 
 export function ensureLobbySettings(
-  ctx: Ctx,
+  _ctx: Ctx,
   game: GameState,
-  appConfig: { ai: { defaultGenerationModel: string } },
+  appConfig: Ctx["appConfig"],
 ): NonNullable<GameState["lobbySettings"]> {
-  if (game.lobbySettings) return game.lobbySettings;
-
-  game.lobbySettings = {
-    timeToBuzz: 10,
-    timeToAnswer: 10,
-    selectedModel: appConfig.ai.defaultGenerationModel,
-    reasoningEffort: "off",
-    visualMode: "off",
-    narrationEnabled: false,
-    boardJson: "",
-    sttProviderName: ctx.appConfig.ai.defaultSttProvider,
-    ttsProviderName: ctx.appConfig.ai.defaultTtsProvider,
-    categoryRefreshLocked: false,
-    categoryPoolPrompt: "",
-  };
-
-  return game.lobbySettings;
+  return ensureGameLobbySettings(game, appConfig.ai, { narrationEnabled: false });
 }
 
 export function resolveModelOrFail({

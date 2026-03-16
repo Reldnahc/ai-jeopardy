@@ -2,6 +2,7 @@ import type { JsonMap, PlayerState } from "../../../types/runtime.js";
 import type { CtxDeps } from "../../context.types.js";
 import type { WsHandler } from "../types.js";
 import { MAX_LOBBY_PLAYERS } from "../../../lobby/constants.js";
+import { createDefaultLobbySettings } from "../../../lobby/settings.js";
 import { getUniqueCategories } from "../../../services/categories/getUniqueCategories.js";
 import type { LobbyCreatedMessage, LobbyPlayerSummary } from "../../../../shared/types/lobby.js";
 
@@ -90,19 +91,7 @@ export const lobbyPlayerHandlers: Record<string, WsHandler> = {
       inLobby: true,
       createdAt: Date.now(),
       categories: generatedCategories,
-      lobbySettings: {
-        timeToBuzz: 10,
-        timeToAnswer: 10,
-        selectedModel: hctx.appConfig.ai.defaultGenerationModel,
-        reasoningEffort: "off",
-        visualMode: "off",
-        narrationEnabled: true,
-        boardJson: "",
-        sttProviderName: hctx.appConfig.ai.defaultSttProvider,
-        ttsProviderName: hctx.appConfig.ai.defaultTtsProvider,
-        categoryRefreshLocked: false,
-        categoryPoolPrompt: "",
-      },
+      lobbySettings: createDefaultLobbySettings(hctx.appConfig.ai),
       lockedCategories: {
         firstBoard: Array(5).fill(false),
         secondBoard: Array(5).fill(false),
