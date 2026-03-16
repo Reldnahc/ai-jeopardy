@@ -1,84 +1,15 @@
-// backend/services/ai/board.ts
 import type { BoardData } from "../../../../shared/types/board.js";
-import type { VisualSettings } from "../visuals.js";
 import type { Ctx } from "../../../ws/context.types.js";
-import { Board } from "../../../http/boardRoutes.js";
-
-import { categoryPrompt, finalPrompt } from "./boardPrompts.js";
+import type { Board } from "../../../http/boardRoutes.js";
 import { makeProgressReporter } from "./boardTelemetry.js";
-import { toBoardCategory, toFinalCategory } from "./boardSchemas.js";
-import { createBoardTtsState, enqueueCategoryTts, enqueueFinalTts } from "./boardTts.js";
-import { generateAiCategoryJson, generateAiFinalCategoryJson } from "./boardGenerate.js";
-
-type CreateBoardOptions = Partial<VisualSettings> & {
-  reasoningEffort?: "off" | "low" | "medium" | "high";
-  narrationEnabled?: boolean;
-  ttsVoiceId?: string;
-  onProgress?: (p: { done: number; total: number; progress: number }) => void;
-  onTtsReady?: (assetId: string) => void;
-  trace?: { mark: (event: string, meta?: Record<string, unknown>) => void };
-};
-
-function buildClueKey(boardKey: "firstBoard" | "secondBoard", value: unknown, question: unknown) {
-  const v = String(value ?? "");
-  const q = String(question ?? "").trim();
-  return `${boardKey}:${v}:${q}`;
-}
-
-function pickRandomDistinct<T>(arr: T[], n: number): T[] {
-  const copy = arr.slice();
-  for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
-  }
-  return copy.slice(0, Math.max(0, Math.min(n, copy.length)));
-}
-
-function collectClueKeys(
-  boardKey: "firstBoard" | "secondBoard",
-  board: { categories: Array<{ values: Array<{ value: unknown; question: unknown }> }> },
-) {
-  const out: string[] = [];
-  for (const cat of board?.categories ?? []) {
-    for (const clue of cat?.values ?? []) {
-      out.push(buildClueKey(boardKey, clue?.value, clue?.question));
-    }
-  }
-  return out;
-}
-
-async function saveBoardAsync(ctx: Ctx, host: string, board: Board) {
-  try {
-    const normalizedHost = String(host ?? "")
-      .toLowerCase()
-      .trim();
-    const ownerId = await ctx.repos.profiles.getIdByUsername(normalizedHost);
-    if (!ownerId) return;
-
-    await ctx.repos.boards.insertBoard(ownerId, board);
-    await ctx.repos.profiles.incrementBoardsGenerated(normalizedHost);
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error("[Board] saveBoardAsync failed:", msg);
-  }
-}
-
-/**
- * Wraps any newly appended promises in ttsState.ttsPromises so each promise
- * increments progress once it settles (success or fail).
- */
-function trackNewTtsPromises(
-  ttsState: { ttsPromises: Promise<unknown>[] },
-  progress: ReturnType<typeof makeProgressReporter>,
-  beforeLen: number,
-) {
-  for (let i = beforeLen; i < ttsState.ttsPromises.length; i++) {
-    const p = ttsState.ttsPromises[i];
-    ttsState.ttsPromises[i] = Promise.resolve(p).finally(() => {
-      progress.tick(1);
-    });
-  }
-}
+import { createBoardTtsState } from "./boardTts.js";
+import {
+  buildDailyDoubleClueKeys,
+  resolveCreateBoardSettings,
+  saveBoardAsync,
+  type CreateBoardOptions,
+} from "./boardCreate.helpers.js";
+import { buildBoardCategorySection, buildFinalBoardSection } from "./boardCreate.sections.js";
 
 export async function createBoardData(
   ctx: Ctx,
@@ -87,31 +18,18 @@ export async function createBoardData(
   host: string,
   options: CreateBoardOptions = {},
 ): Promise<BoardData> {
-  const settings = {
-    includeVisuals: false,
-    imageProvider: "commons",
-    maxVisualCluesPerCategory: 2,
-    maxImageSearchTries: 6,
-    commonsThumbWidth: 1600,
-    preferPhotos: true,
-
-    reasoningEffort: "off",
-    narrationEnabled: false,
-    ttsVoiceId: "kokoro:af_heart",
-
-    onProgress: undefined,
-    onTtsReady: undefined,
-    trace: undefined,
-
-    ...options,
-  } satisfies Required<Omit<CreateBoardOptions, "onProgress" | "onTtsReady" | "trace">> &
-    Pick<CreateBoardOptions, "onProgress" | "onTtsReady" | "trace">;
-
+  const settings = resolveCreateBoardSettings(options);
   const trace = settings.trace;
+
   trace?.mark("aiService_enter", { model, includeVisuals: settings.includeVisuals });
 
   if (!categories || categories.length !== 11) {
     throw new Error("You must provide exactly 11 categories.");
+  }
+
+  const modelDef = ctx.modelsByValue[model];
+  if (!modelDef) {
+    throw new Error(`Unknown model: ${model}`);
   }
 
   const [firstCategories, secondCategories, finalCategory] = [
@@ -120,214 +38,69 @@ export async function createBoardData(
     categories[10],
   ];
 
-  const modelDef = ctx.modelsByValue[model];
-  if (!modelDef) throw new Error(`Unknown model: ${model}`);
-
   const baseTotal = 11 + (settings.includeVisuals ? ctx.plannedVisualSlots(settings) + 1 : 0);
-
   const plannedTts = settings.narrationEnabled ? 2 * (10 * 5 + 1) : 0;
 
   const progress = makeProgressReporter(settings.onProgress);
   progress.setTotal(baseTotal + plannedTts);
   progress.report();
 
-  // Concurrency controls
   const limitVisuals = settings.includeVisuals ? ctx.makeLimiter(3) : null;
   const limitTts = settings.narrationEnabled ? ctx.makeLimiter(10) : null;
-
-  // TTS state
   const ttsState = createBoardTtsState();
 
-  // AI client dispatches by model provider at runtime.
   const { callAiJson, parseAiJson } = await import("../aiClients/index.js");
   trace?.mark("createBoardData_begin");
 
   try {
-    // ---- SINGLE JEOPARDY categories ----
-    const firstCategoryPromises = firstCategories.map(async (cat, i) => {
-      trace?.mark("single_category_begin", { i, cat });
-
-      const prompt = categoryPrompt(cat, false, {
-        includeVisuals: settings.includeVisuals,
-        maxVisualCluesPerCategory: settings.maxVisualCluesPerCategory,
-        reasoningEffort: settings.reasoningEffort,
-        maxImageSearchTries: settings.maxImageSearchTries,
-        commonsThumbWidth: settings.commonsThumbWidth,
-        preferPhotos: settings.preferPhotos,
-        includeExamples: true,
-        includeFillTemplate: true,
-      });
-
-      const ai = await generateAiCategoryJson({
-        callAiJson,
-        parseAiJson,
-        model,
-        prompt,
-        reasoningEffort: settings.reasoningEffort,
-        errorLabel: `Single category ${i}`,
-      });
-
-      const category = toBoardCategory(ai);
-
-      // count the AI category as done
-      progress.tick(1);
-
-      // enqueue TTS and hook progress to the newly-added promises
-      const beforeTts = ttsState.ttsPromises.length;
-      const queued = enqueueCategoryTts({
+    const firstCategoryPromises = firstCategories.map((categoryName, index) =>
+      buildBoardCategorySection({
         ctx,
         boardType: "firstBoard",
-        json: ai,
-        narrationEnabled: settings.narrationEnabled,
-        limitTts,
-        ttsVoiceId: settings.ttsVoiceId,
-        onTtsReady: settings.onTtsReady,
-        state: ttsState,
-      });
-
-      if (queued > 0) {
-        trackNewTtsPromises(ttsState, progress, beforeTts);
-      }
-
-      // visuals (each visual slot should tick via progress.tick passed into populateCategoryVisuals)
-      if (settings.includeVisuals && limitVisuals) {
-        const visualSettings: VisualSettings = {
-          includeVisuals: settings.includeVisuals,
-          imageProvider: settings.imageProvider,
-          maxVisualCluesPerCategory: settings.maxVisualCluesPerCategory,
-          maxImageSearchTries: settings.maxImageSearchTries,
-          commonsThumbWidth: settings.commonsThumbWidth,
-          preferPhotos: settings.preferPhotos,
-        };
-
-        await limitVisuals(() =>
-          ctx.populateCategoryVisuals(ctx, category, visualSettings, progress.tick),
-        );
-      }
-
-      trace?.mark("single_category_end", { i, cat });
-      return category;
-    });
-
-    // ---- DOUBLE JEOPARDY categories ----
-    const secondCategoryPromises = secondCategories.map(async (cat, i) => {
-      trace?.mark("double_category_begin", { i, cat });
-
-      const prompt = categoryPrompt(cat, true, {
-        includeVisuals: settings.includeVisuals,
-        maxVisualCluesPerCategory: settings.maxVisualCluesPerCategory,
-        reasoningEffort: settings.reasoningEffort,
-        maxImageSearchTries: settings.maxImageSearchTries,
-        commonsThumbWidth: settings.commonsThumbWidth,
-        preferPhotos: settings.preferPhotos,
-        includeExamples: true,
-        includeFillTemplate: true,
-      });
-
-      const ai = await generateAiCategoryJson({
+        categoryName,
+        index,
+        isDoubleJeopardy: false,
+        model,
+        settings,
         callAiJson,
         parseAiJson,
-        model,
-        prompt,
-        reasoningEffort: settings.reasoningEffort,
-        errorLabel: `Double category ${i}`,
-      });
+        limitVisuals,
+        limitTts,
+        ttsState,
+        progress,
+      }),
+    );
 
-      const category = toBoardCategory(ai);
-
-      // count the AI category as done
-      progress.tick(1);
-
-      // enqueue TTS and hook progress to the newly-added promises
-      const beforeTts = ttsState.ttsPromises.length;
-      const queued = enqueueCategoryTts({
+    const secondCategoryPromises = secondCategories.map((categoryName, index) =>
+      buildBoardCategorySection({
         ctx,
         boardType: "secondBoard",
-        json: ai,
-        narrationEnabled: settings.narrationEnabled,
-        limitTts,
-        ttsVoiceId: settings.ttsVoiceId,
-        onTtsReady: settings.onTtsReady,
-        state: ttsState,
-      });
-
-      if (queued > 0) {
-        trackNewTtsPromises(ttsState, progress, beforeTts);
-      }
-
-      if (settings.includeVisuals && limitVisuals) {
-        const visualSettings: VisualSettings = {
-          includeVisuals: settings.includeVisuals,
-          imageProvider: settings.imageProvider,
-          maxVisualCluesPerCategory: settings.maxVisualCluesPerCategory,
-          maxImageSearchTries: settings.maxImageSearchTries,
-          commonsThumbWidth: settings.commonsThumbWidth,
-          preferPhotos: settings.preferPhotos,
-        };
-
-        await limitVisuals(() =>
-          ctx.populateCategoryVisuals(ctx, category, visualSettings, progress.tick),
-        );
-      }
-
-      trace?.mark("double_category_end", { i, cat });
-      return category;
-    });
-
-    // ---- FINAL JEOPARDY ----
-    const finalPromise = (async () => {
-      trace?.mark("final_category_begin", { cat: finalCategory });
-
-      const prompt = finalPrompt(finalCategory);
-
-      const ai = await generateAiFinalCategoryJson({
+        categoryName,
+        index,
+        isDoubleJeopardy: true,
+        model,
+        settings,
         callAiJson,
         parseAiJson,
-        model,
-        prompt,
-        reasoningEffort: settings.reasoningEffort,
-        errorLabel: "Final jeopardy",
-      });
-
-      const category = toFinalCategory(ai);
-
-      // count the AI final category as done
-      progress.tick(1);
-
-      // enqueue TTS and hook progress to newly-added promises
-      const beforeTts = ttsState.ttsPromises.length;
-      const queued = enqueueFinalTts({
-        ctx,
-        json: ai,
-        narrationEnabled: settings.narrationEnabled,
+        limitVisuals,
         limitTts,
-        ttsVoiceId: settings.ttsVoiceId,
-        onTtsReady: settings.onTtsReady,
-        state: ttsState,
-      });
+        ttsState,
+        progress,
+      }),
+    );
 
-      if (queued > 0) {
-        trackNewTtsPromises(ttsState, progress, beforeTts);
-      }
-
-      if (settings.includeVisuals && limitVisuals) {
-        const visualSettings: VisualSettings = {
-          includeVisuals: settings.includeVisuals,
-          imageProvider: settings.imageProvider,
-          maxVisualCluesPerCategory: settings.maxVisualCluesPerCategory,
-          maxImageSearchTries: settings.maxImageSearchTries,
-          commonsThumbWidth: settings.commonsThumbWidth,
-          preferPhotos: settings.preferPhotos,
-        };
-
-        await limitVisuals(() =>
-          ctx.populateCategoryVisuals(ctx, category, visualSettings, progress.tick),
-        );
-      }
-
-      trace?.mark("final_category_end", { cat: finalCategory });
-      return category;
-    })();
+    const finalPromise = buildFinalBoardSection({
+      ctx,
+      categoryName: finalCategory,
+      model,
+      settings,
+      callAiJson,
+      parseAiJson,
+      limitVisuals,
+      limitTts,
+      ttsState,
+      progress,
+    });
 
     trace?.mark("await_all_results_begin");
     const [firstCategoryResults, secondCategoryResults, finalBuilt] = await Promise.all([
@@ -337,7 +110,6 @@ export async function createBoardData(
     ]);
     trace?.mark("await_all_results_end");
 
-    // Wait for all TTS (wrapped promises tick progress as they settle)
     if (settings.narrationEnabled && ttsState.ttsPromises.length > 0) {
       trace?.mark("await_all_tts_begin", { count: ttsState.ttsPromises.length });
       await Promise.all(ttsState.ttsPromises);
@@ -350,17 +122,11 @@ export async function createBoardData(
 
     const boardRow: Board = { host, model, firstBoard, secondBoard, finalJeopardy };
 
-    if (settings.includeVisuals) progress.tick(1);
+    if (settings.includeVisuals) {
+      progress.tick(1);
+    }
 
     void saveBoardAsync(ctx, host, boardRow);
-
-    const firstKeys = collectClueKeys("firstBoard", firstBoard);
-    const secondKeys = collectClueKeys("secondBoard", secondBoard);
-
-    const dailyDoubleClueKeys = {
-      firstBoard: pickRandomDistinct(firstKeys, 1),
-      secondBoard: pickRandomDistinct(secondKeys, 2),
-    };
 
     progress.finish();
 
@@ -376,12 +142,12 @@ export async function createBoardData(
       ttsAssetIds: Array.from(ttsState.ttsIds),
       ttsByClueKey: ttsState.ttsByClueKey,
       ttsByAnswerKey: ttsState.ttsByAnswerKey,
-      dailyDoubleClueKeys,
+      dailyDoubleClueKeys: buildDailyDoubleClueKeys({ firstBoard, secondBoard }),
     };
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    trace?.mark("createBoardData_fail", { msg });
-    console.error("[Server] Error generating board data:", msg);
-    throw e;
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    trace?.mark("createBoardData_fail", { msg: message });
+    console.error("[Server] Error generating board data:", message);
+    throw error;
   }
 }

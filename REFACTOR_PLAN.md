@@ -24,6 +24,7 @@ This plan normalizes code style and patterns based on the conventions that alrea
 - Completed: extracted ProfileContext request helpers out of `src/contexts/ProfileContext.tsx`.
 - Completed: extracted ProfileContext shared types, store hook, and bootstrap effects out of `src/contexts/ProfileContext.tsx`.
 - Completed: extracted WebSocketContext socket lifecycle into `src/contexts/useWebSocketConnection.ts` and slimmed `src/contexts/WebSocketContext.tsx` down to a thin provider.
+- Completed: extracted board creation settings, section builders, and daily-double assembly out of `backend/services/ai/board/board.ts`.
 - Completed: extracted benchmark workflow timing, usage, and summary helpers out of `backend/services/ai/board/boardBenchmarkWorkflow.ts`.
 - Completed: extracted benchmark workflow board-generation helpers out of `backend/services/ai/board/boardBenchmarkWorkflow.ts`.
 - Completed: extracted benchmark workflow classifier helpers out of `backend/services/ai/board/boardBenchmarkWorkflow.ts`.
@@ -111,6 +112,7 @@ This plan normalizes code style and patterns based on the conventions that alrea
   - Extracted benchmark workflow timing, usage, and summary logic into `backend/services/ai/board/boardBenchmarkWorkflow.summary.ts`.
   - Extracted benchmark workflow shared request/result types into `backend/services/ai/board/boardBenchmarkWorkflow.types.ts`.
   - Extracted benchmark workflow board-generation jobs and board assembly into `backend/services/ai/board/boardBenchmarkGeneration.ts`.
+  - Extracted board creation defaults, section builders, persistence helpers, and daily-double assembly into `backend/services/ai/board/boardCreate.helpers.ts` and `backend/services/ai/board/boardCreate.sections.ts`.
   - Extracted benchmark workflow classifier batching, transport, and scored-clue assembly into `backend/services/ai/board/boardBenchmarkClassifier.ts`.
   - Extracted benchmark workflow JSON artifact writing into `backend/services/ai/board/boardBenchmarkArtifacts.ts`.
   - Extracted benchmark workflow config parsing, constants, and board-set selection into `backend/services/ai/board/boardBenchmarkConfig.ts`.
