@@ -4,11 +4,14 @@ import { pathToFileURL } from "node:url";
 
 import type { Provider } from "../../../../shared/models.js";
 import {
-  buildCategoryPromptFromWorkflow,
-  buildFinalPromptFromWorkflow,
   type BenchmarkPromptWorkflow,
-  valuesFor,
 } from "./boardPromptTemplates.js";
+import {
+  buildBoardGenerationJobs,
+  buildGeneratedBoard,
+  normalizeBoardSetCategories,
+  type BoardGenerationResult,
+} from "./boardBenchmarkGeneration.js";
 import {
   buildBenchmarkSummary,
   computeRunTiming,
@@ -23,11 +26,9 @@ import type {
   BenchmarkBoard,
   ClassifierResult,
   FailedRunResult,
-  FinalCategory,
   FlattenedClue,
   RequestUsage,
   RequestUsageCore,
-  RegularCategory,
   RunResult,
   ScoredClue,
 } from "./boardBenchmarkWorkflow.types.js";
@@ -157,69 +158,6 @@ function requireString(value: unknown, label: string) {
     throw new Error(`${label} must be a non-empty string.`);
   }
   return value.trim();
-}
-
-function normalizeRegularCategory(data: unknown, expectedValues: number[]): RegularCategory {
-  if (!data || typeof data !== "object") {
-    throw new Error("Regular category response must be a JSON object.");
-  }
-
-  const record = data as { category?: unknown; values?: unknown };
-  const category = requireString(record.category, "category");
-  if (!Array.isArray(record.values) || record.values.length !== 5) {
-    throw new Error("Regular category must contain exactly 5 values.");
-  }
-
-  return {
-    category,
-    values: record.values.map((clue, index) => {
-      if (!clue || typeof clue !== "object") {
-        throw new Error(`Clue ${index} must be a JSON object.`);
-      }
-      const typed = clue as { value?: unknown; question?: unknown; answer?: unknown };
-      if (typed.value !== expectedValues[index]) {
-        throw new Error(
-          `Clue ${index} value must be ${expectedValues[index]}, got ${String(typed.value)}.`,
-        );
-      }
-      return {
-        value: expectedValues[index],
-        question: requireString(typed.question, `clue ${index} question`),
-        answer: requireString(typed.answer, `clue ${index} answer`),
-        category,
-      };
-    }),
-  };
-}
-
-function normalizeFinalCategory(data: unknown): FinalCategory {
-  if (!data || typeof data !== "object") {
-    throw new Error("Final category response must be a JSON object.");
-  }
-
-  const record = data as { category?: unknown; values?: unknown };
-  const category = requireString(record.category, "category");
-  if (!Array.isArray(record.values) || record.values.length !== 1) {
-    throw new Error("Final category must contain exactly 1 clue.");
-  }
-
-  const clue = record.values[0];
-  if (!clue || typeof clue !== "object") {
-    throw new Error("Final clue must be a JSON object.");
-  }
-
-  const typed = clue as { question?: unknown; answer?: unknown };
-  return {
-    category,
-    values: [
-      {
-        value: 0,
-        question: requireString(typed.question, "final clue question"),
-        answer: requireString(typed.answer, "final clue answer"),
-        category,
-      },
-    ],
-  };
 }
 
 function makeRequestThrottler(spacingSeconds: number) {
@@ -480,13 +418,7 @@ async function generateBoard(
   activeRequestTracker?: ReturnType<typeof createActiveRequestTracker>,
 ) {
   const boardSetId = requireString(boardSet.board_id, "board_set.board_id");
-  if (!Array.isArray(boardSet.categories) || boardSet.categories.length !== 11) {
-    throw new Error(`${boardSetId} must contain exactly 11 categories.`);
-  }
-
-  const categories = boardSet.categories.map((item, index) =>
-    requireString(item, `${boardSetId}.categories[${index}]`),
-  );
+  const categories = normalizeBoardSetCategories(boardSetId, boardSet.categories);
 
   const workflowName = requireString(workflow.name, "workflow.name");
   const provider = workflow.provider;
@@ -518,45 +450,9 @@ async function generateBoard(
     createAsyncLimiter(Math.max(1, Number(workflow.max_concurrency ?? DEFAULT_MAX_CONCURRENCY)));
   const tracker = activeRequestTracker ?? createActiveRequestTracker();
 
-  const firstCategories = categories.slice(0, 5);
-  const secondCategories = categories.slice(5, 10);
-  const finalCategory = categories[10];
+  const jobs = buildBoardGenerationJobs(categories, workflow, configDir);
 
-  const jobs = [
-    ...firstCategories.map((category, index) => ({
-      section: "firstBoard" as const,
-      index,
-      categoryName: category,
-      prompt: buildCategoryPromptFromWorkflow(category, false, workflow, configDir),
-      normalizer: (data: unknown) => normalizeRegularCategory(data, valuesFor(false)),
-    })),
-    ...secondCategories.map((category, index) => ({
-      section: "secondBoard" as const,
-      index,
-      categoryName: category,
-      prompt: buildCategoryPromptFromWorkflow(category, true, workflow, configDir),
-      normalizer: (data: unknown) => normalizeRegularCategory(data, valuesFor(true)),
-    })),
-    {
-      section: "finalJeopardy" as const,
-      index: 0,
-      categoryName: finalCategory,
-      prompt: buildFinalPromptFromWorkflow(finalCategory, workflow, configDir),
-      normalizer: normalizeFinalCategory,
-    },
-  ];
-
-  const sections: {
-    firstBoard: RegularCategory[];
-    secondBoard: RegularCategory[];
-    finalJeopardy: FinalCategory[];
-  } = {
-    firstBoard: new Array<RegularCategory>(5),
-    secondBoard: new Array<RegularCategory>(5),
-    finalJeopardy: new Array<FinalCategory>(1),
-  };
-
-  const results = await Promise.all(
+  const results: BoardGenerationResult[] = await Promise.all(
     jobs.map(async (job) => {
       const queuedAt = Date.now();
       return requestLimiter(async () => {
@@ -608,27 +504,14 @@ async function generateBoard(
     }),
   );
 
-  for (const result of results) {
-    if (result.section === "finalJeopardy") {
-      sections.finalJeopardy[result.index] = result.category as FinalCategory;
-    } else if (result.section === "firstBoard") {
-      sections.firstBoard[result.index] = result.category as RegularCategory;
-    } else {
-      sections.secondBoard[result.index] = result.category as RegularCategory;
-    }
-  }
-
-  return {
-    board_set_id: boardSetId,
-    workflow: workflowName,
+  return buildGeneratedBoard({
+    boardSetId,
+    workflowName,
     provider,
     model,
     categories,
-    firstBoard: { categories: sections.firstBoard },
-    secondBoard: { categories: sections.secondBoard },
-    finalJeopardy: { categories: sections.finalJeopardy },
-    requestUsage: results.map((result) => result.usage),
-  } satisfies BenchmarkBoard & { requestUsage: RequestUsage[] };
+    results,
+  });
 }
 
 export async function runBenchmark(

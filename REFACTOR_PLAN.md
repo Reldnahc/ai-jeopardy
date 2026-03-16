@@ -22,6 +22,7 @@ This plan normalizes code style and patterns based on the conventions that alrea
 - Completed: extracted pure game socket helpers out of `src/features/game/socket/useGameSocketSync.ts`.
 - Completed: extracted ProfileContext request helpers out of `src/contexts/ProfileContext.tsx`.
 - Completed: extracted benchmark workflow timing, usage, and summary helpers out of `backend/services/ai/board/boardBenchmarkWorkflow.ts`.
+- Completed: extracted benchmark workflow board-generation helpers out of `backend/services/ai/board/boardBenchmarkWorkflow.ts`.
 - Pending: broader file decomposition for oversized controllers, hooks, and route modules.
 
 ## Chosen Defaults
@@ -96,10 +97,11 @@ This plan normalizes code style and patterns based on the conventions that alrea
   - Extracted pure game socket helpers into `src/features/game/socket/useGameSocketSync.helpers.ts`.
   - Extracted benchmark workflow timing, usage, and summary logic into `backend/services/ai/board/boardBenchmarkWorkflow.summary.ts`.
   - Extracted benchmark workflow shared request/result types into `backend/services/ai/board/boardBenchmarkWorkflow.types.ts`.
+  - Extracted benchmark workflow board-generation jobs and board assembly into `backend/services/ai/board/boardBenchmarkGeneration.ts`.
 - Remaining:
   - Split large hooks and components by concern before adding more state branches.
   - Extract route/body parsing helpers from additional large HTTP route modules.
-  - Continue extracting generation and persistence steps from large backend orchestration modules such as `boardBenchmarkWorkflow.ts`.
+  - Continue extracting classifier and persistence steps from large backend orchestration modules such as `boardBenchmarkWorkflow.ts`.
 
 ### 5. Backend Module Consistency
 
