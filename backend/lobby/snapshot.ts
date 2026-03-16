@@ -2,6 +2,7 @@ import { games } from "../state/gamesStore.js";
 import { normalizeCategories11 } from "../validation/boardImport.js";
 import type { GameState, PlayerState, SocketState } from "../types/runtime.js";
 import type { LobbyStateMessage } from "../../shared/types/lobby.js";
+import { toPlayerPayloads } from "./playerPayloads.js";
 
 export const buildLobbyState = (gameId: string, ws: SocketState): LobbyStateMessage | null => {
   const game = games[gameId];
@@ -12,11 +13,7 @@ export const buildLobbyState = (gameId: string, ws: SocketState): LobbyStateMess
   return {
     type: "lobby-state",
     gameId,
-    players: game.players.map((p: PlayerState) => ({
-      username: p.username,
-      displayname: p.displayname,
-      online: p?.online !== false,
-    })),
+    players: toPlayerPayloads(game.players),
     host: typeof game.host === "string" ? game.host : null,
     categories: normalizeCategories11(game.categories),
     lockedCategories: game.lockedCategories,

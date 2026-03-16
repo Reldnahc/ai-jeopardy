@@ -2,6 +2,7 @@ import type { PlayerState } from "../../../types/runtime.js";
 import type { CtxDeps } from "../../context.types.js";
 import type { WsHandler } from "../types.js";
 import { MAX_LOBBY_PLAYERS } from "../../../lobby/constants.js";
+import { toPlayerPayloads } from "../../../lobby/playerPayloads.js";
 import { ensureGameLobbySettings } from "../../../lobby/settings.js";
 import { atLeast, normalizeRole } from "../../../../shared/roles.js";
 import type {
@@ -214,11 +215,7 @@ export const lobbyConfigHandlers: Record<string, WsHandler> = {
 
     hctx.broadcast(gameId, {
       type: "player-list-update",
-      players: game.players.map((p: PlayerState) => ({
-        username: p.username,
-        displayname: p.displayname,
-        online: Boolean(p.online),
-      })),
+      players: toPlayerPayloads(game.players),
       host: game.host,
     });
   },

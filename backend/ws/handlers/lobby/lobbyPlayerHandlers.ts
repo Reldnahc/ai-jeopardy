@@ -2,9 +2,10 @@ import type { JsonMap, PlayerState } from "../../../types/runtime.js";
 import type { CtxDeps } from "../../context.types.js";
 import type { WsHandler } from "../types.js";
 import { MAX_LOBBY_PLAYERS } from "../../../lobby/constants.js";
+import { toPlayerPayloads } from "../../../lobby/playerPayloads.js";
 import { createDefaultLobbySettings } from "../../../lobby/settings.js";
 import { getUniqueCategories } from "../../../services/categories/getUniqueCategories.js";
-import type { LobbyCreatedMessage, LobbyPlayerSummary } from "../../../../shared/types/lobby.js";
+import type { LobbyCreatedMessage } from "../../../../shared/types/lobby.js";
 
 type CreateLobbyData = {
   username?: string;
@@ -108,11 +109,7 @@ export const lobbyPlayerHandlers: Record<string, WsHandler> = {
       type: "lobby-created",
       gameId: newGameId,
       categories: hctx.games[newGameId].categories,
-      players: hctx.games[newGameId].players.map((p: PlayerState): LobbyPlayerSummary => ({
-        username: p.username,
-        displayname: p.displayname,
-        online: Boolean(p.online),
-      })),
+      players: toPlayerPayloads(hctx.games[newGameId].players),
       host: u,
     } satisfies LobbyCreatedMessage);
 
@@ -210,11 +207,7 @@ export const lobbyPlayerHandlers: Record<string, WsHandler> = {
 
     hctx.broadcast(gameId, {
       type: "player-list-update",
-      players: game.players.map((p: PlayerState) => ({
-        username: p.username,
-        displayname: p.displayname,
-        online: Boolean(p.online),
-      })),
+      players: toPlayerPayloads(game.players),
       host: game.host,
     });
   },
@@ -270,11 +263,7 @@ export const lobbyPlayerHandlers: Record<string, WsHandler> = {
 
     hctx.broadcast(effectiveGameId, {
       type: "player-list-update",
-      players: game.players.map((p: PlayerState) => ({
-        username: p.username,
-        displayname: p.displayname,
-        online: Boolean(p.online),
-      })),
+      players: toPlayerPayloads(game.players),
       host: game.host,
     });
 

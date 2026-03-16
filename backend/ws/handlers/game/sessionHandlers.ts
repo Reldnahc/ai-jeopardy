@@ -1,6 +1,7 @@
 import type { GameState, PlayerState } from "../../../types/runtime.js";
 import type { CtxDeps } from "../../context.types.js";
 import type { WsHandler } from "../types.js";
+import { toPlayerPayloads } from "../../../lobby/playerPayloads.js";
 
 type JoinGameData = { gameId: string; username?: string; displayname?: string };
 type LeaveGameData = { gameId: string; username?: string };
@@ -126,11 +127,7 @@ export const sessionHandlers: Record<string, WsHandler> = {
       JSON.stringify({
         type: "game-state",
         gameId,
-        players: game.players.map((p: PlayerState) => ({
-          username: p.username,
-          displayname: p.displayname,
-          online: p?.online !== false,
-        })),
+        players: toPlayerPayloads(game.players),
         host: game.host,
         buzzResult: game.buzzed,
         playerBuzzLockoutUntil: myLockoutUntil,
@@ -185,11 +182,7 @@ export const sessionHandlers: Record<string, WsHandler> = {
 
     hctx.broadcast(gameId, {
       type: "player-list-update",
-      players: game.players.map((p: PlayerState) => ({
-        username: p.username,
-        displayname: p.displayname,
-        online: p?.online !== false,
-      })),
+      players: toPlayerPayloads(game.players),
       host: game.host,
     });
   },
@@ -228,11 +221,7 @@ export const sessionHandlers: Record<string, WsHandler> = {
 
     hctx.broadcast(gameId, {
       type: "player-list-update",
-      players: game.players.map((p: PlayerState) => ({
-        username: p.username,
-        displayname: p.displayname,
-        online: p?.online !== false,
-      })),
+      players: toPlayerPayloads(game.players),
       host: game.host,
     });
 
