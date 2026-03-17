@@ -1,8 +1,8 @@
-import type { models } from "../../../../shared/models.js";
+import type { Model } from "../../../../shared/models.js";
 import type { LobbySettings } from "../socket/useLobbySocketSync.tsx";
 
 export type ReasoningEffortSetting = "off" | "low" | "medium" | "high";
-export type ModelDef = (typeof models)[number];
+export type ModelDef = Model;
 
 export interface HostControlsProps {
   lobbySettings: LobbySettings | null;

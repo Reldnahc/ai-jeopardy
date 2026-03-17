@@ -2,6 +2,8 @@
 import path from "path";
 import type { Application, Request, Response } from "express";
 import type { Repos } from "../repositories/index.js";
+import { appConfig } from "../config/appConfig.js";
+import { getAvailableModels } from "../../shared/models.js";
 
 const TTS_CACHE_TTL_MS = 5 * 60 * 1000;
 
@@ -65,6 +67,15 @@ type CodedError = Error & { code?: string };
 type AssetIdParams = { assetId: string };
 
 export function registerHttpRoutes(app: Application, distPath: string, repos: HttpRepos) {
+  app.get("/api/models", (_req: Request, res: Response) => {
+    return res.json({
+      models: getAvailableModels({
+        hasAnthropicApiKey: appConfig.ai.hasAnthropicApiKey,
+        hasDeepSeekApiKey: appConfig.ai.hasDeepSeekApiKey,
+      }),
+    });
+  });
+
   // --- Images --------------------------------------------------------------
 
   app.get("/api/images/:assetId", async (req: Request<AssetIdParams>, res: Response) => {

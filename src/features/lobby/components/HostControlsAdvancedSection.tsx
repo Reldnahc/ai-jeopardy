@@ -1,6 +1,6 @@
-import { models } from "../../../../shared/models.js";
-import React from "react";
+import React, { useEffect } from "react";
 import type { ModelDef, ReasoningEffortSetting } from "./HostControls.types.ts";
+import { useAvailableModels } from "../../../hooks/useAvailableModels.ts";
 
 interface HostControlsAdvancedSectionProps {
   advancedOpen: boolean;
@@ -39,11 +39,20 @@ const HostControlsAdvancedSection: React.FC<HostControlsAdvancedSectionProps> = 
   setVisualMode,
   setReasoningEffort,
 }) => {
-  const selectedModelDef = models.find((m) => m.value === selectedModel);
+  const { availableModels, isLoaded } = useAvailableModels();
+  const selectedModelDef = availableModels.find((m) => m.value === selectedModel) || null;
   const modelSupportsReasoningEffort = selectedModelDef?.supportsReasoningEffort === true;
   const usingImportedBoard = boardJson.trim().length > 0;
 
-  const groupedModels = models.reduce(
+  useEffect(() => {
+    if (!isLoaded) return;
+    if (availableModels.length === 0) return;
+    if (availableModels.some((model) => model.value === selectedModel)) return;
+
+    setSelectedModel(availableModels[0].value);
+  }, [availableModels, isLoaded, selectedModel, setSelectedModel]);
+
+  const groupedModels = availableModels.reduce(
     (groups, model) => {
       if (!groups[model.price]) groups[model.price] = [];
       groups[model.price].push(model);
@@ -175,9 +184,12 @@ const HostControlsAdvancedSection: React.FC<HostControlsAdvancedSectionProps> = 
                     <select
                       value={selectedModel}
                       onChange={(e) => setSelectedModel(e.target.value)}
-                      disabled={usingImportedBoard}
+                      disabled={usingImportedBoard || availableModels.length === 0}
                       className="p-2 rounded-md border border-gray-300 text-black w-full bg-white cursor-pointer"
                     >
+                      {availableModels.length === 0 ? (
+                        <option value="">No models available</option>
+                      ) : null}
                       {Object.entries(groupedModels).map(([price, grouped]) => (
                         <optgroup
                           key={price}

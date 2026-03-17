@@ -4,7 +4,7 @@ import PageCardContainer from "../components/common/PageCardContainer.tsx";
 import FilterToolbar from "../components/common/FilterToolbar.tsx";
 import SvgOutlinedText from "../components/common/SvgOutlinedText.tsx";
 import { Board } from "../types/Board.ts";
-import { models } from "../../shared/models.js";
+import { useAvailableModels } from "../hooks/useAvailableModels.ts";
 import { getApiBase, fetchJson } from "../utils/utils.ts";
 
 const RecentBoards = () => {
@@ -13,6 +13,7 @@ const RecentBoards = () => {
   const [hasMoreBoards, setHasMoreBoards] = useState(true);
   const [filterModel, setFilterModel] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const { availableModels } = useAvailableModels();
   const loadingRef = useRef(false);
   const hasMoreRef = useRef(true);
   const lastRequestedOffsetRef = useRef<number | null>(null);
@@ -119,8 +120,11 @@ const RecentBoards = () => {
   }, [boards, search]);
 
   const modelSelectOptions = useMemo(
-    () => [{ value: "", label: "All Models" }, ...models.map((m) => ({ value: m.value, label: m.label }))],
-    [],
+    () => [
+      { value: "", label: "All Models" },
+      ...availableModels.map((model) => ({ value: model.value, label: model.label })),
+    ],
+    [availableModels],
   );
   const modelChips = useMemo(
     () => [
@@ -130,14 +134,14 @@ const RecentBoards = () => {
         active: filterModel === null,
         onClick: () => setFilterModel(null),
       },
-      ...models.map((model) => ({
+      ...availableModels.map((model) => ({
         key: model.value,
         label: model.label,
         active: filterModel === model.value,
         onClick: () => setFilterModel(model.value === filterModel ? null : model.value),
       })),
     ],
-    [filterModel],
+    [availableModels, filterModel],
   );
 
   return (

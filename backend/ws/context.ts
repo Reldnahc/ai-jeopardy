@@ -2,7 +2,7 @@ import type WebSocket from "ws";
 import type { Repos } from "../repositories/index.js";
 import type { Ctx } from "./context.types.js";
 import { games } from "../state/gamesStore.js";
-import { modelsByValue } from "../../shared/models.js";
+import { createModelsByValue, getAvailableModels } from "../../shared/models.js";
 import { makeBroadcaster } from "./broadcast.js";
 import { scheduleLobbyCleanupIfEmpty, cancelLobbyCleanup } from "../lobby/cleanup.js";
 import { sendLobbySnapshot, buildLobbyState, getPlayerForSocket } from "../lobby/snapshot.js";
@@ -88,6 +88,10 @@ type GameForClueKey = {
 
 export const createWsContext = (wss: WsServerLike, repos: Repos): Ctx => {
   const { broadcast, broadcastAll } = makeBroadcaster(wss);
+  const availableModels = getAvailableModels({
+    hasAnthropicApiKey: appConfig.ai.hasAnthropicApiKey,
+    hasDeepSeekApiKey: appConfig.ai.hasDeepSeekApiKey,
+  });
 
   const ttsDuration = createTtsDurationService(repos);
 
@@ -116,7 +120,7 @@ export const createWsContext = (wss: WsServerLike, repos: Repos): Ctx => {
 
   return {
     games,
-    modelsByValue,
+    modelsByValue: createModelsByValue(availableModels),
     appConfig,
     perms,
     getTtsDurationMs: (assetId: string) => ttsDuration.getDurationMs(assetId),

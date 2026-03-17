@@ -1,5 +1,5 @@
 import PageCardContainer from "../components/common/PageCardContainer.tsx";
-import { models } from "../../shared/models.ts";
+import { useAvailableModels } from "../hooks/useAvailableModels.ts";
 
 function providerLabel(provider: string | undefined) {
   if (provider === "openai") return "OpenAI";
@@ -9,7 +9,8 @@ function providerLabel(provider: string | undefined) {
 }
 
 export default function ModelInfo() {
-  const orderedModels = [...models].sort((a, b) => Number(a.price > 0) - Number(b.price > 0));
+  const { availableModels } = useAvailableModels();
+  const orderedModels = [...availableModels].sort((a, b) => Number(a.price > 0) - Number(b.price > 0));
 
   return (
     <div className="min-h-screen px-4 py-6 md:px-6">
