@@ -28,6 +28,9 @@ This plan normalizes code style and patterns based on the conventions that alrea
 - Completed: extracted answer submission validation and judging/result helpers out of `answerHandlers.ts`.
 - Completed: centralized answer capture startup and timeout handling across buzz and Daily Double flows.
 - Completed: extracted game host/control state mutations out of `miscHandlers.ts`.
+- Completed: extracted game session join/leave player lifecycle and join snapshot assembly out of `sessionHandlers.ts`.
+- Completed: extracted pending-buzz estimate, queue, and winner-selection helpers out of `buzzHandlers.ts`.
+- Completed: extracted Board Creator local state transitions and round editor rendering out of `src/pages/BoardCreator.tsx`.
 - Completed: verification baseline restored; `npm run test`, `npm run lint`, and `npm run build:backend` are green again.
 - Completed: extracted ProfileContext request helpers out of `src/contexts/ProfileContext.tsx`.
 - Completed: extracted ProfileContext shared types, store hook, and bootstrap effects out of `src/contexts/ProfileContext.tsx`.
@@ -40,7 +43,7 @@ This plan normalizes code style and patterns based on the conventions that alrea
 - Completed: extracted benchmark workflow artifact writers out of `backend/services/ai/board/boardBenchmarkWorkflow.ts`.
 - Completed: extracted benchmark workflow config/bootstrap helpers and execution runner out of `backend/services/ai/board/boardBenchmarkWorkflow.ts`.
 - Completed: extracted game socket local state and router-dependency assembly out of `src/features/game/socket/useGameSocketSync.ts`.
-- Pending: broader file decomposition for oversized controllers, hooks, and route modules.
+- Pending: optional cleanup and consistency passes on medium-sized modules that are no longer architectural bottlenecks.
 
 ## Chosen Defaults
 
@@ -126,6 +129,9 @@ This plan normalizes code style and patterns based on the conventions that alrea
   - Extracted answer submission validation and answer-result/judging state helpers into `backend/game/gameLogic/answerSubmission.ts`.
   - Centralized answer capture startup and timeout result handling into `backend/game/gameLogic/answerCapture.ts`.
   - Extracted host/control state mutations into `backend/game/gameLogic/controlState.ts`.
+  - Extracted session join/reconnect helpers and game-state snapshot assembly into `backend/game/gameLogic/sessionState.ts`.
+  - Extracted pending-buzz estimate validation, queue management, and winner resolution into `backend/game/gameLogic/buzzCollection.ts`.
+  - Extracted Board Creator local state transitions into `src/features/boardCreator/useBoardCreatorState.ts` and round rendering into `src/features/boardCreator/BoardCreatorRoundEditor.tsx`.
   - Extracted benchmark workflow timing, usage, and summary logic into `backend/services/ai/board/boardBenchmarkWorkflow.summary.ts`.
   - Extracted benchmark workflow shared request/result types into `backend/services/ai/board/boardBenchmarkWorkflow.types.ts`.
   - Extracted benchmark workflow board-generation jobs and board assembly into `backend/services/ai/board/boardBenchmarkGeneration.ts`.
@@ -166,21 +172,19 @@ This plan normalizes code style and patterns based on the conventions that alrea
 
 ## High-Value Targets
 
-These files are the strongest remaining structural cleanup candidates:
+The highest-priority structural targets from this plan have been completed. Remaining work is optional and should be driven by new feature pressure rather than file size alone:
 
-- `backend/ws/handlers/game/miscHandlers.ts`
-- `backend/ws/handlers/game/buzzHandlers.ts`
-- `backend/ws/handlers/game/sessionHandlers.ts`
-- `src/pages/BoardCreator.tsx`
-- Remaining frontend controllers or page-level components that still mix local UI state with transport orchestration
+- Medium-sized websocket handlers that still have domain logic worth extracting if they grow again
+- Remaining frontend controllers or page-level components that mix local UI state with transport orchestration
+- Small import/export consistency cleanup where touched by future feature work
 
 ## Suggested Execution Order
 
 1. Normalize imports and export-style outliers.
 2. Remove the worst `as unknown as` cases at the frontend/backend boundaries.
 3. Extract shared payload types into `shared/`.
-4. Split remaining websocket handler orchestration by concern, starting with host/control handlers and pending-buzz race logic.
-5. Finish the remaining page/controller decompositions only where state and transport logic are still coupled.
+4. Split remaining websocket handler orchestration by concern only when new changes would otherwise increase coupling.
+5. Finish remaining page/controller decompositions only where state and transport logic are still coupled in active feature areas.
 6. Run targeted tests after each pass and run broader lint/test/build checks at the end of each workstream.
 
 ## Verification Expectations
