@@ -2,9 +2,10 @@ import type { GameState } from "../../types/runtime.js";
 import type { CtxDeps } from "../../ws/context.types.js";
 import type { ResolverCtx } from "../gameLogic/resolver.js";
 import { shouldIncrementStats } from "../statsGate.js";
+import { startAnswerCapture } from "../gameLogic/answerCapture.js";
 
 export type DailyDoubleFinalizeCtx = ResolverCtx &
-  CtxDeps<"clearDdWagerTimer" | "startAnswerWindow" | "games" | "parseClueValue" | "autoResolveAfterJudgement">;
+  CtxDeps<"clearDdWagerTimer" | "startAnswerWindow" | "games" | "autoResolveAfterJudgement">;
 
 export async function finalizeDailyDoubleWagerAndStartClue(
   gameId: string,
@@ -73,75 +74,14 @@ export async function finalizeDailyDoubleWagerAndStartClue(
     { assetId: ttsAssetId },
   ]);
 
-  // Start server-authoritative answer capture session (same as your current DD flow)
-  const answerSeconds =
-    typeof game.timeToAnswer === "number" && game.timeToAnswer > 0 ? game.timeToAnswer : 9;
-
-  const recordMs = answerSeconds * 1000;
-  const deadlineAt = Date.now() + recordMs;
-
-  game.phase = "ANSWER_CAPTURE";
-  game.answeringPlayerUsername = dd.playerUsername;
-  game.answerClueKey = clueKey;
-  game.answerSessionId = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
-  game.answerTranscript = null;
-  game.answerVerdict = null;
-  game.answerConfidence = null;
-
-  ctx.clearAnswerWindow(game);
-
-  ctx.broadcast(gameId, {
-    type: "answer-capture-start",
+  startAnswerCapture({
+    ctx,
     gameId,
-    username: dd.playerUsername,
-    displayname: dd.playerDisplayname,
-    answerSessionId: game.answerSessionId,
+    game,
+    playerUsername: dd.playerUsername,
+    playerDisplayname: dd.playerDisplayname,
     clueKey,
-    durationMs: recordMs,
-    deadlineAt,
-  });
-
-  if (answerSeconds > 0) {
-    ctx.startGameTimer(gameId, game, ctx, answerSeconds, "answer");
-  }
-
-  ctx.startAnswerWindow(gameId, game, ctx.broadcast, recordMs, () => {
-    const g = ctx.games?.[gameId];
-    if (!g) return;
-
-    if (!g.answerSessionId) return;
-    if (g.answerSessionId !== game.answerSessionId) return;
-    if (g.answeringPlayerKey !== game.answeringPlayerKey) return;
-    if (!g.selectedClue) return;
-
-    g.phase = "RESULT";
-    g.answerTranscript = "";
-    g.answerVerdict = "incorrect";
-    g.answerConfidence = 0.0;
-
-    const ddWorth =
-      g.dailyDouble?.clueKey === g.clueState?.clueKey &&
-      Number.isFinite(Number(g.dailyDouble?.wager))
-        ? Number(g.dailyDouble.wager)
-        : null;
-
-    const clueValue = ctx.parseClueValue(g.selectedClue?.value);
-    const worth = ddWorth !== null ? ddWorth : clueValue;
-
-    ctx.broadcast(gameId, {
-      type: "answer-result",
-      gameId,
-      answerSessionId: g.answerSessionId,
-      username: dd.playerUsername,
-      displayname: dd.playerDisplayname,
-      transcript: "",
-      verdict: "incorrect",
-      confidence: 0.0,
-      suggestedDelta: -worth,
-    });
-
-    ctx
-      .autoResolveAfterJudgement(ctx, gameId, g, game.answeringPlayerKey, "incorrect")
-      .catch((e: unknown) => console.error("[dd-answer-timeout] autoResolve failed:", e));
+    onAutoResolveError: (error: unknown) =>
+      console.error("[dd-answer-timeout] autoResolve failed:", error),
   });
 }

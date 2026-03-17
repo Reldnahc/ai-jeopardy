@@ -75,6 +75,7 @@ describe("dailyDouble finalize", () => {
     expect(game.dailyDouble?.stage).toBe("clue");
     expect(game.usedDailyDoubles?.has("firstBoard:400:Q")).toBe(true);
     expect(game.phase).toBe("ANSWER_CAPTURE");
+    expect(game.answeringPlayerKey).toBe("alice");
     expect(ctx.repos.profiles.incrementTrueDailyDoubles).toHaveBeenCalledWith("alice");
     expect(ctx.broadcast).toHaveBeenCalledWith(
       "g1",
@@ -98,7 +99,13 @@ describe("dailyDouble finalize", () => {
       "g1",
       expect.objectContaining({ type: "answer-result", verdict: "incorrect", suggestedDelta: -700 }),
     );
-    expect(ctx.autoResolveAfterJudgement).toHaveBeenCalledWith(ctx, "g1", game, undefined, "incorrect");
+    expect(ctx.autoResolveAfterJudgement).toHaveBeenCalledWith(
+      ctx,
+      "g1",
+      game,
+      "alice",
+      "incorrect",
+    );
   });
 
   it("falls back to default answer timer when configured time is non-positive", async () => {
@@ -112,7 +119,7 @@ describe("dailyDouble finalize", () => {
 
   it("timeout callback uses clue value when DD wager is not active and respects early returns", async () => {
     const game = buildGame();
-    const { ctx, getTimeoutCb } = buildCtx(game, { parseClueValue: vi.fn(() => 600) });
+    const { ctx, getTimeoutCb } = buildCtx(game);
 
     await finalizeDailyDoubleWagerAndStartClue("g1", game, ctx, { wager: 700 });
     const cb = getTimeoutCb();
@@ -127,7 +134,7 @@ describe("dailyDouble finalize", () => {
 
     expect(ctx.broadcast).toHaveBeenCalledWith(
       "g1",
-      expect.objectContaining({ type: "answer-result", verdict: "incorrect", suggestedDelta: -600 }),
+      expect.objectContaining({ type: "answer-result", verdict: "incorrect", suggestedDelta: -400 }),
     );
 
     const callsBefore = (ctx.broadcast as ReturnType<typeof vi.fn>).mock.calls.length;

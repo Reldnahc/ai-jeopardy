@@ -2,6 +2,7 @@ import type { GameState, PlayerState } from "../../../types/runtime.js";
 import type { CtxDeps } from "../../context.types.js";
 import type { WsHandler } from "../types.js";
 import { shouldIncrementStats } from "../../../game/statsGate.js";
+import { startAnswerCapture } from "../../../game/gameLogic/answerCapture.js";
 
 type BuzzData = { gameId: string; estimatedServerBuzzAtMs?: number; clientSeq?: number };
 
@@ -15,7 +16,6 @@ type BuzzHandlersCtx = CtxDeps<
   | "clearAnswerWindow"
   | "startGameTimer"
   | "startAnswerWindow"
-  | "parseClueValue"
   | "autoResolveAfterJudgement"
 >;
 
@@ -148,9 +148,6 @@ export const buzzHandlers: Record<string, WsHandler> = {
           const gg = hctx.games?.[gameId];
           if (!gg) return;
 
-          const ANSWER_SECONDS = typeof gg.timeToAnswer === "number" && gg.timeToAnswer > 0 ? gg.timeToAnswer : 9;
-          const RECORD_MS = ANSWER_SECONDS * 1000;
-
           if (gg.buzzed !== winner.playerUsername) return;
 
           const boardKey = gg.activeBoard || "firstBoard";
@@ -158,61 +155,15 @@ export const buzzHandlers: Record<string, WsHandler> = {
           const q = String(gg.selectedClue?.question ?? "").trim();
           const clueKey = `${boardKey}:${v}:${q}`;
 
-          gg.phase = "ANSWER_CAPTURE";
-          gg.answeringPlayerUsername = winner.playerUsername;
-          gg.answerClueKey = clueKey;
-          gg.answerSessionId = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
-          gg.answerTranscript = null;
-          gg.answerVerdict = null;
-          gg.answerConfidence = null;
-
-          hctx.clearAnswerWindow(gg);
-          const deadlineAt = Date.now() + RECORD_MS;
-
-          hctx.broadcast(gameId, {
-            type: "answer-capture-start",
+          startAnswerCapture({
+            ctx: hctx,
             gameId,
-            username: winner.playerUsername,
-            displayname: winner.playerDisplayname ?? null,
-            answerSessionId: gg.answerSessionId,
+            game: gg,
+            playerUsername: winner.playerUsername,
+            playerDisplayname: winner.playerDisplayname ?? null,
             clueKey,
-            durationMs: RECORD_MS,
-            deadlineAt,
-          });
-
-          if (ANSWER_SECONDS > 0) {
-            hctx.startGameTimer(gameId, gg, hctx, ANSWER_SECONDS, "answer");
-          }
-
-          hctx.startAnswerWindow(gameId, gg, hctx.broadcast, RECORD_MS, () => {
-            const ggg = hctx.games?.[gameId];
-            if (!ggg) return;
-            if (!ggg.answerSessionId) return;
-            if (ggg.answerSessionId !== gg.answerSessionId) return;
-            if (ggg.answeringPlayerUsername !== winner.playerUsername) return;
-            if (!ggg.selectedClue) return;
-
-            ggg.phase = "RESULT";
-            ggg.answerTranscript = "";
-            ggg.answerVerdict = "incorrect";
-            ggg.answerConfidence = 0.0;
-
-            const clueValue = hctx.parseClueValue(ggg.selectedClue?.value);
-            hctx.broadcast(gameId, {
-              type: "answer-result",
-              gameId,
-              answerSessionId: ggg.answerSessionId,
-              username: winner.playerUsername,
-              displayname: winner.playerDisplayname ?? null,
-              transcript: "",
-              verdict: "incorrect",
-              confidence: 0.0,
-              suggestedDelta: -clueValue,
-            });
-
-            ctx
-              .autoResolveAfterJudgement(ctx, gameId, ggg, winner.playerUsername, "incorrect")
-              .catch((e: unknown) => console.error("[answer-timeout] autoResolve failed:", e));
+            onAutoResolveError: (error: unknown) =>
+              console.error("[answer-timeout] autoResolve failed:", error),
           });
         }, 0);
       }, COLLECT_MS);
