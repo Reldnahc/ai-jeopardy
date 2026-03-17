@@ -1,3 +1,4 @@
+import { getModelPricingUsdPer1M } from "../../../shared/models.js";
 import { resolveProviderForModel } from "./aiClients/index.js";
 
 export type AiUsage = {
@@ -6,27 +7,6 @@ export type AiUsage = {
   total_tokens: number | null;
   reasoning_tokens: number | null;
   cost_usd: number | null;
-};
-
-type PriceModel = {
-  inputPer1M: number;
-  outputPer1M: number;
-  reasoningPer1M?: number;
-};
-
-const MODEL_PRICING_USD_PER_1M: Partial<Record<string, PriceModel>> = {
-  "gpt-4o-mini": { inputPer1M: 0.15, outputPer1M: 0.6 },
-  "gpt-4o": { inputPer1M: 2.5, outputPer1M: 10 },
-  "gpt-5-mini": { inputPer1M: 0.25, outputPer1M: 2 },
-  "gpt-5.4": { inputPer1M: 2.5, outputPer1M: 15 },
-  "gpt-5.2": { inputPer1M: 1.75, outputPer1M: 14 },
-  "gpt-5-nano": { inputPer1M: 0.05, outputPer1M: 0.4 },
-  "gpt-4.1-nano": { inputPer1M: 0.1, outputPer1M: 0.4 },
-  "o1-mini": { inputPer1M: 1.1, outputPer1M: 4.4 },
-  "claude-sonnet-4-6": { inputPer1M: 3, outputPer1M: 15 },
-  "claude-haiku-4-5": { inputPer1M: 1, outputPer1M: 5 },
-  "deepseek-chat": { inputPer1M: 0.28, outputPer1M: 0.42 },
-  "deepseek-reasoner": { inputPer1M: 0.28, outputPer1M: 0.42 },
 };
 
 function safeNumber(value: unknown) {
@@ -47,7 +27,7 @@ function estimateRequestCostUsd(args: {
   completionTokens: number | null;
   reasoningTokens: number | null;
 }) {
-  const pricing = MODEL_PRICING_USD_PER_1M[args.model];
+  const pricing = getModelPricingUsdPer1M(args.model);
   if (!pricing) return null;
 
   const promptCost = ((args.promptTokens ?? 0) / 1_000_000) * pricing.inputPer1M;
