@@ -54,7 +54,7 @@ export const env = Object.freeze({
 
   // AI models
   DEFAULT_GENERATION_MODEL: optionalEnv("DEFAULT_GENERATION_MODEL", "deepseek-chat"),
-  JUDGE_MODEL: optionalEnv("JUDGE_MODEL", "deepseek-chat"),
+  JUDGE_MODEL: optionalEnv("JUDGE_MODEL", "gpt-4o-mini"),
   STT_MODEL: optionalEnv("STT_MODEL", "gpt-4o-mini-transcribe"),
   IMAGE_JUDGE_MODEL: optionalEnv("IMAGE_JUDGE_MODEL", "gpt-4.1-mini"),
   COTD_MODEL: optionalEnv("COTD_MODEL", "gpt-4o-mini"),
