@@ -1,6 +1,13 @@
 import type { PlayerState } from "../../../types/runtime.js";
 import type { CtxDeps } from "../../context.types.js";
 import type { WsHandler } from "../types.js";
+import {
+  applyAnswerResult,
+  beginAnswerJudging,
+  buildAnswerResultPayload,
+  resolveSuggestedDelta,
+  validateAnswerSubmission,
+} from "../../../game/gameLogic/answerSubmission.js";
 
 type AnswerAudioBlobData = {
   gameId: string;
@@ -25,122 +32,39 @@ export const answerHandlers: Record<string, WsHandler> = {
     const { gameId, answerSessionId, mimeType, dataBase64 } = (data || {}) as AnswerAudioBlobData;
     const game = hctx.games?.[gameId];
     if (!game) return;
-
-    const norm = (v: unknown) =>
-      String(v ?? "")
-        .trim()
-        .toLowerCase();
-
-    const player = game.players?.find((p: PlayerState) => p.id === ws.id);
-    const playerDisplayname = String(player?.displayname ?? "").trim() || null;
-    const playerUsername = norm(player?.username);
-
-    if (game.phase !== "ANSWER_CAPTURE") {
-      ws.send(
-        JSON.stringify({
-          type: "answer-error",
-          gameId,
-          answerSessionId,
-          message: `Not accepting answers right now (phase=${String(game.phase)}, buzzed=${String(game.buzzed)}, selectedClue=${Boolean(game.selectedClue)})`,
-        }),
-      );
-      return ctx
-        .autoResolveAfterJudgement(ctx, gameId, game, playerUsername, "incorrect")
-        .catch((e: unknown) => console.error("[answer-audio-blob] autoResolve failed:", e));
-    }
-
-    if (!answerSessionId || answerSessionId !== game.answerSessionId) {
-      ws.send(
-        JSON.stringify({
-          type: "answer-error",
-          gameId,
-          answerSessionId,
-          message: "Stale or invalid answer session.",
-        }),
-      );
-      return ctx
-        .autoResolveAfterJudgement(ctx, gameId, game, playerUsername, "incorrect")
-        .catch((e: unknown) => console.error("[answer-audio-blob] autoResolve failed:", e));
-    }
-
-    const answeringUsername = norm(game.answeringPlayerUsername);
-    if (!playerUsername || !answeringUsername || playerUsername !== answeringUsername) {
-      ws.send(
-        JSON.stringify({
-          type: "answer-error",
-          gameId,
-          answerSessionId,
-          message: "You are not the answering player.",
-        }),
-      );
-      return ctx
-        .autoResolveAfterJudgement(ctx, gameId, game, playerUsername, "incorrect")
-        .catch((e: unknown) => console.error("[answer-audio-blob] autoResolve failed:", e));
-    }
-
-    if (typeof dataBase64 !== "string" || !dataBase64.trim()) {
-      ws.send(
-        JSON.stringify({
-          type: "answer-error",
-          gameId,
-          answerSessionId,
-          message: "Missing audio data.",
-        }),
-      );
-      return ctx
-        .autoResolveAfterJudgement(ctx, gameId, game, playerUsername, "incorrect")
-        .catch((e: unknown) => console.error("[answer-audio-blob] autoResolve failed:", e));
-    }
-
-    let buf;
-    try {
-      buf = Buffer.from(dataBase64, "base64");
-    } catch {
-      ws.send(
-        JSON.stringify({
-          type: "answer-error",
-          gameId,
-          answerSessionId,
-          message: "Invalid base64 audio.",
-        }),
-      );
-      return ctx
-        .autoResolveAfterJudgement(ctx, gameId, game, playerUsername, "incorrect")
-        .catch((e: unknown) => console.error("[answer-audio-blob] autoResolve failed:", e));
-    }
-
-    const MAX_BYTES = 2_000_000;
-    if (buf.length > MAX_BYTES) {
-      ws.send(
-        JSON.stringify({
-          type: "answer-error",
-          gameId,
-          answerSessionId,
-          message: "Audio too large.",
-        }),
-      );
-      return ctx
-        .autoResolveAfterJudgement(ctx, gameId, game, playerUsername, "incorrect")
-        .catch((e: unknown) => console.error("[answer-audio-blob] autoResolve failed:", e));
-    }
-
-    hctx.clearAnswerWindow(game);
-    hctx.broadcast(gameId, { type: "answer-capture-ended", gameId, answerSessionId });
-    game.phase = "JUDGING";
-
-    hctx.broadcast(gameId, {
-      type: "answer-processing",
+    const submission = validateAnswerSubmission({
+      game,
+      ws,
       gameId,
       answerSessionId,
+      dataBase64,
+    });
+    const player = game.players?.find((p: PlayerState) => p.id === ws.id);
+    const fallbackUsername = String(player?.username ?? "")
+      .trim()
+      .toLowerCase();
+    if (submission.ok === false) {
+      ws.send(JSON.stringify(submission.errorPayload));
+      return ctx
+        .autoResolveAfterJudgement(ctx, gameId, game, fallbackUsername, "incorrect")
+        .catch((e: unknown) => console.error("[answer-audio-blob] autoResolve failed:", e));
+    }
+    const { playerUsername, playerDisplayname, buffer } = submission;
+
+    beginAnswerJudging({
+      game,
+      gameId,
+      answerSessionId: answerSessionId ?? "",
       playerUsername,
       playerDisplayname,
-      stage: "transcribing",
+      clearAnswerWindow: (currentGame) => hctx.clearAnswerWindow(currentGame),
+      broadcast: (currentGameId, payload) => hctx.broadcast(currentGameId, payload),
     });
 
     let transcript = "";
     try {
       const stt = await hctx.transcribeAnswerAudio(
-        buf,
+        buffer,
         mimeType,
         game.selectedClue?.answer,
         game.lobbySettings.sttProviderName as Parameters<typeof hctx.transcribeAnswerAudio>[3],
@@ -148,35 +72,26 @@ export const answerHandlers: Record<string, WsHandler> = {
       transcript = String(stt || "").trim();
 
       if (!transcript) {
-        const parseValue = (val: unknown) => {
-          const n = Number(String(val || "").replace(/[^0-9]/g, ""));
-          return Number.isFinite(n) ? n : 0;
-        };
-
-        const ddWorth =
-          game.dailyDouble?.clueKey === game.clueState?.clueKey &&
-          Number.isFinite(Number(game.dailyDouble?.wager))
-            ? Number(game.dailyDouble.wager)
-            : null;
-
-        const worth = ddWorth !== null ? ddWorth : parseValue(game.selectedClue?.value);
-
-        game.phase = "RESULT";
-        game.answerTranscript = "";
-        game.answerVerdict = "incorrect";
-        game.answerConfidence = 0.0;
-
-        hctx.broadcast(gameId, {
-          type: "answer-result",
-          gameId,
-          answerSessionId,
-          username: playerUsername,
-          displayname: playerDisplayname,
-          transcript: "",
+        applyAnswerResult({
+          game,
           verdict: "incorrect",
+          transcript: "",
           confidence: 0.0,
-          suggestedDelta: -worth,
         });
+
+        hctx.broadcast(
+          gameId,
+          buildAnswerResultPayload({
+            gameId,
+            answerSessionId,
+            playerUsername,
+            playerDisplayname,
+            transcript: "",
+            verdict: "incorrect",
+            confidence: 0.0,
+            suggestedDelta: resolveSuggestedDelta(game, "incorrect"),
+          }),
+        );
 
         return ctx
           .autoResolveAfterJudgement(ctx, gameId, game, playerUsername, "incorrect")
@@ -184,29 +99,26 @@ export const answerHandlers: Record<string, WsHandler> = {
       }
     } catch (e) {
       console.error("[answer-audio-blob] STT failed:", e?.message || e);
-
-      const parseValue = (val: unknown) => {
-        const n = Number(String(val || "").replace(/[^0-9]/g, ""));
-        return Number.isFinite(n) ? n : 0;
-      };
-      const clueValue = parseValue(game.selectedClue?.value);
-
-      game.phase = "RESULT";
-      game.answerTranscript = "";
-      game.answerVerdict = "incorrect";
-      game.answerConfidence = 0.0;
-
-      hctx.broadcast(gameId, {
-        type: "answer-result",
-        gameId,
-        answerSessionId,
-        username: playerUsername,
-        displayname: playerDisplayname,
-        transcript: "",
+      applyAnswerResult({
+        game,
         verdict: "incorrect",
+        transcript: "",
         confidence: 0.0,
-        suggestedDelta: -clueValue,
       });
+
+      hctx.broadcast(
+        gameId,
+        buildAnswerResultPayload({
+          gameId,
+          answerSessionId,
+          playerUsername,
+          playerDisplayname,
+          transcript: "",
+          verdict: "incorrect",
+          confidence: 0.0,
+          suggestedDelta: resolveSuggestedDelta(game, "incorrect"),
+        }),
+      );
 
       return ctx
         .autoResolveAfterJudgement(ctx, gameId, game, playerUsername, "incorrect")
@@ -237,29 +149,24 @@ export const answerHandlers: Record<string, WsHandler> = {
       verdict = "incorrect";
     }
 
-    const clueValue = hctx.parseClueValue(game.selectedClue?.value);
-    const ddWorth =
-      game.dailyDouble?.clueKey === game.clueState?.clueKey &&
-      Number.isFinite(Number(game.dailyDouble?.wager))
-        ? Number(game.dailyDouble.wager)
-        : null;
-    const worth = ddWorth !== null ? ddWorth : clueValue;
-    const suggestedDelta = verdict === "correct" ? worth : verdict === "incorrect" ? -worth : 0;
-
-    game.phase = "RESULT";
-    game.answerTranscript = transcript;
-    game.answerVerdict = verdict;
-
-    hctx.broadcast(gameId, {
-      type: "answer-result",
-      gameId,
-      answerSessionId,
-      username: playerUsername,
-      displayname: playerDisplayname,
-      transcript,
+    applyAnswerResult({
+      game,
       verdict,
-      suggestedDelta,
+      transcript,
     });
+
+    hctx.broadcast(
+      gameId,
+      buildAnswerResultPayload({
+        gameId,
+        answerSessionId,
+        playerUsername,
+        playerDisplayname,
+        transcript,
+        verdict,
+        suggestedDelta: resolveSuggestedDelta(game, verdict),
+      }),
+    );
 
     return ctx
       .autoResolveAfterJudgement(ctx, gameId, game, playerUsername, verdict)

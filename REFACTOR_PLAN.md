@@ -25,6 +25,7 @@ This plan normalizes code style and patterns based on the conventions that alrea
 - Completed: extracted pure game socket helpers out of `src/features/game/socket/useGameSocketSync.ts`.
 - Completed: extracted game audio playback parsing, persistence, and reminder helpers out of `src/features/game/page/useGameAudioPlayback.ts`.
 - Completed: extracted game clue-selection and Daily Double submission helpers out of websocket handlers into the game domain layer.
+- Completed: extracted answer submission validation and judging/result helpers out of `answerHandlers.ts`.
 - Completed: extracted ProfileContext request helpers out of `src/contexts/ProfileContext.tsx`.
 - Completed: extracted ProfileContext shared types, store hook, and bootstrap effects out of `src/contexts/ProfileContext.tsx`.
 - Completed: extracted WebSocketContext socket lifecycle into `src/contexts/useWebSocketConnection.ts` and slimmed `src/contexts/WebSocketContext.tsx` down to a thin provider.
@@ -119,6 +120,7 @@ This plan normalizes code style and patterns based on the conventions that alrea
   - Extracted game socket local state, refs, and router dependency assembly into `src/features/game/socket/useGameSocketSync.state.ts`.
   - Extracted game audio playback parsing, storage, and autoplay helper logic into `src/features/game/page/gameAudioPlayback.helpers.ts`.
   - Extracted clue selection state, skip handling, and Daily Double submission validation into `backend/game/gameLogic/clueSelection.ts` and `backend/game/dailyDouble/submission.ts`.
+  - Extracted answer submission validation and answer-result/judging state helpers into `backend/game/gameLogic/answerSubmission.ts`.
   - Extracted benchmark workflow timing, usage, and summary logic into `backend/services/ai/board/boardBenchmarkWorkflow.summary.ts`.
   - Extracted benchmark workflow shared request/result types into `backend/services/ai/board/boardBenchmarkWorkflow.types.ts`.
   - Extracted benchmark workflow board-generation jobs and board assembly into `backend/services/ai/board/boardBenchmarkGeneration.ts`.
