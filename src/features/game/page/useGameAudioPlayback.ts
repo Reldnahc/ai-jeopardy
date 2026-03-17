@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getCachedAudioBlobUrl } from "../../../audio/audioCache.ts";
-
-function getApiBase() {
-  if (import.meta.env.DEV) return import.meta.env.VITE_API_BASE || "http://localhost:3002";
-  return "";
-}
-
-function ttsUrl(id: string) {
-  return `${getApiBase()}/api/tts/${encodeURIComponent(id)}`;
-}
+import {
+  buildTtsUrl,
+  computeAiHostOffsetMs,
+  getMicPermissionFromError,
+  getStoredAudioVolume,
+  normalizeMicPermissionState,
+  parseAiHostAsset,
+  persistAudioVolume,
+  resolveGameApiBase,
+  shouldShowAutoplayReminder,
+  type MicPermissionState,
+} from "./gameAudioPlayback.helpers.ts";
 
 type UseGameAudioPlaybackArgs = {
   aiHostAsset: string | null;
@@ -21,6 +24,7 @@ export function useGameAudioPlayback({
   narrationEnabled,
   nowMs,
 }: UseGameAudioPlaybackArgs) {
+  const apiBase = resolveGameApiBase(import.meta.env);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
@@ -31,33 +35,14 @@ export function useGameAudioPlayback({
   const [audioUnlockTick, setAudioUnlockTick] = useState(0);
   const [audioBlockedByPolicy, setAudioBlockedByPolicy] = useState(false);
   const [audioContextState, setAudioContextState] = useState<AudioContextState>("suspended");
-  const [micPermission, setMicPermission] = useState<"granted" | "prompt" | "denied" | "unknown">(
-    "unknown",
-  );
+  const [micPermission, setMicPermission] = useState<MicPermissionState>("unknown");
 
-  const AUDIO_VOLUME_KEY = "aj_audioVolume";
-  const AUDIO_LAST_NONZERO_KEY = "aj_audioLastNonZeroVolume";
-
-  const [audioVolume, setAudioVolume] = useState<number>(() => {
-    try {
-      const raw = localStorage.getItem(AUDIO_VOLUME_KEY);
-      const v = raw == null ? 1 : Number(raw);
-      if (!Number.isFinite(v)) return 1;
-      return Math.min(1, Math.max(0, v));
-    } catch {
-      return 1;
-    }
-  });
+  const [audioVolume, setAudioVolume] = useState<number>(() => getStoredAudioVolume(localStorage));
 
   const audioMuted = audioVolume <= 0;
 
   useEffect(() => {
-    try {
-      localStorage.setItem(AUDIO_VOLUME_KEY, String(audioVolume));
-      if (audioVolume > 0) localStorage.setItem(AUDIO_LAST_NONZERO_KEY, String(audioVolume));
-    } catch {
-      // ignore
-    }
+    persistAudioVolume(localStorage, audioVolume);
   }, [audioVolume]);
 
   const playAudioUrl = useCallback(
@@ -121,22 +106,16 @@ export function useGameAudioPlayback({
     if (lastAiHostAssetPlayedRef.current === aiHostAsset) return;
     if (!isAudioReady || !narrationEnabled || audioMuted) return;
 
-    const parts = aiHostAsset.split("::");
-    const assetId = String(parts[1] ?? aiHostAsset).trim();
-    const startedAtMs = Math.max(0, Number(parts[2] ?? 0) || 0);
-    const baseOffsetMs = Math.max(0, Number(parts[3] ?? 0) || 0);
-    const receivedAtMs = Math.max(0, Number(parts[4] ?? 0) || 0);
-    if (!assetId) return;
+    const parsedAsset = parseAiHostAsset(aiHostAsset);
+    if (!parsedAsset.assetId) return;
 
-    const computedOffsetMs = (() => {
-      if (startedAtMs > 0) return Math.max(baseOffsetMs, Math.round(nowMs() - startedAtMs));
-      if (receivedAtMs > 0)
-        return Math.max(baseOffsetMs, Math.round(baseOffsetMs + (Date.now() - receivedAtMs)));
-      return baseOffsetMs;
-    })();
+    const computedOffsetMs = computeAiHostOffsetMs({
+      asset: parsedAsset,
+      nowMs,
+    });
 
     let cancelled = false;
-    void playAudioUrl(ttsUrl(assetId), computedOffsetMs).then((played) => {
+    void playAudioUrl(buildTtsUrl(parsedAsset.assetId, apiBase), computedOffsetMs).then((played) => {
       if (cancelled) return;
       if (played) lastAiHostAssetPlayedRef.current = aiHostAsset;
     });
@@ -144,7 +123,16 @@ export function useGameAudioPlayback({
     return () => {
       cancelled = true;
     };
-  }, [aiHostAsset, narrationEnabled, audioMuted, isAudioReady, audioUnlockTick, nowMs, playAudioUrl]);
+  }, [
+    aiHostAsset,
+    apiBase,
+    narrationEnabled,
+    audioMuted,
+    isAudioReady,
+    audioUnlockTick,
+    nowMs,
+    playAudioUrl,
+  ]);
 
   useEffect(() => {
     const audio = new Audio();
@@ -217,11 +205,6 @@ export function useGameAudioPlayback({
     let mounted = true;
     let status: PermissionStatus | null = null;
 
-    const mapState = (state: PermissionState) => {
-      if (state === "granted" || state === "prompt" || state === "denied") return state;
-      return "unknown";
-    };
-
     if (!("permissions" in navigator) || !navigator.permissions?.query) {
       setMicPermission("unknown");
       return;
@@ -232,10 +215,10 @@ export function useGameAudioPlayback({
       .then((s) => {
         if (!mounted) return;
         status = s;
-        setMicPermission(mapState(s.state));
+        setMicPermission(normalizeMicPermissionState(s.state));
         s.onchange = () => {
           if (!mounted) return;
-          setMicPermission(mapState(s.state));
+          setMicPermission(normalizeMicPermissionState(s.state));
         };
       })
       .catch(() => {
@@ -259,18 +242,17 @@ export function useGameAudioPlayback({
       stream.getTracks().forEach((track) => track.stop());
       setMicPermission("granted");
     } catch (e) {
-      const name = e instanceof DOMException ? e.name : "";
-      if (name === "NotAllowedError" || name === "SecurityError") setMicPermission("denied");
-      else setMicPermission("prompt");
+      setMicPermission(getMicPermissionFromError(e));
     }
   }, []);
 
-  const showAutoplayReminder = Boolean(
-    narrationEnabled &&
-      !audioMuted &&
-      isAudioReady &&
-      (audioBlockedByPolicy || audioContextState !== "running"),
-  );
+  const showAutoplayReminder = shouldShowAutoplayReminder({
+    narrationEnabled,
+    audioMuted,
+    isAudioReady,
+    audioBlockedByPolicy,
+    audioContextState,
+  });
 
   return {
     audioVolume,

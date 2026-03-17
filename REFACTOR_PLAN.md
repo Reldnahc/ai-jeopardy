@@ -23,6 +23,7 @@ This plan normalizes code style and patterns based on the conventions that alrea
 - Completed: extracted profile page request and mutation helpers out of `src/hooks/profile/useProfilePageController.ts`.
 - Completed: extracted profile page local UI state and effects out of `src/hooks/profile/useProfilePageController.ts`.
 - Completed: extracted pure game socket helpers out of `src/features/game/socket/useGameSocketSync.ts`.
+- Completed: extracted game audio playback parsing, persistence, and reminder helpers out of `src/features/game/page/useGameAudioPlayback.ts`.
 - Completed: extracted ProfileContext request helpers out of `src/contexts/ProfileContext.tsx`.
 - Completed: extracted ProfileContext shared types, store hook, and bootstrap effects out of `src/contexts/ProfileContext.tsx`.
 - Completed: extracted WebSocketContext socket lifecycle into `src/contexts/useWebSocketConnection.ts` and slimmed `src/contexts/WebSocketContext.tsx` down to a thin provider.
@@ -115,6 +116,7 @@ This plan normalizes code style and patterns based on the conventions that alrea
   - Extracted preload queue state into `src/hooks/game/usePreloadUrlQueue.ts` and preload helpers into `src/hooks/game/preload.helpers.ts` and `src/hooks/game/preload.dom.ts`.
   - Extracted pure game socket helpers into `src/features/game/socket/useGameSocketSync.helpers.ts`.
   - Extracted game socket local state, refs, and router dependency assembly into `src/features/game/socket/useGameSocketSync.state.ts`.
+  - Extracted game audio playback parsing, storage, and autoplay helper logic into `src/features/game/page/gameAudioPlayback.helpers.ts`.
   - Extracted benchmark workflow timing, usage, and summary logic into `backend/services/ai/board/boardBenchmarkWorkflow.summary.ts`.
   - Extracted benchmark workflow shared request/result types into `backend/services/ai/board/boardBenchmarkWorkflow.types.ts`.
   - Extracted benchmark workflow board-generation jobs and board assembly into `backend/services/ai/board/boardBenchmarkGeneration.ts`.
