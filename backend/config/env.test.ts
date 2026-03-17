@@ -32,7 +32,7 @@ describe("env config", () => {
     expect(mod.env.FINAL_DRAW_SECONDS).toBe(30);
     expect(mod.env.FINAL_WAGER_SECONDS).toBe(30);
     expect(mod.env.NODE_ENV).toBe("development");
-    expect(mod.env.JUDGE_MODEL).toBe("deepseek-chat");
+    expect(mod.env.JUDGE_MODEL).toBe("gpt-4o-mini");
   });
 
   it("parses optional csv and number env values", async () => {
