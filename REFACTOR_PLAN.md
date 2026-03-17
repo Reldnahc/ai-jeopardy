@@ -13,6 +13,7 @@ This plan normalizes code style and patterns based on the conventions that alrea
 - Completed: centralized empty lobby locked-category defaults into a shared backend helper.
 - Completed: centralized repeated lobby socket error-and-snapshot responses into a shared backend helper.
 - Completed: extracted lobby category-pool replacement logic out of `lobbyCategoryHandlers.ts`.
+- Completed: extracted lobby category slot validation and category-selection helpers out of `lobbyCategoryHandlers.ts`.
 - Completed: extracted profile moderation access and patch logic out of `backend/http/profileRoutes.ts`.
 - Completed: extracted profile customization patch parsing out of `backend/http/profileRoutes.ts`.
 - Completed: extracted Board Creator template/parse/validation helpers out of `src/pages/BoardCreator.tsx`.
@@ -96,6 +97,7 @@ This plan normalizes code style and patterns based on the conventions that alrea
   - Extracted route-specific profile parsing and auth-user helpers into `backend/http/profileRouteHelpers.ts`.
   - Extracted profile customization patch parsing into `backend/http/profileCustomization.ts`.
   - Extracted category-pool replacement logic into `backend/lobby/categoryPoolRefresh.ts`.
+  - Extracted lobby category slot validation and random category selection into `backend/lobby/categorySlots.ts` and `backend/lobby/categorySelection.ts`.
   - Extracted profile moderation logic into `backend/http/profileModeration.ts`.
   - Extracted Board Creator pure helpers into `src/features/boardCreator/boardCreatorUtils.ts`.
   - Extracted ProfileContext cache/freshness helpers into `src/contexts/profileContext.helpers.ts`.
@@ -132,6 +134,7 @@ This plan normalizes code style and patterns based on the conventions that alrea
   - Centralized backend player payload serialization into `backend/lobby/playerPayloads.ts`.
   - Centralized empty locked-category defaults into `backend/lobby/lockedCategories.ts`.
   - Centralized repeated lobby socket error/snapshot responses into `backend/lobby/socketErrors.ts`.
+  - Centralized lobby board-slot validation and category selection logic into `backend/lobby/categorySlots.ts` and `backend/lobby/categorySelection.ts`.
 - Keep route modules structured as imports, local helpers/types, exported `registerXRoutes`.
 - Keep websocket handler files structured as imports, payload/helper definitions, exported handler map.
 - Preserve repository factory patterns such as `createRepos` and `createXRepo`.

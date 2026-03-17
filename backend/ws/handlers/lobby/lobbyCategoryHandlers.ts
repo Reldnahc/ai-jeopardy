@@ -1,10 +1,15 @@
 import type { CtxDeps } from "../../context.types.js";
 import type { WsHandler } from "../types.js";
-import type { GameState } from "../../../types/runtime.js";
 import { buildRefreshedLobbyCategories } from "../../../lobby/categoryPoolRefresh.js";
+import { applyLobbyCategoryValue, chooseRandomLobbyCategory } from "../../../lobby/categorySelection.js";
+import {
+  isLobbyBoardIndexInRange,
+  isLobbyBoardType,
+  isLockedLobbyCategory,
+  parseLobbyBoardIndex,
+  toGlobalLobbyCategoryIndex,
+} from "../../../lobby/categorySlots.js";
 import { createEmptyLockedCategories } from "../../../lobby/lockedCategories.js";
-import { getUniqueCategories } from "../../../services/categories/getUniqueCategories.js";
-import { shuffle, normalizeCategory } from "../../../services/categories/categoryUtils.js";
 import { generateCategoryPoolFromAi } from "../../../services/ai/categoryPool.js";
 import { sendLobbyErrorAndSnapshot } from "../../../lobby/socketErrors.js";
 import { atLeast, normalizeRole } from "../../../../shared/roles.js";
@@ -32,39 +37,6 @@ type LobbyCategoryCtx = CtxDeps<
   "games" | "sendLobbySnapshot" | "broadcast" | "normalizeCategories11"
 >;
 
-type BoardType = "firstBoard" | "secondBoard" | "finalJeopardy";
-
-export function isBoardType(v: unknown): v is BoardType {
-  return v === "firstBoard" || v === "secondBoard" || v === "finalJeopardy";
-}
-
-export function parseBoardIndex(index: unknown): number | null {
-  const idx = Number(index);
-  if (!Number.isFinite(idx)) return null;
-  return idx;
-}
-
-export function isBoardIndexInRange(boardType: BoardType, index: number): boolean {
-  if (boardType === "finalJeopardy") return index === 0;
-  return index >= 0 && index <= 4;
-}
-
-export function toGlobalCategoryIndex(boardType: BoardType, index: number): number {
-  if (boardType === "firstBoard") return index;
-  if (boardType === "secondBoard") return 5 + index;
-  return 10;
-}
-
-export function isLockedCategory(
-  locked: GameState["lockedCategories"] | undefined,
-  boardType: BoardType,
-  index: number,
-): boolean {
-  if (!locked) return false;
-  if (boardType === "finalJeopardy") return Boolean(locked.finalJeopardy?.[0]);
-  return Boolean(locked[boardType]?.[index]);
-}
-
 export const lobbyCategoryHandlers: Record<string, WsHandler> = {
   "toggle-lock-category": async ({ data, ctx }) => {
     const hctx = ctx as LobbyCategoryCtx;
@@ -72,10 +44,10 @@ export const lobbyCategoryHandlers: Record<string, WsHandler> = {
     const game = hctx.games[gameId];
     if (!game) return;
 
-    const bt = isBoardType(boardType) ? boardType : null;
+    const bt = isLobbyBoardType(boardType) ? boardType : null;
     if (!bt) return;
-    const idx = parseBoardIndex(index);
-    if (idx === null || !isBoardIndexInRange(bt, idx)) return;
+    const idx = parseLobbyBoardIndex(index);
+    if (idx === null || !isLobbyBoardIndexInRange(bt, idx)) return;
 
     if (!game.lockedCategories) {
       game.lockedCategories = createEmptyLockedCategories();
@@ -98,13 +70,13 @@ export const lobbyCategoryHandlers: Record<string, WsHandler> = {
     const game = hctx.games[gameId];
     if (!game) return;
 
-    const bt = isBoardType(boardType) ? boardType : null;
+    const bt = isLobbyBoardType(boardType) ? boardType : null;
     if (!bt) return;
 
-    const idx = bt === "finalJeopardy" ? 0 : parseBoardIndex(index);
-    if (idx === null || !isBoardIndexInRange(bt, idx)) return;
+    const idx = bt === "finalJeopardy" ? 0 : parseLobbyBoardIndex(index);
+    if (idx === null || !isLobbyBoardIndexInRange(bt, idx)) return;
 
-    if (isLockedCategory(game.lockedCategories, bt, idx)) {
+    if (isLockedLobbyCategory(game.lockedCategories, bt, idx)) {
       sendLobbyErrorAndSnapshot({
         ws,
         gameId,
@@ -114,30 +86,17 @@ export const lobbyCategoryHandlers: Record<string, WsHandler> = {
       return;
     }
 
-    game.categories = hctx.normalizeCategories11(game.categories);
-
-    const globalIndex = toGlobalCategoryIndex(bt, idx);
-
-    const exclude = game.categories
-      .map((c: unknown) => String(c ?? "").trim())
-      .filter((v: string) => v.length > 0);
+    const normalizedCategories = hctx.normalizeCategories11(game.categories);
+    game.categories = normalizedCategories;
 
     let chosen = "";
-    const pool = Array.isArray(game.categoryPool) ? game.categoryPool : [];
-    const normalizedExclude = new Set(exclude.map(normalizeCategory));
-    const poolChoices = shuffle(pool).filter((c) => {
-      const key = normalizeCategory(String(c ?? ""));
-      return key && !normalizedExclude.has(key);
-    });
-
-    if (poolChoices.length > 0) {
-      chosen = String(poolChoices[0] ?? "").trim();
-    } else {
-      try {
-        chosen = getUniqueCategories(1, { exclude })[0] ?? "";
-      } catch (e) {
-        console.error("[randomize-category] failed to generate category:", e);
-      }
+    try {
+      chosen = chooseRandomLobbyCategory({
+        currentCategories: normalizedCategories,
+        categoryPool: game.categoryPool,
+      });
+    } catch (error) {
+      console.error("[randomize-category] failed to generate category:", error);
     }
 
     if (!chosen) {
@@ -150,13 +109,19 @@ export const lobbyCategoryHandlers: Record<string, WsHandler> = {
       return;
     }
 
-    game.categories[globalIndex] = chosen;
+    const nextCategoryState = applyLobbyCategoryValue({
+      categories: normalizedCategories,
+      boardType: bt,
+      index: idx,
+      value: chosen,
+    });
+    game.categories = nextCategoryState.categories;
 
     hctx.broadcast(gameId, {
       type: "category-updated",
       boardType: bt,
       index: bt === "finalJeopardy" ? 0 : idx,
-      value: chosen,
+      value: nextCategoryState.value,
     });
   },
 
@@ -176,7 +141,7 @@ export const lobbyCategoryHandlers: Record<string, WsHandler> = {
         return;
       }
 
-      const bt = isBoardType(boardType) ? boardType : null;
+      const bt = isLobbyBoardType(boardType) ? boardType : null;
       if (!bt) {
         sendLobbyErrorAndSnapshot({
           ws,
@@ -187,7 +152,7 @@ export const lobbyCategoryHandlers: Record<string, WsHandler> = {
         return;
       }
 
-      const idx = bt === "finalJeopardy" ? 0 : parseBoardIndex(index);
+      const idx = bt === "finalJeopardy" ? 0 : parseLobbyBoardIndex(index);
       if (idx === null) {
         sendLobbyErrorAndSnapshot({
           ws,
@@ -198,7 +163,7 @@ export const lobbyCategoryHandlers: Record<string, WsHandler> = {
         return;
       }
 
-      if (!isBoardIndexInRange(bt, idx)) {
+      if (!isLobbyBoardIndexInRange(bt, idx)) {
         sendLobbyErrorAndSnapshot({
           ws,
           gameId,
@@ -208,7 +173,7 @@ export const lobbyCategoryHandlers: Record<string, WsHandler> = {
         return;
       }
 
-      if (isLockedCategory(game.lockedCategories, bt, idx)) {
+      if (isLockedLobbyCategory(game.lockedCategories, bt, idx)) {
         sendLobbyErrorAndSnapshot({
           ws,
           gameId,
@@ -218,7 +183,7 @@ export const lobbyCategoryHandlers: Record<string, WsHandler> = {
         return;
       }
 
-      const globalIndex = toGlobalCategoryIndex(bt, idx);
+      const globalIndex = toGlobalLobbyCategoryIndex(bt, idx);
 
       if (!Array.isArray(game.categories) || globalIndex < 0 || globalIndex > 10) {
         sendLobbyErrorAndSnapshot({
@@ -230,16 +195,21 @@ export const lobbyCategoryHandlers: Record<string, WsHandler> = {
         return;
       }
 
-      const nextVal = String(value ?? "").replace(/^\s+/, "");
-      game.categories[globalIndex] = nextVal;
+      const nextCategoryState = applyLobbyCategoryValue({
+        categories: game.categories,
+        boardType: bt,
+        index: idx,
+        value,
+      });
+      game.categories = nextCategoryState.categories;
 
-      console.log("[update-category]", gameId, bt, idx, "->", nextVal.slice(0, 60));
+      console.log("[update-category]", gameId, bt, idx, "->", nextCategoryState.value.slice(0, 60));
 
       hctx.broadcast(gameId, {
         type: "category-updated",
         boardType: bt,
         index: bt === "finalJeopardy" ? 0 : idx,
-        value: nextVal,
+        value: nextCategoryState.value,
       });
     } catch (err) {
       console.error("[update-category] crash", err);
