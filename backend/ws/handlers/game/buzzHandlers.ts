@@ -3,6 +3,15 @@ import type { CtxDeps } from "../../context.types.js";
 import type { WsHandler } from "../types.js";
 import { shouldIncrementStats } from "../../../game/statsGate.js";
 import { startAnswerCapture } from "../../../game/gameLogic/answerCapture.js";
+import {
+  addPendingBuzzCandidate,
+  BUZZ_COLLECTION_MS,
+  createPendingBuzzState,
+  getEarlyBuzzLockoutUntil,
+  getEstimatedBuzzAt,
+  isEstimatedBuzzAtValid,
+  resolvePendingBuzzWinner,
+} from "../../../game/gameLogic/buzzCollection.js";
 
 type BuzzData = { gameId: string; estimatedServerBuzzAtMs?: number; clientSeq?: number };
 
@@ -61,36 +70,23 @@ export const buzzHandlers: Record<string, WsHandler> = {
     }
 
     if (game.buzzerLocked) {
-      const EARLY_BUZZ_LOCKOUT_MS = 1000;
-      const until = now + EARLY_BUZZ_LOCKOUT_MS;
+      const until = getEarlyBuzzLockoutUntil(now);
       game.buzzLockouts[stable] = until;
       ws.send(JSON.stringify({ type: "buzz-denied", reason: "early", lockoutUntil: until }));
       return;
     }
 
-    const estRaw = Number((data as BuzzData)?.estimatedServerBuzzAtMs);
-    const looksLikeEpochMs = Number.isFinite(estRaw) && estRaw >= 1_000_000_000_000;
-    const est = looksLikeEpochMs ? estRaw : now;
-
-    if (looksLikeEpochMs) {
-      const openAt = Number(game?.clueState?.buzzOpenAtMs || 0);
-      const MAX_EARLY_MS = 50;
-      const MAX_FUTURE_MS = 250;
-      if (openAt > 0 && est < openAt - MAX_EARLY_MS) {
-        ws.send(JSON.stringify({ type: "buzz-denied", reason: "bad-timestamp", lockoutUntil: 0 }));
-        return;
-      }
-      if (est > now + MAX_FUTURE_MS) {
-        ws.send(JSON.stringify({ type: "buzz-denied", reason: "bad-timestamp", lockoutUntil: 0 }));
-        return;
-      }
+    const { estimatedAt, usedClientEstimate } = getEstimatedBuzzAt(
+      (data as BuzzData)?.estimatedServerBuzzAtMs,
+      now,
+    );
+    if (!isEstimatedBuzzAtValid(game, estimatedAt, now, usedClientEstimate)) {
+      ws.send(JSON.stringify({ type: "buzz-denied", reason: "bad-timestamp", lockoutUntil: 0 }));
+      return;
     }
 
-    const COLLECT_MS = 50;
-    const EPS_MS = 5;
-
     if (!game.pendingBuzz) {
-      game.pendingBuzz = { deadline: now + COLLECT_MS, candidates: [], timer: null };
+      game.pendingBuzz = createPendingBuzzState(now);
 
       game.pendingBuzz.timer = setTimeout(async () => {
         const g = hctx.games?.[gameId];
@@ -110,19 +106,7 @@ export const buzzHandlers: Record<string, WsHandler> = {
         g.pendingBuzz = null;
         if (candidates.length === 0) return;
 
-        candidates.sort(
-          (a: { est: number; arrival: number; msgSeq?: number }, b: { est: number; arrival: number; msgSeq?: number }) => {
-            const dt = a.est - b.est;
-            if (Math.abs(dt) <= EPS_MS) {
-              const da = a.arrival - b.arrival;
-              if (da !== 0) return da;
-              return (a.msgSeq || 0) - (b.msgSeq || 0);
-            }
-            return dt;
-          },
-        );
-
-        const winner = candidates[0];
+        const winner = resolvePendingBuzzWinner(candidates);
         if (!winner?.playerUsername) return;
 
         g.buzzed = winner.playerUsername;
@@ -166,20 +150,17 @@ export const buzzHandlers: Record<string, WsHandler> = {
               console.error("[answer-timeout] autoResolve failed:", error),
           });
         }, 0);
-      }, COLLECT_MS);
+      }, BUZZ_COLLECTION_MS);
     }
 
     const clientSeq = Number((data as BuzzData)?.clientSeq || 0);
-    const already = game.pendingBuzz.candidates.find((c: { playerUsername: string }) => c.playerUsername === stable);
-    if (!already) {
-      game.pendingBuzz.candidates.push({
-        playerUsername: stable,
-        playerDisplayname: String(player.displayname ?? "").trim() || stable,
-        est,
-        arrival: now,
-        clientSeq,
-        msgSeq,
-      });
-    }
+    addPendingBuzzCandidate(game, {
+      playerUsername: stable,
+      playerDisplayname: String(player.displayname ?? "").trim() || stable,
+      est: estimatedAt,
+      arrival: now,
+      clientSeq,
+      msgSeq,
+    });
   },
 };
