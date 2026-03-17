@@ -6,6 +6,7 @@ const baseEnv = {
   OPENAI_API_KEY: "openai-key",
   ANTHROPIC_API_KEY: "",
   DEEPSEEK_API_KEY: "",
+  GEMINI_API_KEY: "",
   DEFAULT_GENERATION_MODEL: "gpt-4o-mini",
   JUDGE_MODEL: "deepseek-chat",
   KOKORO_URL: "",
@@ -71,6 +72,15 @@ describe("appConfig", () => {
     }));
     const mod = await import("./appConfig.js");
     expect(mod.appConfig.ai.hasDeepSeekApiKey).toBe(true);
+  });
+
+  it("surfaces whether Gemini is configured", async () => {
+    vi.resetModules();
+    vi.doMock("./env.js", () => ({
+      env: { ...baseEnv, GEMINI_API_KEY: "gemini-key" },
+    }));
+    const mod = await import("./appConfig.js");
+    expect(mod.appConfig.ai.hasGeminiApiKey).toBe(true);
   });
 
   it("uses the provider-neutral judge model config", async () => {

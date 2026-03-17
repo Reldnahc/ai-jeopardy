@@ -12,6 +12,7 @@ type AppConfig = {
     hasOpenAiApiKey: boolean;
     hasAnthropicApiKey: boolean;
     hasDeepSeekApiKey: boolean;
+    hasGeminiApiKey: boolean;
     defaultSttProvider: NonNullable<LobbySettings["sttProviderName"]>;
     defaultTtsProvider: NonNullable<LobbySettings["ttsProviderName"]>;
     sttModel: string;
@@ -41,6 +42,7 @@ export const appConfig = Object.freeze({
     hasOpenAiApiKey: Boolean(env.OPENAI_API_KEY),
     hasAnthropicApiKey: Boolean(env.ANTHROPIC_API_KEY),
     hasDeepSeekApiKey: Boolean(env.DEEPSEEK_API_KEY),
+    hasGeminiApiKey: Boolean(env.GEMINI_API_KEY),
     defaultSttProvider: env.WHISPER_URL ? "whisper" : "openai",
     defaultTtsProvider: env.KOKORO_URL ? "kokoro" : "openai",
     sttModel: env.STT_MODEL,

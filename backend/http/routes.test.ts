@@ -6,6 +6,7 @@ const appConfigMock = vi.hoisted(() => ({
     ai: {
       hasAnthropicApiKey: false,
       hasDeepSeekApiKey: false,
+      hasGeminiApiKey: false,
     },
   },
 }));
@@ -26,6 +27,7 @@ async function request(app: express.Express, path: string) {
 beforeEach(() => {
   appConfigMock.appConfig.ai.hasAnthropicApiKey = false;
   appConfigMock.appConfig.ai.hasDeepSeekApiKey = false;
+  appConfigMock.appConfig.ai.hasGeminiApiKey = false;
 });
 
 afterAll(() => {
@@ -51,11 +53,15 @@ describe("http routes model catalog", () => {
     expect(out.json.models.every((model: { provider?: string }) => model.provider !== "deepseek")).toBe(
       true,
     );
+    expect(out.json.models.every((model: { provider?: string }) => model.provider !== "gemini")).toBe(
+      true,
+    );
   });
 
   it("includes provider models when those providers are available", async () => {
     appConfigMock.appConfig.ai.hasAnthropicApiKey = true;
     appConfigMock.appConfig.ai.hasDeepSeekApiKey = true;
+    appConfigMock.appConfig.ai.hasGeminiApiKey = true;
 
     const { registerHttpRoutes } = await import("./routes.js");
     const app = express();
@@ -72,6 +78,9 @@ describe("http routes model catalog", () => {
       true,
     );
     expect(out.json.models.some((model: { provider?: string }) => model.provider === "deepseek")).toBe(
+      true,
+    );
+    expect(out.json.models.some((model: { provider?: string }) => model.provider === "gemini")).toBe(
       true,
     );
   });

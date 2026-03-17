@@ -7,6 +7,11 @@ const { ctorMock, createMock, anthropicCtorMock, anthropicCreateMock } = vi.hois
   anthropicCreateMock: vi.fn(async (payload: unknown) => ({ payload })),
 }));
 
+const fetchMock = vi.fn(async () => ({
+  ok: true,
+  json: async () => ({ candidates: [{ content: { parts: [{ text: "{\"ok\":true}" }] } }] }),
+}));
+
 vi.mock("../../../config/env.js", () => ({
   env: {
     OPENAI_API_KEY: "openai-key",
@@ -15,6 +20,8 @@ vi.mock("../../../config/env.js", () => ({
     ANTHROPIC_BASE_URL: "https://anthropic.example",
     DEEPSEEK_API_KEY: "deepseek-key",
     DEEPSEEK_BASE_URL: "https://api.deepseek.com",
+    GEMINI_API_KEY: "gemini-key",
+    GEMINI_BASE_URL: "https://gemini.example",
   },
 }));
 
@@ -48,10 +55,12 @@ import { callAiJson, parseAiJson, resolveProviderForModel } from "./index.js";
 
 describe("aiClients/index", () => {
   beforeEach(() => {
+    vi.stubGlobal("fetch", fetchMock);
     ctorMock.mockClear();
     createMock.mockClear();
     anthropicCtorMock.mockClear();
     anthropicCreateMock.mockClear();
+    fetchMock.mockClear();
   });
 
   it("parses anthropic text JSON responses", () => {
@@ -115,7 +124,22 @@ describe("aiClients/index", () => {
     ).toBe(true);
   });
 
+  it("routes Gemini models through the Gemini provider", async () => {
+    await callAiJson("gemini-2.5-flash", "Hello");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://gemini.example/v1beta/models/gemini-2.5-flash:generateContent?key=gemini-key",
+      expect.objectContaining({
+        method: "POST",
+      }),
+    );
+  });
+
   it("resolves DeepSeek provider from model name", () => {
     expect(resolveProviderForModel("deepseek-reasoner")).toBe("deepseek");
+  });
+
+  it("resolves Gemini provider from model name", () => {
+    expect(resolveProviderForModel("gemini-2.5-pro")).toBe("gemini");
   });
 });

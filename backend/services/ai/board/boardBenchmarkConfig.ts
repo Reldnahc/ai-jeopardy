@@ -87,7 +87,8 @@ export function parseDotenv(filePath: string) {
 export function getApiKeyNameForProvider(provider: Provider) {
   if (provider === "openai") return "OPENAI_API_KEY";
   if (provider === "anthropic") return "ANTHROPIC_API_KEY";
-  return "DEEPSEEK_API_KEY";
+  if (provider === "deepseek") return "DEEPSEEK_API_KEY";
+  return "GEMINI_API_KEY";
 }
 
 export function getConfigValue(

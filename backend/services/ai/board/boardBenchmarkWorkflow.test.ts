@@ -178,6 +178,7 @@ describe("board benchmark workflow helpers", () => {
     expect(getApiKeyNameForProvider("deepseek")).toBe("DEEPSEEK_API_KEY");
     expect(getApiKeyNameForProvider("openai")).toBe("OPENAI_API_KEY");
     expect(getApiKeyNameForProvider("anthropic")).toBe("ANTHROPIC_API_KEY");
+    expect(getApiKeyNameForProvider("gemini")).toBe("GEMINI_API_KEY");
   });
 
   it("extracts usage from OpenAI-compatible prompt/completion token fields", () => {

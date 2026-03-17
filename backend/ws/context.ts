@@ -91,6 +91,7 @@ export const createWsContext = (wss: WsServerLike, repos: Repos): Ctx => {
   const availableModels = getAvailableModels({
     hasAnthropicApiKey: appConfig.ai.hasAnthropicApiKey,
     hasDeepSeekApiKey: appConfig.ai.hasDeepSeekApiKey,
+    hasGeminiApiKey: appConfig.ai.hasGeminiApiKey,
   });
 
   const ttsDuration = createTtsDurationService(repos);

@@ -72,6 +72,7 @@ export function registerHttpRoutes(app: Application, distPath: string, repos: Ht
       models: getAvailableModels({
         hasAnthropicApiKey: appConfig.ai.hasAnthropicApiKey,
         hasDeepSeekApiKey: appConfig.ai.hasDeepSeekApiKey,
+        hasGeminiApiKey: appConfig.ai.hasGeminiApiKey,
       }),
     });
   });

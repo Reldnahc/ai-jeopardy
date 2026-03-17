@@ -1,6 +1,7 @@
 import type { Provider } from "../../../../shared/models.js";
 
 import { callAnthropicJson } from "./anthropicProvider.js";
+import { callGeminiJson } from "./geminiProvider.js";
 import { parseAiJson } from "./json.js";
 import { callDeepSeekJson } from "./deepseekProvider.js";
 import { callOpenAiJson } from "./openaiProvider.js";
@@ -22,6 +23,9 @@ export async function callAiJson(model: string, prompt: string, options: AiCallO
   }
   if (provider === "deepseek") {
     return callDeepSeekJson(model, prompt, normalizedOptions);
+  }
+  if (provider === "gemini") {
+    return callGeminiJson(model, prompt, normalizedOptions);
   }
   return callOpenAiJson(model, prompt, normalizedOptions);
 }

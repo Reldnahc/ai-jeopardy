@@ -41,6 +41,8 @@ export const env = Object.freeze({
   ANTHROPIC_BASE_URL: optionalEnv("ANTHROPIC_BASE_URL", ""),
   DEEPSEEK_API_KEY: optionalEnv("DEEPSEEK_API_KEY", ""),
   DEEPSEEK_BASE_URL: optionalEnv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
+  GEMINI_API_KEY: optionalEnv("GEMINI_API_KEY", ""),
+  GEMINI_BASE_URL: optionalEnv("GEMINI_BASE_URL", "https://generativelanguage.googleapis.com"),
 
   JWT_SECRET: requireEnv("JWT_SECRET"),
   NODE_ENV: optionalEnv("NODE_ENV", "development"),

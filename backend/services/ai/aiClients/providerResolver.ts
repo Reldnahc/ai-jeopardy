@@ -6,6 +6,7 @@ function inferProviderFromModel(model: string): Provider {
     .toLowerCase();
   if (normalized.startsWith("claude-")) return "anthropic";
   if (normalized.startsWith("deepseek-")) return "deepseek";
+  if (normalized.startsWith("gemini-")) return "gemini";
   if (
     normalized.startsWith("gpt-") ||
     normalized.startsWith("o1") ||

@@ -17,5 +17,15 @@ export function parseAiJson<T = unknown>(response: unknown): T {
     return JSON.parse(cleanJsonText(anthropicText)) as T;
   }
 
+  const geminiRoot = response as {
+    candidates?: Array<{ content?: { parts?: Array<{ text?: unknown }> } }>;
+  };
+  const geminiText = geminiRoot?.candidates?.[0]?.content?.parts?.find(
+    (item) => typeof item?.text === "string" && String(item.text).trim(),
+  )?.text;
+  if (typeof geminiText === "string" && geminiText.trim()) {
+    return JSON.parse(cleanJsonText(geminiText)) as T;
+  }
+
   throw new Error("AI response missing JSON text content.");
 }

@@ -7,6 +7,7 @@ function setRequiredBaseEnv() {
   process.env.OPENAI_API_KEY = "key";
   process.env.ANTHROPIC_API_KEY = "";
   process.env.DEEPSEEK_API_KEY = "";
+  process.env.GEMINI_API_KEY = "";
   process.env.JWT_SECRET = "secret";
   process.env.NODE_ENV = "test";
 }
@@ -59,6 +60,8 @@ describe("env config", () => {
     process.env.ANTHROPIC_BASE_URL = "https://anthropic.example";
     process.env.DEEPSEEK_API_KEY = "deepseek-key";
     process.env.DEEPSEEK_BASE_URL = "https://deepseek.example";
+    process.env.GEMINI_API_KEY = "gemini-key";
+    process.env.GEMINI_BASE_URL = "https://gemini.example";
     process.env.JUDGE_MODEL = "deepseek-chat";
 
     const mod = await loadEnvModule();
@@ -70,6 +73,8 @@ describe("env config", () => {
     expect(mod.env.ANTHROPIC_BASE_URL).toBe("https://anthropic.example");
     expect(mod.env.DEEPSEEK_API_KEY).toBe("deepseek-key");
     expect(mod.env.DEEPSEEK_BASE_URL).toBe("https://deepseek.example");
+    expect(mod.env.GEMINI_API_KEY).toBe("gemini-key");
+    expect(mod.env.GEMINI_BASE_URL).toBe("https://gemini.example");
     expect(mod.env.JUDGE_MODEL).toBe("deepseek-chat");
   });
 

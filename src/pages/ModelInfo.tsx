@@ -5,6 +5,7 @@ function providerLabel(provider: string | undefined) {
   if (provider === "openai") return "OpenAI";
   if (provider === "anthropic") return "Anthropic";
   if (provider === "deepseek") return "DeepSeek";
+  if (provider === "gemini") return "Google";
   return "Unknown";
 }
 
