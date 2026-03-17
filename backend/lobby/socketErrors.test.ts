@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
+import type { SocketState } from "../types/runtime.js";
 import { sendLobbyErrorAndSnapshot, sendSocketError } from "./socketErrors.js";
 
 describe("socket error helpers", () => {
   it("sendSocketError serializes the standard error payload", () => {
-    const ws = { send: vi.fn() } as never;
+    const ws = { send: vi.fn() } as unknown as SocketState;
 
     sendSocketError(ws, "bad request", { code: 400 });
 
@@ -13,7 +14,7 @@ describe("socket error helpers", () => {
   });
 
   it("sendLobbyErrorAndSnapshot sends the error and refreshes the lobby snapshot", () => {
-    const ws = { send: vi.fn() } as never;
+    const ws = { send: vi.fn() } as unknown as SocketState;
     const sendLobbySnapshot = vi.fn();
 
     sendLobbyErrorAndSnapshot({

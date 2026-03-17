@@ -21,10 +21,10 @@ export async function callOpenAiCompatibleJson(args: {
   const includeReasoningEffort =
     supportsReasoningEffort && (effort === "low" || effort === "medium" || effort === "high");
 
-  const content = options.image
+  const content: ChatCreateParams["messages"][number]["content"] = options.image
     ? [
-        { type: "text", text: prompt },
-        { type: "image_url", image_url: { url: options.image } },
+        { type: "text" as const, text: prompt },
+        { type: "image_url" as const, image_url: { url: options.image } },
       ]
     : prompt;
 

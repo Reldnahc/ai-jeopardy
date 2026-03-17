@@ -62,9 +62,10 @@ describe("boardCreate helpers", () => {
       firstBoard: {
         categories: [
           {
+            category: "First",
             values: [
-              { value: 200, question: "A" },
-              { value: 400, question: "B" },
+              { value: 200, question: "A", answer: "A1" },
+              { value: 400, question: "B", answer: "B1" },
             ],
           },
         ],
@@ -72,10 +73,11 @@ describe("boardCreate helpers", () => {
       secondBoard: {
         categories: [
           {
+            category: "Second",
             values: [
-              { value: 800, question: "C" },
-              { value: 1200, question: "D" },
-              { value: 1600, question: "E" },
+              { value: 800, question: "C", answer: "C1" },
+              { value: 1200, question: "D", answer: "D1" },
+              { value: 1600, question: "E", answer: "E1" },
             ],
           },
         ],

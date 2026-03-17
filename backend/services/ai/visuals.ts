@@ -69,7 +69,7 @@ export function makeLimiter(maxConcurrent: number) {
     });
 }
 
-function hasImageRepos(repos: Ctx["repos"]): repos is ImageRepos {
+function hasImageRepos(repos: Ctx["repos"]): repos is Ctx["repos"] & ImageRepos {
   return Boolean(
     repos?.images &&
       typeof repos.images.getIdBySha256 === "function" &&

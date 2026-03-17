@@ -105,7 +105,7 @@ export const lobbyPlayerHandlers: Record<string, WsHandler> = {
     sendTimed("lobby-created", {
       type: "lobby-created",
       gameId: newGameId,
-      categories: hctx.games[newGameId].categories,
+      categories: generatedCategories,
       players: toPlayerPayloads(hctx.games[newGameId].players),
       host: u,
     } satisfies LobbyCreatedMessage);

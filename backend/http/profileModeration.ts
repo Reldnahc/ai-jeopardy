@@ -1,9 +1,15 @@
-import type { Repos } from "../repositories/index.js";
 import { containsProfanity } from "../services/profanityService.js";
 import { isBanned, normalizeRole, rank, type LadderRole } from "../../shared/roles.js";
 import { asTrimmedString } from "./profileRouteHelpers.js";
 
-type ProfileModerationRepos = Pick<Repos, "profiles">;
+type ProfileModerationRepos = {
+  profiles: {
+    getPublicProfileByUsername: (username: string) => Promise<{ id?: unknown } | null>;
+    getRoleById: (userId: string) => Promise<string | null>;
+    updateCustomization: (userId: string, patch: Record<string, unknown>) => Promise<unknown>;
+    setRoleById: (userId: string, roleRaw: unknown) => Promise<unknown>;
+  };
+};
 
 type ModerationFailure = {
   ok: false;

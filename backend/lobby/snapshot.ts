@@ -4,6 +4,16 @@ import type { GameState, PlayerState, SocketState } from "../types/runtime.js";
 import type { LobbyStateMessage } from "../../shared/types/lobby.js";
 import { toPlayerPayloads } from "./playerPayloads.js";
 
+function normalizeLockedCategories(game: GameState): LobbyStateMessage["lockedCategories"] {
+  if (!game.lockedCategories) return null;
+
+  return {
+    firstBoard: game.lockedCategories.firstBoard ?? [],
+    secondBoard: game.lockedCategories.secondBoard ?? [],
+    finalJeopardy: game.lockedCategories.finalJeopardy ?? [],
+  };
+}
+
 export const buildLobbyState = (gameId: string, ws: SocketState): LobbyStateMessage | null => {
   const game = games[gameId];
   if (!game) return null;
@@ -16,7 +26,7 @@ export const buildLobbyState = (gameId: string, ws: SocketState): LobbyStateMess
     players: toPlayerPayloads(game.players),
     host: typeof game.host === "string" ? game.host : null,
     categories: normalizeCategories11(game.categories),
-    lockedCategories: game.lockedCategories,
+    lockedCategories: normalizeLockedCategories(game),
     inLobby: game.inLobby,
     lobbySettings: game.lobbySettings ?? null,
     categoryPoolState: {

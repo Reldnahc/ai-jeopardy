@@ -14,10 +14,14 @@ import {
 } from "./profileModeration.js";
 
 function makeRepos() {
+  const getRoleById = vi.fn(async (id: string): Promise<string | null> =>
+    id === "actor" ? "admin" : "default",
+  );
+
   return {
     profiles: {
       getPublicProfileByUsername: vi.fn(async () => ({ id: "target-1", username: "alice" })),
-      getRoleById: vi.fn(async (id: string) => (id === "actor" ? "admin" : "default")),
+      getRoleById,
       updateCustomization: vi.fn(async () => ({})),
       setRoleById: vi.fn(async () => undefined),
     },

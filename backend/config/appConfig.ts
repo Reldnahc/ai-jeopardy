@@ -1,5 +1,34 @@
 // backend/config/appConfig.ts
+import type { LobbySettings } from "../../shared/types/lobby.js";
 import { env } from "./env.js";
+
+type AppConfig = {
+  server: {
+    port: number;
+    corsOrigins: string[];
+  };
+  ai: {
+    defaultGenerationModel: string;
+    hasOpenAiApiKey: boolean;
+    hasAnthropicApiKey: boolean;
+    hasDeepSeekApiKey: boolean;
+    defaultSttProvider: NonNullable<LobbySettings["sttProviderName"]>;
+    defaultTtsProvider: NonNullable<LobbySettings["ttsProviderName"]>;
+    sttModel: string;
+    judgeModel: string;
+    imageJudgeModel: string;
+    cotdModel: string;
+  };
+  gameplay: {
+    buzzLockoutMs: number;
+    clueAnswerTimeoutMs: number;
+    drawSeconds: number;
+    finalWagerSeconds: number;
+  };
+  judging: {
+    strictMode: boolean;
+  };
+};
 
 export const appConfig = Object.freeze({
   server: {
@@ -30,4 +59,4 @@ export const appConfig = Object.freeze({
   judging: {
     strictMode: false,
   },
-});
+} satisfies AppConfig);

@@ -1,5 +1,9 @@
 import type WebSocket from "ws";
 import type { Role } from "../../shared/roles.js";
+import type { LobbySettings } from "../../shared/types/lobby.js";
+
+type LobbySttProvider = NonNullable<LobbySettings["sttProviderName"]>;
+type LobbyTtsProvider = NonNullable<LobbySettings["ttsProviderName"]>;
 
 export type JsonMap = Record<string, unknown>;
 export type TimerKind = "buzz" | "answer" | "wager" | "final-wager" | "final-draw" | string;
@@ -38,20 +42,7 @@ export type GameState = {
   categoryPoolGeneratedAtMs?: number | null;
   categoryPoolNextAllowedAtMs?: number | null;
   categoryPoolGenerating?: boolean;
-  lobbySettings?: {
-    timeToBuzz?: number;
-    timeToAnswer?: number;
-    selectedModel?: string;
-    reasoningEffort?: string;
-    visualMode?: string;
-    narrationEnabled?: boolean;
-    boardJson?: string;
-    sttProviderName?: string;
-    ttsProviderName?: string;
-    categoryRefreshLocked?: boolean;
-    categoryPoolPrompt?: string;
-    [key: string]: unknown;
-  } | null;
+  lobbySettings?: LobbySettings | null;
   boardData?: {
     firstBoard?: { categories?: Array<{ category?: string; values?: BoardClue[] }> };
     secondBoard?: { categories?: Array<{ category?: string; values?: BoardClue[] }> };
@@ -206,7 +197,11 @@ export type WsContext = {
     tts?: Record<string, UnknownFn>;
   };
   appConfig: {
-    ai: { defaultGenerationModel: string; defaultSttProvider: string; defaultTtsProvider: string };
+    ai: {
+      defaultGenerationModel: string;
+      defaultSttProvider: LobbySttProvider;
+      defaultTtsProvider: LobbyTtsProvider;
+    };
   };
   modelsByValue?: Record<string, { disabled?: boolean; price?: number }>;
   perms: { can: (ws: SocketState, permission: string, meta?: JsonMap) => boolean };

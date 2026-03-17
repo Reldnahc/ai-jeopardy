@@ -90,7 +90,7 @@ export function registerProfileRoutes(app: Application, repos: ProfileRepos) {
       if (!userId) return res.status(401).json({ error: "Unauthorized" });
       const body = asRecord(req.body);
       const result = buildProfileCustomizationPatch(body);
-      if (!result.ok) return res.status(result.status).json({ error: result.error });
+      if (result.ok === false) return res.status(result.status).json({ error: result.error });
 
       const profile = await repos.profiles.updateCustomization(userId, result.patch);
       if (!profile) return res.status(400).json({ error: "No supported fields to update" });
@@ -155,7 +155,7 @@ export function registerProfileRoutes(app: Application, repos: ProfileRepos) {
 
       const body = asRecord(req.body);
       const access = await resolveProfileModerationAccess({ repos, actorId, username });
-      if (!access.ok) return res.status(access.status).json({ error: access.error });
+      if (access.ok === false) return res.status(access.status).json({ error: access.error });
 
       const result = await applyProfileModerationPatch({
         repos,
@@ -163,7 +163,7 @@ export function registerProfileRoutes(app: Application, repos: ProfileRepos) {
         actorRank: access.actorRank,
         body,
       });
-      if (!result.ok) return res.status(result.status).json({ error: result.error });
+      if (result.ok === false) return res.status(result.status).json({ error: result.error });
 
       if (!result.changed) {
         return res.status(400).json({ error: "No supported fields to update" });

@@ -69,6 +69,7 @@ import type {
 } from "../game/dailyDouble/dailyDouble.js";
 import type { numberToWords } from "../services/numberToWords.js";
 import type { ensureBoardNarrationTtsForBoardData } from "../services/ai/board/boardTts.js";
+import type { LobbySettings } from "../../shared/types/lobby.js";
 
 export type Trace = {
   mark: (name: string, data?: Record<string, unknown>) => void;
@@ -115,7 +116,7 @@ type BoardDataLike = {
 };
 
 export type Game = {
-  lobbySettings?: { narrationEnabled?: boolean | null; ttsProviderName?: string | null } | null;
+  lobbySettings?: Pick<LobbySettings, "narrationEnabled" | "ttsProviderName"> | null;
   players?: Player[] | null;
   categories?: Category[] | null;
   boardData?: BoardDataLike;
