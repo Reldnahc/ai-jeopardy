@@ -2,6 +2,16 @@ import type { PlayerState } from "../../../types/runtime.js";
 import type { WsHandler } from "../types.js";
 import { shouldIncrementStats } from "../../../game/statsGate.js";
 import { normalizeRole, asLadderRole } from "../../../../shared/roles.js";
+import {
+  acknowledgeGameReady,
+  acknowledgePreloadDone,
+  activateGameReadyHandshake,
+  clearWelcomeTimer,
+  chooseStartingSelector,
+  enterBoardPhase,
+  enterWelcomePhase,
+  resetLobbyStartPhase,
+} from "../../../lobby/startFlow.js";
 
 type GameIdData = { gameId: string };
 type PreloadDoneData = { gameId: string; username?: string; token?: number; playerKey?: string };
@@ -138,24 +148,8 @@ export const lobbyStartHandlers: Record<string, WsHandler> = {
       }
     })();
 
-    const online = (game.players ?? []).filter((p: PlayerState) => p?.online !== false);
-    const pool = online.length > 0 ? online : (game.players ?? []);
-    const pick = pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : null;
-
-    if (pick) {
-      game.selectorKey = pick.username;
-      game.selectorName = pick.displayname;
-    } else {
-      game.selectorKey = null;
-      game.selectorName = null;
-    }
-
-    game.phase = null;
-    game.welcomeEndsAt = null;
-    if (game.welcomeTimer) {
-      clearTimeout(game.welcomeTimer);
-      game.welcomeTimer = null;
-    }
+    chooseStartingSelector(game);
+    resetLobbyStartPhase(game);
 
     trace.mark("broadcast_game_state_start");
     await ctx.setupPreloadHandshake({ ctx, gameId, game, boardData, trace });
@@ -175,57 +169,17 @@ export const lobbyStartHandlers: Record<string, WsHandler> = {
     if (!stable) return;
 
     const tok = Number(token);
-    const finalToken = Number(game.preload.finalToken) || 0;
-
-    game.preload.acksByPlayer ||= {};
-    game.preload.acksByPlayer[stable] = Number.isFinite(tok) ? tok : finalToken;
-    if (!finalToken) return;
-
-    if (
-      !Array.isArray(game.preload.requiredForToken) ||
-      game.preload.requiredForToken.length === 0
-    ) {
-      game.preload.requiredForToken = (game.players ?? [])
-        .filter((p: PlayerState) => p.online)
-        .map((p: PlayerState) =>
-          String(ctx.playerStableId(p) ?? "")
-            .trim()
-            .toLowerCase(),
-        )
-        .filter(Boolean);
-    }
-
-    const required = game.preload.requiredForToken;
-    const allDone = required.every((id: string) => game.preload.acksByPlayer?.[id] === finalToken);
+    const allDone = acknowledgePreloadDone({
+      game,
+      stableId: stable,
+      token: tok,
+      playerStableId: (player: PlayerState) => ctx.playerStableId(player),
+    });
     if (!allDone) return;
 
-    game.preload.active = false;
-    game.inLobby = false;
-    game.isLoading = false;
-    if (!game.lobbyHost) game.lobbyHost = game.host;
-    game.host = "AI Jeopardy";
+    activateGameReadyHandshake(game, (player: PlayerState) => ctx.playerStableId(player));
 
     ctx.broadcast(gameId, { type: "start-game", host: game.host });
-
-    const requiredNow = (game.players ?? [])
-      .filter((p: PlayerState) => p.online)
-      .map((p: PlayerState) =>
-        String(ctx.playerStableId(p) ?? "")
-          .trim()
-          .toLowerCase(),
-      )
-      .filter(Boolean);
-
-    game.gameReady = {
-      expected: Object.fromEntries(requiredNow.map((id: string) => [id, true])) as Record<
-        string,
-        boolean
-      >,
-      acks: {},
-      done: false,
-    };
-
-    game.phase = null;
     ctx.broadcast(gameId, {
       type: "phase-changed",
       phase: game.phase,
@@ -245,15 +199,8 @@ export const lobbyStartHandlers: Record<string, WsHandler> = {
       .trim()
       .toLowerCase();
     if (!stable) return;
-    if (!game.gameReady.expected?.[stable]) return;
-
-    game.gameReady.acks[stable] = true;
-
-    const expectedIds = Object.keys(game.gameReady.expected);
-    const allReady = expectedIds.every((id: string) => game.gameReady.acks[id]);
+    const allReady = acknowledgeGameReady(game, stable);
     if (!allReady) return;
-
-    game.gameReady.done = true;
     const selectorName = String(game.selectorName ?? "").trim();
 
     if (selectorName) {
@@ -267,8 +214,7 @@ export const lobbyStartHandlers: Record<string, WsHandler> = {
         }
       }
 
-      game.phase = "welcome";
-      game.welcomeEndsAt = null;
+      enterWelcomePhase(game);
 
       ctx.broadcast(gameId, {
         type: "phase-changed",
@@ -286,17 +232,14 @@ export const lobbyStartHandlers: Record<string, WsHandler> = {
           { slot: "welcome_outro" },
         ]);
 
-        if (game.welcomeTimer) {
-          clearTimeout(game.welcomeTimer);
-          game.welcomeTimer = null;
-        }
+        clearWelcomeTimer(game);
 
         game.welcomeTimer = setTimeout(() => {
           const g = ctx.games?.[gameId];
           if (!g) return;
           if (g.phase !== "welcome") return;
 
-          g.phase = "board";
+          enterBoardPhase(g);
           g.welcomeTimer = null;
 
           ctx.broadcast(gameId, {
@@ -308,8 +251,7 @@ export const lobbyStartHandlers: Record<string, WsHandler> = {
         }, 600);
       })();
     } else {
-      game.phase = "board";
-      game.welcomeEndsAt = null;
+      enterBoardPhase(game);
 
       ctx.broadcast(gameId, {
         type: "phase-changed",
