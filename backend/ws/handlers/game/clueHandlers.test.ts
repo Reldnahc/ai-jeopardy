@@ -147,6 +147,16 @@ describe("clueHandlers", () => {
       stage: "wager_listen",
       maxWager: 1200,
     });
+    expect(ctx.broadcast).toHaveBeenCalledWith(
+      "g1",
+      expect.objectContaining({
+        type: "daily-double-show-modal",
+        showModal: true,
+        username: "alice",
+        displayname: "Alice",
+        maxWager: 1200,
+      }),
+    );
     expect(ctx.startDdWagerCapture).toHaveBeenCalledWith("g1", game, ctx);
     expect(ctx.doUnlockBuzzerAuthoritative).not.toHaveBeenCalled();
   });

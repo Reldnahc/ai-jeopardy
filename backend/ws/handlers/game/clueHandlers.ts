@@ -179,6 +179,7 @@ export const clueHandlers: Record<string, WsHandler> = {
       const showModal = () => {
         hctx.broadcast(gameId, {
           type: "daily-double-show-modal",
+          showModal: true,
           username: playerUsername,
           displayname: playerDisplayname,
           maxWager,
