@@ -1,6 +1,16 @@
 import type { CtxDeps } from "../../context.types.js";
 import type { WsHandler } from "../types.js";
 import { shouldIncrementStats } from "../../../game/statsGate.js";
+import {
+  activateLiveClue,
+  applySelectedClue,
+  consumeDdSnipe,
+  consumeSkippedClue,
+  estimateClueSpeechMaxMs,
+  normalizeGameValue,
+  resolveSpecialClueModes,
+  startDailyDoubleState,
+} from "../../../game/gameLogic/clueSelection.js";
 
 type ClueSelectedData = { gameId: string; clue?: Record<string, unknown> };
 type ClueHandlersCtx = CtxDeps<
@@ -27,18 +37,10 @@ export const clueHandlers: Record<string, WsHandler> = {
     const { gameId, clue } = (data ?? {}) as ClueSelectedData;
     const game = hctx.games?.[gameId];
     if (!game) return;
-    const clueObj =
-      clue && typeof clue === "object"
-        ? (clue as Record<string, unknown>)
-        : ({} as Record<string, unknown>);
-
-    const norm = (v: unknown) =>
-      String(v ?? "")
-        .trim()
-        .toLowerCase();
+    const clueObj = clue && typeof clue === "object" ? (clue as Record<string, unknown>) : {};
 
     const caller = hctx.getPlayerForSocket(game, ws);
-    const callerStable = caller ? norm(hctx.playerStableId(caller)) : null;
+    const callerStable = caller ? normalizeGameValue(hctx.playerStableId(caller)) : null;
     const callerDisplay = String(caller?.displayname ?? "").trim() || (callerStable ?? null);
 
     console.log("[CLUE SELECT ATTEMPT]", {
@@ -67,7 +69,7 @@ export const clueHandlers: Record<string, WsHandler> = {
       return;
     }
 
-    if (callerStable !== norm(game.selectorKey)) {
+    if (callerStable !== normalizeGameValue(game.selectorKey)) {
       console.warn("[CLUE SELECT BLOCKED] not selector");
       return;
     }
@@ -77,44 +79,25 @@ export const clueHandlers: Record<string, WsHandler> = {
       hctx.fireAndForget(hctx.repos.profiles.incrementCluesSelected(callerStable), "Increment Clues");
     }
 
-    const category =
-      String(clueObj.category ?? "").trim() || hctx.findCategoryForClue(game, clueObj);
+    const { boardKey, clueKey, clueQuestion } = applySelectedClue({
+      game,
+      clue: clueObj,
+      findCategoryForClue: (currentGame, currentClue) =>
+        hctx.findCategoryForClue(currentGame, currentClue),
+    });
+    const { snipedDailyDouble, isDailyDouble, shouldSkip } = resolveSpecialClueModes(
+      game,
+      boardKey,
+      clueKey,
+    );
 
-    game.selectedClue = {
-      ...clueObj,
-      category: category || undefined,
-      isAnswerRevealed: false,
-    };
-
-    const boardKey = game.activeBoard || "firstBoard";
-    const v = String(clueObj.value ?? "");
-    const q = String(clueObj.question ?? "").trim();
-    const clueKey = `${boardKey}:${v}:${q}`;
-
-    const ddKeys = game.boardData?.dailyDoubleClueKeys?.[boardKey] || [];
-    const naturalDD = ddKeys.includes(clueKey) && !game.usedDailyDoubles?.has?.(clueKey);
-    const snipedDD = Boolean(game.ddSnipeNext);
-    const isDailyDouble = naturalDD || snipedDD;
-    const shouldSkip = Boolean(game.skipNextClue);
-
-    if (snipedDD) {
-      game.ddSnipeNext = false;
+    if (snipedDailyDouble) {
+      consumeDdSnipe(game);
       hctx.broadcast(gameId, { type: "dd-snipe-consumed", clueKey });
     }
 
     if (shouldSkip) {
-      game.skipNextClue = false;
-      if (!game.clearedClues) game.clearedClues = new Set();
-
-      const clueId = `${clueObj.value}-${clueObj.question}`;
-      game.clearedClues.add(clueId);
-
-      game.selectedClue = null;
-      game.phase = "board";
-      game.clueState = null;
-      game.buzzed = null;
-      game.buzzerLocked = true;
-      game.buzzLockouts = {};
+      const clueId = consumeSkippedClue(game, clueObj);
 
       hctx.broadcast(gameId, { type: "clue-cleared", clueId });
       hctx.broadcast(gameId, { type: "skip-next-clue-consumed", clueKey });
@@ -122,23 +105,10 @@ export const clueHandlers: Record<string, WsHandler> = {
       return;
     }
 
-    game.phase = "clue";
-    game.clueState = { clueKey, lockedOut: {} };
-    game.buzzed = null;
-    game.buzzerLocked = true;
-    game.buzzLockouts = {};
+    activateLiveClue(game, clueKey);
 
     const pad = 25;
     const ttsAssetId = game.boardData?.ttsByClueKey?.[clueKey] || null;
-    const clueQuestion = String(game.selectedClue?.question ?? "").trim();
-
-    // Safety cap for server wait time before unlocking buzzer.
-    // Duration metadata can occasionally overestimate for generated assets.
-    const estimateSpeechMaxMs = (text: string) => {
-      const words = text ? text.split(/\s+/).filter(Boolean).length : 0;
-      const est = 700 + words * 420;
-      return Math.min(14_000, Math.max(2_000, est));
-    };
 
     const broadcastClueSelected = () => {
       hctx.broadcast(gameId, { type: "buzzer-ui-reset" });
@@ -153,7 +123,7 @@ export const clueHandlers: Record<string, WsHandler> = {
     if (isDailyDouble) {
       if (!game.usedDailyDoubles) game.usedDailyDoubles = new Set();
 
-      const playerUsername = norm(game.selectorKey);
+      const playerUsername = normalizeGameValue(game.selectorKey);
       const playerDisplayname = String(game.selectorName ?? "").trim() || playerUsername;
 
       if (shouldIncrementStats(game)) {
@@ -165,16 +135,14 @@ export const clueHandlers: Record<string, WsHandler> = {
 
       const maxWager = hctx.computeDailyDoubleMaxWager(game, boardKey, playerUsername);
 
-      game.dailyDouble = {
+      startDailyDoubleState({
+        game,
         clueKey,
         boardKey,
         playerUsername,
         playerDisplayname,
-        stage: "wager_listen",
-        wager: null,
         maxWager,
-        attempts: 0,
-      };
+      });
 
       const showModal = () => {
         hctx.broadcast(gameId, {
@@ -200,7 +168,7 @@ export const clueHandlers: Record<string, WsHandler> = {
     await hctx.aiHostVoiceSequence(hctx, gameId, game, [
       { slot: String(game.selectedClue.category ?? ""), pad, maxMs: 2_500 },
       { slot: String(game.selectedClue.value ?? ""), after: broadcastClueSelected, maxMs: 2_000 },
-      { assetId: ttsAssetId, maxMs: estimateSpeechMaxMs(clueQuestion) },
+      { assetId: ttsAssetId, maxMs: estimateClueSpeechMaxMs(clueQuestion) },
     ]);
 
     hctx.doUnlockBuzzerAuthoritative(gameId, game, ctx);

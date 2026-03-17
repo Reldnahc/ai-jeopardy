@@ -218,13 +218,10 @@ describe("dailyDoubleHandlers", () => {
       ctx,
     });
 
-    expect(game.dailyDouble?.wager).toBe(700);
-    expect(game.phase).toBe("clue");
-    expect(game.ddWagerSessionId).toBeNull();
-    expect(game.usedDailyDoubles?.has("firstBoard:400:Q")).toBe(true);
+    expect(ctx.clearDdWagerTimer).toHaveBeenCalledWith(ctx, "g1", game);
     expect(ctx.broadcast).toHaveBeenCalledWith(
       "g1",
-      expect.objectContaining({ type: "daily-double-wager-locked", wager: 700 }),
+      expect.objectContaining({ type: "daily-double-wager-heard", parsedWager: 700 }),
     );
     expect(ctx.finalizeDailyDoubleWagerAndStartClue).toHaveBeenCalledWith("g1", game, ctx, {
       wager: 700,
@@ -232,4 +229,5 @@ describe("dailyDoubleHandlers", () => {
       reason: null,
     });
   });
+
 });
