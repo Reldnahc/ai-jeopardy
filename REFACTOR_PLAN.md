@@ -27,6 +27,8 @@ This plan normalizes code style and patterns based on the conventions that alrea
 - Completed: extracted game clue-selection and Daily Double submission helpers out of websocket handlers into the game domain layer.
 - Completed: extracted answer submission validation and judging/result helpers out of `answerHandlers.ts`.
 - Completed: centralized answer capture startup and timeout handling across buzz and Daily Double flows.
+- Completed: extracted game host/control state mutations out of `miscHandlers.ts`.
+- Completed: verification baseline restored; `npm run test`, `npm run lint`, and `npm run build:backend` are green again.
 - Completed: extracted ProfileContext request helpers out of `src/contexts/ProfileContext.tsx`.
 - Completed: extracted ProfileContext shared types, store hook, and bootstrap effects out of `src/contexts/ProfileContext.tsx`.
 - Completed: extracted WebSocketContext socket lifecycle into `src/contexts/useWebSocketConnection.ts` and slimmed `src/contexts/WebSocketContext.tsx` down to a thin provider.
@@ -123,6 +125,7 @@ This plan normalizes code style and patterns based on the conventions that alrea
   - Extracted clue selection state, skip handling, and Daily Double submission validation into `backend/game/gameLogic/clueSelection.ts` and `backend/game/dailyDouble/submission.ts`.
   - Extracted answer submission validation and answer-result/judging state helpers into `backend/game/gameLogic/answerSubmission.ts`.
   - Centralized answer capture startup and timeout result handling into `backend/game/gameLogic/answerCapture.ts`.
+  - Extracted host/control state mutations into `backend/game/gameLogic/controlState.ts`.
   - Extracted benchmark workflow timing, usage, and summary logic into `backend/services/ai/board/boardBenchmarkWorkflow.summary.ts`.
   - Extracted benchmark workflow shared request/result types into `backend/services/ai/board/boardBenchmarkWorkflow.types.ts`.
   - Extracted benchmark workflow board-generation jobs and board assembly into `backend/services/ai/board/boardBenchmarkGeneration.ts`.
@@ -163,21 +166,22 @@ This plan normalizes code style and patterns based on the conventions that alrea
 
 ## High-Value Targets
 
-These files are strong candidates for the first structural cleanup pass:
+These files are the strongest remaining structural cleanup candidates:
 
-- `src/hooks/profile/useProfilePageController.ts`
-- `src/features/game/socket/useGameSocketSync.ts`
+- `backend/ws/handlers/game/miscHandlers.ts`
+- `backend/ws/handlers/game/buzzHandlers.ts`
+- `backend/ws/handlers/game/sessionHandlers.ts`
 - `src/pages/BoardCreator.tsx`
-- `src/contexts/ProfileContext.tsx`
-- `backend/http/profileRoutes.ts`
+- Remaining frontend controllers or page-level components that still mix local UI state with transport orchestration
 
 ## Suggested Execution Order
 
 1. Normalize imports and export-style outliers.
 2. Remove the worst `as unknown as` cases at the frontend/backend boundaries.
 3. Extract shared payload types into `shared/`.
-4. Split oversized hooks and route modules by concern.
-5. Run targeted tests after each pass and run broader lint/test checks at the end of each workstream.
+4. Split remaining websocket handler orchestration by concern, starting with host/control handlers and pending-buzz race logic.
+5. Finish the remaining page/controller decompositions only where state and transport logic are still coupled.
+6. Run targeted tests after each pass and run broader lint/test/build checks at the end of each workstream.
 
 ## Verification Expectations
 
@@ -185,4 +189,5 @@ These files are strong candidates for the first structural cleanup pass:
 - Run `npm run lint` for TypeScript and React code changes.
 - Run focused Vitest files for touched backend routes, handlers, repositories, or hooks.
 - Run `npm run test` after broad normalization passes.
+- Keep `npm run build:backend` green for backend/game refactors that move shared helper contracts.
 - If a refactor affects user flows, run the relevant Playwright spec or document why it was skipped.

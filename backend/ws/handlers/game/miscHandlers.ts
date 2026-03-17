@@ -1,6 +1,16 @@
 import type { GameState } from "../../../types/runtime.js";
 import type { CtxDeps } from "../../context.types.js";
 import type { WsHandler } from "../types.js";
+import {
+  applyManualScoreUpdate,
+  lockBuzzer,
+  markActiveBoardCluesComplete,
+  resetAnswerCaptureState,
+  resetBuzzerState,
+  revealSelectedAnswer,
+  setDailyDoubleSnipeNext,
+  setSkipNextClue,
+} from "../../../game/gameLogic/controlState.js";
 
 type GameIdData = { gameId: string };
 type UpdateScoreData = { gameId: string; username: string; delta: number };
@@ -40,7 +50,7 @@ export const miscHandlers: Record<string, WsHandler> = {
     const game = hctx.games?.[gameId] as GameState | undefined;
     if (!game) return;
 
-    game.skipNextClue = true;
+    setSkipNextClue(game);
     hctx.broadcast(gameId, { type: "skip-next-clue-set", enabled: true });
   },
 
@@ -50,8 +60,8 @@ export const miscHandlers: Record<string, WsHandler> = {
     const game = hctx.games?.[gameId] as GameState | undefined;
     if (!game) return;
 
-    game.ddSnipeNext = Boolean(enabled);
-    hctx.broadcast(gameId, { type: "dd-snipe-next-set", enabled: Boolean(game.ddSnipeNext) });
+    const isEnabled = setDailyDoubleSnipeNext(game, Boolean(enabled));
+    hctx.broadcast(gameId, { type: "dd-snipe-next-set", enabled: isEnabled });
   },
 
   "unlock-buzzer": async ({ ws, data, ctx }) => {
@@ -69,7 +79,7 @@ export const miscHandlers: Record<string, WsHandler> = {
     if (!ctx.requireHost(ctx.games[gameId], ws)) return;
 
     if (ctx.games[gameId]) {
-      ctx.games[gameId].buzzerLocked = true;
+      lockBuzzer(ctx.games[gameId]);
       ctx.broadcast(gameId, { type: "buzzer-locked" });
     }
   },
@@ -80,17 +90,13 @@ export const miscHandlers: Record<string, WsHandler> = {
     if (!game) return;
     if (!ctx.requireHost(game, ws)) return;
 
-    game.buzzed = null;
-    game.buzzerLocked = true;
-    ctx.games[gameId].buzzLockouts = {};
-    game.timerEndTime = null;
-    game.timerVersion = (game.timerVersion || 0) + 1;
+    const timerVersion = resetBuzzerState(game);
 
     ctx.broadcast(gameId, { type: "buzzer-ui-reset" });
     ctx.broadcast(gameId, { type: "buzzer-locked" });
     ctx.broadcast(gameId, {
       type: "timer-end",
-      timerVersion: ctx.games[gameId]?.timerVersion || 0,
+      timerVersion,
     });
   },
 
@@ -99,19 +105,8 @@ export const miscHandlers: Record<string, WsHandler> = {
     const game = ctx.games[gameId];
     if (!game) return;
 
-    if (!game.clearedClues) game.clearedClues = new Set();
-    const boardKey = game.activeBoard || "firstBoard";
-    const board = game.boardData?.[boardKey] as
-      | { categories?: Array<{ values?: Array<{ value?: unknown; question?: unknown }> }> }
-      | undefined;
-    if (!board?.categories) return;
-
-    for (const cat of board.categories) {
-      for (const clue of cat.values || []) {
-        const clueId = `${clue.value}-${clue.question}`;
-        game.clearedClues.add(clueId);
-      }
-    }
+    const markedClues = markActiveBoardCluesComplete(game);
+    if (markedClues.length === 0) return;
 
     ctx.broadcast(gameId, {
       type: "cleared-clues-sync",
@@ -128,13 +123,9 @@ export const miscHandlers: Record<string, WsHandler> = {
     if (!ctx.requireHost(game, ws)) return;
 
     ctx.clearAnswerWindow(game);
-    game.phase = null;
-    game.answeringPlayerKey = null;
-    game.answerSessionId = null;
-    game.answerClueKey = null;
+    resetAnswerCaptureState(game);
 
-    if (game.selectedClue) {
-      game.selectedClue.isAnswerRevealed = true;
+    if (revealSelectedAnswer(game)) {
       ctx.broadcast(gameId, { type: "answer-revealed", clue: game.selectedClue });
     }
   },
@@ -144,8 +135,7 @@ export const miscHandlers: Record<string, WsHandler> = {
     const game = ctx.games[gameId];
     if (!game) return;
 
-    if (!game.scores) game.scores = {};
-    game.scores[username] = (game.scores[username] || 0) + Number(delta || 0);
+    applyManualScoreUpdate(game, username, delta);
     ctx.broadcast(gameId, { type: "update-scores", scores: game.scores });
   },
 
