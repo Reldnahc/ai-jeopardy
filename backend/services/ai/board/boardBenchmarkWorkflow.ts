@@ -5,6 +5,7 @@ import { pathToFileURL } from "node:url";
 import { writeBenchmarkSummaryArtifact } from "./boardBenchmarkArtifacts.js";
 import {
   buildBenchmarkSummary,
+  extractGeminiUsage,
   extractOpenAiUsage,
   summarizeClassifierResults,
   summarizeUsage,
@@ -34,7 +35,7 @@ import {
 import type { AnyRunResult } from "./boardBenchmarkWorkflow.types.js";
 
 export { chooseBoardSetsForWorkflow, getApiKeyNameForProvider };
-export { extractOpenAiUsage, summarizeClassifierResults, summarizeUsage };
+export { extractGeminiUsage, extractOpenAiUsage, summarizeClassifierResults, summarizeUsage };
 
 export async function runBenchmark(
   config: BenchmarkConfig,

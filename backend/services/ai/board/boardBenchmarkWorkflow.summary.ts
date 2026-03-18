@@ -208,6 +208,34 @@ export function extractAnthropicUsage(response: unknown, model: string) {
   };
 }
 
+export function extractGeminiUsage(response: unknown, model: string) {
+  const root = response as {
+    usageMetadata?: {
+      promptTokenCount?: unknown;
+      candidatesTokenCount?: unknown;
+      totalTokenCount?: unknown;
+      thoughtsTokenCount?: unknown;
+    };
+  };
+  const promptTokens = safeNumber(root.usageMetadata?.promptTokenCount);
+  const completionTokens = safeNumber(root.usageMetadata?.candidatesTokenCount);
+  const totalTokens = safeNumber(root.usageMetadata?.totalTokenCount);
+  const reasoningTokens = safeNumber(root.usageMetadata?.thoughtsTokenCount);
+
+  return {
+    prompt_tokens: promptTokens,
+    completion_tokens: completionTokens,
+    total_tokens: totalTokens,
+    reasoning_tokens: reasoningTokens,
+    cost_usd: estimateRequestCostUsd({
+      model,
+      promptTokens,
+      completionTokens,
+      reasoningTokens,
+    }),
+  };
+}
+
 export function summarizeClassifierResults(scoredClues: ScoredClue[]) {
   const total = scoredClues.length;
   const validCount = scoredClues.filter((item) => item.classifier_valid === true).length;
@@ -225,28 +253,29 @@ export function summarizeClassifierResults(scoredClues: ScoredClue[]) {
     return acc;
   }, {});
 
-  const byBoardType = (
-    ["firstBoard", "secondBoard", "finalJeopardy"] as const
-  ).reduce<
+  const byBoardType = (["firstBoard", "secondBoard", "finalJeopardy"] as const).reduce<
     Record<
       BoardSectionName,
       { total_clues: number; valid_clues: number; invalid_clues: number; valid_rate: number }
     >
-  >((acc, boardType) => {
-    const items = scoredClues.filter((item) => item.board_type === boardType);
-    const boardValid = items.filter((item) => item.classifier_valid === true).length;
-    acc[boardType] = {
-      total_clues: items.length,
-      valid_clues: boardValid,
-      invalid_clues: items.length - boardValid,
-      valid_rate: items.length ? Number((boardValid / items.length).toFixed(4)) : 0,
-    };
-    return acc;
-  }, {
-    firstBoard: { total_clues: 0, valid_clues: 0, invalid_clues: 0, valid_rate: 0 },
-    secondBoard: { total_clues: 0, valid_clues: 0, invalid_clues: 0, valid_rate: 0 },
-    finalJeopardy: { total_clues: 0, valid_clues: 0, invalid_clues: 0, valid_rate: 0 },
-  });
+  >(
+    (acc, boardType) => {
+      const items = scoredClues.filter((item) => item.board_type === boardType);
+      const boardValid = items.filter((item) => item.classifier_valid === true).length;
+      acc[boardType] = {
+        total_clues: items.length,
+        valid_clues: boardValid,
+        invalid_clues: items.length - boardValid,
+        valid_rate: items.length ? Number((boardValid / items.length).toFixed(4)) : 0,
+      };
+      return acc;
+    },
+    {
+      firstBoard: { total_clues: 0, valid_clues: 0, invalid_clues: 0, valid_rate: 0 },
+      secondBoard: { total_clues: 0, valid_clues: 0, invalid_clues: 0, valid_rate: 0 },
+      finalJeopardy: { total_clues: 0, valid_clues: 0, invalid_clues: 0, valid_rate: 0 },
+    },
+  );
 
   return {
     total_clues: total,

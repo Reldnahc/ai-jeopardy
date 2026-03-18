@@ -74,6 +74,34 @@ function extractOpenAiCompatibleUsage(response: unknown, model: string): AiUsage
   };
 }
 
+export function extractGeminiUsage(response: unknown, model: string): AiUsage {
+  const root = response as {
+    usageMetadata?: {
+      promptTokenCount?: unknown;
+      candidatesTokenCount?: unknown;
+      totalTokenCount?: unknown;
+      thoughtsTokenCount?: unknown;
+    };
+  };
+  const promptTokens = safeNumber(root.usageMetadata?.promptTokenCount);
+  const completionTokens = safeNumber(root.usageMetadata?.candidatesTokenCount);
+  const totalTokens = safeNumber(root.usageMetadata?.totalTokenCount);
+  const reasoningTokens = safeNumber(root.usageMetadata?.thoughtsTokenCount);
+
+  return {
+    prompt_tokens: promptTokens,
+    completion_tokens: completionTokens,
+    total_tokens: totalTokens,
+    reasoning_tokens: reasoningTokens,
+    cost_usd: estimateRequestCostUsd({
+      model,
+      promptTokens,
+      completionTokens,
+      reasoningTokens,
+    }),
+  };
+}
+
 function extractAnthropicUsage(response: unknown, model: string): AiUsage {
   const root = response as {
     usage?: {
@@ -106,9 +134,15 @@ function extractAnthropicUsage(response: unknown, model: string): AiUsage {
 
 export function extractAiUsage(response: unknown, model: string): AiUsage {
   const provider = resolveProviderForModel(model);
-  return provider === "anthropic"
-    ? extractAnthropicUsage(response, model)
-    : extractOpenAiCompatibleUsage(response, model);
+  if (provider === "anthropic") {
+    return extractAnthropicUsage(response, model);
+  }
+
+  if (provider === "gemini") {
+    return extractGeminiUsage(response, model);
+  }
+
+  return extractOpenAiCompatibleUsage(response, model);
 }
 
 export function summarizeAiUsage(usages: Array<AiUsage | null | undefined>) {

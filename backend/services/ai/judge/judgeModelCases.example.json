@@ -590,5 +590,53 @@
     "expectedAnswer": "Beethoven",
     "transcript": "Who is Mozart?",
     "expectedVerdict": "incorrect"
+  },
+  {
+    "name": "Quoted Answer - Exact Match",
+    "category": "Film",
+    "question": "This 1975 Spielberg film features a great white shark terrorizing a beach town.",
+    "expectedAnswer": "Jaws",
+    "transcript": "What is \"Jaws\"?",
+    "expectedVerdict": "correct"
+  },
+  {
+    "name": "Quoted Answer - Exact Match - No Question Form",
+    "category": "Film",
+    "question": "This 1975 Spielberg film features a great white shark terrorizing a beach town.",
+    "expectedAnswer": "Jaws",
+    "transcript": "\"Jaws\"",
+    "expectedVerdict": "correct"
+  },
+  {
+    "name": "Quoted Answer - Wrong Answer",
+    "category": "Film",
+    "question": "This 1975 Spielberg film features a great white shark terrorizing a beach town.",
+    "expectedAnswer": "Jaws",
+    "transcript": "What is \"Jurassic Park\"?",
+    "expectedVerdict": "incorrect"
+  },
+  {
+    "name": "Quoted Answer - Multi-Word Title",
+    "category": "Literature",
+    "question": "This Harper Lee novel centers on racial injustice in the American South.",
+    "expectedAnswer": "To Kill a Mockingbird",
+    "transcript": "What is \"To Kill a Mockingbird\"?",
+    "expectedVerdict": "correct"
+  },
+  {
+    "name": "Quoted Answer - Drop Leading Article",
+    "category": "Literature",
+    "question": "This Fitzgerald novel features Jay Gatsby.",
+    "expectedAnswer": "The Great Gatsby",
+    "transcript": "What is \"Great Gatsby\"?",
+    "expectedVerdict": "correct"
+  },
+  {
+    "name": "Quoted Answer - Partial Name Ambiguous",
+    "category": "Science",
+    "question": "This scientist developed the theory of general relativity.",
+    "expectedAnswer": "Albert Einstein",
+    "transcript": "Who is \"Albert\"?",
+    "expectedVerdict": "incorrect"
   }
 ]

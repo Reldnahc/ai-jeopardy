@@ -11,6 +11,7 @@ import { writeFailedRunArtifact, writeSuccessfulRunArtifacts } from "./boardBenc
 import {
   computeRunTiming,
   extractAnthropicUsage,
+  extractGeminiUsage,
   extractInvalidClueDetails,
   extractOpenAiUsage,
   summarizeClassifierResults,
@@ -154,7 +155,9 @@ async function callProviderJson(args: {
         usage:
           provider === "anthropic"
             ? extractAnthropicUsage(response, model)
-            : extractOpenAiUsage(response, model),
+            : provider === "gemini"
+              ? extractGeminiUsage(response, model)
+              : extractOpenAiUsage(response, model),
       };
     } catch (error) {
       if (attempt >= maxRetries) throw error;

@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   chooseBoardSetsForWorkflow,
+  extractGeminiUsage,
   extractOpenAiUsage,
   getApiKeyNameForProvider,
   summarizeClassifierResults,
@@ -196,6 +197,26 @@ describe("board benchmark workflow helpers", () => {
     expect(usage.prompt_tokens).toBe(1200);
     expect(usage.completion_tokens).toBe(600);
     expect(usage.total_tokens).toBe(1800);
+    expect(usage.cost_usd).toBeGreaterThan(0);
+  });
+
+  it("extracts usage from Gemini usageMetadata fields", () => {
+    const usage = extractGeminiUsage(
+      {
+        usageMetadata: {
+          promptTokenCount: 900,
+          candidatesTokenCount: 300,
+          totalTokenCount: 1250,
+          thoughtsTokenCount: 50,
+        },
+      },
+      "gemini-2.5-flash",
+    );
+
+    expect(usage.prompt_tokens).toBe(900);
+    expect(usage.completion_tokens).toBe(300);
+    expect(usage.total_tokens).toBe(1250);
+    expect(usage.reasoning_tokens).toBe(50);
     expect(usage.cost_usd).toBeGreaterThan(0);
   });
 
